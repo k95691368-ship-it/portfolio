@@ -71,6 +71,11 @@ export default function RoomPage() {
           hireConfirmed={contract?.hireConfirmed}
           confirmationExcerpt={contract?.confirmationExcerpt}
         />
+        {contract?.hireConfirmed && (
+          <p>
+            <Link to={`/rooms/${roomId}/contract`}>전자근로계약서 작성/서명하러 가기 →</Link>
+          </p>
+        )}
       </section>
     </div>
   )

@@ -1,0 +1,103 @@
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  width: 500px;
+  max-width: 90vw;
+}
+
+.signature-canvas {
+  width: 100%;
+  height: 200px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  touch-action: none;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  justify-content: flex-end;
+}
+
+.contract-form fieldset {
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+
+.contract-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+
+.contract-form .checkbox-label {
+  flex-direction: row;
+  align-items: center;
+}
+
+.custom-term-row {
+  display: flex;
+  gap: 8px;
+}
+
+.signature-status-row {
+  display: flex;
+  gap: 24px;
+}
+
+.signature-thumb {
+  max-width: 200px;
+  max-height: 100px;
+  border: 1px solid var(--border);
+}
+
+.contract-print {
+  text-align: left;
+  padding: 24px;
+  background: #fff;
+  color: #000;
+}
+
+.contract-print table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+}
+
+.contract-print th,
+.contract-print td {
+  border: 1px solid #ccc;
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.print-signatures {
+  display: flex;
+  gap: 40px;
+  margin-top: 24px;
+}
+
+.print-signatures img {
+  max-width: 200px;
+  max-height: 100px;
+  border: 1px solid #ccc;
+}
