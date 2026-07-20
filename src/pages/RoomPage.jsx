@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useChatPolling } from '../hooks/useChatPolling.js'
 import ChatMessageList from '../components/ChatMessageList.jsx'
 import ChatComposer from '../components/ChatComposer.jsx'
 import RoomDocuments from '../components/RoomDocuments.jsx'
+import ContractFieldsForm from '../components/ContractFieldsForm.jsx'
 
 export default function RoomPage() {
   const { roomId } = useParams()
@@ -12,12 +13,35 @@ export default function RoomPage() {
   const [error, setError] = useState('')
   const { messages, sendMessage } = useChatPolling(roomId)
 
+  const [contract, setContract] = useState(null)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analyzeError, setAnalyzeError] = useState('')
+
+  const loadContract = useCallback(async () => {
+    const data = await api.get(`/rooms/${roomId}/contract`)
+    setContract(data)
+  }, [roomId])
+
   useEffect(() => {
     api
       .get(`/rooms/${roomId}`)
       .then(setRoom)
       .catch((err) => setError(err.message))
-  }, [roomId])
+    loadContract().catch(() => {})
+  }, [roomId, loadContract])
+
+  const handleAnalyze = async () => {
+    setAnalyzeError('')
+    setAnalyzing(true)
+    try {
+      const data = await api.post(`/rooms/${roomId}/analyze`, {})
+      setContract(data)
+    } catch (err) {
+      setAnalyzeError(err.message)
+    } finally {
+      setAnalyzing(false)
+    }
+  }
 
   if (error) return <p className="error">{error}</p>
   if (!room) return <p>불러오는 중...</p>
@@ -35,6 +59,19 @@ export default function RoomPage() {
 
       <ChatMessageList messages={messages} />
       <ChatComposer onSend={sendMessage} />
+
+      <section className="ai-analysis">
+        <h2>채용 조건 분석</h2>
+        <button type="button" onClick={handleAnalyze} disabled={analyzing}>
+          {analyzing ? '분석 중...' : 'AI로 조건 정리하기'}
+        </button>
+        {analyzeError && <p className="error">{analyzeError}</p>}
+        <ContractFieldsForm
+          terms={contract?.terms}
+          hireConfirmed={contract?.hireConfirmed}
+          confirmationExcerpt={contract?.confirmationExcerpt}
+        />
+      </section>
     </div>
   )
 }
