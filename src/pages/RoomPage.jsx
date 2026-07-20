@@ -4,6 +4,7 @@ import { api } from '../api/client.js'
 import { useChatPolling } from '../hooks/useChatPolling.js'
 import ChatMessageList from '../components/ChatMessageList.jsx'
 import ChatComposer from '../components/ChatComposer.jsx'
+import RoomDocuments from '../components/RoomDocuments.jsx'
 
 export default function RoomPage() {
   const { roomId } = useParams()
@@ -29,6 +30,8 @@ export default function RoomPage() {
         <p>참가자: {room.participants.map((p) => p.displayName).join(', ')}</p>
         {room.myRole === 'company' && <p>초대코드: {room.inviteCode}</p>}
       </header>
+
+      <RoomDocuments roomId={roomId} />
 
       <ChatMessageList messages={messages} />
       <ChatComposer onSend={sendMessage} />

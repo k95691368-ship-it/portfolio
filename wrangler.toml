@@ -5,3 +5,7 @@ compatibility_date = "2025-01-01"
 binding = "DB"
 database_name = "interview-platform"
 database_id = "e2eef543-db5b-4de8-8038-845ae96ccb7b"
+
+[[r2_buckets]]
+binding = "DOCUMENTS"
+bucket_name = "portfolio"

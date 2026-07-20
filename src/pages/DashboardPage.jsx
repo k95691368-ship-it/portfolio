@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/client.js'
+import DocumentManager from '../components/DocumentManager.jsx'
 
 export default function DashboardPage() {
   const { user, logout } = useAuth()
@@ -83,6 +84,8 @@ export default function DashboardPage() {
           </button>
         </form>
       )}
+
+      {user.role === 'candidate' && <DocumentManager />}
 
       {error && <p className="error">{error}</p>}
 
