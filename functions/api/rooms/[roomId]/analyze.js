@@ -91,9 +91,21 @@ export async function onRequestPost({ env, data, params }) {
     annual_leave: merge(t.annual_leave, existing?.annual_leave),
     uniform_size: merge(t.uniform_size, existing?.uniform_size),
   }
-  const socialInsuranceJson = t.social_insurance
-    ? JSON.stringify(t.social_insurance)
-    : (existing?.social_insurance_json ?? null)
+  const existingSocialInsurance = existing?.social_insurance_json
+    ? JSON.parse(existing.social_insurance_json)
+    : {}
+  const mergedSocialInsurance = {
+    employment_insurance: merge(t.social_insurance?.employment_insurance, existingSocialInsurance.employment_insurance),
+    health_insurance: merge(t.social_insurance?.health_insurance, existingSocialInsurance.health_insurance),
+    national_pension: merge(t.social_insurance?.national_pension, existingSocialInsurance.national_pension),
+    industrial_accident_insurance: merge(
+      t.social_insurance?.industrial_accident_insurance,
+      existingSocialInsurance.industrial_accident_insurance
+    ),
+  }
+  const socialInsuranceJson = Object.values(mergedSocialInsurance).some((v) => v !== null && v !== undefined)
+    ? JSON.stringify(mergedSocialInsurance)
+    : null
   const customTermsJson =
     t.custom_terms && t.custom_terms.length > 0
       ? JSON.stringify(t.custom_terms)
