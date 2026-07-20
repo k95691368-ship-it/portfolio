@@ -1,4 +1,4 @@
-import { jsonResponse, jsonError } from '../../_lib/http.js'
+import { jsonResponse, jsonError } from '../../../_lib/http.js'
 
 export async function onRequestDelete({ env, data, params }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
