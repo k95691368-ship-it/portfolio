@@ -2,6 +2,7 @@ import { Routes, Route, Link } from 'react-router-dom'
 import LoginPage from './pages/LoginPage.jsx'
 import SignupPage from './pages/SignupPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
+import RoomPage from './pages/RoomPage.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import './App.css'
 
@@ -24,6 +25,7 @@ function App() {
       <Route path="/signup" element={<SignupPage />} />
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/rooms/:roomId" element={<RoomPage />} />
       </Route>
     </Routes>
   )
