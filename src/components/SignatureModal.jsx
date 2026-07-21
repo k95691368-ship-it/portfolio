@@ -41,7 +41,7 @@ export default function SignatureModal({ signerLabel, onSave, onClose }) {
           <button type="button" onClick={onClose} disabled={saving}>
             취소
           </button>
-          <button type="button" onClick={handleSave} disabled={saving}>
+          <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
             {saving ? '저장 중...' : '서명 완료'}
           </button>
         </div>

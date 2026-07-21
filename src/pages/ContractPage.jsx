@@ -178,8 +178,10 @@ export default function ContractPage() {
 
   return (
     <div className="contract-page">
-      <header>
-        <Link to={`/rooms/${roomId}`}>← 면접방으로</Link>
+      <header className="page-header">
+        <Link to={`/rooms/${roomId}`} className="back-link">
+          ← 면접방으로
+        </Link>
         <h1>전자근로계약서</h1>
         <p>{room.title}</p>
       </header>
@@ -245,7 +247,7 @@ export default function ContractPage() {
                     value={c.value}
                     onChange={(e) => updateCustomTerm(idx, 'value', e.target.value)}
                   />
-                  <button type="button" onClick={() => removeCustomTerm(idx)}>
+                  <button type="button" className="btn-danger btn-sm" onClick={() => removeCustomTerm(idx)}>
                     삭제
                   </button>
                 </div>
@@ -256,7 +258,7 @@ export default function ContractPage() {
             </fieldset>
 
             {canEdit && (
-              <button type="button" onClick={handleSave} disabled={saving}>
+              <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
                 {saving ? '저장 중...' : '저장'}
               </button>
             )}
@@ -292,7 +294,7 @@ export default function ContractPage() {
               </div>
             </div>
             {!mySignature && (
-              <button type="button" onClick={() => setSigningRole(myRole)}>
+              <button type="button" className="btn-primary" onClick={() => setSigningRole(myRole)}>
                 서명하기
               </button>
             )}

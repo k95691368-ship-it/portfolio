@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/client.js'
+import { roomStatusInfo } from '../lib/roomStatus.js'
 
 export default function AdminPage() {
   const { user } = useAuth()
@@ -114,21 +115,42 @@ export default function AdminPage() {
               <td>{u.displayName}</td>
               <td>{u.companyName || '-'}</td>
               <td>{u.role === 'company' ? '회사' : '구직자'}</td>
-              <td>{u.isAdmin ? 'O' : '-'}</td>
-              <td>{u.isSuspended ? '정지됨' : '정상'}</td>
+              <td>{u.isAdmin ? <span className="badge badge-accent">관리자</span> : '-'}</td>
+              <td>
+                {u.isSuspended ? (
+                  <span className="badge badge-danger">정지됨</span>
+                ) : (
+                  <span className="badge badge-success">정상</span>
+                )}
+              </td>
               <td>{u.createdAt}</td>
               <td>
                 {u.id === user.id ? (
-                  <span>본인 계정</span>
+                  <span className="badge badge-neutral">본인 계정</span>
                 ) : (
                   <>
-                    <button type="button" disabled={pendingId === u.id} onClick={() => handleToggleSuspend(u)}>
+                    <button
+                      type="button"
+                      className="btn-sm"
+                      disabled={pendingId === u.id}
+                      onClick={() => handleToggleSuspend(u)}
+                    >
                       {u.isSuspended ? '정지 해제' : '정지'}
                     </button>
-                    <button type="button" disabled={pendingId === u.id} onClick={() => handleResetPassword(u)}>
+                    <button
+                      type="button"
+                      className="btn-sm"
+                      disabled={pendingId === u.id}
+                      onClick={() => handleResetPassword(u)}
+                    >
                       비밀번호 재설정
                     </button>
-                    <button type="button" disabled={pendingId === u.id} onClick={() => handleDelete(u)}>
+                    <button
+                      type="button"
+                      className="btn-danger btn-sm"
+                      disabled={pendingId === u.id}
+                      onClick={() => handleDelete(u)}
+                    >
                       영구 삭제
                     </button>
                   </>
@@ -139,12 +161,14 @@ export default function AdminPage() {
                       임시 비밀번호: <code>{revealed[u.id]}</code>
                     </p>
                     <p>이 비밀번호는 지금만 표시되며 다시 확인할 수 없습니다. 지금 복사하세요.</p>
-                    <button type="button" onClick={() => navigator.clipboard.writeText(revealed[u.id])}>
-                      복사
-                    </button>
-                    <button type="button" onClick={() => dismissRevealed(u.id)}>
-                      닫기
-                    </button>
+                    <div>
+                      <button type="button" className="btn-sm" onClick={() => navigator.clipboard.writeText(revealed[u.id])}>
+                        복사
+                      </button>
+                      <button type="button" className="btn-sm" onClick={() => dismissRevealed(u.id)}>
+                        닫기
+                      </button>
+                    </div>
                   </div>
                 )}
               </td>
@@ -165,15 +189,20 @@ export default function AdminPage() {
           </tr>
         </thead>
         <tbody>
-          {rooms.map((r) => (
-            <tr key={r.id}>
-              <td>{r.title}</td>
-              <td>{r.companyName || '-'}</td>
-              <td>{r.candidateName || '-'}</td>
-              <td>{r.status}</td>
-              <td>{r.createdAt}</td>
-            </tr>
-          ))}
+          {rooms.map((r) => {
+            const status = roomStatusInfo(r.status)
+            return (
+              <tr key={r.id}>
+                <td>{r.title}</td>
+                <td>{r.companyName || '-'}</td>
+                <td>{r.candidateName || '-'}</td>
+                <td>
+                  <span className={`badge ${status.badgeClass}`}>{status.label}</span>
+                </td>
+                <td>{r.createdAt}</td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>

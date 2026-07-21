@@ -60,7 +60,7 @@ export default function DocumentManager() {
                 <a href={`/api/documents/${doc.id}/download`} target="_blank" rel="noreferrer">
                   {doc.filename}
                 </a>
-                <button type="button" onClick={() => handleDelete(doc.id)}>
+                <button type="button" className="btn-danger btn-sm" onClick={() => handleDelete(doc.id)}>
                   삭제
                 </button>
               </>

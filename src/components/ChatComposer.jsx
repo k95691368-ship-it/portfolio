@@ -27,7 +27,7 @@ export default function ChatComposer({ onSend }) {
         onChange={(e) => setText(e.target.value)}
         placeholder="메시지를 입력하세요"
       />
-      <button type="submit" disabled={sending}>
+      <button type="submit" className="btn-primary btn-sm" disabled={sending}>
         전송
       </button>
       {error && <p className="error">{error}</p>}

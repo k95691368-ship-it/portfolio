@@ -67,7 +67,7 @@ export default function SignupPage() {
           />
         </label>
         {error && <p className="error">{error}</p>}
-        <button type="submit" disabled={submitting}>
+        <button type="submit" className="btn-primary btn-block" disabled={submitting}>
           가입하기
         </button>
       </form>

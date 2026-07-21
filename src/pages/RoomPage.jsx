@@ -48,8 +48,10 @@ export default function RoomPage() {
 
   return (
     <div className="room-page">
-      <header>
-        <Link to="/dashboard">← 대시보드</Link>
+      <header className="page-header">
+        <Link to="/dashboard" className="back-link">
+          ← 대시보드
+        </Link>
         <h1>{room.title}</h1>
         <p>참가자: {room.participants.map((p) => p.displayName).join(', ')}</p>
         {room.myRole === 'company' && <p>초대코드: {room.inviteCode}</p>}
@@ -57,12 +59,14 @@ export default function RoomPage() {
 
       <RoomDocuments roomId={roomId} />
 
-      <ChatMessageList messages={messages} />
-      <ChatComposer onSend={sendMessage} />
+      <div className="chat-panel">
+        <ChatMessageList messages={messages} />
+        <ChatComposer onSend={sendMessage} />
+      </div>
 
       <section className="ai-analysis">
         <h2>채용 조건 분석</h2>
-        <button type="button" onClick={handleAnalyze} disabled={analyzing}>
+        <button type="button" className="btn-primary" onClick={handleAnalyze} disabled={analyzing}>
           {analyzing ? '분석 중...' : 'AI로 조건 정리하기'}
         </button>
         {analyzeError && <p className="error">{analyzeError}</p>}
