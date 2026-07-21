@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
 import { api } from '../api/client.js'
+import { useAuth } from '../context/AuthContext.jsx'
 import SignatureModal from '../components/SignatureModal.jsx'
 import { IDENTITY_FIELDS, TERM_FIELDS, SOCIAL_INSURANCE_FIELDS } from '../lib/contractTemplate.js'
 
@@ -30,6 +31,7 @@ const EMPTY_FORM = {
 
 export default function ContractPage() {
   const { roomId } = useParams()
+  const { user } = useAuth()
   const [room, setRoom] = useState(null)
   const [contractMeta, setContractMeta] = useState({ hireConfirmed: false })
   const [form, setForm] = useState(EMPTY_FORM)
@@ -278,7 +280,7 @@ export default function ContractPage() {
         {saveMessage && <p className="save-message">{saveMessage}</p>}
       </section>
 
-      {canEdit && (
+      {canEdit && (user.isAdmin || user.isRecruiter) && (
         <section className="ai-draft">
           <h2>AI 계약서 문장 자동 작성</h2>
           <p>위에 입력한 조건을 바탕으로 표준근로계약서 형식의 계약서 문장을 AI가 작성합니다.</p>

@@ -9,6 +9,10 @@ export async function onRequestPost({ env, data, params, request }) {
   const participant = await getRoomParticipant(env, params.roomId, data.user.id)
   if (!participant) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
 
+  if (!data.user.is_admin && !data.user.is_recruiter) {
+    return jsonError('근로계약서 자동완성은 채용자 또는 관리자 권한이 있는 계정만 사용할 수 있습니다.', 403)
+  }
+
   const room = await env.DB.prepare('SELECT status FROM interview_rooms WHERE id = ?')
     .bind(params.roomId)
     .first()

@@ -7,22 +7,42 @@ export async function onRequestPatch({ request, env, data, params }) {
   }
 
   const body = await request.json().catch(() => null)
-  if (typeof body?.isSuspended !== 'boolean') {
-    return jsonError('isSuspended 값(boolean)이 필요합니다.', 400)
+  const hasSuspended = typeof body?.isSuspended === 'boolean'
+  const hasRecruiter = typeof body?.isRecruiter === 'boolean'
+  if (!hasSuspended && !hasRecruiter) {
+    return jsonError('isSuspended 또는 isRecruiter 값(boolean)이 필요합니다.', 400)
   }
 
   const target = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(params.id).first()
   if (!target) return jsonError('사용자를 찾을 수 없습니다.', 404)
 
-  await env.DB.prepare('UPDATE users SET is_suspended = ? WHERE id = ?')
-    .bind(body.isSuspended ? 1 : 0, params.id)
+  const setClauses = []
+  const values = []
+  if (hasSuspended) {
+    setClauses.push('is_suspended = ?')
+    values.push(body.isSuspended ? 1 : 0)
+  }
+  if (hasRecruiter) {
+    setClauses.push('is_recruiter = ?')
+    values.push(body.isRecruiter ? 1 : 0)
+  }
+
+  await env.DB.prepare(`UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`)
+    .bind(...values, params.id)
     .run()
 
-  if (body.isSuspended) {
+  if (hasSuspended && body.isSuspended) {
     await deleteAllUserSessions(env.DB, params.id)
   }
 
-  return jsonResponse({ ok: true, user: { id: params.id, isSuspended: body.isSuspended } })
+  return jsonResponse({
+    ok: true,
+    user: {
+      id: params.id,
+      ...(hasSuspended ? { isSuspended: body.isSuspended } : {}),
+      ...(hasRecruiter ? { isRecruiter: body.isRecruiter } : {}),
+    },
+  })
 }
 
 export async function onRequestDelete({ env, data, params }) {

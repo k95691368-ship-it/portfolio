@@ -531,6 +531,31 @@
   margin-bottom: 0;
 }
 
+.admin-create-account {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.admin-create-account form {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.admin-create-account label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  flex: 1;
+  min-width: 160px;
+}
+
 .admin-table {
   width: 100%;
   border-collapse: separate;

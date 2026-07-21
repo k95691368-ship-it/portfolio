@@ -29,6 +29,7 @@ export async function onRequestPost({ request, env }) {
       role: user.role,
       displayName: user.display_name,
       isAdmin: !!user.is_admin,
+      isRecruiter: !!user.is_recruiter,
     },
     200,
     { 'Set-Cookie': sessionCookieHeader(token) }
