@@ -193,6 +193,7 @@ export default function AdminPage() {
       </section>
 
       <h2>사용자 ({users.length})</h2>
+      <div className="table-scroll">
       <table className="admin-table">
         <thead>
           <tr>
@@ -285,8 +286,10 @@ export default function AdminPage() {
           ))}
         </tbody>
       </table>
+      </div>
 
       <h2>면접방 ({rooms.length})</h2>
+      <div className="table-scroll">
       <table className="admin-table">
         <thead>
           <tr>
@@ -320,6 +323,7 @@ export default function AdminPage() {
           })}
         </tbody>
       </table>
+      </div>
 
       {viewingRoom && (
         <div className="modal-overlay" onClick={() => setViewingRoom(null)}>
