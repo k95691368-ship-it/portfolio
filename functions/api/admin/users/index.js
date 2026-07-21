@@ -5,7 +5,8 @@ import { genTempPassword } from '../../../_lib/tempPassword.js'
 
 export async function onRequestGet({ env }) {
   const { results } = await env.DB.prepare(
-    `SELECT id, email, display_name, company_name, role, is_admin, is_recruiter, is_suspended, created_at
+    `SELECT id, email, display_name, company_name, role, is_admin, is_recruiter, is_suspended,
+            must_change_password, created_at
      FROM users ORDER BY created_at DESC`
   ).all()
 
@@ -19,6 +20,7 @@ export async function onRequestGet({ env }) {
       isAdmin: !!u.is_admin,
       isRecruiter: !!u.is_recruiter,
       isSuspended: !!u.is_suspended,
+      mustChangePassword: !!u.must_change_password,
       createdAt: u.created_at,
     })),
   })
@@ -40,8 +42,8 @@ export async function onRequestPost({ request, env }) {
 
   try {
     await env.DB.prepare(
-      `INSERT INTO users (id, email, password_hash, password_salt, role, display_name, company_name)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO users (id, email, password_hash, password_salt, role, display_name, company_name, must_change_password)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1)`
     )
       .bind(id, email, hash, salt, role, displayName, companyName || null)
       .run()
@@ -64,6 +66,7 @@ export async function onRequestPost({ request, env }) {
         isAdmin: false,
         isRecruiter: false,
         isSuspended: false,
+        mustChangePassword: true,
       },
       tempPassword,
     },

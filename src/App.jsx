@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react'
 import { Routes, Route, Link } from 'react-router-dom'
 import LoginPage from './pages/LoginPage.jsx'
 import SignupPage from './pages/SignupPage.jsx'
+import ChangePasswordPage from './pages/ChangePasswordPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import RoomPage from './pages/RoomPage.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
@@ -27,6 +28,9 @@ function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
+      <Route element={<ProtectedRoute allowMustChangePassword />}>
+        <Route path="/change-password" element={<ChangePasswordPage />} />
+      </Route>
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/rooms/:roomId" element={<RoomPage />} />

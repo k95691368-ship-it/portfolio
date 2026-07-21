@@ -13,7 +13,9 @@ export async function onRequestPost({ env, data, params }) {
   const tempPassword = genTempPassword()
   const { hash, salt } = await hashPassword(tempPassword)
 
-  await env.DB.prepare('UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?')
+  await env.DB.prepare(
+    'UPDATE users SET password_hash = ?, password_salt = ?, must_change_password = 1 WHERE id = ?'
+  )
     .bind(hash, salt, params.id)
     .run()
   await deleteAllUserSessions(env.DB, params.id)

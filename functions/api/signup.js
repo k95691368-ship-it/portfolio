@@ -41,7 +41,7 @@ export async function onRequestPost({ request, env }) {
   const { token } = await createSession(env.DB, id)
 
   return jsonResponse(
-    { id, email, role, displayName, isAdmin: false, isRecruiter: false },
+    { id, email, role, displayName, isAdmin: false, isRecruiter: false, mustChangePassword: false },
     201,
     { 'Set-Cookie': sessionCookieHeader(token) }
   )

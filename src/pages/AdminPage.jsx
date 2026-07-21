@@ -222,6 +222,7 @@ export default function AdminPage() {
                 ) : (
                   <span className="badge badge-success">정상</span>
                 )}
+                {u.mustChangePassword && <span className="badge badge-warning">임시비밀번호</span>}
               </td>
               <td>{u.createdAt}</td>
               <td>
