@@ -114,13 +114,20 @@ export default function ContractPage() {
     setSaveMessage('')
     setError('')
     try {
+      const filteredCustomTerms = form.customTerms.filter((c) => c.label && c.value)
+      const droppedCount = form.customTerms.length - filteredCustomTerms.length
       const payload = {
         ...form,
         wageBaseAmount: form.wageBaseAmount === '' || form.wageBaseAmount === null ? null : Number(form.wageBaseAmount),
-        customTerms: form.customTerms.filter((c) => c.label && c.value),
+        customTerms: filteredCustomTerms,
       }
       await api.patch(`/rooms/${roomId}/contract`, payload)
-      setSaveMessage('저장되었습니다.')
+      setForm((f) => ({ ...f, customTerms: filteredCustomTerms }))
+      setSaveMessage(
+        droppedCount > 0
+          ? `저장되었습니다. (라벨/값이 비어있는 기타 항목 ${droppedCount}개는 저장되지 않았습니다.)`
+          : '저장되었습니다.'
+      )
     } catch (err) {
       setError(err.message)
     } finally {

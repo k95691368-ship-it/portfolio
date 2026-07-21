@@ -1,18 +1,4 @@
-const LABELS = {
-  workLocation: '근무장소',
-  jobDescription: '업무의 내용',
-  contractStartDate: '근로개시일',
-  contractEndDate: '계약종료일',
-  workHoursStart: '근무 시작 시각',
-  workHoursEnd: '근무 종료 시각',
-  workDays: '근무일',
-  restDays: '휴일',
-  wageBaseAmount: '기본급',
-  wagePayMethod: '임금 지급 방법',
-  wagePayDate: '임금 지급일',
-  annualLeave: '연차유급휴가',
-  uniformSize: '유니폼 사이즈',
-}
+import { TERM_FIELDS } from '../lib/contractTemplate.js'
 
 export default function ContractFieldsForm({ terms, hireConfirmed, confirmationExcerpt }) {
   if (!terms) return <p>아직 분석된 조건이 없습니다. "AI로 조건 정리하기"를 눌러보세요.</p>
@@ -27,7 +13,7 @@ export default function ContractFieldsForm({ terms, hireConfirmed, confirmationE
       )}
       <table>
         <tbody>
-          {Object.entries(LABELS).map(([key, label]) => (
+          {TERM_FIELDS.map(({ key, label }) => (
             <tr key={key}>
               <th>{label}</th>
               <td>{terms[key] ?? '-'}</td>

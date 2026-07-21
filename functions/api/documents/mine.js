@@ -1,4 +1,5 @@
 import { jsonResponse, jsonError } from '../../_lib/http.js'
+import { mapDocumentRow } from '../../_lib/documents.js'
 
 export async function onRequestGet({ env, data }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
@@ -9,13 +10,5 @@ export async function onRequestGet({ env, data }) {
     .bind(data.user.id)
     .all()
 
-  return jsonResponse({
-    documents: results.map((d) => ({
-      id: d.id,
-      docType: d.doc_type,
-      filename: d.filename,
-      sizeBytes: d.size_bytes,
-      uploadedAt: d.uploaded_at,
-    })),
-  })
+  return jsonResponse({ documents: results.map(mapDocumentRow) })
 }

@@ -5,8 +5,11 @@ export function useChatPolling(roomId, intervalMs = 2500) {
   const [messages, setMessages] = useState([])
   const [error, setError] = useState('')
   const lastIdRef = useRef(0)
+  const fetchingRef = useRef(false)
 
   const poll = useCallback(async () => {
+    if (fetchingRef.current) return
+    fetchingRef.current = true
     try {
       const data = await api.get(`/rooms/${roomId}/messages?after=${lastIdRef.current}`)
       if (data.messages.length > 0) {
@@ -16,6 +19,8 @@ export function useChatPolling(roomId, intervalMs = 2500) {
       setError('')
     } catch (err) {
       setError(err.message)
+    } finally {
+      fetchingRef.current = false
     }
   }, [roomId])
 

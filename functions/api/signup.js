@@ -1,6 +1,7 @@
 import { genId } from '../_lib/db.js'
 import { hashPassword, createSession, sessionCookieHeader } from '../_lib/auth.js'
 import { jsonResponse, jsonError } from '../_lib/http.js'
+import { checkRateLimit } from '../_lib/rateLimit.js'
 
 export async function onRequestPost({ request, env }) {
   const body = await request.json().catch(() => null)
@@ -17,17 +18,25 @@ export async function onRequestPost({ request, env }) {
     return jsonError('비밀번호는 8자 이상이어야 합니다.', 400)
   }
 
-  const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first()
-  if (existing) return jsonError('이미 가입된 이메일입니다.', 409)
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
+  const allowed = await checkRateLimit(env, `signup:${ip}`, 10, 3600)
+  if (!allowed) return jsonError('잠시 후 다시 시도해주세요.', 429)
 
   const { hash, salt } = await hashPassword(password)
   const id = genId()
-  await env.DB.prepare(
-    `INSERT INTO users (id, email, password_hash, password_salt, role, display_name, company_name)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  )
-    .bind(id, email, hash, salt, role, displayName, companyName || null)
-    .run()
+  try {
+    await env.DB.prepare(
+      `INSERT INTO users (id, email, password_hash, password_salt, role, display_name, company_name)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    )
+      .bind(id, email, hash, salt, role, displayName, companyName || null)
+      .run()
+  } catch (err) {
+    if (String(err?.message || err).includes('UNIQUE')) {
+      return jsonError('이미 가입된 이메일입니다.', 409)
+    }
+    throw err
+  }
 
   const { token } = await createSession(env.DB, id)
 

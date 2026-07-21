@@ -13,7 +13,9 @@ export function AuthProvider({ children }) {
   }, [])
 
   useEffect(() => {
-    refresh().finally(() => setLoading(false))
+    refresh()
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [refresh])
 
   const login = async (email, password) => {

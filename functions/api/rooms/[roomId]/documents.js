@@ -1,13 +1,11 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
+import { getRoomParticipant } from '../../../_lib/rooms.js'
+import { mapDocumentRow } from '../../../_lib/documents.js'
 
 export async function onRequestGet({ env, data, params }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
 
-  const participant = await env.DB.prepare(
-    'SELECT role_in_room FROM room_participants WHERE room_id = ? AND user_id = ?'
-  )
-    .bind(params.roomId, data.user.id)
-    .first()
+  const participant = await getRoomParticipant(env, params.roomId, data.user.id)
   if (!participant) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
 
   const candidate = await env.DB.prepare(
@@ -23,13 +21,5 @@ export async function onRequestGet({ env, data, params }) {
     .bind(candidate.user_id)
     .all()
 
-  return jsonResponse({
-    documents: results.map((d) => ({
-      id: d.id,
-      docType: d.doc_type,
-      filename: d.filename,
-      sizeBytes: d.size_bytes,
-      uploadedAt: d.uploaded_at,
-    })),
-  })
+  return jsonResponse({ documents: results.map(mapDocumentRow) })
 }

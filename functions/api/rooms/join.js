@@ -20,18 +20,23 @@ export async function onRequestPost({ request, env, data }) {
     .first()
 
   if (!alreadyJoined) {
-    const existingCandidate = await env.DB.prepare(
-      "SELECT 1 FROM room_participants WHERE room_id = ? AND role_in_room = 'candidate'"
-    )
-      .bind(room.id)
-      .first()
-    if (existingCandidate) return jsonError('이미 다른 지원자가 참여한 면접방입니다.', 409)
-
-    await env.DB.prepare(
-      'INSERT INTO room_participants (room_id, user_id, role_in_room) VALUES (?, ?, ?)'
-    )
-      .bind(room.id, data.user.id, 'candidate')
-      .run()
+    try {
+      await env.DB.prepare(
+        'INSERT INTO room_participants (room_id, user_id, role_in_room) VALUES (?, ?, ?)'
+      )
+        .bind(room.id, data.user.id, 'candidate')
+        .run()
+    } catch (err) {
+      if (!String(err?.message || err).includes('UNIQUE')) throw err
+      // A concurrent request either already seated this same user, or another
+      // candidate won the single-candidate-per-room slot first.
+      const nowJoined = await env.DB.prepare(
+        'SELECT 1 FROM room_participants WHERE room_id = ? AND user_id = ?'
+      )
+        .bind(room.id, data.user.id)
+        .first()
+      if (!nowJoined) return jsonError('이미 다른 지원자가 참여한 면접방입니다.', 409)
+    }
 
     if (room.status === 'open') {
       await env.DB.prepare("UPDATE interview_rooms SET status = 'active' WHERE id = ?")

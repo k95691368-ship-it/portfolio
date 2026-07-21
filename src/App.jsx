@@ -1,11 +1,13 @@
+import { Suspense, lazy } from 'react'
 import { Routes, Route, Link } from 'react-router-dom'
 import LoginPage from './pages/LoginPage.jsx'
 import SignupPage from './pages/SignupPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import RoomPage from './pages/RoomPage.jsx'
-import ContractPage from './pages/ContractPage.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import './App.css'
+
+const ContractPage = lazy(() => import('./pages/ContractPage.jsx'))
 
 function LandingPage() {
   return (
@@ -27,7 +29,14 @@ function App() {
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/rooms/:roomId" element={<RoomPage />} />
-        <Route path="/rooms/:roomId/contract" element={<ContractPage />} />
+        <Route
+          path="/rooms/:roomId/contract"
+          element={
+            <Suspense fallback={<p>불러오는 중...</p>}>
+              <ContractPage />
+            </Suspense>
+          }
+        />
       </Route>
     </Routes>
   )

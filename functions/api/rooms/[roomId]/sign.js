@@ -1,17 +1,20 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { genId } from '../../../_lib/db.js'
+import { getRoomParticipant } from '../../../_lib/rooms.js'
 
 const MAX_DATA_URL_LENGTH = 2_000_000
 
 export async function onRequestPost({ env, data, params, request }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
 
-  const participant = await env.DB.prepare(
-    'SELECT role_in_room FROM room_participants WHERE room_id = ? AND user_id = ?'
-  )
-    .bind(params.roomId, data.user.id)
-    .first()
+  const participant = await getRoomParticipant(env, params.roomId, data.user.id)
   if (!participant) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
+
+  const room = await env.DB.prepare('SELECT status FROM interview_rooms WHERE id = ?')
+    .bind(params.roomId)
+    .first()
+  if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
+  if (room.status === 'signed') return jsonError('이미 서명이 완료된 계약서입니다.', 409)
 
   const contract = await env.DB.prepare('SELECT hire_confirmed FROM contract_terms WHERE room_id = ?')
     .bind(params.roomId)

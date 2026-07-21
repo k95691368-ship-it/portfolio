@@ -1,14 +1,9 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
-
-async function requireParticipant(env, roomId, userId) {
-  return env.DB.prepare('SELECT role_in_room FROM room_participants WHERE room_id = ? AND user_id = ?')
-    .bind(roomId, userId)
-    .first()
-}
+import { getRoomParticipant } from '../../../_lib/rooms.js'
 
 export async function onRequestGet({ request, env, data, params }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
-  const participant = await requireParticipant(env, params.roomId, data.user.id)
+  const participant = await getRoomParticipant(env, params.roomId, data.user.id)
   if (!participant) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
 
   const url = new URL(request.url)
@@ -38,7 +33,7 @@ export async function onRequestGet({ request, env, data, params }) {
 
 export async function onRequestPost({ request, env, data, params }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
-  const participant = await requireParticipant(env, params.roomId, data.user.id)
+  const participant = await getRoomParticipant(env, params.roomId, data.user.id)
   if (!participant) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
 
   const body = await request.json().catch(() => null)

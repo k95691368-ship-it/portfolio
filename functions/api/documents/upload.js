@@ -3,6 +3,13 @@ import { jsonResponse, jsonError } from '../../_lib/http.js'
 
 const ALLOWED_EXT = ['pdf', 'doc', 'docx', 'hwp', 'hwpx']
 const MAX_SIZE = 10 * 1024 * 1024 // 10MB
+const EXT_MIME = {
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  hwp: 'application/x-hwp',
+  hwpx: 'application/haansofthwpx',
+}
 
 export async function onRequestPost({ request, env, data }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
@@ -36,7 +43,7 @@ export async function onRequestPost({ request, env, data }) {
 
   const id = genId()
   const r2Key = `documents/${data.user.id}/${docType}-${Date.now()}.${ext}`
-  const contentType = file.type || 'application/octet-stream'
+  const contentType = EXT_MIME[ext] || 'application/octet-stream'
 
   await env.DOCUMENTS.put(r2Key, file.stream(), {
     httpMetadata: { contentType },

@@ -3,14 +3,18 @@ import { useState } from 'react'
 export default function ChatComposer({ onSend }) {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
+  const [error, setError] = useState('')
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!text.trim()) return
     setSending(true)
+    setError('')
     try {
       await onSend(text.trim())
       setText('')
+    } catch (err) {
+      setError(err.message)
     } finally {
       setSending(false)
     }
@@ -26,6 +30,7 @@ export default function ChatComposer({ onSend }) {
       <button type="submit" disabled={sending}>
         전송
       </button>
+      {error && <p className="error">{error}</p>}
     </form>
   )
 }

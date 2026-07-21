@@ -25,7 +25,8 @@ export async function onRequestGet({ env, data, params }) {
   return new Response(object.body, {
     headers: {
       'Content-Type': doc.content_type,
-      'Content-Disposition': `inline; filename="${encodeURIComponent(doc.filename)}"`,
+      'Content-Disposition': `attachment; filename="${encodeURIComponent(doc.filename)}"`,
+      'X-Content-Type-Options': 'nosniff',
     },
   })
 }

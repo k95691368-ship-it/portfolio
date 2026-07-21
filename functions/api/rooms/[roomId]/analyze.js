@@ -1,51 +1,15 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { analyzeConversation } from '../../../_lib/claude.js'
+import { rowToCamelTerms } from '../../../_lib/contract.js'
+import { getRoomParticipant } from '../../../_lib/rooms.js'
 
 const COOLDOWN_SECONDS = 45
-
-function toCamelTerms(row) {
-  return {
-    workLocation: row.work_location ?? null,
-    jobDescription: row.job_description ?? null,
-    contractStartDate: row.contract_start_date ?? null,
-    contractEndDate: row.contract_end_date ?? null,
-    workHoursStart: row.work_hours_start ?? null,
-    workHoursEnd: row.work_hours_end ?? null,
-    workDays: row.work_days ?? null,
-    restDays: row.rest_days ?? null,
-    wageBaseAmount: row.wage_base_amount ?? null,
-    wagePayMethod: row.wage_pay_method ?? null,
-    wagePayDate: row.wage_pay_date ?? null,
-    annualLeave: row.annual_leave ?? null,
-    socialInsurance: row.social_insurance_json ? JSON.parse(row.social_insurance_json) : null,
-    uniformSize: row.uniform_size ?? null,
-    customTerms: row.custom_terms_json ? JSON.parse(row.custom_terms_json) : [],
-  }
-}
 
 export async function onRequestPost({ env, data, params }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
 
-  const participant = await env.DB.prepare(
-    'SELECT role_in_room FROM room_participants WHERE room_id = ? AND user_id = ?'
-  )
-    .bind(params.roomId, data.user.id)
-    .first()
+  const participant = await getRoomParticipant(env, params.roomId, data.user.id)
   if (!participant) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
-
-  const existing = await env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?')
-    .bind(params.roomId)
-    .first()
-
-  if (existing) {
-    const secondsSinceUpdate = (Date.now() - new Date(`${existing.updated_at}Z`).getTime()) / 1000
-    if (secondsSinceUpdate < COOLDOWN_SECONDS) {
-      return jsonError(
-        `너무 잦은 요청입니다. ${Math.ceil(COOLDOWN_SECONDS - secondsSinceUpdate)}초 후 다시 시도해주세요.`,
-        429
-      )
-    }
-  }
 
   const { results: messages } = await env.DB.prepare(
     `SELECT m.id, m.body, rp.role_in_room, u.display_name
@@ -60,11 +24,39 @@ export async function onRequestPost({ env, data, params }) {
 
   if (messages.length === 0) return jsonError('분석할 대화 내용이 없습니다.', 400)
 
+  // Ensure a row exists, then atomically claim the cooldown slot in one statement
+  // so concurrent requests can't all read the same "expired" timestamp and race
+  // past the check before any of them writes (unlike reading updated_at, this
+  // column is never touched by the manual contract-edit PATCH route either).
+  await env.DB.prepare('INSERT INTO contract_terms (room_id) VALUES (?) ON CONFLICT(room_id) DO NOTHING')
+    .bind(params.roomId)
+    .run()
+
+  const claim = await env.DB.prepare(
+    `UPDATE contract_terms SET last_analyzed_at = datetime('now')
+     WHERE room_id = ? AND (last_analyzed_at IS NULL OR last_analyzed_at < datetime('now', '-' || ? || ' seconds'))`
+  )
+    .bind(params.roomId, COOLDOWN_SECONDS)
+    .run()
+
+  if (claim.meta.changes === 0) {
+    const row = await env.DB.prepare('SELECT last_analyzed_at FROM contract_terms WHERE room_id = ?')
+      .bind(params.roomId)
+      .first()
+    const secondsSince = (Date.now() - new Date(`${row.last_analyzed_at}Z`).getTime()) / 1000
+    const remaining = Math.max(1, Math.ceil(COOLDOWN_SECONDS - secondsSince))
+    return jsonError(`너무 잦은 요청입니다. ${remaining}초 후 다시 시도해주세요.`, 429)
+  }
+
+  const existing = await env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?')
+    .bind(params.roomId)
+    .first()
+
   const transcript = messages
     .map((m) => `${m.role_in_room === 'company' ? '회사' : '지원자'}(${m.display_name}): ${m.body}`)
     .join('\n')
 
-  const previousTerms = existing ? toCamelTerms(existing) : null
+  const previousTerms = rowToCamelTerms(existing)
 
   let analysis
   try {
