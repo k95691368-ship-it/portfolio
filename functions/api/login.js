@@ -18,10 +18,18 @@ export async function onRequestPost({ request, env }) {
   const valid = await verifyPassword(body.password, user.password_hash, user.password_salt)
   if (!valid) return jsonError('이메일 또는 비밀번호가 올바르지 않습니다.', 401)
 
+  if (user.is_suspended) return jsonError('정지된 계정입니다. 관리자에게 문의해주세요.', 403)
+
   const { token } = await createSession(env.DB, user.id)
 
   return jsonResponse(
-    { id: user.id, email: user.email, role: user.role, displayName: user.display_name },
+    {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      displayName: user.display_name,
+      isAdmin: !!user.is_admin,
+    },
     200,
     { 'Set-Cookie': sessionCookieHeader(token) }
   )

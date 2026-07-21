@@ -8,6 +8,7 @@ import ProtectedRoute from './components/ProtectedRoute.jsx'
 import './App.css'
 
 const ContractPage = lazy(() => import('./pages/ContractPage.jsx'))
+const AdminPage = lazy(() => import('./pages/AdminPage.jsx'))
 
 function LandingPage() {
   return (
@@ -34,6 +35,16 @@ function App() {
           element={
             <Suspense fallback={<p>불러오는 중...</p>}>
               <ContractPage />
+            </Suspense>
+          }
+        />
+      </Route>
+      <Route element={<ProtectedRoute requireAdmin />}>
+        <Route
+          path="/admin"
+          element={
+            <Suspense fallback={<p>불러오는 중...</p>}>
+              <AdminPage />
             </Suspense>
           }
         />

@@ -68,6 +68,10 @@ export async function deleteSession(db, token) {
   await db.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(tokenHash).run()
 }
 
+export async function deleteAllUserSessions(db, userId) {
+  await db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId).run()
+}
+
 export function parseCookie(request, name) {
   const header = request.headers.get('Cookie') || ''
   const match = header.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`))
@@ -94,5 +98,6 @@ export async function getSessionUser(db, request) {
     )
     .bind(tokenHash)
     .first()
-  return row || null
+  if (!row || row.is_suspended) return null
+  return row
 }

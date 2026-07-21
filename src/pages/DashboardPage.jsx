@@ -59,6 +59,7 @@ export default function DashboardPage() {
     <div className="dashboard-page">
       <header>
         <h1>{user.role === 'company' ? '회사' : '구직자'} 대시보드</h1>
+        {user.isAdmin && <Link to="/admin">관리자 패널</Link>}
         <button onClick={logout}>로그아웃</button>
       </header>
       <p>{user.displayName}님, 환영합니다.</p>
