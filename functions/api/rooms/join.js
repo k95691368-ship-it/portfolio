@@ -1,8 +1,12 @@
 import { jsonResponse, jsonError } from '../../_lib/http.js'
+import { checkRateLimit } from '../../_lib/rateLimit.js'
 
 export async function onRequestPost({ request, env, data }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
   if (data.user.role !== 'candidate') return jsonError('구직자 계정만 참여할 수 있습니다.', 403)
+
+  const allowed = await checkRateLimit(env, `join:${data.user.id}`, 30, 600)
+  if (!allowed) return jsonError('시도가 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)
 
   const body = await request.json().catch(() => null)
   const inviteCode = body?.inviteCode?.trim()?.toUpperCase()

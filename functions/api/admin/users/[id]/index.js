@@ -1,5 +1,6 @@
 import { jsonResponse, jsonError } from '../../../../_lib/http.js'
 import { deleteAllUserSessions } from '../../../../_lib/auth.js'
+import { logAdminAction } from '../../../../_lib/auditLog.js'
 
 export async function onRequestPatch({ request, env, data, params }) {
   if (params.id === data.user.id) {
@@ -13,7 +14,7 @@ export async function onRequestPatch({ request, env, data, params }) {
     return jsonError('isSuspended 또는 isRecruiter 값(boolean)이 필요합니다.', 400)
   }
 
-  const target = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(params.id).first()
+  const target = await env.DB.prepare('SELECT id, email FROM users WHERE id = ?').bind(params.id).first()
   if (!target) return jsonError('사용자를 찾을 수 없습니다.', 404)
 
   const setClauses = []
@@ -35,6 +36,23 @@ export async function onRequestPatch({ request, env, data, params }) {
     await deleteAllUserSessions(env.DB, params.id)
   }
 
+  if (hasSuspended) {
+    await logAdminAction(env, {
+      actorId: data.user.id,
+      action: body.isSuspended ? 'suspend_user' : 'unsuspend_user',
+      targetUserId: params.id,
+      detail: `email=${target.email}`,
+    })
+  }
+  if (hasRecruiter) {
+    await logAdminAction(env, {
+      actorId: data.user.id,
+      action: body.isRecruiter ? 'grant_recruiter' : 'revoke_recruiter',
+      targetUserId: params.id,
+      detail: `email=${target.email}`,
+    })
+  }
+
   return jsonResponse({
     ok: true,
     user: {
@@ -50,7 +68,7 @@ export async function onRequestDelete({ env, data, params }) {
     return jsonError('본인 계정은 삭제할 수 없습니다.', 403)
   }
 
-  const target = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(params.id).first()
+  const target = await env.DB.prepare('SELECT id, email FROM users WHERE id = ?').bind(params.id).first()
   if (!target) return jsonError('사용자를 찾을 수 없습니다.', 404)
 
   const participation = await env.DB.prepare(
@@ -84,6 +102,12 @@ export async function onRequestDelete({ env, data, params }) {
     env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(params.id),
     env.DB.prepare('DELETE FROM users WHERE id = ?').bind(params.id),
   ])
+
+  await logAdminAction(env, {
+    actorId: data.user.id,
+    action: 'delete_user',
+    detail: `email=${target.email}`,
+  })
 
   return jsonResponse({ ok: true, deleted: true })
 }

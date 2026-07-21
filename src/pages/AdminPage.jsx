@@ -3,7 +3,18 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/client.js'
 import { roomStatusInfo } from '../lib/roomStatus.js'
 
-const EMPTY_NEW_ACCOUNT = { email: '', displayName: '', role: 'candidate', companyName: '' }
+const EMPTY_NEW_ACCOUNT = { email: '', displayName: '', role: 'candidate', companyName: '', isRecruiter: false }
+
+const AUDIT_ACTION_LABELS = {
+  create_user: '계정 생성',
+  suspend_user: '계정 정지',
+  unsuspend_user: '정지 해제',
+  grant_recruiter: '채용자 지정',
+  revoke_recruiter: '채용자 해제',
+  reset_password: '비밀번호 재설정',
+  delete_user: '계정 삭제',
+  delete_room: '면접방 삭제',
+}
 
 export default function AdminPage() {
   const { user } = useAuth()
@@ -23,10 +34,17 @@ export default function AdminPage() {
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [messagesError, setMessagesError] = useState('')
 
+  const [auditLog, setAuditLog] = useState([])
+
   const loadAll = useCallback(async () => {
-    const [usersData, roomsData] = await Promise.all([api.get('/admin/users'), api.get('/admin/rooms')])
+    const [usersData, roomsData, auditData] = await Promise.all([
+      api.get('/admin/users'),
+      api.get('/admin/rooms'),
+      api.get('/admin/audit-log'),
+    ])
     setUsers(usersData.users)
     setRooms(roomsData.rooms)
+    setAuditLog(auditData.entries)
   }, [])
 
   useEffect(() => {
@@ -43,6 +61,8 @@ export default function AdminPage() {
     })
 
   const updateNewAccount = (field) => (e) => setNewAccount((f) => ({ ...f, [field]: e.target.value }))
+  const toggleNewAccountRecruiter = (e) =>
+    setNewAccount((f) => ({ ...f, isRecruiter: e.target.checked }))
 
   const handleCreateAccount = async (e) => {
     e.preventDefault()
@@ -54,6 +74,7 @@ export default function AdminPage() {
         displayName: newAccount.displayName,
         role: newAccount.role,
         companyName: newAccount.role === 'company' ? newAccount.companyName : undefined,
+        isRecruiter: newAccount.isRecruiter,
       })
       setRevealed((prev) => ({ ...prev, [res.user.id]: res.tempPassword }))
       setNewAccount(EMPTY_NEW_ACCOUNT)
@@ -136,6 +157,25 @@ export default function AdminPage() {
     }
   }
 
+  const handleDeleteRoom = async (room) => {
+    if (
+      !window.confirm(
+        `"${room.title}" 면접방을 영구 삭제하시겠습니까? 채팅/서명/계약 조건이 모두 사라지며 되돌릴 수 없습니다.`
+      )
+    )
+      return
+    setError('')
+    setPendingId(room.id)
+    try {
+      await api.delete(`/admin/rooms/${room.id}`)
+      await loadAll()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setPendingId('')
+    }
+  }
+
   const handleViewMessages = async (room) => {
     setViewingRoom(room)
     setRoomMessages([])
@@ -182,6 +222,10 @@ export default function AdminPage() {
               <input value={newAccount.companyName} onChange={updateNewAccount('companyName')} />
             </label>
           )}
+          <label className="checkbox-label">
+            <input type="checkbox" checked={newAccount.isRecruiter} onChange={toggleNewAccountRecruiter} />
+            채용자 등급 부여
+          </label>
           <button type="submit" className="btn-primary" disabled={creating}>
             {creating ? '생성 중...' : '계정 만들기'}
           </button>
@@ -317,10 +361,50 @@ export default function AdminPage() {
                   <button type="button" className="btn-sm" onClick={() => handleViewMessages(r)}>
                     채팅 보기
                   </button>
+                  <button
+                    type="button"
+                    className="btn-danger btn-sm"
+                    disabled={pendingId === r.id}
+                    onClick={() => handleDeleteRoom(r)}
+                  >
+                    삭제
+                  </button>
                 </td>
               </tr>
             )
           })}
+        </tbody>
+      </table>
+      </div>
+
+      <h2>감사 로그 (최근 {auditLog.length}건)</h2>
+      <div className="table-scroll">
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>시각</th>
+            <th>수행자</th>
+            <th>작업</th>
+            <th>대상</th>
+            <th>세부정보</th>
+          </tr>
+        </thead>
+        <tbody>
+          {auditLog.length === 0 ? (
+            <tr>
+              <td colSpan={5}>기록이 없습니다.</td>
+            </tr>
+          ) : (
+            auditLog.map((entry) => (
+              <tr key={entry.id}>
+                <td>{entry.createdAt}</td>
+                <td>{entry.actorEmail}</td>
+                <td>{AUDIT_ACTION_LABELS[entry.action] || entry.action}</td>
+                <td>{entry.targetEmail || entry.roomTitle || '-'}</td>
+                <td>{entry.detail || '-'}</td>
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
       </div>

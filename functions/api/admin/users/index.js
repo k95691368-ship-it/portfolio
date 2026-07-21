@@ -2,6 +2,7 @@ import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { genId } from '../../../_lib/db.js'
 import { hashPassword } from '../../../_lib/auth.js'
 import { genTempPassword } from '../../../_lib/tempPassword.js'
+import { logAdminAction } from '../../../_lib/auditLog.js'
 
 export async function onRequestGet({ env }) {
   const { results } = await env.DB.prepare(
@@ -26,9 +27,9 @@ export async function onRequestGet({ env }) {
   })
 }
 
-export async function onRequestPost({ request, env }) {
+export async function onRequestPost({ request, env, data }) {
   const body = await request.json().catch(() => null)
-  const { email, displayName, role, companyName } = body || {}
+  const { email, displayName, role, companyName, isRecruiter } = body || {}
   if (!email || !displayName || !role) {
     return jsonError('이메일, 이름, 역할은 필수입니다.', 400)
   }
@@ -39,13 +40,14 @@ export async function onRequestPost({ request, env }) {
   const tempPassword = genTempPassword()
   const { hash, salt } = await hashPassword(tempPassword)
   const id = genId()
+  const recruiterFlag = isRecruiter ? 1 : 0
 
   try {
     await env.DB.prepare(
-      `INSERT INTO users (id, email, password_hash, password_salt, role, display_name, company_name, must_change_password)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1)`
+      `INSERT INTO users (id, email, password_hash, password_salt, role, display_name, company_name, must_change_password, is_recruiter)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`
     )
-      .bind(id, email, hash, salt, role, displayName, companyName || null)
+      .bind(id, email, hash, salt, role, displayName, companyName || null, recruiterFlag)
       .run()
   } catch (err) {
     if (String(err?.message || err).includes('UNIQUE')) {
@@ -53,6 +55,13 @@ export async function onRequestPost({ request, env }) {
     }
     throw err
   }
+
+  await logAdminAction(env, {
+    actorId: data.user.id,
+    action: 'create_user',
+    targetUserId: id,
+    detail: `email=${email}, role=${role}, isRecruiter=${!!recruiterFlag}`,
+  })
 
   return jsonResponse(
     {
@@ -64,7 +73,7 @@ export async function onRequestPost({ request, env }) {
         companyName: companyName || null,
         role,
         isAdmin: false,
-        isRecruiter: false,
+        isRecruiter: !!recruiterFlag,
         isSuspended: false,
         mustChangePassword: true,
       },
