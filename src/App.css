@@ -269,6 +269,7 @@
 
 .ai-analysis,
 .contract-form,
+.ai-draft,
 .signature-section,
 .document-manager,
 .room-documents {
@@ -436,6 +437,12 @@
   border-radius: var(--radius);
 }
 
+.contract-print h1,
+.contract-print h2,
+.contract-print h3 {
+  color: #000;
+}
+
 .contract-print table {
   width: 100%;
   border-collapse: collapse;
@@ -448,6 +455,22 @@
   padding: 8px 12px;
   text-align: left;
   font-size: 14px;
+}
+
+.contract-articles {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 20px;
+}
+.contract-article h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+.contract-article p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 165%;
 }
 
 .print-signatures {

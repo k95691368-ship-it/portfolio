@@ -65,6 +65,79 @@ const SYSTEM_PROMPT = `당신은 한국 채용 면접 채팅 대화를 분석하
 2. hire_confirmed는 반드시 "회사 측의 명확한 합격/채용 통보"와 "지원자의 명확한 수락 의사표시"가 모두 확인될 때만 true로 표시하세요. 단순히 우호적인 대화, 조건 협의 중인 상태만으로는 false로 유지하세요.
 3. [이전에 추출된 조건]이 주어지면, 이번 대화에서 새로 명확히 확인된 값이 있을 때만 그 필드를 채우고, 새로 언급되지 않은 필드는 null로 반환하세요(병합은 호출 측에서 처리합니다).`
 
+const DRAFT_TOOL = {
+  name: 'record_contract_draft',
+  description:
+    '주어진 근로조건 값들을 바탕으로 대한민국 고용노동부 표준근로계약서 양식에 맞춰 조항별 계약서 본문을 작성한다.',
+  input_schema: {
+    type: 'object',
+    required: ['articles'],
+    properties: {
+      articles: {
+        type: 'array',
+        description:
+          '표준근로계약서의 조항들. 순서대로: 근로계약기간, 근무장소, 업무의 내용, 소정근로시간, 근무일/휴일, 임금, 연차유급휴가, 사회보험 적용여부, 기타',
+        items: {
+          type: 'object',
+          required: ['heading', 'body'],
+          properties: {
+            heading: { type: 'string', description: '조항 제목 (예: "제1조 (근로계약기간)")' },
+            body: {
+              type: 'string',
+              description:
+                '해당 조항의 본문. 제공된 값을 자연스러운 계약서 문장으로 반영하고, 값이 없는 항목은 "추후 협의"로 표기한다.',
+            },
+          },
+        },
+      },
+    },
+  },
+}
+
+const DRAFT_SYSTEM_PROMPT = `당신은 대한민국 고용노동부 표준근로계약서 양식에 따라 근로계약서 초안을 작성하는 어시스턴트입니다.
+
+규칙:
+1. 아래 [근로조건 데이터]에 있는 값만 사용하고, 데이터에 없는 사실을 지어내지 마세요.
+2. 값이 비어있거나 null인 항목은 "추후 협의" 또는 "미정"으로 자연스럽게 표기하세요.
+3. 법적 계약서에 맞는 정중하고 명확한 문어체(합니다체/한다체)를 사용하세요.
+4. 각 조항은 실제 표준근로계약서처럼 "제n조 (제목)" 형식의 heading과, 해당 조항 내용을 완결된 문장으로 서술한 body로 구성하세요.
+5. 사회보험 항목은 값이 true인 것만 "적용"으로 표기하고, 값이 없으면 "추후 협의"로 표기하세요.`
+
+export async function draftContractDocument(env, terms) {
+  const apiKey = env.CLAUDE_API_KEY
+  if (!apiKey) throw new Error('CLAUDE_API_KEY가 설정되지 않았습니다. Cloudflare 시크릿을 등록해주세요.')
+
+  const userContent = `[근로조건 데이터]\n${JSON.stringify(terms)}`
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 2048,
+      system: DRAFT_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: userContent }],
+      tools: [DRAFT_TOOL],
+      tool_choice: { type: 'tool', name: 'record_contract_draft' },
+    }),
+  })
+
+  if (!res.ok) {
+    const errText = await res.text()
+    throw new Error(`Claude API 오류 (${res.status}): ${errText.slice(0, 300)}`)
+  }
+
+  const data = await res.json()
+  const toolUse = data.content.find((block) => block.type === 'tool_use')
+  if (!toolUse) throw new Error('AI 응답에서 계약서 초안을 찾을 수 없습니다.')
+
+  return toolUse.input
+}
+
 export async function analyzeConversation(env, transcript, previousTerms) {
   const apiKey = env.CLAUDE_API_KEY
   if (!apiKey) throw new Error('CLAUDE_API_KEY가 설정되지 않았습니다. Cloudflare 시크릿을 등록해주세요.')

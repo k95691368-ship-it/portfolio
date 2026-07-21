@@ -1,0 +1,43 @@
+import { jsonResponse, jsonError } from '../../../_lib/http.js'
+import { draftContractDocument } from '../../../_lib/claude.js'
+import { getRoomParticipant } from '../../../_lib/rooms.js'
+import { checkRateLimit } from '../../../_lib/rateLimit.js'
+
+export async function onRequestPost({ env, data, params, request }) {
+  if (!data.user) return jsonError('로그인이 필요합니다.', 401)
+
+  const participant = await getRoomParticipant(env, params.roomId, data.user.id)
+  if (!participant) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
+
+  const room = await env.DB.prepare('SELECT status FROM interview_rooms WHERE id = ?')
+    .bind(params.roomId)
+    .first()
+  if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
+  if (room.status === 'signed') return jsonError('이미 서명이 완료된 계약서는 다시 작성할 수 없습니다.', 409)
+
+  const allowed = await checkRateLimit(env, `contract-draft:${params.roomId}`, 5, 60)
+  if (!allowed) return jsonError('너무 잦은 요청입니다. 잠시 후 다시 시도해주세요.', 429)
+
+  let terms
+  try {
+    terms = await request.json()
+  } catch {
+    return jsonError('잘못된 요청입니다.', 400)
+  }
+
+  let document
+  try {
+    document = await draftContractDocument(env, terms)
+  } catch (err) {
+    return jsonError(err.message, 502)
+  }
+
+  await env.DB.prepare(
+    `INSERT INTO contract_terms (room_id, ai_document_json) VALUES (?, ?)
+     ON CONFLICT(room_id) DO UPDATE SET ai_document_json = excluded.ai_document_json, updated_at = datetime('now')`
+  )
+    .bind(params.roomId, JSON.stringify(document.articles))
+    .run()
+
+  return jsonResponse({ articles: document.articles })
+}

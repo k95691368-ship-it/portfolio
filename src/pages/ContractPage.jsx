@@ -40,6 +40,9 @@ export default function ContractPage() {
   const [saveMessage, setSaveMessage] = useState('')
   const [signingRole, setSigningRole] = useState(null)
   const [exporting, setExporting] = useState(false)
+  const [aiDocument, setAiDocument] = useState(null)
+  const [drafting, setDrafting] = useState(false)
+  const [draftError, setDraftError] = useState('')
   const printRef = useRef(null)
 
   const loadAll = useCallback(async () => {
@@ -54,6 +57,7 @@ export default function ContractPage() {
       hireConfirmedAt: contractData.hireConfirmedAt,
       confirmationExcerpt: contractData.confirmationExcerpt,
     })
+    setAiDocument(contractData.terms?.aiDocument ?? null)
 
     const t = contractData.terms || {}
     const company = roomData.participants.find((p) => p.role === 'company')
@@ -107,7 +111,7 @@ export default function ContractPage() {
   const otherRole = myRole === 'company' ? 'candidate' : 'company'
   const mySignature = signatures.find((s) => s.role === myRole)
   const otherSignature = signatures.find((s) => s.role === otherRole)
-  const canEdit = contractMeta.hireConfirmed && !isSigned
+  const canEdit = !isSigned
 
   const handleSave = async () => {
     setSaving(true)
@@ -132,6 +136,19 @@ export default function ContractPage() {
       setError(err.message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleDraftDocument = async () => {
+    setDrafting(true)
+    setDraftError('')
+    try {
+      const data = await api.post(`/rooms/${roomId}/contract-draft`, form)
+      setAiDocument(data.articles)
+    } catch (err) {
+      setDraftError(err.message)
+    } finally {
+      setDrafting(false)
     }
   }
 
@@ -188,124 +205,137 @@ export default function ContractPage() {
 
       {!contractMeta.hireConfirmed && (
         <p className="notice">
-          아직 채용이 확정되지 않았습니다. 면접방 채팅에서 "AI로 조건 정리하기"로 채용 확정이 감지된 후 계약서를 작성할
-          수 있습니다.
+          아직 채용이 확정되지 않았습니다. 계약 조건은 지금 미리 작성할 수 있지만, 서명은 채용이 확정된 후에 가능합니다.
         </p>
       )}
+      {isSigned && <p className="signed-banner">양측 서명이 완료되었습니다.</p>}
+      {error && <p className="error">{error}</p>}
 
-      {contractMeta.hireConfirmed && (
-        <>
-          {isSigned && <p className="signed-banner">양측 서명이 완료되었습니다.</p>}
-          {error && <p className="error">{error}</p>}
+      <section className="contract-form">
+        <h2>계약 조건 입력/수정</h2>
+        <fieldset disabled={!canEdit}>
+          <h3>당사자 정보</h3>
+          {IDENTITY_FIELDS.map((f) => (
+            <label key={f.key}>
+              {f.label}
+              <input value={form[f.key] ?? ''} onChange={(e) => updateField(f.key, e.target.value)} />
+            </label>
+          ))}
 
-          <section className="contract-form">
-            <h2>계약 조건 입력/수정</h2>
-            <fieldset disabled={!canEdit}>
-              <h3>당사자 정보</h3>
-              {IDENTITY_FIELDS.map((f) => (
-                <label key={f.key}>
-                  {f.label}
-                  <input value={form[f.key] ?? ''} onChange={(e) => updateField(f.key, e.target.value)} />
-                </label>
-              ))}
+          <h3>근로조건</h3>
+          {TERM_FIELDS.map((f) => (
+            <label key={f.key}>
+              {f.label}
+              <input
+                type={f.type ?? 'text'}
+                placeholder={f.placeholder}
+                value={form[f.key] ?? ''}
+                onChange={(e) => updateField(f.key, e.target.value)}
+              />
+            </label>
+          ))}
 
-              <h3>근로조건</h3>
-              {TERM_FIELDS.map((f) => (
-                <label key={f.key}>
-                  {f.label}
-                  <input
-                    type={f.type ?? 'text'}
-                    placeholder={f.placeholder}
-                    value={form[f.key] ?? ''}
-                    onChange={(e) => updateField(f.key, e.target.value)}
-                  />
-                </label>
-              ))}
+          <h3>사회보험 적용</h3>
+          {SOCIAL_INSURANCE_FIELDS.map((f) => (
+            <label key={f.key} className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={!!form.socialInsurance[f.key]}
+                onChange={() => toggleInsurance(f.key)}
+              />
+              {f.label}
+            </label>
+          ))}
 
-              <h3>사회보험 적용</h3>
-              {SOCIAL_INSURANCE_FIELDS.map((f) => (
-                <label key={f.key} className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={!!form.socialInsurance[f.key]}
-                    onChange={() => toggleInsurance(f.key)}
-                  />
-                  {f.label}
-                </label>
-              ))}
-
-              <h3>그 밖의 사항</h3>
-              {form.customTerms.map((c, idx) => (
-                <div key={idx} className="custom-term-row">
-                  <input
-                    placeholder="항목명"
-                    value={c.label}
-                    onChange={(e) => updateCustomTerm(idx, 'label', e.target.value)}
-                  />
-                  <input
-                    placeholder="내용"
-                    value={c.value}
-                    onChange={(e) => updateCustomTerm(idx, 'value', e.target.value)}
-                  />
-                  <button type="button" className="btn-danger btn-sm" onClick={() => removeCustomTerm(idx)}>
-                    삭제
-                  </button>
-                </div>
-              ))}
-              <button type="button" onClick={addCustomTerm}>
-                + 항목 추가
+          <h3>그 밖의 사항</h3>
+          {form.customTerms.map((c, idx) => (
+            <div key={idx} className="custom-term-row">
+              <input
+                placeholder="항목명"
+                value={c.label}
+                onChange={(e) => updateCustomTerm(idx, 'label', e.target.value)}
+              />
+              <input
+                placeholder="내용"
+                value={c.value}
+                onChange={(e) => updateCustomTerm(idx, 'value', e.target.value)}
+              />
+              <button type="button" className="btn-danger btn-sm" onClick={() => removeCustomTerm(idx)}>
+                삭제
               </button>
-            </fieldset>
-
-            {canEdit && (
-              <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
-                {saving ? '저장 중...' : '저장'}
-              </button>
-            )}
-            {saveMessage && <p className="save-message">{saveMessage}</p>}
-          </section>
-
-          <section className="signature-section">
-            <h2>서명</h2>
-            <div className="signature-status-row">
-              <div>
-                <p>회사</p>
-                {signatures.find((s) => s.role === 'company') ? (
-                  <img
-                    src={signatures.find((s) => s.role === 'company').imageDataUrl}
-                    alt="회사 서명"
-                    className="signature-thumb"
-                  />
-                ) : (
-                  <p>미서명</p>
-                )}
-              </div>
-              <div>
-                <p>지원자</p>
-                {signatures.find((s) => s.role === 'candidate') ? (
-                  <img
-                    src={signatures.find((s) => s.role === 'candidate').imageDataUrl}
-                    alt="지원자 서명"
-                    className="signature-thumb"
-                  />
-                ) : (
-                  <p>미서명</p>
-                )}
-              </div>
             </div>
-            {!mySignature && (
-              <button type="button" className="btn-primary" onClick={() => setSigningRole(myRole)}>
-                서명하기
-              </button>
-            )}
-            {mySignature && !otherSignature && <p>상대방의 서명을 기다리고 있습니다.</p>}
-          </section>
-
-          <button type="button" onClick={handleExportPdf} disabled={exporting}>
-            {exporting ? 'PDF 생성 중...' : 'PDF 다운로드'}
+          ))}
+          <button type="button" onClick={addCustomTerm}>
+            + 항목 추가
           </button>
-        </>
+        </fieldset>
+
+        {canEdit && (
+          <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? '저장 중...' : '저장'}
+          </button>
+        )}
+        {saveMessage && <p className="save-message">{saveMessage}</p>}
+      </section>
+
+      {canEdit && (
+        <section className="ai-draft">
+          <h2>AI 계약서 문장 자동 작성</h2>
+          <p>위에 입력한 조건을 바탕으로 표준근로계약서 형식의 계약서 문장을 AI가 작성합니다.</p>
+          <button type="button" onClick={handleDraftDocument} disabled={drafting}>
+            {drafting ? 'AI가 계약서를 작성하는 중...' : aiDocument ? 'AI 계약서 다시 작성하기' : 'AI로 계약서 작성하기'}
+          </button>
+          {draftError && <p className="error">{draftError}</p>}
+        </section>
       )}
+
+      <section className="signature-section">
+        <h2>서명</h2>
+        <div className="signature-status-row">
+          <div>
+            <p>회사</p>
+            {signatures.find((s) => s.role === 'company') ? (
+              <img
+                src={signatures.find((s) => s.role === 'company').imageDataUrl}
+                alt="회사 서명"
+                className="signature-thumb"
+              />
+            ) : (
+              <p>미서명</p>
+            )}
+          </div>
+          <div>
+            <p>지원자</p>
+            {signatures.find((s) => s.role === 'candidate') ? (
+              <img
+                src={signatures.find((s) => s.role === 'candidate').imageDataUrl}
+                alt="지원자 서명"
+                className="signature-thumb"
+              />
+            ) : (
+              <p>미서명</p>
+            )}
+          </div>
+        </div>
+        {!mySignature && (
+          <>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => setSigningRole(myRole)}
+              disabled={!contractMeta.hireConfirmed}
+            >
+              서명하기
+            </button>
+            {!contractMeta.hireConfirmed && <p className="notice">채용이 확정된 후에 서명할 수 있습니다.</p>}
+          </>
+        )}
+        {mySignature && !otherSignature && <p>상대방의 서명을 기다리고 있습니다.</p>}
+      </section>
+
+      <button type="button" onClick={handleExportPdf} disabled={exporting}>
+        {exporting ? 'PDF 생성 중...' : 'PDF 다운로드'}
+      </button>
 
       {signingRole && (
         <SignatureModal
@@ -315,13 +345,23 @@ export default function ContractPage() {
         />
       )}
 
-      {contractMeta.hireConfirmed && (
-        <div className="contract-print" ref={printRef}>
-          <h2 className="print-title">표준근로계약서</h2>
-          <p>
-            {form.employerName || '사업체명 미기재'} (이하 "사업주")과(와) {form.employeeName || '근로자 미기재'}
-            (이하 "근로자")은 다음과 같이 근로계약을 체결한다.
-          </p>
+      <div className="contract-print" ref={printRef}>
+        <h2 className="print-title">표준근로계약서</h2>
+        <p>
+          {form.employerName || '사업체명 미기재'} (이하 "사업주")과(와) {form.employeeName || '근로자 미기재'}
+          (이하 "근로자")은 다음과 같이 근로계약을 체결한다.
+        </p>
+
+        {aiDocument ? (
+          <div className="contract-articles">
+            {aiDocument.map((article, idx) => (
+              <div key={idx} className="contract-article">
+                <h3>{article.heading}</h3>
+                <p>{article.body}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
           <table>
             <tbody>
               {IDENTITY_FIELDS.map((f) => (
@@ -352,23 +392,23 @@ export default function ContractPage() {
               )}
             </tbody>
           </table>
+        )}
 
-          <div className="print-signatures">
-            <div>
-              <p>사업주 (회사)</p>
-              {signatures.find((s) => s.role === 'company') && (
-                <img src={signatures.find((s) => s.role === 'company').imageDataUrl} alt="회사 서명" />
-              )}
-            </div>
-            <div>
-              <p>근로자 (지원자)</p>
-              {signatures.find((s) => s.role === 'candidate') && (
-                <img src={signatures.find((s) => s.role === 'candidate').imageDataUrl} alt="지원자 서명" />
-              )}
-            </div>
+        <div className="print-signatures">
+          <div>
+            <p>사업주 (회사)</p>
+            {signatures.find((s) => s.role === 'company') && (
+              <img src={signatures.find((s) => s.role === 'company').imageDataUrl} alt="회사 서명" />
+            )}
+          </div>
+          <div>
+            <p>근로자 (지원자)</p>
+            {signatures.find((s) => s.role === 'candidate') && (
+              <img src={signatures.find((s) => s.role === 'candidate').imageDataUrl} alt="지원자 서명" />
+            )}
           </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
