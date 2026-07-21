@@ -52,7 +52,12 @@ export async function onRequestDelete({ env, data, params }) {
   const { results: docs } = await env.DB.prepare('SELECT r2_key FROM documents WHERE user_id = ?')
     .bind(params.id)
     .all()
-  await Promise.allSettled(docs.map((d) => env.DOCUMENTS.delete(d.r2_key)))
+  const deletions = await Promise.allSettled(docs.map((d) => env.DOCUMENTS.delete(d.r2_key)))
+  deletions.forEach((result, i) => {
+    if (result.status === 'rejected') {
+      console.error(`R2 delete failed for document ${docs[i].r2_key} (user ${params.id}):`, result.reason)
+    }
+  })
 
   await env.DB.batch([
     env.DB.prepare('DELETE FROM documents WHERE user_id = ?').bind(params.id),
