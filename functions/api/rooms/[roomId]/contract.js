@@ -48,6 +48,9 @@ export async function onRequestPatch({ env, data, params, request }) {
 
   const participant = await getRoomParticipant(env, params.roomId, data.user.id)
   if (!participant) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
+  if (participant.role_in_room !== 'company') {
+    return jsonError('계약서는 회사(고용) 측만 수정할 수 있습니다.', 403)
+  }
 
   const room = await env.DB.prepare('SELECT status FROM interview_rooms WHERE id = ?')
     .bind(params.roomId)
@@ -62,28 +65,45 @@ export async function onRequestPatch({ env, data, params, request }) {
     return jsonError('잘못된 요청입니다.', 400)
   }
 
+  const existing = await env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?')
+    .bind(params.roomId)
+    .first()
+
   const columns = []
   const values = []
+  const changes = []
   for (const [camelKey, column] of Object.entries(EDITABLE_FIELDS)) {
     if (Object.prototype.hasOwnProperty.call(body, camelKey)) {
+      const newVal = body[camelKey] === '' ? null : body[camelKey]
       columns.push(column)
-      values.push(body[camelKey] === '' ? null : body[camelKey])
+      values.push(newVal)
+      const oldVal = existing ? (existing[column] ?? null) : null
+      if (String(oldVal ?? '') !== String(newVal ?? '')) {
+        changes.push({ field: camelKey, from: oldVal, to: newVal })
+      }
     }
   }
   if (Object.prototype.hasOwnProperty.call(body, 'socialInsurance')) {
+    const newJson = body.socialInsurance ? JSON.stringify(body.socialInsurance) : null
     columns.push('social_insurance_json')
-    values.push(body.socialInsurance ? JSON.stringify(body.socialInsurance) : null)
+    values.push(newJson)
+    const oldJson = existing?.social_insurance_json ?? null
+    if ((oldJson ?? '') !== (newJson ?? '')) {
+      changes.push({ field: 'socialInsurance', from: oldJson, to: newJson })
+    }
   }
   if (Object.prototype.hasOwnProperty.call(body, 'customTerms')) {
+    const newJson =
+      body.customTerms && body.customTerms.length > 0 ? JSON.stringify(body.customTerms) : null
     columns.push('custom_terms_json')
-    values.push(body.customTerms && body.customTerms.length > 0 ? JSON.stringify(body.customTerms) : null)
+    values.push(newJson)
+    const oldJson = existing?.custom_terms_json ?? null
+    if ((oldJson ?? '') !== (newJson ?? '')) {
+      changes.push({ field: 'customTerms', from: oldJson, to: newJson })
+    }
   }
 
   if (columns.length === 0) return jsonError('수정할 항목이 없습니다.', 400)
-
-  const existing = await env.DB.prepare('SELECT room_id FROM contract_terms WHERE room_id = ?')
-    .bind(params.roomId)
-    .first()
 
   if (existing) {
     const setSql = columns.map((c) => `${c} = ?`).join(', ') + ", updated_at = datetime('now')"
@@ -95,6 +115,14 @@ export async function onRequestPatch({ env, data, params, request }) {
     const placeholders = insertCols.map(() => '?').join(', ')
     await env.DB.prepare(`INSERT INTO contract_terms (${insertCols.join(', ')}) VALUES (${placeholders})`)
       .bind(params.roomId, ...values)
+      .run()
+  }
+
+  if (changes.length > 0) {
+    await env.DB.prepare(
+      'INSERT INTO contract_edit_history (room_id, editor_user_id, changes) VALUES (?, ?, ?)'
+    )
+      .bind(params.roomId, data.user.id, JSON.stringify(changes))
       .run()
   }
 

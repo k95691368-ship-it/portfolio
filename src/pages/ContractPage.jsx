@@ -7,6 +7,34 @@ import { useAuth } from '../context/AuthContext.jsx'
 import SignatureModal from '../components/SignatureModal.jsx'
 import { IDENTITY_FIELDS, TERM_FIELDS, SOCIAL_INSURANCE_FIELDS } from '../lib/contractTemplate.js'
 
+const FIELD_LABELS = {
+  ...Object.fromEntries([...IDENTITY_FIELDS, ...TERM_FIELDS].map((f) => [f.key, f.label])),
+  socialInsurance: '사회보험 적용',
+  customTerms: '그 밖의 사항',
+}
+
+function formatHistoryValue(field, value) {
+  if (value === null || value === undefined || value === '') return '(비어 있음)'
+  if (field === 'socialInsurance') {
+    try {
+      const obj = JSON.parse(value)
+      const on = SOCIAL_INSURANCE_FIELDS.filter((f) => obj[f.key]).map((f) => f.label)
+      return on.length > 0 ? on.join(', ') : '(없음)'
+    } catch {
+      return String(value)
+    }
+  }
+  if (field === 'customTerms') {
+    try {
+      const arr = JSON.parse(value)
+      return arr.map((c) => `${c.label}: ${c.value}`).join(', ') || '(없음)'
+    } catch {
+      return String(value)
+    }
+  }
+  return String(value)
+}
+
 const EMPTY_FORM = {
   employerName: '',
   employerAddress: '',
@@ -45,15 +73,18 @@ export default function ContractPage() {
   const [aiDocument, setAiDocument] = useState(null)
   const [drafting, setDrafting] = useState(false)
   const [draftError, setDraftError] = useState('')
+  const [history, setHistory] = useState([])
   const printRef = useRef(null)
 
   const loadAll = useCallback(async () => {
-    const [roomData, contractData, sigData] = await Promise.all([
+    const [roomData, contractData, sigData, historyData] = await Promise.all([
       api.get(`/rooms/${roomId}`),
       api.get(`/rooms/${roomId}/contract`),
       api.get(`/rooms/${roomId}/signatures`),
+      api.get(`/rooms/${roomId}/contract-history`).catch(() => ({ history: [] })),
     ])
     setRoom(roomData)
+    setHistory(historyData.history ?? [])
     setContractMeta({
       hireConfirmed: contractData.hireConfirmed,
       hireConfirmedAt: contractData.hireConfirmedAt,
@@ -113,7 +144,7 @@ export default function ContractPage() {
   const otherRole = myRole === 'company' ? 'candidate' : 'company'
   const mySignature = signatures.find((s) => s.role === myRole)
   const otherSignature = signatures.find((s) => s.role === otherRole)
-  const canEdit = !isSigned
+  const canEdit = !isSigned && myRole === 'company'
 
   const handleSave = async () => {
     setSaving(true)
@@ -214,7 +245,10 @@ export default function ContractPage() {
       {error && <p className="error">{error}</p>}
 
       <section className="contract-form">
-        <h2>계약 조건 입력/수정</h2>
+        <h2>{myRole === 'company' ? '계약 조건 입력/수정' : '계약 조건 확인'}</h2>
+        {myRole !== 'company' && !isSigned && (
+          <p className="notice">계약 조건은 회사(고용) 측만 작성·수정할 수 있습니다. 내용을 확인한 뒤 서명해주세요.</p>
+        )}
         <fieldset disabled={!canEdit}>
           <h3>당사자 정보</h3>
           {IDENTITY_FIELDS.map((f) => (
@@ -334,6 +368,31 @@ export default function ContractPage() {
         )}
         {mySignature && !otherSignature && <p>상대방의 서명을 기다리고 있습니다.</p>}
       </section>
+
+      {history.length > 0 && (
+        <section className="contract-history">
+          <h2>수정 이력 ({history.length})</h2>
+          <ul className="history-list">
+            {history.map((entry) => (
+              <li key={entry.id} className="history-entry">
+                <p className="history-meta">
+                  {entry.createdAt} · {entry.editorName}
+                  {entry.editorRole === 'company' ? ' (회사)' : entry.editorRole === 'candidate' ? ' (지원자)' : ''}
+                </p>
+                <ul className="history-changes">
+                  {entry.changes.map((c, i) => (
+                    <li key={i}>
+                      <strong>{FIELD_LABELS[c.field] || c.field}</strong>: {formatHistoryValue(c.field, c.from)}
+                      {' → '}
+                      {formatHistoryValue(c.field, c.to)}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <button type="button" onClick={handleExportPdf} disabled={exporting}>
         {exporting ? 'PDF 생성 중...' : 'PDF 다운로드'}

@@ -2,6 +2,7 @@ import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { analyzeConversation } from '../../../_lib/claude.js'
 import { rowToCamelTerms } from '../../../_lib/contract.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
+import { mergeValue, mergeSocialInsurance } from '../../../_lib/merge.js'
 
 const COOLDOWN_SECONDS = 45
 
@@ -66,38 +67,26 @@ export async function onRequestPost({ env, data, params }) {
   }
 
   const t = analysis.terms || {}
-  const merge = (newVal, oldVal) => (newVal === null || newVal === undefined ? (oldVal ?? null) : newVal)
 
   const merged = {
-    work_location: merge(t.work_location, existing?.work_location),
-    job_description: merge(t.job_description, existing?.job_description),
-    contract_start_date: merge(t.contract_start_date, existing?.contract_start_date),
-    contract_end_date: merge(t.contract_end_date, existing?.contract_end_date),
-    work_hours_start: merge(t.work_hours_start, existing?.work_hours_start),
-    work_hours_end: merge(t.work_hours_end, existing?.work_hours_end),
-    work_days: merge(t.work_days, existing?.work_days),
-    rest_days: merge(t.rest_days, existing?.rest_days),
-    wage_base_amount: merge(t.wage_base_amount, existing?.wage_base_amount),
-    wage_pay_method: merge(t.wage_pay_method, existing?.wage_pay_method),
-    wage_pay_date: merge(t.wage_pay_date, existing?.wage_pay_date),
-    annual_leave: merge(t.annual_leave, existing?.annual_leave),
-    uniform_size: merge(t.uniform_size, existing?.uniform_size),
+    work_location: mergeValue(t.work_location, existing?.work_location),
+    job_description: mergeValue(t.job_description, existing?.job_description),
+    contract_start_date: mergeValue(t.contract_start_date, existing?.contract_start_date),
+    contract_end_date: mergeValue(t.contract_end_date, existing?.contract_end_date),
+    work_hours_start: mergeValue(t.work_hours_start, existing?.work_hours_start),
+    work_hours_end: mergeValue(t.work_hours_end, existing?.work_hours_end),
+    work_days: mergeValue(t.work_days, existing?.work_days),
+    rest_days: mergeValue(t.rest_days, existing?.rest_days),
+    wage_base_amount: mergeValue(t.wage_base_amount, existing?.wage_base_amount),
+    wage_pay_method: mergeValue(t.wage_pay_method, existing?.wage_pay_method),
+    wage_pay_date: mergeValue(t.wage_pay_date, existing?.wage_pay_date),
+    annual_leave: mergeValue(t.annual_leave, existing?.annual_leave),
+    uniform_size: mergeValue(t.uniform_size, existing?.uniform_size),
   }
-  const existingSocialInsurance = existing?.social_insurance_json
-    ? JSON.parse(existing.social_insurance_json)
-    : {}
-  const mergedSocialInsurance = {
-    employment_insurance: merge(t.social_insurance?.employment_insurance, existingSocialInsurance.employment_insurance),
-    health_insurance: merge(t.social_insurance?.health_insurance, existingSocialInsurance.health_insurance),
-    national_pension: merge(t.social_insurance?.national_pension, existingSocialInsurance.national_pension),
-    industrial_accident_insurance: merge(
-      t.social_insurance?.industrial_accident_insurance,
-      existingSocialInsurance.industrial_accident_insurance
-    ),
-  }
-  const socialInsuranceJson = Object.values(mergedSocialInsurance).some((v) => v !== null && v !== undefined)
-    ? JSON.stringify(mergedSocialInsurance)
-    : null
+  const { json: socialInsuranceJson } = mergeSocialInsurance(
+    t.social_insurance,
+    existing?.social_insurance_json
+  )
   const customTermsJson =
     t.custom_terms && t.custom_terms.length > 0
       ? JSON.stringify(t.custom_terms)

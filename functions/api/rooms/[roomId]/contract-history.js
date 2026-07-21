@@ -1,0 +1,31 @@
+import { jsonResponse, jsonError } from '../../../_lib/http.js'
+import { getRoomParticipant } from '../../../_lib/rooms.js'
+
+export async function onRequestGet({ env, data, params }) {
+  if (!data.user) return jsonError('로그인이 필요합니다.', 401)
+
+  const participant = await getRoomParticipant(env, params.roomId, data.user.id)
+  if (!participant) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
+
+  const { results } = await env.DB.prepare(
+    `SELECT h.id, h.changes, h.created_at, u.display_name AS editor_name, rp.role_in_room AS editor_role
+     FROM contract_edit_history h
+     JOIN users u ON u.id = h.editor_user_id
+     LEFT JOIN room_participants rp ON rp.room_id = h.room_id AND rp.user_id = h.editor_user_id
+     WHERE h.room_id = ?
+     ORDER BY h.id DESC
+     LIMIT 100`
+  )
+    .bind(params.roomId)
+    .all()
+
+  return jsonResponse({
+    history: results.map((r) => ({
+      id: r.id,
+      editorName: r.editor_name,
+      editorRole: r.editor_role,
+      changes: JSON.parse(r.changes),
+      createdAt: r.created_at,
+    })),
+  })
+}

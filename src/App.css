@@ -271,6 +271,7 @@
 .contract-form,
 .ai-draft,
 .signature-section,
+.contract-history,
 .document-manager,
 .room-documents {
   border: 1px solid var(--border);
@@ -280,6 +281,35 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.history-entry {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+}
+.history-meta {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.history-changes {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  word-break: break-word;
 }
 
 .contract-fields table {
