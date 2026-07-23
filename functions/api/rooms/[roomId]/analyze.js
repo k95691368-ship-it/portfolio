@@ -33,6 +33,13 @@ export async function onRequestPost({ env, data, params }) {
     .bind(params.roomId)
     .run()
 
+  // 쿨다운 선점 이전의 상태를 미리 읽어 둔다. AI 호출이 실패하면 이 값으로
+  // last_analyzed_at을 되돌려, 실패한 시도는 쿨다운을 소모하지 않게 한다.
+  const existing = await env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?')
+    .bind(params.roomId)
+    .first()
+  const prevAnalyzedAt = existing?.last_analyzed_at ?? null
+
   const claim = await env.DB.prepare(
     `UPDATE contract_terms SET last_analyzed_at = datetime('now')
      WHERE room_id = ? AND (last_analyzed_at IS NULL OR last_analyzed_at < datetime('now', '-' || ? || ' seconds'))`
@@ -49,10 +56,6 @@ export async function onRequestPost({ env, data, params }) {
     return jsonError(`너무 잦은 요청입니다. ${remaining}초 후 다시 시도해주세요.`, 429)
   }
 
-  const existing = await env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?')
-    .bind(params.roomId)
-    .first()
-
   const transcript = messages
     .map((m) => `${m.role_in_room === 'company' ? '회사' : '지원자'}(${m.display_name}): ${m.body}`)
     .join('\n')
@@ -63,6 +66,11 @@ export async function onRequestPost({ env, data, params }) {
   try {
     analysis = await analyzeConversation(env, transcript, previousTerms)
   } catch (err) {
+    // 실패한 시도는 쿨다운을 소모하지 않도록 이전 값으로 되돌린다 (즉시 재시도 허용).
+    await env.DB.prepare('UPDATE contract_terms SET last_analyzed_at = ? WHERE room_id = ?')
+      .bind(prevAnalyzedAt, params.roomId)
+      .run()
+      .catch(() => {})
     return jsonError(err.message, 502)
   }
 
