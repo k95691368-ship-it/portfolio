@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import { roomStatusInfo } from '../lib/roomStatus.js'
 
@@ -18,16 +19,15 @@ const AUDIT_ACTION_LABELS = {
 
 export default function AdminPage() {
   const { user } = useAuth()
+  const toast = useToast()
   const [users, setUsers] = useState([])
   const [rooms, setRooms] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [pendingId, setPendingId] = useState('')
   const [revealed, setRevealed] = useState({})
 
   const [newAccount, setNewAccount] = useState(EMPTY_NEW_ACCOUNT)
   const [creating, setCreating] = useState(false)
-  const [createError, setCreateError] = useState('')
 
   const [viewingRoom, setViewingRoom] = useState(null)
   const [roomMessages, setRoomMessages] = useState([])
@@ -49,9 +49,9 @@ export default function AdminPage() {
 
   useEffect(() => {
     loadAll()
-      .catch((err) => setError(err.message))
+      .catch((err) => toast.error(err.message))
       .finally(() => setLoading(false))
-  }, [loadAll])
+  }, [loadAll, toast])
 
   const dismissRevealed = (id) =>
     setRevealed((prev) => {
@@ -66,7 +66,6 @@ export default function AdminPage() {
 
   const handleCreateAccount = async (e) => {
     e.preventDefault()
-    setCreateError('')
     setCreating(true)
     try {
       const res = await api.post('/admin/users', {
@@ -79,8 +78,9 @@ export default function AdminPage() {
       setRevealed((prev) => ({ ...prev, [res.user.id]: res.tempPassword }))
       setNewAccount(EMPTY_NEW_ACCOUNT)
       await loadAll()
+      toast.success('계정이 생성되었습니다. 임시 비밀번호를 확인하세요.')
     } catch (err) {
-      setCreateError(err.message)
+      toast.error(err.message)
     } finally {
       setCreating(false)
     }
@@ -89,13 +89,13 @@ export default function AdminPage() {
   const handleToggleSuspend = async (target) => {
     const action = target.isSuspended ? '정지 해제' : '정지'
     if (!window.confirm(`${target.email} 계정을 ${action}하시겠습니까?`)) return
-    setError('')
     setPendingId(target.id)
     try {
       await api.patch(`/admin/users/${target.id}`, { isSuspended: !target.isSuspended })
       await loadAll()
+      toast.success(`계정을 ${action}했습니다.`)
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setPendingId('')
     }
@@ -104,13 +104,13 @@ export default function AdminPage() {
   const handleToggleRecruiter = async (target) => {
     const action = target.isRecruiter ? '채용자 등급 해제' : '채용자 등급 지정'
     if (!window.confirm(`${target.email} 계정을 ${action}하시겠습니까?`)) return
-    setError('')
     setPendingId(target.id)
     try {
       await api.patch(`/admin/users/${target.id}`, { isRecruiter: !target.isRecruiter })
       await loadAll()
+      toast.success(`${action} 처리되었습니다.`)
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setPendingId('')
     }
@@ -123,13 +123,13 @@ export default function AdminPage() {
       )
     )
       return
-    setError('')
     setPendingId(target.id)
     try {
       const res = await api.post(`/admin/users/${target.id}/reset-password`, {})
       setRevealed((prev) => ({ ...prev, [target.id]: res.tempPassword }))
+      toast.success('임시 비밀번호가 발급되었습니다. 확인하세요.')
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setPendingId('')
     }
@@ -141,17 +141,17 @@ export default function AdminPage() {
     )
     if (typed === null) return
     if (typed !== target.email) {
-      setError('입력한 이메일이 일치하지 않아 삭제를 취소했습니다.')
+      toast.error('입력한 이메일이 일치하지 않아 삭제를 취소했습니다.')
       return
     }
-    setError('')
     setPendingId(target.id)
     try {
       await api.delete(`/admin/users/${target.id}`)
       dismissRevealed(target.id)
       await loadAll()
+      toast.success('계정이 삭제되었습니다.')
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setPendingId('')
     }
@@ -164,13 +164,13 @@ export default function AdminPage() {
       )
     )
       return
-    setError('')
     setPendingId(room.id)
     try {
       await api.delete(`/admin/rooms/${room.id}`)
       await loadAll()
+      toast.success('면접방이 삭제되었습니다.')
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setPendingId('')
     }
@@ -196,7 +196,6 @@ export default function AdminPage() {
   return (
     <div className="admin-page">
       <h1>관리자 패널</h1>
-      {error && <p className="error">{error}</p>}
 
       <section className="admin-create-account">
         <h2>새 계정 만들기</h2>
@@ -230,7 +229,6 @@ export default function AdminPage() {
             {creating ? '생성 중...' : '계정 만들기'}
           </button>
         </form>
-        {createError && <p className="error">{createError}</p>}
         <p className="notice">
           생성된 계정의 임시 비밀번호는 아래 사용자 목록의 해당 계정 행에 한 번만 표시됩니다.
         </p>

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api } from '../api/client.js'
+import { useToast } from '../context/ToastContext.jsx'
 import { useChatPolling } from '../hooks/useChatPolling.js'
 import ChatMessageList from '../components/ChatMessageList.jsx'
 import ChatComposer from '../components/ChatComposer.jsx'
@@ -11,13 +12,13 @@ import RoomInviteEmailForm from '../components/RoomInviteEmailForm.jsx'
 
 export default function RoomPage() {
   const { roomId } = useParams()
+  const toast = useToast()
   const [room, setRoom] = useState(null)
   const [error, setError] = useState('')
   const { messages, sendMessage } = useChatPolling(roomId)
 
   const [contract, setContract] = useState(null)
   const [analyzing, setAnalyzing] = useState(false)
-  const [analyzeError, setAnalyzeError] = useState('')
 
   const loadContract = useCallback(async () => {
     const data = await api.get(`/rooms/${roomId}/contract`)
@@ -33,13 +34,13 @@ export default function RoomPage() {
   }, [roomId, loadContract])
 
   const handleAnalyze = async () => {
-    setAnalyzeError('')
     setAnalyzing(true)
     try {
       const data = await api.post(`/rooms/${roomId}/analyze`, {})
       setContract(data)
+      toast.success('채용 조건이 정리되었습니다.')
     } catch (err) {
-      setAnalyzeError(err.message)
+      toast.error(err.message)
     } finally {
       setAnalyzing(false)
     }
@@ -76,7 +77,6 @@ export default function RoomPage() {
             <button type="button" className="btn-primary" onClick={handleAnalyze} disabled={analyzing}>
               {analyzing ? '분석 중...' : 'AI로 조건 정리하기'}
             </button>
-            {analyzeError && <p className="error">{analyzeError}</p>}
           </>
         )}
         <ContractFieldsForm

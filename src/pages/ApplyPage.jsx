@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { api } from '../api/client.js'
+import { useToast } from '../context/ToastContext.jsx'
 import { CONSENT_ITEMS } from '../lib/consentText.js'
 
 const EMPLOYMENT_TYPES = ['정규직', '계약직', '인턴', '아르바이트', '프리랜서', '기타']
@@ -64,20 +65,19 @@ export default function ApplyPage() {
     consentThirdParty: false,
   })
 
+  const toast = useToast()
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
   const [done, setDone] = useState(false)
   const careerKeyRef = useRef(0)
 
   const pickFile = (setter) => (event) => {
     const file = event.target.files?.[0] || null
     if (file && file.size > MAX_FILE_SIZE) {
-      setError('파일 크기는 10MB 이하만 첨부할 수 있습니다.')
+      toast.error('파일 크기는 10MB 이하만 첨부할 수 있습니다.')
       event.target.value = ''
       setter(null)
       return
     }
-    setError('')
     setter(file)
   }
 
@@ -105,14 +105,13 @@ export default function ApplyPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setError('')
 
     if (!consents.consentRequired) {
-      setError('개인정보 필수항목 수집·이용에 동의해야 지원할 수 있습니다.')
+      toast.error('개인정보 필수항목 수집·이용에 동의해야 지원할 수 있습니다.')
       return
     }
     if (!resume) {
-      setError('이력서 파일을 첨부해주세요.')
+      toast.error('이력서 파일을 첨부해주세요.')
       return
     }
 
@@ -133,8 +132,9 @@ export default function ApplyPage() {
 
       await api.upload(`/jobs/${id}/apply`, form)
       setDone(true)
+      toast.success('지원서가 정상 제출되었습니다.')
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setSubmitting(false)
     }
@@ -382,7 +382,6 @@ export default function ApplyPage() {
           ))}
         </section>
 
-        {error && <p className="error">{error}</p>}
         <button type="submit" className="btn-primary btn-block" disabled={submitting}>
           {submitting ? '제출 중...' : '지원서 제출하기'}
         </button>

@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useToast } from '../context/ToastContext.jsx'
 
 export default function SignupPage() {
   const { signup } = useAuth()
+  const toast = useToast()
   const navigate = useNavigate()
   const [form, setForm] = useState({
     email: '',
@@ -12,20 +14,18 @@ export default function SignupPage() {
     displayName: '',
     companyName: '',
   })
-  const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const update = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }))
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setError('')
     setSubmitting(true)
     try {
       await signup(form)
       navigate('/dashboard')
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setSubmitting(false)
     }
@@ -66,7 +66,6 @@ export default function SignupPage() {
             minLength={8}
           />
         </label>
-        {error && <p className="error">{error}</p>}
         <button type="submit" className="btn-primary btn-block" disabled={submitting}>
           가입하기
         </button>

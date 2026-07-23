@@ -1,24 +1,24 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useToast } from '../context/ToastContext.jsx'
 
 export default function LoginPage() {
   const { login } = useAuth()
+  const toast = useToast()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setError('')
     setSubmitting(true)
     try {
       await login(email, password)
       navigate('/dashboard')
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setSubmitting(false)
     }
@@ -41,7 +41,6 @@ export default function LoginPage() {
             required
           />
         </label>
-        {error && <p className="error">{error}</p>}
         <button type="submit" className="btn-primary btn-block" disabled={submitting}>
           로그인
         </button>

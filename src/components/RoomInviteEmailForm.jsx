@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api/client.js'
+import { useToast } from '../context/ToastContext.jsx'
 
 function defaultMessage(candidateName, companyName) {
   return `안녕하세요, ${candidateName}님.
@@ -14,11 +15,11 @@ export default function RoomInviteEmailForm({ roomId, candidateName, companyName
   const defaultSubject = useMemo(() => `[${companyName}] 면접방 참여 안내`, [companyName])
   const [subject, setSubject] = useState(defaultSubject)
   const [bodyText, setBodyText] = useState(() => defaultMessage(candidateName, companyName))
+  const toast = useToast()
   const [candidate, setCandidate] = useState(null)
   const [emailConfigured, setEmailConfigured] = useState(true)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
-  const [error, setError] = useState('')
   const [sentTo, setSentTo] = useState('')
 
   useEffect(() => {
@@ -28,22 +29,22 @@ export default function RoomInviteEmailForm({ roomId, candidateName, companyName
         setCandidate(data.candidate)
         setEmailConfigured(data.emailConfigured)
       })
-      .catch((err) => setError(err.message))
+      .catch((err) => toast.error(err.message))
       .finally(() => setLoading(false))
-  }, [roomId])
+  }, [roomId, toast])
 
   const handleSend = async (event) => {
     event.preventDefault()
     if (!window.confirm(`${candidate?.displayName || candidateName}님에게 면접방 초대 이메일을 보내시겠습니까?`)) {
       return
     }
-    setError('')
     setSending(true)
     try {
       const data = await api.post(`/rooms/${roomId}/invite-email`, { subject, bodyText })
       setSentTo(data.recipientEmailMasked)
+      toast.success('면접방 초대 이메일을 보냈습니다.')
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setSending(false)
     }
@@ -71,7 +72,6 @@ export default function RoomInviteEmailForm({ roomId, candidateName, companyName
         </p>
       )}
       {sentTo && <p className="save-message">{sentTo} 주소로 초대 이메일을 보냈습니다.</p>}
-      {error && <p className="error">{error}</p>}
       <form className="final-offer-form" onSubmit={handleSend}>
         <label>
           제목

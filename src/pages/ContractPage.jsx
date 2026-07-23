@@ -4,6 +4,7 @@ import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
 import { api } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useToast } from '../context/ToastContext.jsx'
 import SignatureModal from '../components/SignatureModal.jsx'
 import { IDENTITY_FIELDS, TERM_FIELDS, SOCIAL_INSURANCE_FIELDS } from '../lib/contractTemplate.js'
 
@@ -60,6 +61,7 @@ const EMPTY_FORM = {
 export default function ContractPage() {
   const { roomId } = useParams()
   const { user } = useAuth()
+  const toast = useToast()
   const [room, setRoom] = useState(null)
   const [contractMeta, setContractMeta] = useState({ hireConfirmed: false })
   const [form, setForm] = useState(EMPTY_FORM)
@@ -67,17 +69,14 @@ export default function ContractPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
-  const [saveMessage, setSaveMessage] = useState('')
   const [signingRole, setSigningRole] = useState(null)
   const [exporting, setExporting] = useState(false)
   const [aiDocument, setAiDocument] = useState(null)
   const [drafting, setDrafting] = useState(false)
-  const [draftError, setDraftError] = useState('')
   const [history, setHistory] = useState([])
   const [signedContract, setSignedContract] = useState(null)
   const [signedMeta, setSignedMeta] = useState({ emailConfigured: true, candidateEmailMasked: null })
   const [storing, setStoring] = useState(false)
-  const [storeError, setStoreError] = useState('')
   const printRef = useRef(null)
 
   const loadAll = useCallback(async () => {
@@ -163,8 +162,6 @@ export default function ContractPage() {
 
   const handleSave = async () => {
     setSaving(true)
-    setSaveMessage('')
-    setError('')
     try {
       const filteredCustomTerms = form.customTerms.filter((c) => c.label && c.value)
       const droppedCount = form.customTerms.length - filteredCustomTerms.length
@@ -175,13 +172,13 @@ export default function ContractPage() {
       }
       await api.patch(`/rooms/${roomId}/contract`, payload)
       setForm((f) => ({ ...f, customTerms: filteredCustomTerms }))
-      setSaveMessage(
+      toast.success(
         droppedCount > 0
           ? `저장되었습니다. (라벨/값이 비어있는 기타 항목 ${droppedCount}개는 저장되지 않았습니다.)`
-          : '저장되었습니다.'
+          : '정상적으로 저장되었습니다.'
       )
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setSaving(false)
     }
@@ -189,21 +186,26 @@ export default function ContractPage() {
 
   const handleDraftDocument = async () => {
     setDrafting(true)
-    setDraftError('')
     try {
       const data = await api.post(`/rooms/${roomId}/contract-draft`, form)
       setAiDocument(data.articles)
+      toast.success('AI 계약서 문장이 작성되었습니다.')
     } catch (err) {
-      setDraftError(err.message)
+      toast.error(err.message)
     } finally {
       setDrafting(false)
     }
   }
 
   const handleSign = async (imageDataUrl) => {
-    await api.post(`/rooms/${roomId}/sign`, { imageDataUrl })
-    setSigningRole(null)
-    await loadAll()
+    try {
+      await api.post(`/rooms/${roomId}/sign`, { imageDataUrl })
+      setSigningRole(null)
+      await loadAll()
+      toast.success('서명이 완료되었습니다.')
+    } catch (err) {
+      toast.error(err.message)
+    }
   }
 
   const buildPdf = async () => {
@@ -231,12 +233,11 @@ export default function ContractPage() {
 
   const handleExportPdf = async () => {
     setExporting(true)
-    setError('')
     try {
       const pdf = await buildPdf()
       pdf.save('근로계약서.pdf')
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setExporting(false)
     }
@@ -244,7 +245,6 @@ export default function ContractPage() {
 
   const handleStoreAndSend = async () => {
     setStoring(true)
-    setStoreError('')
     try {
       const pdf = await buildPdf()
       const blob = pdf.output('blob')
@@ -253,8 +253,13 @@ export default function ContractPage() {
       const data = await api.upload(`/rooms/${roomId}/signed-contract`, fd)
       setSignedContract(data.stored)
       setSignedMeta((m) => ({ ...m, emailConfigured: data.emailConfigured }))
+      toast.success(
+        data.stored?.emailStatus === 'sent'
+          ? '계약서를 저장하고 이메일로 사본을 전송했습니다.'
+          : '계약서가 저장되었습니다.'
+      )
     } catch (err) {
-      setStoreError(err.message)
+      toast.error(err.message)
     } finally {
       setStoring(false)
     }
@@ -279,7 +284,6 @@ export default function ContractPage() {
         </p>
       )}
       {isSigned && <p className="signed-banner">양측 서명이 완료되었습니다.</p>}
-      {error && <p className="error">{error}</p>}
 
       <section className="contract-form">
         <h2>{myRole === 'company' ? '계약 조건 입력/수정' : '계약 조건 확인'}</h2>
@@ -348,7 +352,6 @@ export default function ContractPage() {
             {saving ? '저장 중...' : '저장'}
           </button>
         )}
-        {saveMessage && <p className="save-message">{saveMessage}</p>}
       </section>
 
       {canEdit && (user.isAdmin || user.isRecruiter) && (
@@ -358,7 +361,6 @@ export default function ContractPage() {
           <button type="button" onClick={handleDraftDocument} disabled={drafting}>
             {drafting ? 'AI가 계약서를 작성하는 중...' : aiDocument ? 'AI 계약서 다시 작성하기' : 'AI로 계약서 작성하기'}
           </button>
-          {draftError && <p className="error">{draftError}</p>}
         </section>
       )}
 
@@ -438,7 +440,6 @@ export default function ContractPage() {
               이메일 발송 기능이 아직 설정되지 않았습니다. 지금은 서버 보관·다운로드만 가능합니다.
             </p>
           )}
-          {storeError && <p className="error">{storeError}</p>}
           {myRole === 'company' && (
             <button type="button" className="btn-primary" onClick={handleStoreAndSend} disabled={storing}>
               {storing

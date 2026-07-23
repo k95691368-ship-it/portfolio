@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api/client.js'
+import { useToast } from '../context/ToastContext.jsx'
 
 function defaultMessage(candidateName, companyName) {
   return `안녕하세요, ${candidateName}님.
@@ -15,11 +16,11 @@ export default function FinalOfferEmailForm({ roomId, candidateName, companyName
   const defaultSubject = useMemo(() => `[${companyName}] 최종 합격을 축하드립니다`, [companyName])
   const [subject, setSubject] = useState(defaultSubject)
   const [bodyText, setBodyText] = useState(() => defaultMessage(candidateName, companyName))
+  const toast = useToast()
   const [candidate, setCandidate] = useState(null)
   const [delivery, setDelivery] = useState(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
-  const [error, setError] = useState('')
 
   useEffect(() => {
     api
@@ -28,9 +29,9 @@ export default function FinalOfferEmailForm({ roomId, candidateName, companyName
         setCandidate(data.candidate)
         setDelivery(data.delivery)
       })
-      .catch((err) => setError(err.message))
+      .catch((err) => toast.error(err.message))
       .finally(() => setLoading(false))
-  }, [roomId])
+  }, [roomId, toast])
 
   const handleSend = async (event) => {
     event.preventDefault()
@@ -38,13 +39,13 @@ export default function FinalOfferEmailForm({ roomId, candidateName, companyName
       return
     }
 
-    setError('')
     setSending(true)
     try {
       const data = await api.post(`/rooms/${roomId}/final-offer-email`, { subject, bodyText })
       setDelivery(data.delivery)
+      toast.success('최종합격 이메일을 보냈습니다.')
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setSending(false)
     }
@@ -91,7 +92,6 @@ export default function FinalOfferEmailForm({ roomId, candidateName, companyName
         <p className="notice">이전 발송이 완료되지 않았습니다. 내용을 확인하고 다시 시도해주세요.</p>
       )}
       {delivery?.status === 'sending' && <p className="notice">현재 이메일을 발송하고 있습니다.</p>}
-      {error && <p className="error">{error}</p>}
       <form className="final-offer-form" onSubmit={handleSend}>
         <label>
           제목

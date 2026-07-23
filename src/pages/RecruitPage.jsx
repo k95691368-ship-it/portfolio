@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useToast } from '../context/ToastContext.jsx'
 
 const STATUS_LABEL = {
   submitted: { label: '심사 대기', badge: 'badge-warning' },
@@ -10,8 +11,8 @@ const STATUS_LABEL = {
 }
 
 function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
+  const toast = useToast()
   const [detail, setDetail] = useState(null)
-  const [error, setError] = useState('')
   const [working, setWorking] = useState(false)
   const [passResult, setPassResult] = useState(null)
 
@@ -19,8 +20,8 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
     api
       .get(`/applications/${appId}`)
       .then((data) => setDetail(data.application))
-      .catch((err) => setError(err.message))
-  }, [appId])
+      .catch((err) => toast.error(err.message))
+  }, [appId, toast])
 
   useEffect(() => {
     load()
@@ -28,15 +29,15 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
 
   const handlePass = async () => {
     if (!window.confirm('서류합격 처리하시겠습니까? 지원자 계정과 면접방이 자동 생성됩니다.')) return
-    setError('')
     setWorking(true)
     try {
       const result = await api.post(`/applications/${appId}/pass`, {})
       setPassResult(result)
+      toast.success('서류합격 처리되었습니다. 지원자 계정과 면접방이 생성되었습니다.')
       load()
       onChanged()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setWorking(false)
     }
@@ -44,14 +45,14 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
 
   const handleReject = async () => {
     if (!window.confirm('불합격 처리하시겠습니까?')) return
-    setError('')
     setWorking(true)
     try {
       await api.post(`/applications/${appId}/reject`, {})
+      toast.success('불합격 처리되었습니다.')
       load()
       onChanged()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setWorking(false)
     }
@@ -168,8 +169,6 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
               </p>
             </div>
 
-            {error && <p className="error">{error}</p>}
-
             {detail.status === 'submitted' && (
               <div className="modal-actions">
                 {canPass ? (
@@ -198,10 +197,10 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
 
 export default function RecruitPage() {
   const { user } = useAuth()
+  const toast = useToast()
   const [postings, setPostings] = useState([])
   const [applications, setApplications] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [selectedApp, setSelectedApp] = useState(null)
 
   // 새 공고 폼
@@ -222,20 +221,20 @@ export default function RecruitPage() {
 
   useEffect(() => {
     loadAll()
-      .catch((err) => setError(err.message))
+      .catch((err) => toast.error(err.message))
       .finally(() => setLoading(false))
-  }, [loadAll])
+  }, [loadAll, toast])
 
   const handleCreate = async (e) => {
     e.preventDefault()
-    setError('')
     setCreating(true)
     try {
       await api.post('/postings', form)
       setForm({ title: '', department: '', employmentType: '', location: '', description: '' })
       await loadAll()
+      toast.success('공고가 정상 등록되었습니다.')
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setCreating(false)
     }
@@ -246,8 +245,9 @@ export default function RecruitPage() {
     try {
       await api.patch(`/postings/${posting.id}`, { status: next })
       await loadAll()
+      toast.success(next === 'closed' ? '공고를 마감했습니다.' : '공고를 다시 모집합니다.')
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     }
   }
 
@@ -256,8 +256,9 @@ export default function RecruitPage() {
     try {
       await api.delete(`/postings/${posting.id}`)
       await loadAll()
+      toast.success('공고가 삭제되었습니다.')
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     }
   }
 
@@ -269,8 +270,6 @@ export default function RecruitPage() {
           <Link to="/dashboard">대시보드</Link>
         </div>
       </header>
-
-      {error && <p className="error">{error}</p>}
 
       <section className="recruit-section">
         <h2>채용 공고 등록</h2>

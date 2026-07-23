@@ -1,15 +1,16 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import DocumentManager from '../components/DocumentManager.jsx'
 import { roomStatusInfo } from '../lib/roomStatus.js'
 
 export default function DashboardPage() {
   const { user, logout } = useAuth()
+  const toast = useToast()
   const [rooms, setRooms] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
 
   const [title, setTitle] = useState('')
   const [inviteCode, setInviteCode] = useState('')
@@ -27,15 +28,15 @@ export default function DashboardPage() {
 
   const handleCreate = async (e) => {
     e.preventDefault()
-    setError('')
     setSubmitting(true)
     try {
       const room = await api.post('/rooms/create', { title })
       setCreatedRoom(room)
       setTitle('')
       await loadRooms()
+      toast.success('면접방이 생성되었습니다.')
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setSubmitting(false)
     }
@@ -43,14 +44,14 @@ export default function DashboardPage() {
 
   const handleJoin = async (e) => {
     e.preventDefault()
-    setError('')
     setSubmitting(true)
     try {
       await api.post('/rooms/join', { inviteCode })
       setInviteCode('')
       await loadRooms()
+      toast.success('면접방에 참여했습니다.')
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setSubmitting(false)
     }
@@ -93,8 +94,6 @@ export default function DashboardPage() {
       )}
 
       {user.role === 'candidate' && <DocumentManager />}
-
-      {error && <p className="error">{error}</p>}
 
       {createdRoom && (
         <p className="notice">

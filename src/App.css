@@ -1085,6 +1085,66 @@
   min-height: 160px;
 }
 
+/* 상단 팝업 알림 (토스트) */
+.toast-viewport {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: min(92vw, 520px);
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.45;
+  padding: 14px 18px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  color: #fff;
+  animation: toast-in 0.22s ease;
+}
+.toast-success {
+  background: var(--success);
+  border-color: var(--success);
+}
+.toast-error {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+.toast-info {
+  background: var(--text-h);
+  border-color: var(--text-h);
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 640px) {
+  .toast-viewport {
+    top: 10px;
+    max-width: 92vw;
+  }
+}
+
 /* 서명 완료 계약서 보관/전송 */
 .signed-contract-section {
   display: flex;
