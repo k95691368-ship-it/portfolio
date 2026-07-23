@@ -61,6 +61,7 @@ export default function DashboardPage() {
       <header className="dashboard-header">
         <h1>{user.role === 'company' ? '회사' : '구직자'} 대시보드</h1>
         <div className="header-actions">
+          {(user.isAdmin || user.isRecruiter) && <Link to="/recruit">채용 관리</Link>}
           {user.isAdmin && <Link to="/admin">관리자 패널</Link>}
           <button className="btn-ghost" onClick={logout}>
             로그아웃

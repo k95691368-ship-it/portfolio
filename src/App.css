@@ -685,3 +685,385 @@
 .temp-password-banner button {
   margin-right: 6px;
 }
+
+/* ===== 채용 공고 · 지원 (신규) ===== */
+
+.jobs-page,
+.job-detail-page,
+.apply-page,
+.recruit-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 40px 48px;
+  text-align: left;
+}
+@media (max-width: 640px) {
+  .jobs-page,
+  .job-detail-page,
+  .apply-page,
+  .recruit-page {
+    padding: 24px 20px;
+  }
+}
+
+/* 랜딩 (회사/지원자 분기) */
+.landing-page {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+.landing-hero {
+  max-width: 640px;
+  width: 100%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.landing-eyebrow {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.2px;
+}
+.landing-sub {
+  color: var(--text-muted);
+  font-size: 15px;
+  margin-bottom: 20px;
+}
+.landing-choices {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.landing-choice {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 28px 24px;
+  border-radius: var(--radius);
+  text-align: center;
+}
+.landing-choice-title {
+  font-size: 22px;
+  font-weight: 700;
+}
+.landing-choice-desc {
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+/* 공고 목록 */
+.job-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.job-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: inherit;
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease,
+    border-color 0.15s ease;
+}
+.job-card:hover {
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+  border-color: var(--accent-border);
+  text-decoration: none;
+}
+.job-card-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+.job-card-meta {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.job-detail-meta {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.job-detail-body {
+  white-space: pre-wrap;
+  line-height: 1.7;
+  font-size: 15px;
+  color: var(--text);
+}
+.job-detail-actions {
+  display: flex;
+  gap: 12px;
+}
+
+/* 지원서 폼 */
+.apply-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.apply-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.apply-section h2 {
+  margin: 0;
+}
+.apply-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+.apply-form label.checkbox-label {
+  flex-direction: row;
+  align-items: center;
+  font-weight: 500;
+}
+.apply-required-note {
+  font-size: 13px;
+}
+.consent-required {
+  color: var(--danger);
+  font-weight: 700;
+}
+.consent-optional {
+  color: var(--text-muted);
+}
+
+.career-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.career-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.career-row label {
+  flex: 1;
+  min-width: 160px;
+}
+.career-entry > button {
+  align-self: flex-start;
+}
+
+.file-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.file-field-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+.file-field-label em {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: normal;
+}
+.file-field .upload-button {
+  align-self: flex-start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 개인정보 동의 */
+.consent-all {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.consent-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.consent-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.consent-toggle {
+  margin-left: auto;
+  padding: 4px 12px;
+  font-size: 12px;
+  background: var(--surface);
+}
+.consent-text {
+  white-space: pre-wrap;
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.apply-done {
+  max-width: 520px;
+  margin: 40px auto;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.apply-done .btn-primary {
+  align-self: center;
+}
+
+/* 채용 관리 */
+.recruit-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.recruit-section h2 {
+  margin: 0;
+}
+.posting-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.posting-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+.posting-form .btn-primary {
+  align-self: flex-start;
+}
+
+/* 지원서 상세 모달 */
+.application-modal {
+  max-width: 640px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  text-align: left;
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.application-fields {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 8px 16px;
+  margin: 0;
+  font-size: 14px;
+}
+.application-fields dt {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.application-fields dd {
+  margin: 0;
+  color: var(--text-h);
+}
+.application-block {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.application-block h3 {
+  margin: 0;
+}
+.career-view {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+.career-view p {
+  color: var(--text-muted);
+  white-space: pre-wrap;
+}
+.cover-letter-view {
+  white-space: pre-wrap;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.doc-download-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+/* 면접방 초대 이메일 (최종합격 이메일과 동일 스타일) */
+.room-invite-email {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.room-invite-email h2 {
+  margin: 0;
+}
+.room-invite-email .final-offer-form textarea {
+  min-height: 160px;
+}

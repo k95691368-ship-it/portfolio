@@ -7,6 +7,7 @@ import ChatComposer from '../components/ChatComposer.jsx'
 import RoomDocuments from '../components/RoomDocuments.jsx'
 import ContractFieldsForm from '../components/ContractFieldsForm.jsx'
 import FinalOfferEmailForm from '../components/FinalOfferEmailForm.jsx'
+import RoomInviteEmailForm from '../components/RoomInviteEmailForm.jsx'
 
 export default function RoomPage() {
   const { roomId } = useParams()
@@ -91,11 +92,18 @@ export default function RoomPage() {
       </section>
 
       {room.myRole === 'company' && (
-        <FinalOfferEmailForm
-          roomId={roomId}
-          candidateName={candidate?.displayName || '지원자'}
-          companyName={company?.companyName || company?.displayName || '회사'}
-        />
+        <>
+          <RoomInviteEmailForm
+            roomId={roomId}
+            candidateName={candidate?.displayName || '지원자'}
+            companyName={company?.companyName || company?.displayName || '회사'}
+          />
+          <FinalOfferEmailForm
+            roomId={roomId}
+            candidateName={candidate?.displayName || '지원자'}
+            companyName={company?.companyName || company?.displayName || '회사'}
+          />
+        </>
       )}
     </div>
   )
