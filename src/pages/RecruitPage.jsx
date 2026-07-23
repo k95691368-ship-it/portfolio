@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -195,6 +195,72 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
   )
 }
 
+function RecruitStats({ postings, applications }) {
+  const stats = useMemo(() => {
+    const openPostings = postings.filter((p) => p.status === 'open').length
+    const submitted = applications.filter((a) => a.status === 'submitted').length
+    const passed = applications.filter((a) => a.status === 'passed').length
+    const rejected = applications.filter((a) => a.status === 'rejected').length
+    const total = applications.length
+    const decided = passed + rejected
+    const passRate = decided > 0 ? Math.round((passed / decided) * 100) : null
+    return { total, openPostings, submitted, passed, rejected, passRate, count: postings.length }
+  }, [postings, applications])
+
+  const seg = (n) => (stats.total > 0 ? `${(n / stats.total) * 100}%` : '0%')
+
+  return (
+    <section className="recruit-section">
+      <h2>채용 현황</h2>
+      <div className="stat-row">
+        <div className="stat-tile">
+          <span className="stat-value">{stats.count}</span>
+          <span className="stat-label">전체 공고</span>
+          <span className="stat-sub">모집 중 {stats.openPostings}</span>
+        </div>
+        <div className="stat-tile">
+          <span className="stat-value">{stats.total}</span>
+          <span className="stat-label">전체 지원자</span>
+        </div>
+        <div className="stat-tile">
+          <span className="stat-value">{stats.submitted}</span>
+          <span className="stat-label">심사 대기</span>
+        </div>
+        <div className="stat-tile">
+          <span className="stat-value">{stats.passed}</span>
+          <span className="stat-label">서류합격</span>
+        </div>
+        <div className="stat-tile">
+          <span className="stat-value">{stats.passRate === null ? '—' : `${stats.passRate}%`}</span>
+          <span className="stat-label">서류 합격률</span>
+          <span className="stat-sub">합격/(합격+불합격)</span>
+        </div>
+      </div>
+
+      {stats.total > 0 && (
+        <div className="status-breakdown">
+          <div className="status-bar" role="img" aria-label={`심사 대기 ${stats.submitted}, 서류합격 ${stats.passed}, 불합격 ${stats.rejected}`}>
+            {stats.submitted > 0 && <span className="status-seg-submitted" style={{ width: seg(stats.submitted) }} />}
+            {stats.passed > 0 && <span className="status-seg-passed" style={{ width: seg(stats.passed) }} />}
+            {stats.rejected > 0 && <span className="status-seg-rejected" style={{ width: seg(stats.rejected) }} />}
+          </div>
+          <div className="status-legend">
+            <span className="status-legend-item">
+              <span className="status-dot status-seg-submitted" /> 심사 대기 {stats.submitted}
+            </span>
+            <span className="status-legend-item">
+              <span className="status-dot status-seg-passed" /> 서류합격 {stats.passed}
+            </span>
+            <span className="status-legend-item">
+              <span className="status-dot status-seg-rejected" /> 불합격 {stats.rejected}
+            </span>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
 export default function RecruitPage() {
   const { user } = useAuth()
   const toast = useToast()
@@ -270,6 +336,8 @@ export default function RecruitPage() {
           <Link to="/dashboard">대시보드</Link>
         </div>
       </header>
+
+      {!loading && <RecruitStats postings={postings} applications={applications} />}
 
       <section className="recruit-section">
         <h2>채용 공고 등록</h2>
