@@ -902,6 +902,23 @@
   text-overflow: ellipsis;
 }
 
+/* 화면에는 숨기되 키보드/스크린리더 접근은 유지 (파일 input 등) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.upload-button:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* 개인정보 동의 */
 .consent-all {
   display: flex;

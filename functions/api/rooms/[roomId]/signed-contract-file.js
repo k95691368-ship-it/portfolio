@@ -20,7 +20,7 @@ export async function onRequestGet({ env, data, params }) {
   return new Response(object.body, {
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="${encodeURIComponent(row.filename)}"`,
+      'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(row.filename)}`,
       'X-Content-Type-Options': 'nosniff',
     },
   })

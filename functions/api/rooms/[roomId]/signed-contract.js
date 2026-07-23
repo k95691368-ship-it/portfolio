@@ -85,32 +85,41 @@ export async function onRequestPost({ request, env, data, params }) {
   const r2Key = `contracts/${params.roomId}/signed-${Date.now()}.pdf`
   const filename = `근로계약서_${params.roomId.slice(0, 8)}.pdf`
 
-  // 기존 저장본이 있으면 R2 정리
+  // 기존 저장본 키를 기억해 두고, 새 저장·DB 커밋이 성공한 뒤에만 삭제한다.
   const existing = await env.DB.prepare('SELECT r2_key FROM signed_contracts WHERE room_id = ?')
     .bind(params.roomId)
     .first()
-  if (existing) {
-    await env.DOCUMENTS.delete(existing.r2_key).catch(() => {})
-  }
 
   await env.DOCUMENTS.put(r2Key, buffer, { httpMetadata: { contentType: 'application/pdf' } })
 
   const id = genId()
-  await env.DB.prepare(
-    `INSERT INTO signed_contracts (id, room_id, r2_key, filename, size_bytes, stored_by_user_id, email_status)
-     VALUES (?, ?, ?, ?, ?, ?, 'not_sent')
-     ON CONFLICT(room_id) DO UPDATE SET
-       r2_key = excluded.r2_key,
-       filename = excluded.filename,
-       size_bytes = excluded.size_bytes,
-       stored_by_user_id = excluded.stored_by_user_id,
-       email_status = 'not_sent',
-       email_error = NULL,
-       emailed_at = NULL,
-       updated_at = datetime('now')`
-  )
-    .bind(id, params.roomId, r2Key, filename, file.size, data.user.id)
-    .run()
+  try {
+    await env.DB.prepare(
+      `INSERT INTO signed_contracts (id, room_id, r2_key, filename, size_bytes, stored_by_user_id, email_status)
+       VALUES (?, ?, ?, ?, ?, ?, 'not_sent')
+       ON CONFLICT(room_id) DO UPDATE SET
+         r2_key = excluded.r2_key,
+         filename = excluded.filename,
+         size_bytes = excluded.size_bytes,
+         stored_by_user_id = excluded.stored_by_user_id,
+         email_status = 'not_sent',
+         email_error = NULL,
+         emailed_at = NULL,
+         updated_at = datetime('now')`
+    )
+      .bind(id, params.roomId, r2Key, filename, file.size, data.user.id)
+      .run()
+  } catch (err) {
+    // DB 반영 실패 시 방금 올린 객체를 정리하고, 기존 저장본은 그대로 보존.
+    console.error(`Signed contract DB write failed for room ${params.roomId}:`, err)
+    await env.DOCUMENTS.delete(r2Key).catch(() => {})
+    return jsonError('계약서 저장에 실패했습니다. 잠시 후 다시 시도해주세요.', 500)
+  }
+
+  // DB 커밋 성공 후에만 이전 저장본을 삭제 (키가 다를 때).
+  if (existing && existing.r2_key !== r2Key) {
+    await env.DOCUMENTS.delete(existing.r2_key).catch(() => {})
+  }
 
   // 지원자에게 이메일 발송 (설정된 경우에만 시도)
   let emailStatus = 'not_sent'

@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { CONSENT_ITEMS } from '../lib/consentText.js'
 
 const EMPLOYMENT_TYPES = ['정규직', '계약직', '인턴', '아르바이트', '프리랜서', '기타']
 const SOURCES = ['채용 사이트', '회사 홈페이지', '지인 추천', '검색', 'SNS', '기타']
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
-function emptyCareer() {
+function emptyCareer(key) {
   return {
+    _key: key,
     employmentType: '',
     companyName: '',
     startDate: '',
@@ -65,6 +67,19 @@ export default function ApplyPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
+  const careerKeyRef = useRef(0)
+
+  const pickFile = (setter) => (event) => {
+    const file = event.target.files?.[0] || null
+    if (file && file.size > MAX_FILE_SIZE) {
+      setError('파일 크기는 10MB 이하만 첨부할 수 있습니다.')
+      event.target.value = ''
+      setter(null)
+      return
+    }
+    setError('')
+    setter(file)
+  }
 
   useEffect(() => {
     api
@@ -125,7 +140,16 @@ export default function ApplyPage() {
     }
   }
 
-  if (loadError) return <p className="error">{loadError}</p>
+  if (loadError) {
+    return (
+      <div className="apply-page">
+        <p className="error">{loadError}</p>
+        <p>
+          <Link to="/jobs">← 채용 공고 목록으로</Link>
+        </p>
+      </div>
+    )
+  }
 
   if (done) {
     return (
@@ -192,7 +216,7 @@ export default function ApplyPage() {
           <h2>경력사항</h2>
           {careers.length === 0 && <p className="notice">경력이 있으시면 항목을 추가해주세요. (선택)</p>}
           {careers.map((career, index) => (
-            <div className="career-entry" key={index}>
+            <div className="career-entry" key={career._key}>
               <div className="career-row">
                 <label>
                   고용형태
@@ -279,7 +303,7 @@ export default function ApplyPage() {
           <button
             type="button"
             className="btn-ghost"
-            onClick={() => setCareers((prev) => [...prev, emptyCareer()])}
+            onClick={() => setCareers((prev) => [...prev, emptyCareer(careerKeyRef.current++)])}
           >
             + 항목 추가
           </button>
@@ -296,9 +320,9 @@ export default function ApplyPage() {
               {resume ? resume.name : '파일 업로드'}
               <input
                 type="file"
-                hidden
+                className="sr-only"
                 accept=".pdf,.doc,.docx,.hwp,.hwpx"
-                onChange={(e) => setResume(e.target.files?.[0] || null)}
+                onChange={pickFile(setResume)}
               />
             </label>
           </div>
@@ -310,9 +334,9 @@ export default function ApplyPage() {
               {portfolio ? portfolio.name : '파일 업로드'}
               <input
                 type="file"
-                hidden
+                className="sr-only"
                 accept=".pdf,.doc,.docx,.hwp,.hwpx"
-                onChange={(e) => setPortfolio(e.target.files?.[0] || null)}
+                onChange={pickFile(setPortfolio)}
               />
             </label>
           </div>

@@ -28,9 +28,18 @@ export async function onRequestPost({ env, data, params }) {
   }
 
   // 지원 이메일로 계정 조회 (없으면 신규 생성)
-  const existingUser = await env.DB.prepare('SELECT id FROM users WHERE email = ?')
+  const existingUser = await env.DB.prepare('SELECT id, role FROM users WHERE email = ?')
     .bind(application.applicant_email)
     .first()
+
+  // 본인(채용자) 계정이면 회사·지원자로 동시 착석하게 되어 충돌하므로 거부
+  if (existingUser && existingUser.id === data.user.id) {
+    return jsonError('본인 계정 이메일로는 서류합격 처리를 할 수 없습니다.', 409)
+  }
+  // 이미 다른 유형(회사/관리자)으로 쓰이는 이메일은 지원자로 편입할 수 없음
+  if (existingUser && existingUser.role !== 'candidate') {
+    return jsonError('이 이메일은 이미 다른 유형의 계정으로 사용 중이라 지원자로 연결할 수 없습니다.', 409)
+  }
 
   let candidateUserId
   let tempPassword = null
@@ -49,6 +58,18 @@ export async function onRequestPost({ env, data, params }) {
          VALUES (?, ?, ?, ?, 'candidate', ?, 1)`
       ).bind(candidateUserId, application.applicant_email, hash, salt, application.applicant_name)
     )
+  }
+
+  // 동시 요청으로 인한 고아 면접방을 막기 위해, 먼저 지원서를 원자적으로 '선점'한다.
+  const claim = await env.DB.prepare(
+    `UPDATE applications
+     SET status = 'passed', reviewed_by_user_id = ?, reviewed_at = datetime('now')
+     WHERE id = ? AND status = 'submitted'`
+  )
+    .bind(data.user.id, params.id)
+    .run()
+  if (claim.meta.changes === 0) {
+    return jsonError('이미 심사가 완료된 지원서입니다.', 409)
   }
 
   // 초대코드 충돌 방지 재시도
@@ -78,14 +99,18 @@ export async function onRequestPost({ env, data, params }) {
         `INSERT INTO room_participants (room_id, user_id, role_in_room) VALUES (?, ?, 'candidate')`
       ).bind(roomId, candidateUserId),
       env.DB.prepare(
-        `UPDATE applications
-         SET status = 'passed', created_user_id = ?, room_id = ?,
-             reviewed_by_user_id = ?, reviewed_at = datetime('now')
-         WHERE id = ? AND status = 'submitted'`
-      ).bind(candidateUserId, roomId, data.user.id, params.id),
+        `UPDATE applications SET created_user_id = ?, room_id = ? WHERE id = ?`
+      ).bind(candidateUserId, roomId, params.id),
     ])
   } catch (err) {
     console.error(`Application pass failed (application ${params.id}):`, err)
+    // 선점만 되고 계정·면접방 생성이 실패했으면 지원서 상태를 되돌린다.
+    await env.DB.prepare(
+      `UPDATE applications SET status = 'submitted', reviewed_by_user_id = NULL, reviewed_at = NULL WHERE id = ?`
+    )
+      .bind(params.id)
+      .run()
+      .catch(() => {})
     return jsonError('서류합격 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', 500)
   }
 

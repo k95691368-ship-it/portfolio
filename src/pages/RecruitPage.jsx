@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client.js'
+import { useAuth } from '../context/AuthContext.jsx'
 
 const STATUS_LABEL = {
   submitted: { label: '심사 대기', badge: 'badge-warning' },
@@ -8,7 +9,7 @@ const STATUS_LABEL = {
   rejected: { label: '불합격', badge: 'badge-danger' },
 }
 
-function ApplicationDetail({ appId, onClose, onChanged }) {
+function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
   const [detail, setDetail] = useState(null)
   const [error, setError] = useState('')
   const [working, setWorking] = useState(false)
@@ -171,9 +172,13 @@ function ApplicationDetail({ appId, onClose, onChanged }) {
 
             {detail.status === 'submitted' && (
               <div className="modal-actions">
-                <button type="button" className="btn-primary" onClick={handlePass} disabled={working}>
-                  서류합격 (계정·면접방 생성)
-                </button>
+                {canPass ? (
+                  <button type="button" className="btn-primary" onClick={handlePass} disabled={working}>
+                    서류합격 (계정·면접방 생성)
+                  </button>
+                ) : (
+                  <p className="notice">서류합격(계정·면접방 생성)은 회사 계정에서만 가능합니다.</p>
+                )}
                 <button type="button" className="btn-danger" onClick={handleReject} disabled={working}>
                   불합격
                 </button>
@@ -192,6 +197,7 @@ function ApplicationDetail({ appId, onClose, onChanged }) {
 }
 
 export default function RecruitPage() {
+  const { user } = useAuth()
   const [postings, setPostings] = useState([])
   const [applications, setApplications] = useState([])
   const [loading, setLoading] = useState(true)
@@ -414,6 +420,7 @@ export default function RecruitPage() {
           appId={selectedApp}
           onClose={() => setSelectedApp(null)}
           onChanged={loadAll}
+          canPass={user.role === 'company'}
         />
       )}
     </div>
