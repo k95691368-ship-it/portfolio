@@ -96,7 +96,7 @@ export async function onRequestPost({ env, data, params }) {
   const hireConfirmed = analysis.hire_confirmed || wasConfirmed
   const hireConfirmedAt = analysis.hire_confirmed && !wasConfirmed ? new Date().toISOString() : (existing?.hire_confirmed_at ?? null)
   const confirmationExcerpt = analysis.hire_confirmed
-    ? analysis.confirmation_excerpt
+    ? (analysis.confirmation_excerpt ?? null)
     : (existing?.hire_confirmation_excerpt ?? null)
   const lastMessageId = messages[messages.length - 1].id
 

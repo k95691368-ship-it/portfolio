@@ -118,7 +118,7 @@ export async function draftContractDocument(env, terms) {
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 2048,
+      max_tokens: 4096,
       system: DRAFT_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userContent }],
       tools: [DRAFT_TOOL],
@@ -132,8 +132,15 @@ export async function draftContractDocument(env, terms) {
   }
 
   const data = await res.json()
-  const toolUse = data.content.find((block) => block.type === 'tool_use')
-  if (!toolUse) throw new Error('AI 응답에서 계약서 초안을 찾을 수 없습니다.')
+  const toolUse = Array.isArray(data.content)
+    ? data.content.find((block) => block.type === 'tool_use')
+    : null
+  if (!toolUse || !Array.isArray(toolUse.input?.articles) || toolUse.input.articles.length === 0) {
+    if (data.stop_reason === 'max_tokens') {
+      throw new Error('AI 응답이 너무 길어 계약서 생성이 중단되었습니다. 입력 조건을 줄여 다시 시도해주세요.')
+    }
+    throw new Error('AI 응답에서 유효한 계약서 초안을 찾을 수 없습니다. 잠시 후 다시 시도해주세요.')
+  }
 
   return toolUse.input
 }
@@ -167,8 +174,12 @@ export async function analyzeConversation(env, transcript, previousTerms) {
   }
 
   const data = await res.json()
-  const toolUse = data.content.find((block) => block.type === 'tool_use')
-  if (!toolUse) throw new Error('AI 응답에서 분석 결과를 찾을 수 없습니다.')
+  const toolUse = Array.isArray(data.content)
+    ? data.content.find((block) => block.type === 'tool_use')
+    : null
+  if (!toolUse || typeof toolUse.input !== 'object' || toolUse.input === null) {
+    throw new Error('AI 응답에서 분석 결과를 찾을 수 없습니다. 잠시 후 다시 시도해주세요.')
+  }
 
   return toolUse.input
 }
