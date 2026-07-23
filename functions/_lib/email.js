@@ -119,6 +119,37 @@ export async function sendRoomInviteEmail(env, { to, subject, bodyText, companyN
   })
 }
 
+// 서류 전형 결과(합격/불합격)를 지원자에게 안내.
+export async function sendApplicationResultEmail(env, { to, applicantName, companyName, result }) {
+  const passed = result === 'passed'
+  const subject = passed
+    ? `[${companyName}] 서류 전형 합격 안내`
+    : `[${companyName}] 서류 전형 결과 안내`
+  const bodyText = passed
+    ? `안녕하세요, ${applicantName}님.
+
+${companyName} 서류 전형에 합격하셨음을 안내드립니다.
+지원하신 이메일이 로그인 아이디가 되며, 담당자가 별도로 안내하는 임시 비밀번호로 로그인하신 뒤 면접 절차를 이어서 진행해 주세요.
+
+축하드립니다. 감사합니다.`
+    : `안녕하세요, ${applicantName}님.
+
+${companyName} 서류 전형에 지원해 주셔서 진심으로 감사드립니다.
+아쉽게도 이번 전형에서는 함께하지 못하게 되었음을 안내드립니다.
+지원자님의 앞날에 좋은 결과가 있기를 응원하겠습니다.
+
+감사합니다.`
+
+  return sendBrandedEmail(env, {
+    to,
+    subject,
+    bodyText,
+    companyName,
+    heading: passed ? 'DOCUMENT PASS' : 'RESULT',
+    title: passed ? '서류 전형 합격 안내' : '서류 전형 결과 안내',
+  })
+}
+
 // 서명 완료된 근로계약서 PDF를 첨부하여 지원자에게 발송.
 // pdfBase64 는 PDF 바이트의 base64 문자열.
 export async function sendSignedContractEmail(env, { to, companyName, pdfBase64, filename }) {

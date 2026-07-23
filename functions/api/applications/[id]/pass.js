@@ -3,6 +3,8 @@ import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { hashPassword } from '../../../_lib/auth.js'
 import { genTempPassword } from '../../../_lib/tempPassword.js'
 import { requireManageableApplication } from '../../../_lib/applications.js'
+import { logAdminAction } from '../../../_lib/auditLog.js'
+import { isEmailConfigured, sendApplicationResultEmail } from '../../../_lib/email.js'
 
 function genInviteCode() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // 헷갈리는 글자(0/O, 1/I) 제외
@@ -114,11 +116,40 @@ export async function onRequestPost({ env, data, params }) {
     return jsonError('서류합격 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', 500)
   }
 
+  const companyName = data.user.company_name || data.user.display_name
+
+  // 감사 로그 기록 (실패해도 처리 결과에는 영향 없음)
+  await logAdminAction(env, {
+    actorId: data.user.id,
+    action: 'application_pass',
+    targetUserId: candidateUserId,
+    targetRoomId: roomId,
+    detail: `${application.applicant_email} · ${application.posting_title}`,
+  }).catch(() => {})
+
+  // 지원자에게 합격 안내 이메일 (설정된 경우에만, 실패해도 무시)
+  let emailStatus = 'not_sent'
+  if (isEmailConfigured(env)) {
+    try {
+      await sendApplicationResultEmail(env, {
+        to: application.applicant_email,
+        applicantName: application.applicant_name,
+        companyName,
+        result: 'passed',
+      })
+      emailStatus = 'sent'
+    } catch (err) {
+      emailStatus = 'failed'
+      console.error(`Pass result email failed (application ${params.id}):`, err)
+    }
+  }
+
   return jsonResponse(
     {
       ok: true,
       status: 'passed',
       roomId,
+      emailStatus,
       account: {
         email: application.applicant_email,
         alreadyExisted,

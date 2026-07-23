@@ -1,6 +1,7 @@
 import { genId } from '../../_lib/db.js'
 import { jsonResponse, jsonError } from '../../_lib/http.js'
 import { canManageRecruiting } from '../../_lib/recruiter.js'
+import { logAdminAction } from '../../_lib/auditLog.js'
 
 const TITLE_MAX = 150
 const SHORT_MAX = 100
@@ -64,6 +65,12 @@ export async function onRequestPost({ request, env, data }) {
   )
     .bind(id, data.user.id, title, department || null, employmentType || null, location || null, description)
     .run()
+
+  await logAdminAction(env, {
+    actorId: data.user.id,
+    action: 'posting_create',
+    detail: title,
+  }).catch(() => {})
 
   return jsonResponse({ ok: true, id }, 201)
 }

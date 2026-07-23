@@ -15,6 +15,12 @@ const AUDIT_ACTION_LABELS = {
   reset_password: '비밀번호 재설정',
   delete_user: '계정 삭제',
   delete_room: '면접방 삭제',
+  application_pass: '서류합격',
+  application_reject: '서류불합격',
+  posting_create: '공고 등록',
+  posting_close: '공고 마감',
+  posting_reopen: '공고 재모집',
+  posting_delete: '공고 삭제',
 }
 
 export default function AdminPage() {

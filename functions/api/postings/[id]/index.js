@@ -1,5 +1,6 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { canManagePosting } from '../../../_lib/recruiter.js'
+import { logAdminAction } from '../../../_lib/auditLog.js'
 
 const TITLE_MAX = 150
 const SHORT_MAX = 100
@@ -86,6 +87,14 @@ export async function onRequestPatch({ request, env, data, params }) {
     .bind(...values)
     .run()
 
+  if (body.status !== undefined && body.status !== posting.status) {
+    await logAdminAction(env, {
+      actorId: data.user.id,
+      action: body.status === 'closed' ? 'posting_close' : 'posting_reopen',
+      detail: posting.title,
+    }).catch(() => {})
+  }
+
   return jsonResponse({ ok: true })
 }
 
@@ -106,5 +115,12 @@ export async function onRequestDelete({ env, data, params }) {
   }
 
   await env.DB.prepare('DELETE FROM job_postings WHERE id = ?').bind(params.id).run()
+
+  await logAdminAction(env, {
+    actorId: data.user.id,
+    action: 'posting_delete',
+    detail: posting.title,
+  }).catch(() => {})
+
   return jsonResponse({ ok: true })
 }
