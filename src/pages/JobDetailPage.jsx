@@ -31,6 +31,7 @@ export default function JobDetailPage() {
         <p className="job-detail-meta">
           {[posting.department, posting.employmentType, posting.location].filter(Boolean).join(' · ')}
         </p>
+        {posting.deadline && <p className="job-detail-meta">지원 마감: {posting.deadline}</p>}
       </header>
 
       <div className="job-detail-body">{posting.description}</div>

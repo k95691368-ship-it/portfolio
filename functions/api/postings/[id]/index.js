@@ -5,10 +5,11 @@ import { logAdminAction } from '../../../_lib/auditLog.js'
 const TITLE_MAX = 150
 const SHORT_MAX = 100
 const DESC_MAX = 20000
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 async function loadPosting(env, id) {
   return env.DB.prepare(
-    `SELECT id, created_by_user_id, title, department, employment_type, location, description, status, created_at
+    `SELECT id, created_by_user_id, title, department, employment_type, location, description, status, deadline, created_at
      FROM job_postings WHERE id = ?`
   )
     .bind(id)
@@ -31,6 +32,7 @@ export async function onRequestGet({ env, data, params }) {
       location: posting.location,
       description: posting.description,
       status: posting.status,
+      deadline: posting.deadline,
       createdAt: posting.created_at,
     },
   })
@@ -77,6 +79,12 @@ export async function onRequestPatch({ request, env, data, params }) {
     if (!['open', 'closed'].includes(body.status)) return jsonError('상태 값이 올바르지 않습니다.', 400)
     fields.push('status = ?')
     values.push(body.status)
+  }
+  if (body.deadline !== undefined) {
+    const deadline = (body.deadline || '').toString().trim()
+    if (deadline && !DATE_RE.test(deadline)) return jsonError('마감일 형식이 올바르지 않습니다.', 400)
+    fields.push('deadline = ?')
+    values.push(deadline || null)
   }
 
   if (fields.length === 0) return jsonError('수정할 내용이 없습니다.', 400)

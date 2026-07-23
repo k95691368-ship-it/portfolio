@@ -7,6 +7,8 @@ const TITLE_MAX = 150
 const SHORT_MAX = 100
 const DESC_MAX = 20000
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
 function mapRow(row) {
   return {
     id: row.id,
@@ -15,6 +17,7 @@ function mapRow(row) {
     employmentType: row.employment_type,
     location: row.location,
     status: row.status,
+    deadline: row.deadline,
     createdBy: row.created_by_display_name || null,
     applicationCount: row.application_count ?? 0,
     createdAt: row.created_at,
@@ -27,7 +30,7 @@ export async function onRequestGet({ env, data }) {
   if (!canManageRecruiting(data.user)) return jsonError('채용 관리 권한이 없습니다.', 403)
 
   const base = `
-    SELECT p.id, p.title, p.department, p.employment_type, p.location, p.status, p.created_at,
+    SELECT p.id, p.title, p.department, p.employment_type, p.location, p.status, p.deadline, p.created_at,
            u.display_name AS created_by_display_name,
            (SELECT COUNT(*) FROM applications a WHERE a.posting_id = p.id) AS application_count
     FROM job_postings p
@@ -54,16 +57,18 @@ export async function onRequestPost({ request, env, data }) {
   const department = (body?.department || '').toString().trim().slice(0, SHORT_MAX)
   const employmentType = (body?.employmentType || '').toString().trim().slice(0, SHORT_MAX)
   const location = (body?.location || '').toString().trim().slice(0, SHORT_MAX)
+  const deadline = (body?.deadline || '').toString().trim()
 
   if (!title) return jsonError('공고 제목을 입력해주세요.', 400)
   if (!description) return jsonError('공고 상세 내용을 입력해주세요.', 400)
+  if (deadline && !DATE_RE.test(deadline)) return jsonError('마감일 형식이 올바르지 않습니다.', 400)
 
   const id = genId()
   await env.DB.prepare(
-    `INSERT INTO job_postings (id, created_by_user_id, title, department, employment_type, location, description)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO job_postings (id, created_by_user_id, title, department, employment_type, location, description, deadline)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   )
-    .bind(id, data.user.id, title, department || null, employmentType || null, location || null, description)
+    .bind(id, data.user.id, title, department || null, employmentType || null, location || null, description, deadline || null)
     .run()
 
   await logAdminAction(env, {

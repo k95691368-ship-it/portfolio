@@ -275,9 +275,26 @@ export default function RecruitPage() {
     department: '',
     employmentType: '',
     location: '',
+    deadline: '',
     description: '',
   })
   const [creating, setCreating] = useState(false)
+
+  // 지원서 검색·필터
+  const [appSearch, setAppSearch] = useState('')
+  const [appStatus, setAppStatus] = useState('all')
+  const filteredApps = useMemo(() => {
+    const q = appSearch.trim().toLowerCase()
+    return applications.filter((a) => {
+      if (appStatus !== 'all' && a.status !== appStatus) return false
+      if (!q) return true
+      return (
+        a.applicantName?.toLowerCase().includes(q) ||
+        a.applicantEmail?.toLowerCase().includes(q) ||
+        a.postingTitle?.toLowerCase().includes(q)
+      )
+    })
+  }, [applications, appSearch, appStatus])
 
   const loadAll = useCallback(async () => {
     const [p, a] = await Promise.all([api.get('/postings'), api.get('/applications')])
@@ -373,6 +390,14 @@ export default function RecruitPage() {
                 onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
               />
             </label>
+            <label>
+              마감일 (선택)
+              <input
+                type="date"
+                value={form.deadline}
+                onChange={(e) => setForm((f) => ({ ...f, deadline: e.target.value }))}
+              />
+            </label>
           </div>
           <label>
             상세 내용 <span className="consent-required">*</span>
@@ -402,6 +427,7 @@ export default function RecruitPage() {
                 <tr>
                   <th>제목</th>
                   <th>상태</th>
+                  <th>마감일</th>
                   <th>지원자</th>
                   <th>등록일</th>
                   <th>관리</th>
@@ -416,6 +442,7 @@ export default function RecruitPage() {
                         {p.status === 'open' ? '모집 중' : '마감'}
                       </span>
                     </td>
+                    <td>{p.deadline || '상시'}</td>
                     <td>{p.applicationCount}명</td>
                     <td>{p.createdAt?.slice(0, 10)}</td>
                     <td>
@@ -445,20 +472,39 @@ export default function RecruitPage() {
         ) : applications.length === 0 ? (
           <p className="notice">아직 접수된 지원서가 없습니다.</p>
         ) : (
-          <div className="table-scroll">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>이름</th>
-                  <th>공고</th>
-                  <th>이메일</th>
-                  <th>상태</th>
-                  <th>지원일</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {applications.map((a) => (
+          <>
+            <div className="filter-row">
+              <input
+                type="search"
+                placeholder="이름·이메일·공고 검색"
+                value={appSearch}
+                onChange={(e) => setAppSearch(e.target.value)}
+              />
+              <select value={appStatus} onChange={(e) => setAppStatus(e.target.value)}>
+                <option value="all">전체 상태</option>
+                <option value="submitted">심사 대기</option>
+                <option value="passed">서류합격</option>
+                <option value="rejected">불합격</option>
+              </select>
+              <span className="filter-count">{filteredApps.length}건</span>
+            </div>
+            {filteredApps.length === 0 ? (
+              <p className="notice">조건에 맞는 지원서가 없습니다.</p>
+            ) : (
+              <div className="table-scroll">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>이름</th>
+                      <th>공고</th>
+                      <th>이메일</th>
+                      <th>상태</th>
+                      <th>지원일</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredApps.map((a) => (
                   <tr key={a.id}>
                     <td>{a.applicantName}</td>
                     <td>{a.postingTitle}</td>
@@ -475,10 +521,12 @@ export default function RecruitPage() {
                       </button>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </section>
 

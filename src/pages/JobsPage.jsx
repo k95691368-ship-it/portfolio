@@ -41,6 +41,9 @@ export default function JobsPage() {
                     .filter(Boolean)
                     .join(' · ')}
                 </span>
+                {posting.deadline && (
+                  <span className="job-card-deadline">~ {posting.deadline} 마감</span>
+                )}
               </Link>
             </li>
           ))}

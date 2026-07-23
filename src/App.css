@@ -799,6 +799,11 @@
   font-size: 13px;
   color: var(--text-muted);
 }
+.job-card-deadline {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
 
 .job-detail-meta {
   color: var(--text-muted);
@@ -1001,6 +1006,23 @@
 }
 .posting-form .btn-primary {
   align-self: flex-start;
+}
+
+/* 지원서 검색·필터 */
+.filter-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.filter-row input[type='search'] {
+  flex: 1;
+  min-width: 200px;
+}
+.filter-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
 }
 
 /* 채용 현황 통계 (KPI 타일 + 심사현황 바) */

@@ -16,11 +16,13 @@ export async function onRequestPost({ request, env, params }) {
   if (!allowed) return jsonError('지원이 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)
 
   const posting = await env.DB.prepare(
-    `SELECT id, title, status FROM job_postings WHERE id = ?`
+    `SELECT id, title, status,
+            (deadline IS NOT NULL AND deadline < date('now')) AS expired
+     FROM job_postings WHERE id = ?`
   )
     .bind(params.id)
     .first()
-  if (!posting || posting.status !== 'open') {
+  if (!posting || posting.status !== 'open' || posting.expired) {
     return jsonError('마감되었거나 존재하지 않는 채용 공고입니다.', 404)
   }
 
