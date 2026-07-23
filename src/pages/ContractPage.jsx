@@ -74,6 +74,10 @@ export default function ContractPage() {
   const [drafting, setDrafting] = useState(false)
   const [draftError, setDraftError] = useState('')
   const [history, setHistory] = useState([])
+  const [signedContract, setSignedContract] = useState(null)
+  const [signedMeta, setSignedMeta] = useState({ emailConfigured: true, candidateEmailMasked: null })
+  const [storing, setStoring] = useState(false)
+  const [storeError, setStoreError] = useState('')
   const printRef = useRef(null)
 
   const loadAll = useCallback(async () => {
@@ -118,6 +122,17 @@ export default function ContractPage() {
       customTerms: t.customTerms ?? [],
     })
     setSignatures(sigData.signatures)
+
+    if (roomData.status === 'signed') {
+      const signed = await api.get(`/rooms/${roomId}/signed-contract`).catch(() => null)
+      if (signed) {
+        setSignedContract(signed.stored)
+        setSignedMeta({
+          emailConfigured: signed.emailConfigured,
+          candidateEmailMasked: signed.candidateEmailMasked,
+        })
+      }
+    }
   }, [roomId])
 
   useEffect(() => {
@@ -191,35 +206,57 @@ export default function ContractPage() {
     await loadAll()
   }
 
+  const buildPdf = async () => {
+    const canvas = await html2canvas(printRef.current, { scale: 2, backgroundColor: '#ffffff' })
+    const imgData = canvas.toDataURL('image/png')
+    const pdf = new jsPDF('p', 'mm', 'a4')
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const imgWidth = pageWidth
+    const imgHeight = (canvas.height * imgWidth) / canvas.width
+    let heightLeft = imgHeight
+    let position = 0
+
+    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+    heightLeft -= pageHeight
+
+    while (heightLeft > 0) {
+      position -= pageHeight
+      pdf.addPage()
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+      heightLeft -= pageHeight
+    }
+    return pdf
+  }
+
   const handleExportPdf = async () => {
     setExporting(true)
     setError('')
     try {
-      const canvas = await html2canvas(printRef.current, { scale: 2, backgroundColor: '#ffffff' })
-      const imgData = canvas.toDataURL('image/png')
-      const pdf = new jsPDF('p', 'mm', 'a4')
-      const pageWidth = pdf.internal.pageSize.getWidth()
-      const pageHeight = pdf.internal.pageSize.getHeight()
-      const imgWidth = pageWidth
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
-      let heightLeft = imgHeight
-      let position = 0
-
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-      heightLeft -= pageHeight
-
-      while (heightLeft > 0) {
-        position -= pageHeight
-        pdf.addPage()
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-        heightLeft -= pageHeight
-      }
-
+      const pdf = await buildPdf()
       pdf.save('근로계약서.pdf')
     } catch (err) {
       setError(err.message)
     } finally {
       setExporting(false)
+    }
+  }
+
+  const handleStoreAndSend = async () => {
+    setStoring(true)
+    setStoreError('')
+    try {
+      const pdf = await buildPdf()
+      const blob = pdf.output('blob')
+      const fd = new FormData()
+      fd.append('pdf', blob, '근로계약서.pdf')
+      const data = await api.upload(`/rooms/${roomId}/signed-contract`, fd)
+      setSignedContract(data.stored)
+      setSignedMeta((m) => ({ ...m, emailConfigured: data.emailConfigured }))
+    } catch (err) {
+      setStoreError(err.message)
+    } finally {
+      setStoring(false)
     }
   }
 
@@ -368,6 +405,51 @@ export default function ContractPage() {
         )}
         {mySignature && !otherSignature && <p>상대방의 서명을 기다리고 있습니다.</p>}
       </section>
+
+      {isSigned && (
+        <section className="signed-contract-section">
+          <h2>서명 완료 계약서 보관 · 전송</h2>
+          {signedContract ? (
+            <>
+              <p className="save-message">
+                계약서가 저장되었습니다. ({signedContract.createdAt})
+                {signedContract.emailStatus === 'sent' && ' · 지원자에게 이메일 전송 완료'}
+                {signedContract.emailStatus === 'failed' && ' · 이메일 전송 실패'}
+                {signedContract.emailStatus === 'not_sent' &&
+                  !signedMeta.emailConfigured &&
+                  ' · 이메일 미설정(저장만 완료)'}
+              </p>
+              <p>
+                <a href={`/api/rooms/${roomId}/signed-contract-file`}>저장된 계약서 PDF 다운로드 →</a>
+              </p>
+            </>
+          ) : myRole === 'company' ? (
+            <p className="notice">
+              서명이 완료되었습니다. 아래 버튼을 누르면 계약서를 서버에 보관하고
+              {signedMeta.candidateEmailMasked ? ` 지원자(${signedMeta.candidateEmailMasked})` : ' 지원자'}에게
+              이메일로 전달합니다.
+            </p>
+          ) : (
+            <p className="notice">회사 측에서 계약서를 저장·전송하면 여기에서 사본을 받을 수 있습니다.</p>
+          )}
+
+          {!signedMeta.emailConfigured && myRole === 'company' && (
+            <p className="notice">
+              이메일 발송 기능이 아직 설정되지 않았습니다. 지금은 서버 보관·다운로드만 가능합니다.
+            </p>
+          )}
+          {storeError && <p className="error">{storeError}</p>}
+          {myRole === 'company' && (
+            <button type="button" className="btn-primary" onClick={handleStoreAndSend} disabled={storing}>
+              {storing
+                ? '처리 중...'
+                : signedContract
+                  ? '계약서 다시 저장·전송'
+                  : '계약서 저장 및 지원자에게 이메일 전송'}
+            </button>
+          )}
+        </section>
+      )}
 
       {history.length > 0 && (
         <section className="contract-history">

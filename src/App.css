@@ -1067,3 +1067,20 @@
 .room-invite-email .final-offer-form textarea {
   min-height: 160px;
 }
+
+/* 서명 완료 계약서 보관/전송 */
+.signed-contract-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.signed-contract-section h2 {
+  margin: 0;
+}
+.signed-contract-section .btn-primary {
+  align-self: flex-start;
+}

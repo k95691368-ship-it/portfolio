@@ -118,3 +118,57 @@ export async function sendRoomInviteEmail(env, { to, subject, bodyText, companyN
     title: '면접방 참여 안내',
   })
 }
+
+// 서명 완료된 근로계약서 PDF를 첨부하여 지원자에게 발송.
+// pdfBase64 는 PDF 바이트의 base64 문자열.
+export async function sendSignedContractEmail(env, { to, companyName, pdfBase64, filename }) {
+  if (!env.RESEND_API_KEY) {
+    throw new Error('RESEND_API_KEY 환경 변수가 설정되지 않았습니다.')
+  }
+  if (!env.FINAL_OFFER_FROM_EMAIL) {
+    throw new Error('FINAL_OFFER_FROM_EMAIL 환경 변수가 설정되지 않았습니다.')
+  }
+
+  const fromName = env.FINAL_OFFER_FROM_NAME || companyName
+  const from = fromName ? `${fromName} <${env.FINAL_OFFER_FROM_EMAIL}>` : env.FINAL_OFFER_FROM_EMAIL
+  const subject = `[${companyName}] 근로계약서 사본 전달`
+  const bodyText = `안녕하세요.
+
+${companyName}와(과) 체결한 근로계약서 서명본을 첨부합니다. 내용을 확인하시고 보관해 주세요.
+
+감사합니다.`
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from,
+      to,
+      subject,
+      text: bodyText,
+      html: buildBrandedEmailHtml({ bodyText, companyName, heading: 'LABOR CONTRACT', title: '근로계약서 사본' }),
+      attachments: [{ filename: filename || '근로계약서.pdf', content: pdfBase64 }],
+    }),
+  })
+
+  if (!res.ok) {
+    const detail = await res.text()
+    throw new Error(`Resend API 오류 (${res.status}): ${detail.slice(0, 300)}`)
+  }
+
+  return res.json()
+}
+
+// ArrayBuffer → base64 (큰 파일에서 스택 오버플로를 피하기 위해 청크 처리).
+export function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize))
+  }
+  return btoa(binary)
+}
