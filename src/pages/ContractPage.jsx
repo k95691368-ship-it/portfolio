@@ -392,7 +392,7 @@ export default function ContractPage() {
             )}
           </div>
         </div>
-        {!mySignature && (
+        {(myRole === 'company' || myRole === 'candidate') && !mySignature && (
           <>
             <button
               type="button"
@@ -405,6 +405,7 @@ export default function ContractPage() {
             {!contractMeta.hireConfirmed && <p className="notice">채용이 확정된 후에 서명할 수 있습니다.</p>}
           </>
         )}
+        {myRole === 'admin' && <p className="notice">관리자 열람 모드 — 서명은 참여자만 가능합니다.</p>}
         {mySignature && !otherSignature && <p>상대방의 서명을 기다리고 있습니다.</p>}
       </section>
 

@@ -6,7 +6,8 @@ export async function onRequestGet({ env, data, params }) {
   const doc = await env.DB.prepare('SELECT * FROM documents WHERE id = ?').bind(params.id).first()
   if (!doc) return jsonError('파일을 찾을 수 없습니다.', 404)
 
-  let allowed = doc.user_id === data.user.id
+  // 소유자 또는 관리자는 항상 허용, 그 외에는 같은 면접방을 공유하는 경우에만 허용.
+  let allowed = doc.user_id === data.user.id || !!data.user.is_admin
   if (!allowed) {
     const shared = await env.DB.prepare(
       `SELECT 1 FROM room_participants rp1

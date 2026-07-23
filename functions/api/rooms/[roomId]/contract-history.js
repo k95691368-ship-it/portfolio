@@ -1,10 +1,10 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
-import { getRoomParticipant } from '../../../_lib/rooms.js'
+import { getRoomAccess } from '../../../_lib/rooms.js'
 
 export async function onRequestGet({ env, data, params }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
 
-  const participant = await getRoomParticipant(env, params.roomId, data.user.id)
+  const participant = await getRoomAccess(env, params.roomId, data.user)
   if (!participant) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
 
   const { results } = await env.DB.prepare(

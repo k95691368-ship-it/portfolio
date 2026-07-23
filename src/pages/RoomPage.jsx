@@ -67,7 +67,11 @@ export default function RoomPage() {
 
       <div className="chat-panel">
         <ChatMessageList messages={messages} />
-        <ChatComposer onSend={sendMessage} />
+        {room.myRole === 'admin' ? (
+          <p className="notice">관리자 열람 모드입니다. 채팅 작성은 참여자만 가능합니다.</p>
+        ) : (
+          <ChatComposer onSend={sendMessage} />
+        )}
       </div>
 
       <section className="ai-analysis">

@@ -18,9 +18,9 @@ export default function DashboardPage() {
   const [createdRoom, setCreatedRoom] = useState(null)
 
   const loadRooms = useCallback(async () => {
-    const data = await api.get('/rooms/list')
+    const data = await api.get(user.isAdmin ? '/admin/rooms' : '/rooms/list')
     setRooms(data.rooms)
-  }, [])
+  }, [user.isAdmin])
 
   useEffect(() => {
     loadRooms().finally(() => setLoading(false))
@@ -101,11 +101,11 @@ export default function DashboardPage() {
         </p>
       )}
 
-      <h2>내 면접방</h2>
+      <h2>{user.isAdmin ? '모든 면접방' : '내 면접방'}</h2>
       {loading ? (
         <p>불러오는 중...</p>
       ) : rooms.length === 0 ? (
-        <p>참여 중인 면접방이 없습니다.</p>
+        <p>{user.isAdmin ? '등록된 면접방이 없습니다.' : '참여 중인 면접방이 없습니다.'}</p>
       ) : (
         <ul className="room-list">
           {rooms.map((room) => {
@@ -116,12 +116,14 @@ export default function DashboardPage() {
                   <div className="room-info">
                     <span className="room-title">{room.title}</span>
                     <span className="room-meta">
-                      {user.role === 'company'
-                        ? room.candidateName
-                          ? `${room.candidateName}님 참여 중`
-                          : '지원자 대기 중'
-                        : room.companyName}
-                      {user.role === 'company' && ` · 초대코드 ${room.inviteCode}`}
+                      {user.isAdmin
+                        ? `${room.companyName || '회사'}${room.candidateName ? ` · ${room.candidateName}` : ' · 지원자 대기'}`
+                        : user.role === 'company'
+                          ? room.candidateName
+                            ? `${room.candidateName}님 참여 중`
+                            : '지원자 대기 중'
+                          : room.companyName}
+                      {!user.isAdmin && user.role === 'company' && ` · 초대코드 ${room.inviteCode}`}
                     </span>
                   </div>
                   <span className={`badge ${status.badgeClass}`}>{status.label}</span>
