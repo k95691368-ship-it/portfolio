@@ -2,7 +2,7 @@ import { genId } from '../../../_lib/db.js'
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { checkRateLimit } from '../../../_lib/rateLimit.js'
 import { parseBool, validateApplication, normalizeCareer } from '../../../_lib/application.js'
-import { fileExt, mimeForExt, validateUploadFile } from '../../../_lib/uploads.js'
+import { fileExt, mimeForExt, validateUploadFile, validateFileContent } from '../../../_lib/uploads.js'
 
 const NAME_MAX = 100
 const PHONE_MAX = 40
@@ -48,12 +48,16 @@ export async function onRequestPost({ request, env, params }) {
   const resumeFile = form.get('resume')
   const resumeError = validateUploadFile(resumeFile)
   if (resumeError) return jsonError(`이력서: ${resumeError}`, 400)
+  const resumeContentError = await validateFileContent(resumeFile)
+  if (resumeContentError) return jsonError(`이력서: ${resumeContentError}`, 400)
 
   const portfolioFile = form.get('portfolio')
   const hasPortfolio = portfolioFile && typeof portfolioFile !== 'string' && portfolioFile.size > 0
   if (hasPortfolio) {
     const portfolioError = validateUploadFile(portfolioFile)
     if (portfolioError) return jsonError(`포트폴리오: ${portfolioError}`, 400)
+    const portfolioContentError = await validateFileContent(portfolioFile)
+    if (portfolioContentError) return jsonError(`포트폴리오: ${portfolioContentError}`, 400)
   }
 
   // 같은 공고에 같은 이메일로 심사 대기 중인 지원이 있으면 중복 차단

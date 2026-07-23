@@ -1,5 +1,6 @@
 import { genId } from '../../_lib/db.js'
 import { jsonResponse, jsonError } from '../../_lib/http.js'
+import { validateFileContent } from '../../_lib/uploads.js'
 
 const ALLOWED_EXT = ['pdf', 'doc', 'docx', 'hwp', 'hwpx']
 const MAX_SIZE = 10 * 1024 * 1024 // 10MB
@@ -30,6 +31,8 @@ export async function onRequestPost({ request, env, data }) {
   if (!ALLOWED_EXT.includes(ext)) {
     return jsonError('PDF, DOC, DOCX, HWP 파일만 업로드할 수 있습니다.', 400)
   }
+  const contentError = await validateFileContent(file)
+  if (contentError) return jsonError(contentError, 400)
 
   const existing = await env.DB.prepare(
     'SELECT id, r2_key FROM documents WHERE user_id = ? AND doc_type = ?'
