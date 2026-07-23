@@ -125,6 +125,10 @@ export async function onRequestPost({ request, env, params }) {
   } catch (err) {
     console.error(`Application insert failed (posting ${params.id}):`, err)
     await Promise.allSettled(uploads.map((u) => env.DOCUMENTS.delete(u.r2Key)))
+    // 동시 제출 경쟁으로 부분 유니크 인덱스를 위반한 경우 중복 안내로 응답
+    if (String(err?.message || err).includes('UNIQUE')) {
+      return jsonError('이미 이 공고에 지원하셨습니다. 심사 결과를 기다려주세요.', 409)
+    }
     return jsonError('지원서 저장에 실패했습니다. 잠시 후 다시 시도해주세요.', 500)
   }
 

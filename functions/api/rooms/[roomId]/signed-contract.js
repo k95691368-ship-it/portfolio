@@ -82,11 +82,12 @@ export async function onRequestPost({ request, env, data, params }) {
   if (file.size > MAX_PDF_SIZE) return jsonError('계약서 파일이 너무 큽니다. (8MB 이하)', 400)
 
   const buffer = await file.arrayBuffer()
-  const r2Key = `contracts/${params.roomId}/signed-${Date.now()}.pdf`
+  // 방마다 고정 키 — 재저장 시 같은 객체를 덮어써서 고아 객체가 생기지 않는다.
+  const r2Key = `contracts/${params.roomId}/signed.pdf`
   const filename = `근로계약서_${params.roomId.slice(0, 8)}.pdf`
 
-  // 기존 저장본 키를 기억해 두고, 새 저장·DB 커밋이 성공한 뒤에만 삭제한다.
-  const existing = await env.DB.prepare('SELECT r2_key FROM signed_contracts WHERE room_id = ?')
+  // 기존 저장 행이 있는지 (DB 실패 시 방금 올린 객체 정리 판단용)
+  const existing = await env.DB.prepare('SELECT 1 FROM signed_contracts WHERE room_id = ?')
     .bind(params.roomId)
     .first()
 
@@ -110,15 +111,10 @@ export async function onRequestPost({ request, env, data, params }) {
       .bind(id, params.roomId, r2Key, filename, file.size, data.user.id)
       .run()
   } catch (err) {
-    // DB 반영 실패 시 방금 올린 객체를 정리하고, 기존 저장본은 그대로 보존.
     console.error(`Signed contract DB write failed for room ${params.roomId}:`, err)
-    await env.DOCUMENTS.delete(r2Key).catch(() => {})
+    // 기존 저장본이 없던 신규 저장인데 DB가 실패했다면 방금 올린 객체를 정리한다.
+    if (!existing) await env.DOCUMENTS.delete(r2Key).catch(() => {})
     return jsonError('계약서 저장에 실패했습니다. 잠시 후 다시 시도해주세요.', 500)
-  }
-
-  // DB 커밋 성공 후에만 이전 저장본을 삭제 (키가 다를 때).
-  if (existing && existing.r2_key !== r2Key) {
-    await env.DOCUMENTS.delete(existing.r2_key).catch(() => {})
   }
 
   // 지원자에게 이메일 발송 (설정된 경우에만 시도)

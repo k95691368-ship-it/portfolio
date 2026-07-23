@@ -413,7 +413,7 @@ export default function ContractPage() {
             <>
               <p className="save-message">
                 계약서가 저장되었습니다. ({signedContract.createdAt})
-                {signedContract.emailStatus === 'sent' && ' · 지원자에게 이메일 전송 완료'}
+                {signedContract.emailStatus === 'sent' && ' · 이메일로 사본 전송 완료'}
                 {signedContract.emailStatus === 'failed' && ' · 이메일 전송 실패'}
                 {signedContract.emailStatus === 'not_sent' &&
                   !signedMeta.emailConfigured &&
