@@ -1,7 +1,7 @@
 import { TERM_FIELDS } from '../lib/contractTemplate.js'
 
 export default function ContractFieldsForm({ terms, hireConfirmed, confirmationExcerpt }) {
-  if (!terms) return <p>아직 분석된 조건이 없습니다. "AI로 조건 정리하기"를 눌러보세요.</p>
+  if (!terms) return <p>아직 분석된 채용 조건이 없습니다.</p>
 
   return (
     <div className="contract-fields">

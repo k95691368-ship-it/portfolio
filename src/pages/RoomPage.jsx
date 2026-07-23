@@ -6,6 +6,7 @@ import ChatMessageList from '../components/ChatMessageList.jsx'
 import ChatComposer from '../components/ChatComposer.jsx'
 import RoomDocuments from '../components/RoomDocuments.jsx'
 import ContractFieldsForm from '../components/ContractFieldsForm.jsx'
+import FinalOfferEmailForm from '../components/FinalOfferEmailForm.jsx'
 
 export default function RoomPage() {
   const { roomId } = useParams()
@@ -46,6 +47,9 @@ export default function RoomPage() {
   if (error) return <p className="error">{error}</p>
   if (!room) return <p>불러오는 중...</p>
 
+  const candidate = room.participants.find((participant) => participant.role === 'candidate')
+  const company = room.participants.find((participant) => participant.role === 'company')
+
   return (
     <div className="room-page">
       <header className="page-header">
@@ -66,19 +70,33 @@ export default function RoomPage() {
 
       <section className="ai-analysis">
         <h2>채용 조건 분석</h2>
-        <button type="button" className="btn-primary" onClick={handleAnalyze} disabled={analyzing}>
-          {analyzing ? '분석 중...' : 'AI로 조건 정리하기'}
-        </button>
-        {analyzeError && <p className="error">{analyzeError}</p>}
+        {room.myRole === 'company' && (
+          <>
+            <button type="button" className="btn-primary" onClick={handleAnalyze} disabled={analyzing}>
+              {analyzing ? '분석 중...' : 'AI로 조건 정리하기'}
+            </button>
+            {analyzeError && <p className="error">{analyzeError}</p>}
+          </>
+        )}
         <ContractFieldsForm
           terms={contract?.terms}
           hireConfirmed={contract?.hireConfirmed}
           confirmationExcerpt={contract?.confirmationExcerpt}
         />
         <p>
-          <Link to={`/rooms/${roomId}/contract`}>전자근로계약서 작성하러 가기 →</Link>
+          <Link to={`/rooms/${roomId}/contract`}>
+            {room.myRole === 'company' ? '전자근로계약서 작성하러 가기 →' : '전자근로계약서 확인·서명하러 가기 →'}
+          </Link>
         </p>
       </section>
+
+      {room.myRole === 'company' && (
+        <FinalOfferEmailForm
+          roomId={roomId}
+          candidateName={candidate?.displayName || '지원자'}
+          companyName={company?.companyName || company?.displayName || '회사'}
+        />
+      )}
     </div>
   )
 }

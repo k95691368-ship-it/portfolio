@@ -10,6 +10,7 @@ export async function onRequestDelete({ env, data, params }) {
   // documents belong to the user, not the room (a candidate's resume can be shared
   // across rooms), so they're intentionally left untouched here.
   await env.DB.batch([
+    env.DB.prepare('DELETE FROM final_offer_emails WHERE room_id = ?').bind(params.roomId),
     env.DB.prepare('DELETE FROM chat_messages WHERE room_id = ?').bind(params.roomId),
     env.DB.prepare('DELETE FROM signatures WHERE room_id = ?').bind(params.roomId),
     env.DB.prepare('DELETE FROM contract_terms WHERE room_id = ?').bind(params.roomId),

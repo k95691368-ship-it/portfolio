@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react'
-import { Routes, Route, Link } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './pages/LoginPage.jsx'
 import SignupPage from './pages/SignupPage.jsx'
 import ChangePasswordPage from './pages/ChangePasswordPage.jsx'
@@ -11,21 +11,10 @@ import './App.css'
 const ContractPage = lazy(() => import('./pages/ContractPage.jsx'))
 const AdminPage = lazy(() => import('./pages/AdminPage.jsx'))
 
-function LandingPage() {
-  return (
-    <div className="landing-page">
-      <h1>포트폴리오 7월 18일 제작</h1>
-      <Link to="/login" className="btn-primary">
-        인터뷰 플랫폼 데모 보기
-      </Link>
-    </div>
-  )
-}
-
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
+      <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route element={<ProtectedRoute allowMustChangePassword />}>
