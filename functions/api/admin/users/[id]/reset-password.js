@@ -8,8 +8,12 @@ export async function onRequestPost({ env, data, params }) {
     return jsonError('본인 계정의 비밀번호는 이 기능으로 재설정할 수 없습니다.', 403)
   }
 
-  const target = await env.DB.prepare('SELECT id, email FROM users WHERE id = ?').bind(params.id).first()
+  const target = await env.DB.prepare('SELECT id, email, is_admin FROM users WHERE id = ?').bind(params.id).first()
   if (!target) return jsonError('사용자를 찾을 수 없습니다.', 404)
+  // 관리자 계정의 비밀번호는 다른 관리자가 재설정할 수 없다 (계정 탈취 방지).
+  if (target.is_admin) {
+    return jsonError('관리자 계정의 비밀번호는 다른 관리자가 재설정할 수 없습니다.', 403)
+  }
 
   const tempPassword = genTempPassword()
   const { hash, salt } = await hashPassword(tempPassword)

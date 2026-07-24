@@ -14,8 +14,12 @@ export async function onRequestPatch({ request, env, data, params }) {
     return jsonError('isSuspended 또는 isRecruiter 값(boolean)이 필요합니다.', 400)
   }
 
-  const target = await env.DB.prepare('SELECT id, email FROM users WHERE id = ?').bind(params.id).first()
+  const target = await env.DB.prepare('SELECT id, email, is_admin FROM users WHERE id = ?').bind(params.id).first()
   if (!target) return jsonError('사용자를 찾을 수 없습니다.', 404)
+  // 관리자 계정은 다른 관리자가 변경할 수 없다 (계정 잠금·탈취 방지).
+  if (target.is_admin) {
+    return jsonError('관리자 계정은 다른 관리자가 변경할 수 없습니다.', 403)
+  }
 
   const setClauses = []
   const values = []
@@ -68,8 +72,12 @@ export async function onRequestDelete({ env, data, params }) {
     return jsonError('본인 계정은 삭제할 수 없습니다.', 403)
   }
 
-  const target = await env.DB.prepare('SELECT id, email FROM users WHERE id = ?').bind(params.id).first()
+  const target = await env.DB.prepare('SELECT id, email, is_admin FROM users WHERE id = ?').bind(params.id).first()
   if (!target) return jsonError('사용자를 찾을 수 없습니다.', 404)
+  // 관리자 계정은 다른 관리자가 삭제할 수 없다.
+  if (target.is_admin) {
+    return jsonError('관리자 계정은 다른 관리자가 삭제할 수 없습니다.', 403)
+  }
 
   const participation = await env.DB.prepare(
     'SELECT COUNT(*) AS count FROM room_participants WHERE user_id = ?'

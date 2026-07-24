@@ -277,6 +277,8 @@ export default function AdminPage() {
               <td>
                 {u.id === user.id ? (
                   <span className="badge badge-neutral">본인 계정</span>
+                ) : u.isAdmin ? (
+                  <span className="badge badge-neutral">관리자 보호</span>
                 ) : (
                   <>
                     <button
