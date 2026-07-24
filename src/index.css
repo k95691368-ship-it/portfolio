@@ -267,3 +267,8 @@ input[type='checkbox'] {
   color: var(--warning);
   border-color: var(--warning-border);
 }
+.badge-developer {
+  background: var(--text-h);
+  color: #fff;
+  border-color: var(--text-h);
+}

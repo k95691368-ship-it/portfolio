@@ -6,7 +6,7 @@ import { logAdminAction } from '../../../_lib/auditLog.js'
 
 export async function onRequestGet({ env }) {
   const { results } = await env.DB.prepare(
-    `SELECT id, email, display_name, company_name, role, is_admin, is_recruiter, is_suspended,
+    `SELECT id, email, display_name, company_name, role, is_admin, is_recruiter, is_developer, is_suspended,
             must_change_password, created_at
      FROM users ORDER BY created_at DESC`
   ).all()
@@ -20,6 +20,7 @@ export async function onRequestGet({ env }) {
       role: u.role,
       isAdmin: !!u.is_admin,
       isRecruiter: !!u.is_recruiter,
+      isDeveloper: !!u.is_developer,
       isSuspended: !!u.is_suspended,
       mustChangePassword: !!u.must_change_password,
       createdAt: u.created_at,

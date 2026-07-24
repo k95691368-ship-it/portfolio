@@ -249,8 +249,7 @@ export default function AdminPage() {
             <th>이름</th>
             <th>회사명</th>
             <th>역할</th>
-            <th>관리자</th>
-            <th>채용자</th>
+            <th>권한</th>
             <th>상태</th>
             <th>가입일</th>
             <th>작업</th>
@@ -263,8 +262,17 @@ export default function AdminPage() {
               <td>{u.displayName}</td>
               <td>{u.companyName || '-'}</td>
               <td>{u.role === 'company' ? '회사' : '구직자'}</td>
-              <td>{u.isAdmin ? <span className="badge badge-accent">관리자</span> : '-'}</td>
-              <td>{u.isRecruiter ? <span className="badge badge-warning">채용자</span> : '-'}</td>
+              <td>
+                {u.isDeveloper ? (
+                  <span className="badge badge-developer">개발자</span>
+                ) : u.isAdmin ? (
+                  <span className="badge badge-accent">관리자</span>
+                ) : u.isRecruiter ? (
+                  <span className="badge badge-warning">채용자</span>
+                ) : (
+                  <span className="badge badge-neutral">일반</span>
+                )}
+              </td>
               <td>
                 {u.isSuspended ? (
                   <span className="badge badge-danger">정지됨</span>
@@ -277,7 +285,9 @@ export default function AdminPage() {
               <td>
                 {u.id === user.id ? (
                   <span className="badge badge-neutral">본인 계정</span>
-                ) : u.isAdmin ? (
+                ) : u.isDeveloper ? (
+                  <span className="badge badge-neutral">개발자 보호</span>
+                ) : u.isAdmin && !user.isDeveloper ? (
                   <span className="badge badge-neutral">관리자 보호</span>
                 ) : (
                   <>

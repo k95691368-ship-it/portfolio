@@ -30,6 +30,7 @@ export async function onRequestPost({ request, env }) {
       displayName: user.display_name,
       isAdmin: !!user.is_admin,
       isRecruiter: !!user.is_recruiter,
+      isDeveloper: !!user.is_developer,
       mustChangePassword: !!user.must_change_password,
     },
     200,
