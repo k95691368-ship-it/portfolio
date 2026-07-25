@@ -238,6 +238,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.room-next-action {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
 
 /* Room page */
 

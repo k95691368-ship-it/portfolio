@@ -125,6 +125,7 @@ export default function DashboardPage() {
                           : room.companyName}
                       {!user.isAdmin && user.role === 'company' && ` · 초대코드 ${room.inviteCode}`}
                     </span>
+                    {room.nextAction && <span className="room-next-action">→ {room.nextAction}</span>}
                   </div>
                   <span className={`badge ${status.badgeClass}`}>{status.label}</span>
                 </Link>
