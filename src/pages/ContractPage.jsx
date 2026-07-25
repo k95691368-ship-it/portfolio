@@ -74,18 +74,21 @@ export default function ContractPage() {
   const [aiDocument, setAiDocument] = useState(null)
   const [drafting, setDrafting] = useState(false)
   const [history, setHistory] = useState([])
+  const [auditTrail, setAuditTrail] = useState(null)
   const [signedContract, setSignedContract] = useState(null)
   const [signedMeta, setSignedMeta] = useState({ emailConfigured: true, candidateEmailMasked: null })
   const [storing, setStoring] = useState(false)
   const printRef = useRef(null)
 
   const loadAll = useCallback(async () => {
-    const [roomData, contractData, sigData, historyData] = await Promise.all([
+    const [roomData, contractData, sigData, historyData, auditData] = await Promise.all([
       api.get(`/rooms/${roomId}`),
       api.get(`/rooms/${roomId}/contract`),
       api.get(`/rooms/${roomId}/signatures`),
       api.get(`/rooms/${roomId}/contract-history`).catch(() => ({ history: [] })),
+      api.get(`/rooms/${roomId}/audit-trail`).catch(() => null),
     ])
+    setAuditTrail(auditData)
     setRoom(roomData)
     setHistory(historyData.history ?? [])
     setContractMeta({
@@ -563,6 +566,28 @@ export default function ContractPage() {
             )}
           </div>
         </div>
+
+        {auditTrail && auditTrail.events.length > 0 && (
+          <div className="audit-trail-print">
+            <h3>계약 이력 증명 (감사추적)</h3>
+            <table>
+              <tbody>
+                {auditTrail.events.map((e, i) => (
+                  <tr key={i}>
+                    <td className="audit-time">{e.at}</td>
+                    <td>{e.event}</td>
+                    <td>{e.detail || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {auditTrail.documentHash && (
+              <p className="audit-hash">
+                문서 무결성 지문(SHA-256): {auditTrail.documentHash}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
