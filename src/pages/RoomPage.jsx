@@ -88,6 +88,16 @@ export default function RoomPage() {
           hireConfirmed={contract?.hireConfirmed}
           confirmationExcerpt={contract?.confirmationExcerpt}
         />
+        {contract?.terms?.analysisWarnings?.length > 0 && (
+          <div className="ai-warnings">
+            <h3>⚠️ AI 법적 검토 경고</h3>
+            {contract.terms.analysisWarnings.map((w, i) => (
+              <p key={i} className="error">
+                {w}
+              </p>
+            ))}
+          </div>
+        )}
         <p>
           <Link to={`/rooms/${roomId}/contract`}>
             {room.myRole === 'company' ? '전자근로계약서 작성하러 가기 →' : '전자근로계약서 확인·서명하러 가기 →'}

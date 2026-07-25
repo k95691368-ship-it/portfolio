@@ -24,7 +24,7 @@ async function getCandidate(env, roomId) {
 
 async function getStored(env, roomId) {
   return env.DB.prepare(
-    `SELECT id, filename, size_bytes, email_status, emailed_at, created_at
+    `SELECT id, filename, size_bytes, email_status, emailed_at, sha256_hash, created_at
      FROM signed_contracts WHERE room_id = ?`
   )
     .bind(roomId)
@@ -38,6 +38,7 @@ function storedResponse(row) {
     sizeBytes: row.size_bytes,
     emailStatus: row.email_status,
     emailedAt: row.emailed_at,
+    sha256Hash: row.sha256_hash,
     createdAt: row.created_at,
   }
 }
@@ -82,6 +83,10 @@ export async function onRequestPost({ request, env, data, params }) {
   if (file.size > MAX_PDF_SIZE) return jsonError('계약서 파일이 너무 큽니다. (8MB 이하)', 400)
 
   const buffer = await file.arrayBuffer()
+  // 위변조 방지: 저장 시점의 문서 지문(SHA-256). 다운로드한 PDF를 다시 해시해
+  // 비교하면 이후 변경되지 않았음을 증명할 수 있다.
+  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
+  const sha256 = [...new Uint8Array(hashBuffer)].map((b) => b.toString(16).padStart(2, '0')).join('')
   // 방마다 고정 키 — 재저장 시 같은 객체를 덮어써서 고아 객체가 생기지 않는다.
   const r2Key = `contracts/${params.roomId}/signed.pdf`
   const filename = `근로계약서_${params.roomId.slice(0, 8)}.pdf`
@@ -96,8 +101,8 @@ export async function onRequestPost({ request, env, data, params }) {
   const id = genId()
   try {
     await env.DB.prepare(
-      `INSERT INTO signed_contracts (id, room_id, r2_key, filename, size_bytes, stored_by_user_id, email_status)
-       VALUES (?, ?, ?, ?, ?, ?, 'not_sent')
+      `INSERT INTO signed_contracts (id, room_id, r2_key, filename, size_bytes, stored_by_user_id, email_status, sha256_hash)
+       VALUES (?, ?, ?, ?, ?, ?, 'not_sent', ?)
        ON CONFLICT(room_id) DO UPDATE SET
          r2_key = excluded.r2_key,
          filename = excluded.filename,
@@ -106,9 +111,10 @@ export async function onRequestPost({ request, env, data, params }) {
          email_status = 'not_sent',
          email_error = NULL,
          emailed_at = NULL,
+         sha256_hash = excluded.sha256_hash,
          updated_at = datetime('now')`
     )
-      .bind(id, params.roomId, r2Key, filename, file.size, data.user.id)
+      .bind(id, params.roomId, r2Key, filename, file.size, data.user.id, sha256)
       .run()
   } catch (err) {
     console.error(`Signed contract DB write failed for room ${params.roomId}:`, err)

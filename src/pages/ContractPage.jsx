@@ -425,6 +425,16 @@ export default function ContractPage() {
               <p>
                 <a href={`/api/rooms/${roomId}/signed-contract-file`}>저장된 계약서 PDF 다운로드 →</a>
               </p>
+              {signedContract.sha256Hash && (
+                <p className="integrity-hash">
+                  문서 무결성 지문(SHA-256): <code>{signedContract.sha256Hash}</code>
+                  <br />
+                  <em>
+                    다운로드한 PDF의 SHA-256 해시가 위 값과 일치하면 저장 이후 위·변조되지 않았음이
+                    증명됩니다.
+                  </em>
+                </p>
+              )}
             </>
           ) : myRole === 'company' ? (
             <p className="notice">

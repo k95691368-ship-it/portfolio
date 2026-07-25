@@ -53,6 +53,12 @@ const ANALYSIS_TOOL = {
         type: ['string', 'null'],
         description: 'hire_confirmed가 true인 경우, 그 근거가 되는 대화 인용',
       },
+      warnings: {
+        type: 'array',
+        items: { type: 'string' },
+        description:
+          '추출된 근로조건에서 발견된 법적 검토 필요 사항. 각 항목은 한 문장의 한국어 경고. 문제가 없으면 빈 배열.',
+      },
       reasoning: { type: 'string', description: '판단 근거를 한두 문장으로 설명' },
     },
   },
@@ -63,7 +69,13 @@ const SYSTEM_PROMPT = `당신은 한국 채용 면접 채팅 대화를 분석하
 규칙:
 1. 대화에서 언급된 근로조건(근무장소, 업무내용, 근무시간, 임금, 사회보험 등)을 최대한 정확히 추출하세요. 언급되지 않은 항목은 null로 두세요.
 2. hire_confirmed는 반드시 "회사 측의 명확한 합격/채용 통보"와 "지원자의 명확한 수락 의사표시"가 모두 확인될 때만 true로 표시하세요. 단순히 우호적인 대화, 조건 협의 중인 상태만으로는 false로 유지하세요.
-3. [이전에 추출된 조건]이 주어지면, 이번 대화에서 새로 명확히 확인된 값이 있을 때만 그 필드를 채우고, 새로 언급되지 않은 필드는 null로 반환하세요(병합은 호출 측에서 처리합니다).`
+3. [이전에 추출된 조건]이 주어지면, 이번 대화에서 새로 명확히 확인된 값이 있을 때만 그 필드를 채우고, 새로 언급되지 않은 필드는 null로 반환하세요(병합은 호출 측에서 처리합니다).
+4. 추출한 조건(이전 조건과 병합한 최종 상태 기준)에 근로기준법상 검토가 필요한 사항이 있으면 warnings에 한 문장씩 담으세요. 검토 기준:
+   - 최저임금: 2026년 최저시급 10,320원 (주 40시간·월 209시간 기준 월 2,156,880원). 기본급과 근로시간으로 환산 시급이 미달로 의심되면 경고.
+   - 근로시간: 1일 8시간·주 40시간 초과(연장 포함 주 52시간 한도) 의심 시 경고. 휴게시간이 명시되면 그만큼 제외하고 계산.
+   - 사회보험: 4대보험 중 일부를 적용하지 않겠다고 명시한 경우 경고.
+   - 기타 명백한 위법 소지(무급 연장근로, 최저임금 미만 수습 감액 초과 등).
+   확실한 근거가 있을 때만 경고하고, 정보가 부족하면 경고하지 마세요.`
 
 const DRAFT_TOOL = {
   name: 'record_contract_draft',
@@ -145,41 +157,62 @@ export async function draftContractDocument(env, terms) {
   return toolUse.input
 }
 
+// 모델이 드물게 조건을 전부 비워 반환하는 경우를 감지 (재시도 판단용).
+function isEmptyAnalysis(input) {
+  if (input.hire_confirmed) return false
+  const t = input.terms
+  if (!t || typeof t !== 'object') return true
+  return !Object.values(t).some((v) => {
+    if (v === null || v === undefined) return false
+    if (Array.isArray(v)) return v.length > 0
+    if (typeof v === 'object') return Object.values(v).some((x) => x !== null && x !== undefined)
+    return true
+  })
+}
+
 export async function analyzeConversation(env, transcript, previousTerms) {
   const apiKey = env.CLAUDE_API_KEY
   if (!apiKey) throw new Error('CLAUDE_API_KEY가 설정되지 않았습니다. Cloudflare 시크릿을 등록해주세요.')
 
   const userContent = `[이전에 추출된 조건]\n${JSON.stringify(previousTerms)}\n\n[대화 내용]\n${transcript}`
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 1024,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userContent }],
-      tools: [ANALYSIS_TOOL],
-      tool_choice: { type: 'tool', name: 'record_interview_analysis' },
-    }),
-  })
+  const callOnce = async () => {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 2048,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: userContent }],
+        tools: [ANALYSIS_TOOL],
+        tool_choice: { type: 'tool', name: 'record_interview_analysis' },
+      }),
+    })
 
-  if (!res.ok) {
-    const errText = await res.text()
-    throw new Error(`Claude API 오류 (${res.status}): ${errText.slice(0, 300)}`)
+    if (!res.ok) {
+      const errText = await res.text()
+      throw new Error(`Claude API 오류 (${res.status}): ${errText.slice(0, 300)}`)
+    }
+
+    const data = await res.json()
+    const toolUse = Array.isArray(data.content)
+      ? data.content.find((block) => block.type === 'tool_use')
+      : null
+    if (!toolUse || typeof toolUse.input !== 'object' || toolUse.input === null) {
+      throw new Error('AI 응답에서 분석 결과를 찾을 수 없습니다. 잠시 후 다시 시도해주세요.')
+    }
+    return toolUse.input
   }
 
-  const data = await res.json()
-  const toolUse = Array.isArray(data.content)
-    ? data.content.find((block) => block.type === 'tool_use')
-    : null
-  if (!toolUse || typeof toolUse.input !== 'object' || toolUse.input === null) {
-    throw new Error('AI 응답에서 분석 결과를 찾을 수 없습니다. 잠시 후 다시 시도해주세요.')
+  let analysis = await callOnce()
+  // 대화가 충분히 있는데 조건이 전부 비면 1회 재시도 (간헐적 빈 응답 보험).
+  if (isEmptyAnalysis(analysis) && transcript.length > 100) {
+    analysis = await callOnce()
   }
-
-  return toolUse.input
+  return analysis
 }

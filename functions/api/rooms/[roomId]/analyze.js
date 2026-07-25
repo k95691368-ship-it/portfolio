@@ -61,6 +61,11 @@ export async function onRequestPost({ env, data, params }) {
     .join('\n')
 
   const previousTerms = rowToCamelTerms(existing)
+  if (previousTerms) {
+    // 경고는 분석 결과물이지 조건이 아니므로 AI 입력에서 제외
+    delete previousTerms.analysisWarnings
+    delete previousTerms.aiDocument
+  }
 
   let analysis
   try {
@@ -100,6 +105,10 @@ export async function onRequestPost({ env, data, params }) {
       ? JSON.stringify(t.custom_terms)
       : (existing?.custom_terms_json ?? null)
 
+  const warnings = Array.isArray(analysis.warnings)
+    ? analysis.warnings.slice(0, 10).map((w) => String(w).slice(0, 300))
+    : []
+
   const wasConfirmed = !!existing?.hire_confirmed
   const hireConfirmed = analysis.hire_confirmed || wasConfirmed
   const hireConfirmedAt = analysis.hire_confirmed && !wasConfirmed ? new Date().toISOString() : (existing?.hire_confirmed_at ?? null)
@@ -115,8 +124,8 @@ export async function onRequestPost({ env, data, params }) {
        wage_base_amount, wage_pay_method, wage_pay_date, annual_leave,
        social_insurance_json, uniform_size, custom_terms_json,
        hire_confirmed, hire_confirmed_at, hire_confirmation_excerpt,
-       extraction_confidence, last_analyzed_message_id, updated_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+       extraction_confidence, last_analyzed_message_id, analysis_warnings_json, updated_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
      ON CONFLICT(room_id) DO UPDATE SET
        work_location=excluded.work_location, job_description=excluded.job_description,
        contract_start_date=excluded.contract_start_date, contract_end_date=excluded.contract_end_date,
@@ -130,6 +139,7 @@ export async function onRequestPost({ env, data, params }) {
        hire_confirmation_excerpt=excluded.hire_confirmation_excerpt,
        extraction_confidence=excluded.extraction_confidence,
        last_analyzed_message_id=excluded.last_analyzed_message_id,
+       analysis_warnings_json=excluded.analysis_warnings_json,
        updated_at=datetime('now')`
   )
     .bind(
@@ -153,7 +163,8 @@ export async function onRequestPost({ env, data, params }) {
       hireConfirmedAt,
       confirmationExcerpt,
       analysis.confirmation_confidence ?? null,
-      lastMessageId
+      lastMessageId,
+      warnings.length > 0 ? JSON.stringify(warnings) : null
     )
     .run()
 
@@ -180,6 +191,7 @@ export async function onRequestPost({ env, data, params }) {
       socialInsurance: socialInsuranceJson ? JSON.parse(socialInsuranceJson) : null,
       uniformSize: merged.uniform_size,
       customTerms: customTermsJson ? JSON.parse(customTermsJson) : [],
+      analysisWarnings: warnings,
     },
     hireConfirmed,
     hireConfirmedAt,

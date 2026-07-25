@@ -21,5 +21,6 @@ export function rowToCamelTerms(row) {
     uniformSize: row.uniform_size ?? null,
     customTerms: row.custom_terms_json ? JSON.parse(row.custom_terms_json) : [],
     aiDocument: row.ai_document_json ? JSON.parse(row.ai_document_json) : null,
+    analysisWarnings: row.analysis_warnings_json ? JSON.parse(row.analysis_warnings_json) : [],
   }
 }
