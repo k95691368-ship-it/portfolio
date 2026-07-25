@@ -32,6 +32,7 @@ export async function onRequestPost({ env, data, params }) {
 
   const companyName = data.user.company_name || data.user.display_name
   let emailStatus = 'not_sent'
+  let emailError = null
   if (isEmailConfigured(env)) {
     try {
       await sendApplicationResultEmail(env, {
@@ -43,9 +44,10 @@ export async function onRequestPost({ env, data, params }) {
       emailStatus = 'sent'
     } catch (err) {
       emailStatus = 'failed'
-      console.error(`Reject result email failed (application ${params.id}):`, err)
+      emailError = String(err?.message || err).slice(0, 300)
+      console.error(`Reject result email failed (application ${params.id}):`, emailError)
     }
   }
 
-  return jsonResponse({ ok: true, status: 'rejected', emailStatus })
+  return jsonResponse({ ok: true, status: 'rejected', emailStatus, emailError })
 }

@@ -19,15 +19,16 @@ describe('final offer email helpers', () => {
     expect(html).toContain('A&amp;B &lt;채용팀&gt;')
   })
 
-  it('sends through the Resend API with the configured sender information', async () => {
+  it('sends through the Mailjet API with the configured sender information', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ id: 'email_123' }),
+      json: async () => ({ Messages: [{ Status: 'success' }] }),
     })
     vi.stubGlobal('fetch', fetchMock)
 
     const env = {
-      RESEND_API_KEY: 're_test_key',
+      MAILJET_API_KEY: 'mj_key',
+      MAILJET_SECRET_KEY: 'mj_secret',
       FINAL_OFFER_FROM_EMAIL: 'recruiting@example.com',
       FINAL_OFFER_FROM_NAME: '채용팀',
     }
@@ -40,22 +41,45 @@ describe('final offer email helpers', () => {
     })
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://api.resend.com/emails',
+      'https://api.mailjet.com/v3.1/send',
       expect.objectContaining({
         method: 'POST',
-        headers: expect.objectContaining({ Authorization: 'Bearer re_test_key' }),
+        headers: expect.objectContaining({ Authorization: `Basic ${btoa('mj_key:mj_secret')}` }),
       })
     )
     const sentBody = JSON.parse(fetchMock.mock.calls[0][1].body)
-    expect(sentBody.to).toBe('candidate@example.com')
-    expect(sentBody.from).toBe('채용팀 <recruiting@example.com>')
-    expect(sentBody.subject).toBe('최종 합격 안내')
-    expect(sentBody.text).toBe('합격을 축하합니다.')
+    const message = sentBody.Messages[0]
+    expect(message.To[0].Email).toBe('candidate@example.com')
+    expect(message.From.Email).toBe('recruiting@example.com')
+    expect(message.From.Name).toBe('채용팀')
+    expect(message.Subject).toBe('최종 합격 안내')
+    expect(message.TextPart).toBe('합격을 축하합니다.')
 
     vi.unstubAllGlobals()
   })
 
-  it('fails clearly when the Resend API key is missing', async () => {
+  it('rejects when Mailjet reports a per-message error', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ Messages: [{ Status: 'error', Errors: [{ ErrorMessage: 'bad sender' }] }] }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      sendFinalOfferEmail(
+        {
+          MAILJET_API_KEY: 'k',
+          MAILJET_SECRET_KEY: 's',
+          FINAL_OFFER_FROM_EMAIL: 'recruiting@example.com',
+        },
+        { to: 'a@b.com', subject: 's', bodyText: 'b', companyName: 'c' }
+      )
+    ).rejects.toThrow('Mailjet 발송 실패')
+
+    vi.unstubAllGlobals()
+  })
+
+  it('fails clearly when the Mailjet API key is missing', async () => {
     await expect(
       sendFinalOfferEmail(
         { FINAL_OFFER_FROM_EMAIL: 'recruiting@example.com' },
@@ -66,6 +90,6 @@ describe('final offer email helpers', () => {
           companyName: '테스트 회사',
         }
       )
-    ).rejects.toThrow('RESEND_API_KEY')
+    ).rejects.toThrow('MAILJET_API_KEY')
   })
 })

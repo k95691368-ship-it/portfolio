@@ -129,6 +129,7 @@ export async function onRequestPost({ env, data, params }) {
 
   // 지원자에게 합격 안내 이메일 (설정된 경우에만, 실패해도 무시)
   let emailStatus = 'not_sent'
+  let emailError = null
   if (isEmailConfigured(env)) {
     try {
       await sendApplicationResultEmail(env, {
@@ -140,7 +141,8 @@ export async function onRequestPost({ env, data, params }) {
       emailStatus = 'sent'
     } catch (err) {
       emailStatus = 'failed'
-      console.error(`Pass result email failed (application ${params.id}):`, err)
+      emailError = String(err?.message || err).slice(0, 300)
+      console.error(`Pass result email failed (application ${params.id}):`, emailError)
     }
   }
 
@@ -150,6 +152,7 @@ export async function onRequestPost({ env, data, params }) {
       status: 'passed',
       roomId,
       emailStatus,
+      emailError,
       account: {
         email: application.applicant_email,
         alreadyExisted,

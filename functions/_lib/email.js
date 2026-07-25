@@ -56,45 +56,59 @@ export function buildFinalOfferEmailHtml({ bodyText, companyName }) {
 // Used by the route to return a clear "not configured" error instead of
 // attempting a doomed send.
 export function isEmailConfigured(env) {
-  return !!(env.RESEND_API_KEY && env.FINAL_OFFER_FROM_EMAIL)
+  return !!(env.MAILJET_API_KEY && env.MAILJET_SECRET_KEY && env.FINAL_OFFER_FROM_EMAIL)
 }
 
-// 공용 발송 함수 — 최종합격/면접초대 모두 이 함수를 통해 Resend로 발송.
+// 공용 발송 함수 — 모든 이메일이 이 함수를 통해 Mailjet(v3.1)으로 발송된다.
+// attachments: [{ filename, contentBase64, contentType }] (선택)
 export async function sendBrandedEmail(
   env,
-  { to, subject, bodyText, companyName, heading, title }
+  { to, subject, bodyText, companyName, heading, title, attachments }
 ) {
-  if (!env.RESEND_API_KEY) {
-    throw new Error('RESEND_API_KEY 환경 변수가 설정되지 않았습니다.')
+  if (!env.MAILJET_API_KEY || !env.MAILJET_SECRET_KEY) {
+    throw new Error('MAILJET_API_KEY / MAILJET_SECRET_KEY 환경 변수가 설정되지 않았습니다.')
   }
   if (!env.FINAL_OFFER_FROM_EMAIL) {
     throw new Error('FINAL_OFFER_FROM_EMAIL 환경 변수가 설정되지 않았습니다.')
   }
 
-  const fromName = env.FINAL_OFFER_FROM_NAME || companyName
-  const from = fromName ? `${fromName} <${env.FINAL_OFFER_FROM_EMAIL}>` : env.FINAL_OFFER_FROM_EMAIL
+  const fromName = env.FINAL_OFFER_FROM_NAME || companyName || ''
+  const message = {
+    From: { Email: env.FINAL_OFFER_FROM_EMAIL, Name: fromName },
+    To: [{ Email: to }],
+    Subject: subject,
+    TextPart: bodyText,
+    HTMLPart: buildBrandedEmailHtml({ bodyText, companyName, heading, title }),
+  }
+  if (Array.isArray(attachments) && attachments.length > 0) {
+    message.Attachments = attachments.map((a) => ({
+      ContentType: a.contentType || 'application/octet-stream',
+      Filename: a.filename,
+      Base64Content: a.contentBase64,
+    }))
+  }
 
-  const res = await fetch('https://api.resend.com/emails', {
+  const auth = btoa(`${env.MAILJET_API_KEY}:${env.MAILJET_SECRET_KEY}`)
+  const res = await fetch('https://api.mailjet.com/v3.1/send', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      Authorization: `Basic ${auth}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      from,
-      to,
-      subject,
-      text: bodyText,
-      html: buildBrandedEmailHtml({ bodyText, companyName, heading, title }),
-    }),
+    body: JSON.stringify({ Messages: [message] }),
   })
 
   if (!res.ok) {
     const detail = await res.text()
-    throw new Error(`Resend API 오류 (${res.status}): ${detail.slice(0, 300)}`)
+    throw new Error(`Mailjet API 오류 (${res.status}): ${detail.slice(0, 300)}`)
   }
 
-  return res.json()
+  const result = await res.json()
+  const status = result?.Messages?.[0]?.Status
+  if (status !== 'success') {
+    throw new Error(`Mailjet 발송 실패: ${JSON.stringify(result?.Messages?.[0] ?? result).slice(0, 300)}`)
+  }
+  return result
 }
 
 export async function sendFinalOfferEmail(env, { to, subject, bodyText, companyName }) {
@@ -153,44 +167,23 @@ ${companyName} 서류 전형에 지원해 주셔서 진심으로 감사드립니
 // 서명 완료된 근로계약서 PDF를 첨부하여 지원자에게 발송.
 // pdfBase64 는 PDF 바이트의 base64 문자열.
 export async function sendSignedContractEmail(env, { to, companyName, pdfBase64, filename }) {
-  if (!env.RESEND_API_KEY) {
-    throw new Error('RESEND_API_KEY 환경 변수가 설정되지 않았습니다.')
-  }
-  if (!env.FINAL_OFFER_FROM_EMAIL) {
-    throw new Error('FINAL_OFFER_FROM_EMAIL 환경 변수가 설정되지 않았습니다.')
-  }
-
-  const fromName = env.FINAL_OFFER_FROM_NAME || companyName
-  const from = fromName ? `${fromName} <${env.FINAL_OFFER_FROM_EMAIL}>` : env.FINAL_OFFER_FROM_EMAIL
-  const subject = `[${companyName}] 근로계약서 사본 전달`
   const bodyText = `안녕하세요.
 
 ${companyName}와(과) 체결한 근로계약서 서명본을 첨부합니다. 내용을 확인하시고 보관해 주세요.
 
 감사합니다.`
 
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from,
-      to,
-      subject,
-      text: bodyText,
-      html: buildBrandedEmailHtml({ bodyText, companyName, heading: 'LABOR CONTRACT', title: '근로계약서 사본' }),
-      attachments: [{ filename: filename || '근로계약서.pdf', content: pdfBase64 }],
-    }),
+  return sendBrandedEmail(env, {
+    to,
+    subject: `[${companyName}] 근로계약서 사본 전달`,
+    bodyText,
+    companyName,
+    heading: 'LABOR CONTRACT',
+    title: '근로계약서 사본',
+    attachments: [
+      { filename: filename || '근로계약서.pdf', contentBase64: pdfBase64, contentType: 'application/pdf' },
+    ],
   })
-
-  if (!res.ok) {
-    const detail = await res.text()
-    throw new Error(`Resend API 오류 (${res.status}): ${detail.slice(0, 300)}`)
-  }
-
-  return res.json()
 }
 
 // ArrayBuffer → base64 (큰 파일에서 스택 오버플로를 피하기 위해 청크 처리).
