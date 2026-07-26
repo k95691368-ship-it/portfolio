@@ -7,6 +7,7 @@ import {
   sendSignedContractEmail,
   arrayBufferToBase64,
 } from '../../../_lib/email.js'
+import { notifyUser } from '../../../_lib/notify.js'
 
 const MAX_PDF_SIZE = 8 * 1024 * 1024 // 8MB
 
@@ -151,6 +152,12 @@ export async function onRequestPost({ request, env, data, params }) {
       .bind(emailStatus, emailError, emailStatus, params.roomId)
       .run()
   }
+
+  await notifyUser(env, candidate?.id, {
+    type: 'contract_stored',
+    message: '서명 완료된 근로계약서가 보관되었습니다. 사본을 확인해보세요.',
+    link: `/rooms/${params.roomId}/contract`,
+  })
 
   const stored = await getStored(env, params.roomId)
   return jsonResponse(

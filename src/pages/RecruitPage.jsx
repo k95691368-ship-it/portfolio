@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
+import NotificationBell from '../components/NotificationBell.jsx'
 
 const STATUS_LABEL = {
   submitted: { label: '심사 대기', badge: 'badge-warning' },
@@ -10,18 +11,43 @@ const STATUS_LABEL = {
   rejected: { label: '불합격', badge: 'badge-danger' },
 }
 
+const FIT_LABEL = {
+  high: { label: '적합도 높음', badge: 'badge-success' },
+  medium: { label: '적합도 보통', badge: 'badge-warning' },
+  low: { label: '적합도 낮음', badge: 'badge-danger' },
+  unknown: { label: '판단 보류', badge: 'badge-neutral' },
+}
+
 function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
   const toast = useToast()
   const [detail, setDetail] = useState(null)
   const [working, setWorking] = useState(false)
   const [passResult, setPassResult] = useState(null)
+  const [screening, setScreening] = useState(null)
+  const [screeningLoading, setScreeningLoading] = useState(false)
 
   const load = useCallback(() => {
     api
       .get(`/applications/${appId}`)
-      .then((data) => setDetail(data.application))
+      .then((data) => {
+        setDetail(data.application)
+        setScreening(data.application.aiScreening)
+      })
       .catch((err) => toast.error(err.message))
   }, [appId, toast])
+
+  const handleScreen = async () => {
+    setScreeningLoading(true)
+    try {
+      const data = await api.post(`/applications/${appId}/screen`, {})
+      setScreening(data.screening)
+      toast.success('AI 서류 검토가 완료되었습니다.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setScreeningLoading(false)
+    }
+  }
 
   useEffect(() => {
     load()
@@ -167,6 +193,60 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
                 {detail.consent.optional ? '✅' : '❌'} · 제3자 제공{' '}
                 {detail.consent.thirdParty ? '✅' : '❌'}
               </p>
+            </div>
+
+            <div className="application-block ai-screening">
+              <div className="ai-screening-head">
+                <h3>AI 서류 검토</h3>
+                <button type="button" className="btn-sm" onClick={handleScreen} disabled={screeningLoading}>
+                  {screeningLoading ? 'AI가 검토하는 중...' : screening ? '다시 검토' : 'AI로 검토하기'}
+                </button>
+              </div>
+              {screening ? (
+                <>
+                  <p>
+                    <span className={`badge ${FIT_LABEL[screening.fit]?.badge || 'badge-neutral'}`}>
+                      {FIT_LABEL[screening.fit]?.label || screening.fit}
+                    </span>{' '}
+                    <span className="screening-fit-reason">{screening.fitReason}</span>
+                  </p>
+                  <p className="screening-summary">{screening.summary}</p>
+                  {screening.strengths.length > 0 && (
+                    <div>
+                      <strong>강점</strong>
+                      <ul className="screening-list">
+                        {screening.strengths.map((s, i) => (
+                          <li key={i}>{s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {screening.concerns.length > 0 && (
+                    <div>
+                      <strong>확인 필요</strong>
+                      <ul className="screening-list">
+                        {screening.concerns.map((s, i) => (
+                          <li key={i}>{s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {screening.interviewQuestions.length > 0 && (
+                    <div>
+                      <strong>추천 면접 질문</strong>
+                      <ul className="screening-list">
+                        {screening.interviewQuestions.map((s, i) => (
+                          <li key={i}>{s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="notice">
+                  AI가 공고 요건과 지원서를 비교해 요약·적합도·강점·확인사항·추천 면접 질문을 정리해줍니다.
+                </p>
+              )}
             </div>
 
             {detail.status === 'submitted' && (
@@ -350,6 +430,7 @@ export default function RecruitPage() {
       <header className="dashboard-header">
         <h1>채용 관리</h1>
         <div className="header-actions">
+          <NotificationBell />
           <Link to="/dashboard">대시보드</Link>
         </div>
       </header>

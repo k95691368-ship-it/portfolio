@@ -3,6 +3,7 @@ import { analyzeConversation } from '../../../_lib/claude.js'
 import { rowToCamelTerms } from '../../../_lib/contract.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { mergeValue, mergeSocialInsurance } from '../../../_lib/merge.js'
+import { notifyUser } from '../../../_lib/notify.js'
 
 const COOLDOWN_SECONDS = 45
 
@@ -172,6 +173,17 @@ export async function onRequestPost({ env, data, params }) {
     await env.DB.prepare("UPDATE interview_rooms SET status = 'contract_pending' WHERE id = ?")
       .bind(params.roomId)
       .run()
+
+    const candidate = await env.DB.prepare(
+      "SELECT user_id FROM room_participants WHERE room_id = ? AND role_in_room = 'candidate'"
+    )
+      .bind(params.roomId)
+      .first()
+    await notifyUser(env, candidate?.user_id, {
+      type: 'hire_confirmed',
+      message: '채용이 확정되었습니다! 전자근로계약서를 확인하고 서명해주세요.',
+      link: `/rooms/${params.roomId}/contract`,
+    })
   }
 
   return jsonResponse({

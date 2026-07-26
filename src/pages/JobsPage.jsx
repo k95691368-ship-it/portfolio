@@ -22,7 +22,10 @@ export default function JobsPage() {
           ← 처음으로
         </Link>
         <h1>채용 공고</h1>
-        <p>관심 있는 공고에 로그인 없이 바로 지원할 수 있습니다.</p>
+        <p>
+          관심 있는 공고에 로그인 없이 바로 지원할 수 있습니다. ·{' '}
+          <Link to="/application-status">지원 현황 조회 →</Link>
+        </p>
       </header>
 
       {error && <p className="error">{error}</p>}

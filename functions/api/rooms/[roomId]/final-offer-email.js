@@ -2,6 +2,7 @@ import { genId } from '../../../_lib/db.js'
 import { maskEmail, sendFinalOfferEmail, isEmailConfigured } from '../../../_lib/email.js'
 import { jsonError, jsonResponse } from '../../../_lib/http.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
+import { notifyUser } from '../../../_lib/notify.js'
 
 const SUBJECT_MAX_LENGTH = 150
 const BODY_MAX_LENGTH = 5000
@@ -151,6 +152,12 @@ export async function onRequestPost({ request, env, data, params }) {
       .run()
     return jsonError('이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.', 502)
   }
+
+  await notifyUser(env, candidate.id, {
+    type: 'final_offer',
+    message: `${companyName}에서 최종 합격을 안내했습니다. 축하합니다!`,
+    link: `/rooms/${params.roomId}`,
+  })
 
   const delivery = await getDelivery(env, params.roomId)
   return jsonResponse({ ok: true, delivery: deliveryResponse(delivery) }, 201)

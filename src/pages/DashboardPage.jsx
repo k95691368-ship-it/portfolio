@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import DocumentManager from '../components/DocumentManager.jsx'
+import NotificationBell from '../components/NotificationBell.jsx'
 import { roomStatusInfo } from '../lib/roomStatus.js'
 
 export default function DashboardPage() {
@@ -62,6 +63,7 @@ export default function DashboardPage() {
       <header className="dashboard-header">
         <h1>{user.role === 'company' ? '회사' : '구직자'} 대시보드</h1>
         <div className="header-actions">
+          <NotificationBell />
           {(user.isAdmin || user.isRecruiter) && <Link to="/recruit">채용 관리</Link>}
           {user.isAdmin && <Link to="/admin">관리자 패널</Link>}
           <button className="btn-ghost" onClick={logout}>

@@ -1,5 +1,6 @@
 import { jsonResponse, jsonError } from '../../_lib/http.js'
 import { checkRateLimit } from '../../_lib/rateLimit.js'
+import { notifyUser } from '../../_lib/notify.js'
 
 export async function onRequestPost({ request, env, data }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
@@ -47,6 +48,12 @@ export async function onRequestPost({ request, env, data }) {
         .bind(room.id)
         .run()
     }
+
+    await notifyUser(env, room.company_user_id, {
+      type: 'room_join',
+      message: `${data.user.display_name}님이 '${room.title}' 면접방에 참여했습니다.`,
+      link: `/rooms/${room.id}`,
+    })
   }
 
   return jsonResponse({ id: room.id, title: room.title })

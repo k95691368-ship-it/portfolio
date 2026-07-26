@@ -1,6 +1,7 @@
 import { maskEmail, sendRoomInviteEmail, isEmailConfigured } from '../../../_lib/email.js'
 import { jsonError, jsonResponse } from '../../../_lib/http.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
+import { notifyUser } from '../../../_lib/notify.js'
 
 const SUBJECT_MAX_LENGTH = 150
 const BODY_MAX_LENGTH = 5000
@@ -75,6 +76,12 @@ export async function onRequestPost({ request, env, data, params }) {
     console.error(`Room invite email failed for room ${params.roomId}:`, detail)
     return jsonError('이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.', 502)
   }
+
+  await notifyUser(env, candidate.id, {
+    type: 'room_invite',
+    message: `${companyName}에서 면접방 참여를 요청했습니다.`,
+    link: `/rooms/${params.roomId}`,
+  })
 
   return jsonResponse({ ok: true, recipientEmailMasked: maskEmail(candidate.email) }, 201)
 }

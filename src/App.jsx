@@ -9,6 +9,7 @@ import RoomPage from './pages/RoomPage.jsx'
 import JobsPage from './pages/JobsPage.jsx'
 import JobDetailPage from './pages/JobDetailPage.jsx'
 import ApplyPage from './pages/ApplyPage.jsx'
+import ApplicationStatusPage from './pages/ApplicationStatusPage.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import './App.css'
 
@@ -27,6 +28,7 @@ function App() {
       <Route path="/jobs" element={<JobsPage />} />
       <Route path="/jobs/:id" element={<JobDetailPage />} />
       <Route path="/jobs/:id/apply" element={<ApplyPage />} />
+      <Route path="/application-status" element={<ApplicationStatusPage />} />
 
       <Route element={<ProtectedRoute allowMustChangePassword />}>
         <Route path="/change-password" element={<ChangePasswordPage />} />

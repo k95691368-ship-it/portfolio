@@ -68,6 +68,7 @@ export default function ApplyPage() {
   const toast = useToast()
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
+  const [lookupCode, setLookupCode] = useState('')
   const careerKeyRef = useRef(0)
 
   const pickFile = (setter) => (event) => {
@@ -130,7 +131,8 @@ export default function ApplyPage() {
       form.append('resume', resume)
       if (portfolio) form.append('portfolio', portfolio)
 
-      await api.upload(`/jobs/${id}/apply`, form)
+      const res = await api.upload(`/jobs/${id}/apply`, form)
+      setLookupCode(res.lookupCode || '')
       setDone(true)
       toast.success('지원서가 정상 제출되었습니다.')
     } catch (err) {
@@ -163,6 +165,22 @@ export default function ApplyPage() {
           <p className="notice">
             서류에 합격하면 이 이메일을 아이디로 하는 계정과 임시 비밀번호가 발급됩니다.
           </p>
+          {lookupCode && (
+            <div className="lookup-code-box">
+              <p className="lookup-code-label">접수번호 (심사 상태 조회에 사용됩니다 — 꼭 보관하세요)</p>
+              <p className="lookup-code">
+                <code>{lookupCode}</code>
+                <button
+                  type="button"
+                  className="btn-sm"
+                  onClick={() => navigator.clipboard?.writeText(lookupCode)}
+                >
+                  복사
+                </button>
+              </p>
+              <Link to={`/application-status?code=${lookupCode}`}>지원 현황 바로 조회하기 →</Link>
+            </div>
+          )}
           <button type="button" className="btn-primary" onClick={() => navigate('/jobs')}>
             다른 공고 보기
           </button>

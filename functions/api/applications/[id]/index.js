@@ -35,6 +35,8 @@ export async function onRequestGet({ env, data, params }) {
       createdUserId: a.created_user_id,
       reviewedAt: a.reviewed_at,
       createdAt: a.created_at,
+      aiScreening: a.ai_screening_json ? JSON.parse(a.ai_screening_json) : null,
+      screenedAt: a.screened_at,
       documents: docs.map((d) => ({
         id: d.id,
         docType: d.doc_type,

@@ -9,6 +9,15 @@ const PHONE_MAX = 40
 const SOURCE_MAX = 200
 const COVER_MAX = 5000
 
+// 지원 현황 조회용 접수번호 (혼동 문자 제외 10자)
+function genLookupCode() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  const bytes = crypto.getRandomValues(new Uint8Array(10))
+  let code = ''
+  for (const b of bytes) code += alphabet[b % alphabet.length]
+  return code
+}
+
 // 공개: 특정 채용 공고에 지원. 로그인 불필요, multipart(파일 포함) 한 번의 요청.
 export async function onRequestPost({ request, env, params }) {
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
@@ -98,13 +107,14 @@ export async function onRequestPost({ request, env, params }) {
     return jsonError('파일 업로드에 실패했습니다. 잠시 후 다시 시도해주세요.', 502)
   }
 
+  const lookupCode = genLookupCode()
   const statements = [
     env.DB.prepare(
       `INSERT INTO applications (
          id, posting_id, applicant_name, applicant_email, applicant_phone,
          career_json, application_source, cover_letter,
-         consent_required, consent_optional, consent_third_party, consented_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+         consent_required, consent_optional, consent_third_party, consented_at, lookup_code
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)`
     ).bind(
       appId,
       params.id,
@@ -116,7 +126,8 @@ export async function onRequestPost({ request, env, params }) {
       coverLetter || null,
       consentRequired ? 1 : 0,
       consentOptional ? 1 : 0,
-      consentThirdParty ? 1 : 0
+      consentThirdParty ? 1 : 0,
+      lookupCode
     ),
     ...uploads.map((u) =>
       env.DB.prepare(
@@ -138,5 +149,5 @@ export async function onRequestPost({ request, env, params }) {
     return jsonError('지원서 저장에 실패했습니다. 잠시 후 다시 시도해주세요.', 500)
   }
 
-  return jsonResponse({ ok: true, applicationId: appId }, 201)
+  return jsonResponse({ ok: true, applicationId: appId, lookupCode }, 201)
 }

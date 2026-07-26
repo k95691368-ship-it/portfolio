@@ -157,6 +157,85 @@ export async function draftContractDocument(env, terms) {
   return toolUse.input
 }
 
+const SCREENING_TOOL = {
+  name: 'record_application_screening',
+  description: '채용 공고 요건과 지원서를 비교 분석한 서류 스크리닝 결과를 기록한다.',
+  input_schema: {
+    type: 'object',
+    required: ['summary', 'fit', 'fit_reason', 'strengths', 'concerns', 'interview_questions'],
+    properties: {
+      summary: { type: 'string', description: '지원자 프로필 요약 (2~4문장, 경력·핵심 역량 중심)' },
+      fit: {
+        type: 'string',
+        enum: ['high', 'medium', 'low', 'unknown'],
+        description: '공고 요건 대비 적합도. 판단할 정보가 부족하면 unknown.',
+      },
+      fit_reason: { type: 'string', description: '적합도 판단 근거 한두 문장' },
+      strengths: { type: 'array', items: { type: 'string' }, description: '지원서에서 확인되는 강점 (없으면 빈 배열)' },
+      concerns: {
+        type: 'array',
+        items: { type: 'string' },
+        description: '우려되거나 서류만으로 확인 불가한 사항 (없으면 빈 배열)',
+      },
+      interview_questions: {
+        type: 'array',
+        items: { type: 'string' },
+        description: '이 지원자에게 면접에서 물어보면 좋을 맞춤 질문 3~5개',
+      },
+    },
+  },
+}
+
+const SCREENING_SYSTEM_PROMPT = `당신은 채용 담당자를 돕는 서류 스크리닝 어시스턴트입니다.
+
+규칙:
+1. [채용 공고]의 요건과 [지원서] 내용을 비교해 객관적으로 분석하세요.
+2. 지원서에 적힌 내용만 근거로 삼고, 없는 사실을 추정하거나 지어내지 마세요.
+3. 정보가 부족해 적합도를 판단하기 어려우면 fit을 unknown으로 두고 그 이유를 fit_reason에 쓰세요.
+4. 학력·나이·성별·출신 지역 등 차별 소지가 있는 요소는 평가에 사용하지 마세요.
+5. 면접 질문은 이 지원자의 경력과 공고 요건의 간극을 확인할 수 있는 구체적인 질문으로 작성하세요.
+6. 모든 출력은 한국어로 작성하세요.`
+
+// 지원서 AI 스크리닝 — 공고 요건 대비 요약/적합도/강점/확인사항/면접질문.
+export async function screenApplication(env, { posting, application }) {
+  const apiKey = env.CLAUDE_API_KEY
+  if (!apiKey) throw new Error('CLAUDE_API_KEY가 설정되지 않았습니다. Cloudflare 시크릿을 등록해주세요.')
+
+  const userContent = `[채용 공고]\n${JSON.stringify(posting)}\n\n[지원서]\n${JSON.stringify(application)}`
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 2048,
+      system: SCREENING_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: userContent }],
+      tools: [SCREENING_TOOL],
+      tool_choice: { type: 'tool', name: 'record_application_screening' },
+    }),
+  })
+
+  if (!res.ok) {
+    const errText = await res.text()
+    throw new Error(`Claude API 오류 (${res.status}): ${errText.slice(0, 300)}`)
+  }
+
+  const data = await res.json()
+  const toolUse = Array.isArray(data.content)
+    ? data.content.find((block) => block.type === 'tool_use')
+    : null
+  if (!toolUse || typeof toolUse.input !== 'object' || toolUse.input === null || !toolUse.input.summary) {
+    throw new Error('AI 응답에서 스크리닝 결과를 찾을 수 없습니다. 잠시 후 다시 시도해주세요.')
+  }
+
+  return toolUse.input
+}
+
 // 모델이 드물게 조건을 전부 비워 반환하는 경우를 감지 (재시도 판단용).
 function isEmptyAnalysis(input) {
   if (input.hire_confirmed) return false

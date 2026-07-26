@@ -5,6 +5,7 @@ import { genTempPassword } from '../../../_lib/tempPassword.js'
 import { requireManageableApplication } from '../../../_lib/applications.js'
 import { logAdminAction } from '../../../_lib/auditLog.js'
 import { isEmailConfigured, sendApplicationResultEmail } from '../../../_lib/email.js'
+import { notifyUser } from '../../../_lib/notify.js'
 
 function genInviteCode() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // 헷갈리는 글자(0/O, 1/I) 제외
@@ -117,6 +118,13 @@ export async function onRequestPost({ env, data, params }) {
   }
 
   const companyName = data.user.company_name || data.user.display_name
+
+  // 지원자 인앱 알림 (첫 로그인 시 확인)
+  await notifyUser(env, candidateUserId, {
+    type: 'application_passed',
+    message: `${companyName} 서류 전형에 합격했습니다! 면접방에서 절차를 이어가세요.`,
+    link: `/rooms/${roomId}`,
+  })
 
   // 감사 로그 기록 (실패해도 처리 결과에는 영향 없음)
   await logAdminAction(env, {

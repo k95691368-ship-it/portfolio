@@ -1,6 +1,7 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { genId } from '../../../_lib/db.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
+import { notifyUser } from '../../../_lib/notify.js'
 
 const MAX_DATA_URL_LENGTH = 2_000_000
 
@@ -58,6 +59,22 @@ export async function onRequestPost({ env, data, params, request }) {
     await env.DB.prepare("UPDATE interview_rooms SET status = 'signed' WHERE id = ?")
       .bind(params.roomId)
       .run()
+  }
+
+  // 상대방에게 알림 (모두 서명 완료 시에는 양측 모두)
+  const { results: others } = await env.DB.prepare(
+    'SELECT user_id FROM room_participants WHERE room_id = ? AND user_id != ?'
+  )
+    .bind(params.roomId, data.user.id)
+    .all()
+  for (const other of others) {
+    await notifyUser(env, other.user_id, {
+      type: bothSigned ? 'contract_signed' : 'signature',
+      message: bothSigned
+        ? '전자근로계약서 서명이 완료되었습니다. 계약서를 확인해보세요.'
+        : `${data.user.display_name}님이 계약서에 서명했습니다. 내 서명을 진행해주세요.`,
+      link: `/rooms/${params.roomId}/contract`,
+    })
   }
 
   return jsonResponse({ ok: true, signerRole: participant.role_in_room, bothSigned })
