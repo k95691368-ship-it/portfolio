@@ -353,6 +353,43 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
     expect(times).toEqual([...times].sort())
   })
 
+  it('면접 대화를 회사 보관용 기록으로 정리한다', async () => {
+    // 요약할 만한 대화를 채운다 (최소 4건).
+    const lines = [
+      ['company', '근무는 주 5일, 09시부터 18시까지입니다. 가능하실까요?'],
+      ['candidate', '네 가능합니다. 이전 직장에서도 같은 시간대로 3년 근무했습니다.'],
+      ['company', '임금은 협의된 금액으로 하고, 지급일은 매월 25일입니다.'],
+      ['candidate', '좋습니다. 4대보험 적용 여부만 확인 부탁드립니다.'],
+    ]
+    for (const [who, body] of lines) {
+      const client = who === 'company' ? company : candidate
+      const sent = await client(`/api/rooms/${state.roomId}/messages`, {
+        method: 'POST',
+        body: { body },
+      })
+      expect(sent.status).toBe(201)
+    }
+
+    // 지원자는 회사 보관용 기록을 볼 수 없다.
+    const denied = await candidate(`/api/rooms/${state.roomId}/interview-summary`)
+    expect(denied.status).toBe(403)
+
+    const empty = await company(`/api/rooms/${state.roomId}/interview-summary`)
+    expect(empty.status).toBe(200)
+    expect(empty.json.summary).toBeNull()
+
+    const written = await company(`/api/rooms/${state.roomId}/interview-summary`, { method: 'POST' })
+    expect(written.status, `요약 작성 실패: ${written.text}`).toBe(201)
+    expect(written.json.summary.overview.length).toBeGreaterThan(10)
+    expect(written.json.messageCount).toBeGreaterThanOrEqual(5)
+
+    const saved = await company(`/api/rooms/${state.roomId}/interview-summary`)
+    expect(saved.json.summary.overview).toBe(written.json.summary.overview)
+    expect(saved.json.author).toBeTruthy()
+    expect(saved.json.messageCount).toBe(written.json.messageCount)
+    // AI가 본문을 쓰는 데 시간이 걸린다.
+  }, 120000)
+
   it('갱신 계약을 이전 계약과 이으면 계속근로기간이 합산된다', async () => {
     // 같은 근로자와 두 번째 계약을 맺는다 (계정은 그대로 쓴다).
     const room = await company('/api/rooms/create', {
