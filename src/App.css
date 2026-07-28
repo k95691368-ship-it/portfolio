@@ -1549,7 +1549,8 @@
 }
 
 /* 계약 기간 (체결 이후 만료까지 관리) */
-.contract-period {
+.contract-period,
+.contract-lifecycle {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1557,6 +1558,32 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
+}
+.lifecycle-chain {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+.lifecycle-chain li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.lifecycle-dates {
+  color: var(--text-muted);
+}
+.lifecycle-link {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.lifecycle-link select {
+  max-width: 100%;
 }
 .period-head {
   display: flex;

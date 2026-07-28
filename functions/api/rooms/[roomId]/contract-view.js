@@ -9,7 +9,13 @@ import {
   findMissingFields,
   diffAgreedVsCurrent,
 } from '../../../_lib/contractCheck.js'
-import { describeContractPeriod, checkPeriodCompliance } from '../../../_lib/contractPeriod.js'
+import {
+  describeContractPeriod,
+  checkPeriodCompliance,
+  describeContinuousEmployment,
+  checkContinuityCompliance,
+  describeRetention,
+} from '../../../_lib/contractPeriod.js'
 import { checkContractDocument } from '../../../_lib/documentCheck.js'
 import { findLanguage } from '../../../_lib/languages.js'
 
@@ -107,11 +113,73 @@ export async function onRequestGet({ env, data, params }) {
 
   // 계약 기간 상태는 체결 전후 모두 필요하다 (체결 후에는 만료 관리에 쓰인다).
   const period = terms ? describeContractPeriod(terms) : null
+  const candidateRow = participantRows.find((p) => p.role_in_room === 'candidate')
+
+  // 갱신으로 이어진 계약이 있으면 계속근로기간을 합산해야 2년 상한을 제대로 본다.
+  // 이어진 계약이 없을 때는 조회 자체를 하지 않는다.
+  let continuity = { linked: false, count: termsRow ? 1 : 0 }
+  if (termsRow?.previous_room_id) {
+    const { results: chain } = await env.DB.prepare(
+      `WITH RECURSIVE chain(room_id, previous_room_id, depth) AS (
+         SELECT room_id, previous_room_id, 0 FROM contract_terms WHERE room_id = ?
+         UNION ALL
+         SELECT ct.room_id, ct.previous_room_id, chain.depth + 1
+           FROM contract_terms ct, chain
+          WHERE ct.room_id = chain.previous_room_id AND chain.depth < 10
+       )
+       SELECT chain.depth, ct.room_id, ct.contract_start_date, ct.contract_end_date, r.title
+         FROM chain
+         JOIN contract_terms ct ON ct.room_id = chain.room_id
+         JOIN interview_rooms r ON r.id = chain.room_id
+        ORDER BY chain.depth DESC`
+    )
+      .bind(roomId)
+      .all()
+    continuity = describeContinuousEmployment(
+      chain.map((c) => ({
+        roomId: c.room_id,
+        title: c.title,
+        startDate: c.contract_start_date,
+        endDate: c.contract_end_date,
+      }))
+    )
+    continuity.previousRoomId = termsRow.previous_room_id
+  }
+
+  // 체결이 끝난 계약은 보존 의무 기간을 관리해야 한다 (근로기준법 제42조).
+  const retention = isSigned && terms ? describeRetention(terms, storedRow?.created_at) : null
+
+  // 회사가 이 계약을 어떤 계약의 갱신으로 이을지 고를 수 있게, 같은 근로자의
+  // 이미 체결된 계약 목록을 함께 내려준다.
+  let linkableRooms = []
+  if (!isSigned && access.role_in_room === 'company' && candidateRow) {
+    const { results } = await env.DB.prepare(
+      `SELECT r.id, r.title, ct.contract_start_date, ct.contract_end_date
+         FROM room_participants rp
+         JOIN interview_rooms r ON r.id = rp.room_id
+         LEFT JOIN contract_terms ct ON ct.room_id = r.id
+        WHERE rp.user_id = ? AND rp.role_in_room = 'candidate'
+          AND r.status = 'signed' AND r.id != ?
+        ORDER BY ct.contract_start_date DESC LIMIT 20`
+    )
+      .bind(candidateRow.id, roomId)
+      .all()
+    linkableRooms = results.map((r) => ({
+      id: r.id,
+      title: r.title,
+      startDate: r.contract_start_date,
+      endDate: r.contract_end_date,
+    }))
+  }
 
   let preSignCheck = null
   if (!isSigned && terms) {
     const diffs = diffAgreedVsCurrent(parsedHistory, terms)
-    const legalIssues = [...checkLegalCompliance(terms), ...checkPeriodCompliance(terms)]
+    const legalIssues = [
+      ...checkLegalCompliance(terms),
+      ...checkPeriodCompliance(terms),
+      ...checkContinuityCompliance(continuity),
+    ]
     const missingFields = findMissingFields(terms)
     // 서명 대상은 계약 조건이 아니라 계약서 본문이므로 본문도 함께 대조한다.
     const documentCheck = checkContractDocument(terms)
@@ -128,8 +196,6 @@ export async function onRequestGet({ env, data, params }) {
         documentCheck.missingArticles.length > 0,
     }
   }
-
-  const candidate = participantRows.find((p) => p.role_in_room === 'candidate')
 
   return jsonResponse({
     room: {
@@ -189,6 +255,9 @@ export async function onRequestGet({ env, data, params }) {
     },
     preSignCheck,
     period,
+    continuity,
+    retention,
+    linkableRooms,
     // 번역과 나란히 대조할 원본 조항 (번역 시 쓰는 것과 같은 기준)
     sourceArticles:
       terms?.aiDocument && terms.aiDocument.length > 0
@@ -221,9 +290,9 @@ export async function onRequestGet({ env, data, params }) {
             emailedAt: storedRow.emailed_at,
             createdAt: storedRow.created_at,
           },
-          candidateEmailMasked: candidate ? maskEmail(candidate.email) : null,
+          candidateEmailMasked: candidateRow ? maskEmail(candidateRow.email) : null,
           emailConfigured: isEmailConfigured(env),
         }
-      : { stored: null, candidateEmailMasked: candidate ? maskEmail(candidate.email) : null, emailConfigured: isEmailConfigured(env) },
+      : { stored: null, candidateEmailMasked: candidateRow ? maskEmail(candidateRow.email) : null, emailConfigured: isEmailConfigured(env) },
   })
 }

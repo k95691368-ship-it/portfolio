@@ -93,6 +93,107 @@ export function describeContractPeriod(terms, now = new Date()) {
   }
 }
 
+// 근로기준법 제42조: 근로계약서 등 근로관계 서류는 3년간 보존해야 한다.
+export const RETENTION_YEARS = 3
+// 갱신 사이 공백이 이보다 길면 계속근로가 끊겼을 수 있다고 본다.
+export const CONTINUITY_GAP_DAYS = 30
+
+// 계약서 보존 의무 기간. 기산일은 근로관계가 끝난 날(계약 종료일),
+// 종료일이 없으면 서명일로 잡는다.
+export function describeRetention(terms, signedAt, now = new Date()) {
+  const base = parseContractDate(terms?.contractEndDate) || parseContractDate(signedAt)
+  if (!base) return { known: false }
+
+  const until = new Date(
+    Date.UTC(base.getUTCFullYear() + RETENTION_YEARS, base.getUTCMonth(), base.getUTCDate())
+  )
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  const remainingDays = daysBetween(today, until)
+
+  return {
+    known: true,
+    basis: base.toISOString().slice(0, 10),
+    until: until.toISOString().slice(0, 10),
+    remainingDays,
+    expired: remainingDays < 0,
+    label: remainingDays < 0 ? '보존 의무 기간 종료' : `보존 만료 ${remainingDays}일 전`,
+    detail:
+      remainingDays < 0
+        ? `근로기준법 제42조에 따른 3년 보존 의무 기간(${until.toISOString().slice(0, 10)})이 지났습니다.`
+        : `근로기준법 제42조에 따라 ${until.toISOString().slice(0, 10)}까지 보존해야 합니다.`,
+  }
+}
+
+// 이어진 계약들의 계속근로기간을 합산한다.
+// segments는 오래된 순 [{roomId, title, startDate, endDate}].
+export function describeContinuousEmployment(segments, now = new Date()) {
+  const parsed = (segments || [])
+    .map((s) => ({
+      roomId: s.roomId,
+      title: s.title,
+      start: parseContractDate(s.startDate),
+      end: parseContractDate(s.endDate),
+    }))
+    .filter((s) => s.start)
+
+  if (parsed.length < 2) return { linked: false, count: parsed.length }
+
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  let totalMonths = 0
+  const gaps = []
+
+  parsed.forEach((s, i) => {
+    // 진행 중인 마지막 계약은 종료일이 없으면 오늘까지로 센다.
+    const end = s.end || (i === parsed.length - 1 ? today : null)
+    // 종료일도 일한 날이다. "3월 1일 ~ 이듬해 2월 28일"은 11개월이 아니라 1년이므로
+    // 하루를 더해 센다. 계속근로기간은 실제로 일한 기간이어야 한다.
+    if (end) totalMonths += Math.max(0, monthsBetween(s.start, new Date(end.getTime() + DAY_MS)) ?? 0)
+
+    const next = parsed[i + 1]
+    if (next && s.end) {
+      const gap = daysBetween(s.end, next.start)
+      if (gap > CONTINUITY_GAP_DAYS) {
+        gaps.push({ afterRoomId: s.roomId, days: gap })
+      }
+    }
+  })
+
+  const first = parsed[0]
+  const last = parsed[parsed.length - 1]
+
+  return {
+    linked: true,
+    count: parsed.length,
+    totalMonths,
+    startDate: first.start.toISOString().slice(0, 10),
+    endDate: (last.end || null)?.toISOString().slice(0, 10) ?? null,
+    exceedsFixedTermLimit: totalMonths > FIXED_TERM_LIMIT_MONTHS,
+    gaps,
+    segments: parsed.map((s) => ({
+      roomId: s.roomId,
+      title: s.title,
+      startDate: s.start.toISOString().slice(0, 10),
+      endDate: s.end ? s.end.toISOString().slice(0, 10) : null,
+    })),
+  }
+}
+
+// 이어진 계약을 합산했을 때만 드러나는 경고.
+export function checkContinuityCompliance(continuity) {
+  if (!continuity?.linked || !continuity.exceedsFixedTermLimit) return []
+  const gapNote =
+    continuity.gaps.length > 0
+      ? ' 다만 계약 사이에 공백이 있어 계속근로로 볼지는 실제 근무 여부에 따라 달라질 수 있습니다.'
+      : ''
+  return [
+    {
+      severity: 'high',
+      title: '계속근로 2년 초과',
+      detail: `이어진 계약 ${continuity.count}건의 계속근로기간이 약 ${continuity.totalMonths}개월로 2년을 넘습니다. 기간제법 제4조에 따라 2년을 초과해 사용한 기간제근로자는 기간의 정함이 없는 근로계약을 체결한 것으로 봅니다.${gapNote}`,
+    },
+  ]
+}
+
 // 서명 전 점검에 함께 실을 기간 관련 경고.
 export function checkPeriodCompliance(terms, now = new Date()) {
   const issues = []

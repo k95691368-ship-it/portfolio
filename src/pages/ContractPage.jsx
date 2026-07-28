@@ -157,6 +157,86 @@ const PERIOD_BADGE = {
 }
 
 // 계약 기간 — 체결로 끝이 아니라 만료까지 관리해야 한다.
+// 이어진 계약(갱신) — 계속근로기간 합산과 보존 의무 기간
+function ContractLifecycle({ continuity, retention, linkableRooms, canLink, onLink, onUnlink, busy }) {
+  const [selected, setSelected] = useState('')
+  const showPicker = canLink && linkableRooms.length > 0
+  if (!continuity?.linked && !retention?.known && !showPicker) return null
+
+  return (
+    <section className="contract-lifecycle">
+      <h2>계약 이력과 보존</h2>
+
+      {continuity?.linked && (
+        <>
+          <p className="period-detail">
+            이어진 계약 {continuity.count}건 · 계속근로기간 약 {continuity.totalMonths}개월 (
+            {continuity.startDate} ~ {continuity.endDate ?? '진행 중'})
+          </p>
+          <ol className="lifecycle-chain">
+            {continuity.segments.map((s) => (
+              <li key={s.roomId}>
+                <span>{s.title}</span>
+                <span className="lifecycle-dates">
+                  {s.startDate} ~ {s.endDate ?? '진행 중'}
+                </span>
+              </li>
+            ))}
+          </ol>
+          {continuity.exceedsFixedTermLimit && (
+            <p className="period-alert">
+              계약 하나하나는 2년 이내지만 이어서 보면 2년을 넘습니다. 기간제법 제4조에 따라 기간의
+              정함이 없는 근로계약으로 보게 될 수 있습니다.
+            </p>
+          )}
+          {continuity.gaps?.length > 0 && (
+            <p className="period-detail">
+              계약 사이에 {continuity.gaps.map((g) => `${g.days}일`).join(', ')}의 공백이 있어 계속근로로
+              볼지는 실제 근무 여부에 따라 달라질 수 있습니다.
+            </p>
+          )}
+          {canLink && (
+            <button type="button" className="btn-sm" onClick={onUnlink} disabled={busy}>
+              연결 해제
+            </button>
+          )}
+        </>
+      )}
+
+      {showPicker && !continuity?.linked && (
+        <div className="lifecycle-link">
+          <p className="period-detail">
+            이 계약이 이전 계약의 갱신이라면 이어두세요. 계속근로기간을 합산해 2년 상한을 함께
+            봅니다.
+          </p>
+          <select value={selected} onChange={(e) => setSelected(e.target.value)}>
+            <option value="">이전 계약 선택</option>
+            {linkableRooms.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.title} ({r.startDate ?? '개시일 미기재'} ~ {r.endDate ?? '종료일 없음'})
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="btn-sm"
+            onClick={() => onLink(selected)}
+            disabled={busy || !selected}
+          >
+            이전 계약으로 연결
+          </button>
+        </div>
+      )}
+
+      {retention?.known && (
+        <p className={retention.expired ? 'period-alert' : 'period-detail'}>
+          <span className="badge badge-neutral">{retention.label}</span> {retention.detail}
+        </p>
+      )}
+    </section>
+  )
+}
+
 function ContractPeriod({ period }) {
   if (!period?.known) return null
 
@@ -526,6 +606,10 @@ export default function ContractPage() {
   const [translations, setTranslations] = useState([])
   const [sourceArticles, setSourceArticles] = useState([])
   const [translating, setTranslating] = useState(false)
+  const [continuity, setContinuity] = useState(null)
+  const [retention, setRetention] = useState(null)
+  const [linkableRooms, setLinkableRooms] = useState([])
+  const [linking, setLinking] = useState(false)
   const printRef = useRef(null)
 
   const loadAll = useCallback(async () => {
@@ -576,6 +660,9 @@ export default function ContractPage() {
     setSignatures(sigData.signatures)
     setChangeRequests(view.changeRequests ?? [])
     setPeriod(view.period ?? null)
+    setContinuity(view.continuity ?? null)
+    setRetention(view.retention ?? null)
+    setLinkableRooms(view.linkableRooms ?? [])
     setTranslations(view.translations ?? [])
     setSourceArticles(view.sourceArticles ?? [])
 
@@ -664,6 +751,32 @@ export default function ContractPage() {
       toast.error(err.message)
     } finally {
       setTranslating(false)
+    }
+  }
+
+  const handleLinkPrevious = async (previousRoomId) => {
+    setLinking(true)
+    try {
+      await api.post(`/rooms/${roomId}/link-previous`, { previousRoomId })
+      await loadAll()
+      toast.success('이전 계약과 연결되었습니다. 계속근로기간을 합산해 확인합니다.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setLinking(false)
+    }
+  }
+
+  const handleUnlinkPrevious = async () => {
+    setLinking(true)
+    try {
+      await api.delete(`/rooms/${roomId}/link-previous`)
+      await loadAll()
+      toast.success('이전 계약 연결을 해제했습니다.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setLinking(false)
     }
   }
 
@@ -905,6 +1018,16 @@ export default function ContractPage() {
       )}
 
       <ContractPeriod period={period} />
+
+      <ContractLifecycle
+        continuity={continuity}
+        retention={retention}
+        linkableRooms={linkableRooms}
+        canLink={myRole === 'company' && !isSigned}
+        onLink={handleLinkPrevious}
+        onUnlink={handleUnlinkPrevious}
+        busy={linking}
+      />
 
       <ContractTranslations
         translations={translations}

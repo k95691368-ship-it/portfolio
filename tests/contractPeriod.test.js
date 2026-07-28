@@ -4,6 +4,9 @@ import {
   monthsBetween,
   describeContractPeriod,
   checkPeriodCompliance,
+  describeContinuousEmployment,
+  checkContinuityCompliance,
+  describeRetention,
 } from '../functions/_lib/contractPeriod.js'
 
 const NOW = new Date(Date.UTC(2026, 8, 15)) // 2026-09-15 기준으로 고정
@@ -124,5 +127,112 @@ describe('checkPeriodCompliance (기간제법 제4조)', () => {
 
   it('기간의 정함이 없으면 기간 경고 대상이 아니다', () => {
     expect(checkPeriodCompliance({ contractStartDate: '2026-01-01' }, NOW)).toEqual([])
+  })
+})
+
+describe('describeContinuousEmployment', () => {
+  const chain = [
+    { roomId: 'a', title: '1년차', startDate: '2024-03-01', endDate: '2025-02-28' },
+    { roomId: 'b', title: '2년차', startDate: '2025-03-01', endDate: '2026-02-28' },
+    { roomId: 'c', title: '3년차', startDate: '2026-03-01', endDate: '2027-02-28' },
+  ]
+
+  it('계약이 하나뿐이면 합산할 것이 없다', () => {
+    expect(describeContinuousEmployment([chain[0]], NOW).linked).toBe(false)
+  })
+
+  it('이어진 계약의 기간을 합산한다', () => {
+    const r = describeContinuousEmployment(chain, NOW)
+    expect(r.linked).toBe(true)
+    expect(r.count).toBe(3)
+    expect(r.totalMonths).toBeGreaterThanOrEqual(35)
+    expect(r.startDate).toBe('2024-03-01')
+    expect(r.exceedsFixedTermLimit).toBe(true)
+  })
+
+  it('계약 하나만 보면 2년을 넘지 않아도 합산하면 넘는 것을 잡는다', () => {
+    const each = describeContractPeriod(
+      { contractStartDate: chain[2].startDate, contractEndDate: chain[2].endDate },
+      NOW
+    )
+    expect(each.exceedsFixedTermLimit).toBe(false)
+    expect(describeContinuousEmployment(chain, NOW).exceedsFixedTermLimit).toBe(true)
+  })
+
+  it('계약 사이 공백이 길면 표시한다', () => {
+    const gapped = [
+      { roomId: 'a', title: '이전', startDate: '2023-01-01', endDate: '2023-12-31' },
+      { roomId: 'b', title: '이후', startDate: '2025-06-01', endDate: '2026-05-31' },
+    ]
+    const r = describeContinuousEmployment(gapped, NOW)
+    expect(r.gaps.length).toBe(1)
+    expect(r.gaps[0].afterRoomId).toBe('a')
+  })
+
+  it('진행 중인 마지막 계약은 오늘까지로 센다', () => {
+    const open = [
+      { roomId: 'a', title: '이전', startDate: '2024-09-01', endDate: '2025-08-31' },
+      { roomId: 'b', title: '현재', startDate: '2025-09-01', endDate: null },
+    ]
+    const r = describeContinuousEmployment(open, NOW)
+    expect(r.totalMonths).toBeGreaterThanOrEqual(23)
+    expect(r.endDate).toBeNull()
+  })
+})
+
+describe('checkContinuityCompliance', () => {
+  it('이어지지 않았으면 경고하지 않는다', () => {
+    expect(checkContinuityCompliance({ linked: false })).toEqual([])
+    expect(checkContinuityCompliance(null)).toEqual([])
+  })
+
+  it('합산 2년 초과는 높은 등급으로 경고한다', () => {
+    const issues = checkContinuityCompliance({
+      linked: true,
+      count: 3,
+      totalMonths: 36,
+      exceedsFixedTermLimit: true,
+      gaps: [],
+    })
+    expect(issues).toHaveLength(1)
+    expect(issues[0].severity).toBe('high')
+    expect(issues[0].detail).toContain('36개월')
+  })
+
+  it('공백이 있으면 단서를 함께 붙인다', () => {
+    const issues = checkContinuityCompliance({
+      linked: true,
+      count: 2,
+      totalMonths: 30,
+      exceedsFixedTermLimit: true,
+      gaps: [{ afterRoomId: 'a', days: 90 }],
+    })
+    expect(issues[0].detail).toContain('공백')
+  })
+})
+
+describe('describeRetention', () => {
+  it('계약 종료일부터 3년을 보존 기간으로 잡는다', () => {
+    const r = describeRetention({ contractEndDate: '2026-12-31' }, null, NOW)
+    expect(r.known).toBe(true)
+    expect(r.until).toBe('2029-12-31')
+    expect(r.expired).toBe(false)
+    expect(r.detail).toContain('제42조')
+  })
+
+  it('종료일이 없으면 서명일을 기산일로 쓴다', () => {
+    const r = describeRetention({}, '2026-01-10', NOW)
+    expect(r.basis).toBe('2026-01-10')
+    expect(r.until).toBe('2029-01-10')
+  })
+
+  it('보존 기간이 지나면 종료로 표시한다', () => {
+    const r = describeRetention({ contractEndDate: '2020-01-01' }, null, NOW)
+    expect(r.expired).toBe(true)
+    expect(r.label).toContain('종료')
+  })
+
+  it('기산할 날짜가 없으면 알 수 없음', () => {
+    expect(describeRetention({}, null, NOW).known).toBe(false)
   })
 })
