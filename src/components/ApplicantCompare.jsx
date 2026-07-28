@@ -74,25 +74,35 @@ export default function ApplicantCompare({ postingId, postingTitle, onClose, onO
             정보는 쓰지 않으며, 최종 판단은 채용 담당자가 합니다.
           </p>
 
-          <div className="table-scroll">
+          {/* 표를 읽어 주는 도구가 어느 열의 값인지 알 수 있도록 열 머리를 연결하고,
+              무엇을 비교하는 표인지 이름을 붙인다. */}
+          <div className="table-scroll" tabIndex={0} role="region" aria-label="지원자 비교 표">
             <table className="admin-table">
+              <caption className="sr-only">
+                {postingTitle} 지원자 {data.applicants.length}명을 직무 적합도와 경력 기간으로 정렬한
+                표
+              </caption>
               <thead>
                 <tr>
-                  <th>순위</th>
-                  <th>이름</th>
-                  <th>적합도</th>
-                  <th>경력</th>
-                  <th>근거</th>
-                  <th>강점 / 확인 필요</th>
-                  <th>상태</th>
-                  <th></th>
+                  <th scope="col">순위</th>
+                  <th scope="col">이름</th>
+                  <th scope="col">적합도</th>
+                  <th scope="col">경력</th>
+                  <th scope="col">근거</th>
+                  <th scope="col">강점 / 확인 필요</th>
+                  <th scope="col">상태</th>
+                  <th scope="col">
+                    <span className="sr-only">지원서 열기</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {data.applicants.map((a) => (
                   <tr key={a.id}>
                     <td>{a.rank}</td>
-                    <td>{a.applicantName}</td>
+                    <th scope="row" className="compare-name">
+                      {a.applicantName}
+                    </th>
                     <td>
                       <span className={`badge ${FIT_BADGE[a.fit]}`}>{a.fitLabel}</span>
                     </td>
@@ -120,6 +130,7 @@ export default function ApplicantCompare({ postingId, postingTitle, onClose, onO
                         type="button"
                         className="btn-sm"
                         onClick={() => onOpenApplication(a.id)}
+                        aria-label={`${a.applicantName} 지원서 보기`}
                       >
                         지원서 보기
                       </button>

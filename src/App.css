@@ -272,7 +272,7 @@
 .chat-message.mine {
   align-self: flex-end;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   border-radius: 16px 16px 4px 16px;
 }
 .chat-message p {
@@ -289,7 +289,7 @@
   color: var(--text-muted);
 }
 .chat-message.mine .chat-sender {
-  color: rgba(255, 255, 255, 0.8);
+  color: color-mix(in srgb, var(--on-accent) 78%, transparent);
 }
 .chat-composer {
   display: flex;
@@ -496,6 +496,9 @@
   background: #fff;
 }
 
+/* 계약서 본문과 서명 면은 화면 테마를 따르지 않는다.
+   이 영역은 그대로 PDF로 내보내 보관·교부되는 문서이고, 서명 이미지는 배경이
+   비어 있는 검은 획이라 어두운 면 위에서는 보이지 않는다. 종이는 흰색이다. */
 .contract-print {
   text-align: left;
   padding: 32px;
@@ -559,7 +562,7 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.5);
+  background: var(--overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1227,20 +1230,22 @@
   border: 1px solid transparent;
   box-shadow: var(--shadow);
   cursor: pointer;
-  color: #fff;
+  /* 토스트 면은 두 화면에서 같은 색을 쓰므로 글자도 늘 흰색이다.
+     --success/--danger를 그대로 쓰면 어두운 화면에서 밝아져 흰 글자가 묻힌다. */
+  color: var(--toast-text);
   animation: toast-in 0.22s ease;
 }
 .toast-success {
-  background: var(--success);
-  border-color: var(--success);
+  background: var(--toast-success);
+  border-color: var(--toast-border);
 }
 .toast-error {
-  background: var(--danger);
-  border-color: var(--danger);
+  background: var(--toast-danger);
+  border-color: var(--toast-border);
 }
 .toast-info {
-  background: var(--text-h);
-  border-color: var(--text-h);
+  background: var(--toast-info);
+  border-color: var(--toast-border);
 }
 @keyframes toast-in {
   from {
@@ -1279,8 +1284,9 @@
   height: 18px;
   padding: 0 4px;
   border-radius: var(--radius-full);
-  background: var(--danger);
-  color: #fff;
+  /* 안 읽은 개수는 아주 작은 글씨라, 두 화면에서 대비가 확실한 색을 쓴다 */
+  background: var(--toast-danger);
+  color: var(--toast-text);
   font-size: 11px;
   font-weight: 700;
   display: inline-flex;
@@ -1432,7 +1438,7 @@
   padding: 10px 20px;
   border-radius: var(--radius-full);
   background: var(--accent);
-  color: #fff !important;
+  color: var(--on-accent) !important;
   font-weight: 600;
 }
 .status-login-btn:hover {
@@ -1505,7 +1511,7 @@
 }
 .translation-tabs .active {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 .translation-body {
   display: flex;
@@ -1630,14 +1636,14 @@
   flex: none;
 }
 .my-app-steps .step-done .step-dot {
-  background: var(--success, #16a34a);
+  background: var(--success);
 }
 .my-app-steps .step-current .step-dot {
-  background: var(--accent, #2563eb);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #2563eb) 25%, transparent);
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 .my-app-steps .step-stopped .step-dot {
-  background: var(--warning, #d97706);
+  background: var(--warning);
 }
 .my-app-steps .step-current .step-label,
 .my-app-steps .step-done .step-label {
@@ -1654,6 +1660,16 @@
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+}
+/* 표 안의 행 머리(이름)는 열 머리처럼 굵게 보이지 않아야 한다 */
+.compare-name {
+  font-weight: 600;
+  text-align: left;
+}
+/* 가로로 스크롤되는 표는 키보드로도 옮길 수 있어야 한다 */
+.table-scroll:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .compare-summary {
   font-size: 15px;

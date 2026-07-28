@@ -8,6 +8,15 @@ const STATUS_BADGE = {
   rejected: { label: '불합격', badge: 'badge-neutral' },
 }
 
+// 단계의 상태는 점 색깔로만 구분된다. 색을 구분하지 못하거나 화면을 읽어 주는
+// 도구를 쓰는 사람에게는 아무 뜻도 전달되지 않으므로 말로도 함께 남긴다.
+const STEP_STATE_TEXT = {
+  done: '완료',
+  current: '진행 중',
+  stopped: '여기서 중단됨',
+  upcoming: '예정',
+}
+
 // 로그인한 지원자가 자기 지원서를 모아 본다.
 //
 // 접수번호를 따로 들고 다니며 공개 조회 화면에서 한 건씩 확인하지 않아도 되고,
@@ -45,7 +54,7 @@ export default function MyApplications() {
         {applications.map((a) => {
           const info = STATUS_BADGE[a.status] || STATUS_BADGE.submitted
           return (
-            <article key={a.id} className="my-app-card">
+            <article key={a.id} className="my-app-card" aria-label={`${a.postingTitle} 지원 현황`}>
               <div className="my-app-head">
                 <h3>{a.postingTitle}</h3>
                 <span className={`badge ${info.badge}`}>{info.label}</span>
@@ -59,6 +68,7 @@ export default function MyApplications() {
                   <li key={s.key} className={`step-${s.state}`}>
                     <span className="step-dot" aria-hidden="true" />
                     <span className="step-label">{s.label}</span>
+                    <span className="sr-only"> — {STEP_STATE_TEXT[s.state]}</span>
                     {s.at && <span className="step-at">{s.at.slice(0, 10)}</span>}
                   </li>
                 ))}

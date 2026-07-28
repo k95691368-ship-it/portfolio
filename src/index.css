@@ -7,8 +7,16 @@
   --surface: #f2f4f6;
   --border: #e5e8eb;
   --code-bg: #f2f4f6;
-  /* 진한 바탕 위에 얹는 글자색 (두 테마 모두 흰색) */
+  /* 강조색 면 위에 얹는 글자색. 밝은 화면에서 --accent는 진한 파랑이라 흰 글자가
+     읽히지만, 어두운 화면에서는 --accent가 밝아지므로 이 값도 함께 뒤집힌다. */
   --on-accent: #fff;
+  /* 토스트는 어느 화면에서든 같은 색 면 위에 흰 글자를 얹는다 */
+  --toast-text: #fff;
+  --toast-success: #00875a;
+  --toast-danger: #cf2637;
+  --toast-info: #2b2f36;
+  --toast-border: transparent;
+  --overlay: rgba(15, 23, 42, 0.5);
 
   --accent: #0064ff;
   --accent-bg: rgba(0, 100, 255, 0.08);
@@ -98,6 +106,12 @@
     --success-text: #4ee7a2;
     --warning-text: #ffc670;
 
+    /* 어두운 화면에서는 강조색이 밝아지므로, 그 위의 글자는 어두워야 읽힌다.
+       (흰 글자는 2.6:1로 미달, 이 값은 7.5:1) */
+    --on-accent: #10131a;
+    --toast-border: rgba(255, 255, 255, 0.22);
+    --overlay: rgba(0, 0, 0, 0.66);
+
     --social-bg: rgba(255, 255, 255, 0.04);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
     --shadow: rgba(0, 0, 0, 0.6) 0 10px 15px -3px, rgba(0, 0, 0, 0.4) 0 4px 6px -2px;
@@ -135,6 +149,12 @@
   --danger-text: #ff8e97;
   --success-text: #4ee7a2;
   --warning-text: #ffc670;
+
+  /* 어두운 화면에서는 강조색이 밝아지므로, 그 위의 글자는 어두워야 읽힌다.
+     (흰 글자는 2.6:1로 미달, 이 값은 7.5:1) */
+  --on-accent: #10131a;
+  --toast-border: rgba(255, 255, 255, 0.22);
+  --overlay: rgba(0, 0, 0, 0.66);
 
   --social-bg: rgba(255, 255, 255, 0.04);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
