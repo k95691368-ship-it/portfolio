@@ -1,18 +1,7 @@
-import { useEffect, useState } from 'react'
-import { api } from '../api/client.js'
-
 const LABELS = { resume: '이력서', cover_letter: '자기소개서' }
 
-export default function RoomDocuments({ roomId }) {
-  const [documents, setDocuments] = useState([])
-
-  useEffect(() => {
-    api
-      .get(`/rooms/${roomId}/documents`)
-      .then((data) => setDocuments(data.documents))
-      .catch(() => setDocuments([]))
-  }, [roomId])
-
+// 서류 목록은 면접방 화면이 한 번의 요청으로 함께 받아 온다.
+export default function RoomDocuments({ documents = [] }) {
   if (documents.length === 0) return null
 
   return (

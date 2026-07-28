@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
 
@@ -11,27 +11,18 @@ ${companyName} 채용 담당자입니다. 면접 진행을 위해 면접방으�
 감사합니다.`
 }
 
-export default function RoomInviteEmailForm({ roomId, candidateName, companyName }) {
+// initial: 면접방 화면이 한 번의 요청으로 함께 받아 온 { candidate, emailConfigured }
+export default function RoomInviteEmailForm({ roomId, initial, candidateName, companyName }) {
   const defaultSubject = useMemo(() => `[${companyName}] 면접방 참여 안내`, [companyName])
   const [subject, setSubject] = useState(defaultSubject)
   const [bodyText, setBodyText] = useState(() => defaultMessage(candidateName, companyName))
   const toast = useToast()
-  const [candidate, setCandidate] = useState(null)
-  const [emailConfigured, setEmailConfigured] = useState(true)
-  const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [sentTo, setSentTo] = useState('')
 
-  useEffect(() => {
-    api
-      .get(`/rooms/${roomId}/invite-email`)
-      .then((data) => {
-        setCandidate(data.candidate)
-        setEmailConfigured(data.emailConfigured)
-      })
-      .catch((err) => toast.error(err.message))
-      .finally(() => setLoading(false))
-  }, [roomId, toast])
+  const candidate = initial?.candidate ?? null
+  const emailConfigured = initial?.emailConfigured ?? true
+  const loading = !initial
 
   const handleSend = async (event) => {
     event.preventDefault()

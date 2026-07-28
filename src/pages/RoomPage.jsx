@@ -16,31 +16,31 @@ export default function RoomPage() {
   const { roomId } = useParams()
   const toast = useToast()
   const { user } = useAuth()
-  const [room, setRoom] = useState(null)
+  const [view, setView] = useState(null)
   const [error, setError] = useState('')
-  const { messages, sendMessage } = useChatPolling(roomId)
-
-  const [contract, setContract] = useState(null)
   const [analyzing, setAnalyzing] = useState(false)
 
-  const loadContract = useCallback(async () => {
-    const data = await api.get(`/rooms/${roomId}/contract`)
-    setContract(data)
+  // 이 화면에 필요한 모든 정보를 한 번의 요청으로 받는다.
+  const loadView = useCallback(async () => {
+    const data = await api.get(`/rooms/${roomId}/view`)
+    setView(data)
+    return data
   }, [roomId])
 
   useEffect(() => {
-    api
-      .get(`/rooms/${roomId}`)
-      .then(setRoom)
-      .catch((err) => setError(err.message))
-    loadContract().catch(() => {})
-  }, [roomId, loadContract])
+    setView(null)
+    setError('')
+    loadView().catch((err) => setError(err.message))
+  }, [loadView])
+
+  // 대화의 첫 묶음은 위 요청에 이미 들어 있다. 그다음부터만 증분으로 확인한다.
+  const { messages, sendMessage } = useChatPolling(roomId, 2500, view?.messages ?? null)
 
   const handleAnalyze = async () => {
     setAnalyzing(true)
     try {
       const data = await api.post(`/rooms/${roomId}/analyze`, {})
-      setContract(data)
+      setView((prev) => (prev ? { ...prev, contract: data } : prev))
       toast.success('채용 조건이 정리되었습니다.')
     } catch (err) {
       toast.error(err.message)
@@ -50,8 +50,10 @@ export default function RoomPage() {
   }
 
   if (error) return <p className="error">{error}</p>
-  if (!room) return <p>불러오는 중...</p>
+  if (!view) return <p>불러오는 중...</p>
 
+  const room = view.room
+  const contract = view.contract
   const candidate = room.participants.find((participant) => participant.role === 'candidate')
   const company = room.participants.find((participant) => participant.role === 'company')
 
@@ -66,7 +68,7 @@ export default function RoomPage() {
         {room.myRole === 'company' && <p>초대코드: {room.inviteCode}</p>}
       </header>
 
-      <RoomDocuments roomId={roomId} />
+      <RoomDocuments documents={view.documents} />
 
       <div className="chat-panel">
         <ChatMessageList messages={messages} />
@@ -111,8 +113,10 @@ export default function RoomPage() {
       {room.myRole === 'company' && (
         <InterviewSummary
           roomId={roomId}
+          record={view.interviewSummary}
           canWrite={!!(user?.isAdmin || user?.isRecruiter)}
           messageCount={messages.length}
+          onChanged={loadView}
         />
       )}
 
@@ -120,11 +124,13 @@ export default function RoomPage() {
         <>
           <RoomInviteEmailForm
             roomId={roomId}
+            initial={view.inviteEmail}
             candidateName={candidate?.displayName || '지원자'}
             companyName={company?.companyName || company?.displayName || '회사'}
           />
           <FinalOfferEmailForm
             roomId={roomId}
+            initial={view.finalOfferEmail}
             candidateName={candidate?.displayName || '지원자'}
             companyName={company?.companyName || company?.displayName || '회사'}
           />

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
 
@@ -12,26 +12,20 @@ ${companyName} 채용 전형 결과, 최종 합격하셨음을 안내드립니�
 감사합니다.`
 }
 
-export default function FinalOfferEmailForm({ roomId, candidateName, companyName }) {
+// initial: 면접방 화면이 한 번의 요청으로 함께 받아 온 { candidate, delivery }
+export default function FinalOfferEmailForm({ roomId, initial, candidateName, companyName }) {
   const defaultSubject = useMemo(() => `[${companyName}] 최종 합격을 축하드립니다`, [companyName])
   const [subject, setSubject] = useState(defaultSubject)
   const [bodyText, setBodyText] = useState(() => defaultMessage(candidateName, companyName))
   const toast = useToast()
-  const [candidate, setCandidate] = useState(null)
-  const [delivery, setDelivery] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  // 발송하면 그 결과로 갱신되므로, 받아 온 값을 시작점으로 삼는다.
+  const [sentDelivery, setSentDelivery] = useState(null)
 
-  useEffect(() => {
-    api
-      .get(`/rooms/${roomId}/final-offer-email`)
-      .then((data) => {
-        setCandidate(data.candidate)
-        setDelivery(data.delivery)
-      })
-      .catch((err) => toast.error(err.message))
-      .finally(() => setLoading(false))
-  }, [roomId, toast])
+  const candidate = initial?.candidate ?? null
+  const delivery = sentDelivery ?? initial?.delivery ?? null
+  const loading = !initial
+  const setDelivery = setSentDelivery
 
   const handleSend = async (event) => {
     event.preventDefault()

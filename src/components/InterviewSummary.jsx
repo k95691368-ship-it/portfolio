@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useState } from 'react'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
 
@@ -7,25 +7,16 @@ import { useToast } from '../context/ToastContext.jsx'
 // 지원자에 대한 평가가 아니라 "무슨 이야기가 오갔는가"의 기록이다. 무엇을
 // 근거로 쓴 요약인지 알 수 있도록 작성자·작성 시점·그때까지의 대화 수를
 // 함께 보여준다. 대화가 더 오갔으면 다시 정리할 수 있다.
-export default function InterviewSummary({ roomId, canWrite, messageCount }) {
+// record: 면접방 화면이 한 번의 요청으로 함께 받아 온 기록 (없으면 null)
+export default function InterviewSummary({ roomId, record, canWrite, messageCount, onChanged }) {
   const toast = useToast()
-  const [record, setRecord] = useState(null)
   const [busy, setBusy] = useState(false)
-
-  const load = useCallback(async () => {
-    const data = await api.get(`/rooms/${roomId}/interview-summary`)
-    setRecord(data.summary ? data : null)
-  }, [roomId])
-
-  useEffect(() => {
-    load().catch(() => {})
-  }, [load])
 
   const handleWrite = async () => {
     setBusy(true)
     try {
       await api.post(`/rooms/${roomId}/interview-summary`, {})
-      await load()
+      await onChanged()
       toast.success('면접 요약이 기록되었습니다.')
     } catch (err) {
       toast.error(err.message)

@@ -6,13 +6,38 @@ import { api } from '../api/client.js'
 const MAX_IDLE_MS = 15000
 const BACKOFF_AFTER = 6 // 이만큼 연속으로 새 메시지가 없으면 간격을 늘린다
 
-export function useChatPolling(roomId, intervalMs = 2500) {
+// initialMessages: 면접방 화면이 한 번의 요청으로 이미 받아 둔 첫 묶음.
+// 이것이 올 때까지 기다렸다가 그다음부터 증분으로만 확인한다. 같은 대화를
+// 두 번 받지 않기 위해서다.
+export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null) {
   const [messages, setMessages] = useState([])
   const [error, setError] = useState('')
+  const [ready, setReady] = useState(false)
   const lastIdRef = useRef(0)
   const fetchingRef = useRef(false)
   const emptyRunsRef = useRef(0)
   const timerRef = useRef(null)
+  const seededRef = useRef(false)
+
+  // 다른 면접방으로 옮기면 처음 상태로 되돌린다.
+  useEffect(() => {
+    seededRef.current = false
+    lastIdRef.current = 0
+    emptyRunsRef.current = 0
+    setMessages([])
+    setReady(false)
+  }, [roomId])
+
+  // 첫 묶음은 화면이 받아 온 것을 그대로 쓴다. 한 번만 받는다.
+  useEffect(() => {
+    if (seededRef.current || !initialMessages) return
+    seededRef.current = true
+    if (initialMessages.length > 0) {
+      lastIdRef.current = initialMessages[initialMessages.length - 1].id
+      setMessages(initialMessages)
+    }
+    setReady(true)
+  }, [initialMessages])
 
   const poll = useCallback(async () => {
     if (fetchingRef.current) return
@@ -35,9 +60,7 @@ export function useChatPolling(roomId, intervalMs = 2500) {
   }, [roomId])
 
   useEffect(() => {
-    setMessages([])
-    lastIdRef.current = 0
-    emptyRunsRef.current = 0
+    if (!ready) return undefined
 
     // 조용한 시간이 길어질수록 간격을 늘리되 상한을 둔다.
     const nextDelay = () => {
@@ -67,13 +90,14 @@ export function useChatPolling(roomId, intervalMs = 2500) {
     }
     document.addEventListener('visibilitychange', onVisible)
 
-    schedule(0)
+    // 첫 묶음은 이미 받았으므로 한 박자 뒤부터 확인한다.
+    schedule(intervalMs)
     return () => {
       stopped = true
       clearTimeout(timerRef.current)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [poll, intervalMs])
+  }, [poll, intervalMs, ready])
 
   const sendMessage = useCallback(
     async (body) => {
