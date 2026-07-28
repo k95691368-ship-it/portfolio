@@ -33,8 +33,16 @@ export default function NotificationBell() {
 
   useEffect(() => {
     load()
-    const timer = setInterval(load, 60000)
-    return () => clearInterval(timer)
+    // 보고 있지 않은 탭에서는 확인하지 않고, 돌아오면 바로 새로고침한다.
+    const tick = () => {
+      if (document.visibilityState === 'visible') load()
+    }
+    const timer = setInterval(tick, 60000)
+    document.addEventListener('visibilitychange', tick)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', tick)
+    }
   }, [load])
 
   // 바깥 클릭 시 닫기

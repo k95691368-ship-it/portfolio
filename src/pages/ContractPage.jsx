@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import html2canvas from 'html2canvas'
-import { jsPDF } from 'jspdf'
 import { api } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
@@ -156,13 +154,18 @@ export default function ContractPage() {
   const printRef = useRef(null)
 
   const loadAll = useCallback(async () => {
-    const [roomData, contractData, sigData, historyData, auditData] = await Promise.all([
-      api.get(`/rooms/${roomId}`),
-      api.get(`/rooms/${roomId}/contract`),
-      api.get(`/rooms/${roomId}/signatures`),
-      api.get(`/rooms/${roomId}/contract-history`).catch(() => ({ history: [] })),
-      api.get(`/rooms/${roomId}/audit-trail`).catch(() => null),
-    ])
+    // 서명 여부에 따라 둘 중 하나만 쓰이지만, 상태를 받고 나서 다시 요청하면
+    // 왕복이 한 번 더 생긴다. 둘 다 함께 요청해 페이지 로딩을 한 번에 끝낸다.
+    const [roomData, contractData, sigData, historyData, auditData, preSignData, storedData] =
+      await Promise.all([
+        api.get(`/rooms/${roomId}`),
+        api.get(`/rooms/${roomId}/contract`),
+        api.get(`/rooms/${roomId}/signatures`),
+        api.get(`/rooms/${roomId}/contract-history`).catch(() => ({ history: [] })),
+        api.get(`/rooms/${roomId}/audit-trail`).catch(() => null),
+        api.get(`/rooms/${roomId}/pre-sign-check`).catch(() => null),
+        api.get(`/rooms/${roomId}/signed-contract`).catch(() => null),
+      ])
     setAuditTrail(auditData)
     setRoom(roomData)
     setHistory(historyData.history ?? [])
@@ -200,21 +203,15 @@ export default function ContractPage() {
     })
     setSignatures(sigData.signatures)
 
-    // 서명 전 최종 안전 점검 (아직 서명이 완료되지 않은 계약서만)
-    if (roomData.status !== 'signed') {
-      const check = await api.get(`/rooms/${roomId}/pre-sign-check`).catch(() => null)
-      setPreSign(check)
-    }
+    // 서명 전 최종 안전 점검은 아직 체결되지 않은 계약서에만 보여준다.
+    setPreSign(roomData.status === 'signed' ? null : preSignData)
 
-    if (roomData.status === 'signed') {
-      const signed = await api.get(`/rooms/${roomId}/signed-contract`).catch(() => null)
-      if (signed) {
-        setSignedContract(signed.stored)
-        setSignedMeta({
-          emailConfigured: signed.emailConfigured,
-          candidateEmailMasked: signed.candidateEmailMasked,
-        })
-      }
+    if (roomData.status === 'signed' && storedData) {
+      setSignedContract(storedData.stored)
+      setSignedMeta({
+        emailConfigured: storedData.emailConfigured,
+        candidateEmailMasked: storedData.candidateEmailMasked,
+      })
     }
   }, [roomId])
 
@@ -292,7 +289,14 @@ export default function ContractPage() {
     }
   }
 
+  // PDF 생성 라이브러리는 600KB가 넘는데, 계약서를 읽거나 서명만 하는 경우에는
+  // 쓰이지 않는다. 그래서 페이지 진입 시가 아니라 실제로 내보내기를 누른 순간에
+  // 불러온다.
   const buildPdf = async () => {
+    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+      import('html2canvas'),
+      import('jspdf'),
+    ])
     const canvas = await html2canvas(printRef.current, { scale: 2, backgroundColor: '#ffffff' })
     const imgData = canvas.toDataURL('image/png')
     const pdf = new jsPDF('p', 'mm', 'a4')
