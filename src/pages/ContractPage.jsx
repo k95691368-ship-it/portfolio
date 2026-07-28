@@ -154,18 +154,15 @@ export default function ContractPage() {
   const printRef = useRef(null)
 
   const loadAll = useCallback(async () => {
-    // 서명 여부에 따라 둘 중 하나만 쓰이지만, 상태를 받고 나서 다시 요청하면
-    // 왕복이 한 번 더 생긴다. 둘 다 함께 요청해 페이지 로딩을 한 번에 끝낸다.
-    const [roomData, contractData, sigData, historyData, auditData, preSignData, storedData] =
-      await Promise.all([
-        api.get(`/rooms/${roomId}`),
-        api.get(`/rooms/${roomId}/contract`),
-        api.get(`/rooms/${roomId}/signatures`),
-        api.get(`/rooms/${roomId}/contract-history`).catch(() => ({ history: [] })),
-        api.get(`/rooms/${roomId}/audit-trail`).catch(() => null),
-        api.get(`/rooms/${roomId}/pre-sign-check`).catch(() => null),
-        api.get(`/rooms/${roomId}/signed-contract`).catch(() => null),
-      ])
+    // 이 화면에 필요한 모든 정보를 한 번의 요청으로 받는다.
+    const view = await api.get(`/rooms/${roomId}/contract-view`)
+    const roomData = view.room
+    const contractData = view.contract
+    const sigData = { signatures: view.signatures }
+    const historyData = { history: view.history }
+    const auditData = view.auditTrail
+    const preSignData = view.preSignCheck
+    const storedData = view.signedContract
     setAuditTrail(auditData)
     setRoom(roomData)
     setHistory(historyData.history ?? [])

@@ -1,14 +1,10 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { getRoomAccess } from '../../../_lib/rooms.js'
-
-// SQLite "YYYY-MM-DD HH:MM:SS"와 ISO "....T...Z"가 섞여 있어 정렬용으로 통일한다.
-function normalizeTime(t) {
-  if (!t) return ''
-  return String(t).replace('T', ' ').replace('Z', '').slice(0, 19)
-}
+import { buildAuditEvents } from '../../../_lib/auditTrail.js'
 
 // 감사추적: 면접방 생성부터 서명·보관·발송까지의 전 과정을 시간순으로 반환.
-// 참여자 양측 + 관리자(열람)가 볼 수 있으며, 계약서 PDF 출력에도 포함된다.
+// 참여자 양측 + 관리자(열람)가 볼 수 있다.
+// (계약서 화면은 contract-view 통합 조회로 같은 내용을 함께 받는다)
 export async function onRequestGet({ env, data, params }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
   const access = await getRoomAccess(env, params.roomId, data.user)
@@ -57,61 +53,17 @@ export async function onRequestGet({ env, data, params }) {
 
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
 
-  const events = []
-  events.push({ at: room.created_at, event: '면접방 생성', detail: room.title })
-
-  for (const p of participants.results) {
-    events.push({
-      at: p.joined_at,
-      event: p.role_in_room === 'company' ? '회사 참여' : '지원자 참여',
-      detail: p.display_name,
-    })
-  }
-  if (terms?.last_analyzed_at) {
-    events.push({ at: terms.last_analyzed_at, event: 'AI 조건 분석 (최근)', detail: null })
-  }
-  if (terms?.hire_confirmed_at) {
-    events.push({ at: terms.hire_confirmed_at, event: '채용 확정', detail: null })
-  }
-  for (const h of history.results) {
-    let count = 0
-    try {
-      count = JSON.parse(h.changes).length
-    } catch {
-      count = 0
-    }
-    events.push({
-      at: h.created_at,
-      event: '계약 조건 수정',
-      detail: `${h.display_name} · ${count}개 항목`,
-    })
-  }
-  for (const s of signatures.results) {
-    events.push({
-      at: s.signed_at,
-      event: s.signer_role === 'company' ? '회사 서명' : '지원자 서명',
-      detail: s.display_name,
-    })
-  }
-  if (finalOffer?.sent_at) {
-    events.push({ at: finalOffer.sent_at, event: '최종합격 이메일 발송', detail: null })
-  }
-  if (signedContract) {
-    events.push({
-      at: signedContract.created_at,
-      event: '서명 계약서 보관',
-      detail: signedContract.filename,
-    })
-    if (signedContract.emailed_at) {
-      events.push({ at: signedContract.emailed_at, event: '계약서 사본 이메일 발송', detail: null })
-    }
-  }
-
-  events.sort((a, b) => normalizeTime(a.at).localeCompare(normalizeTime(b.at)))
-
   return jsonResponse({
     roomTitle: room.title,
     documentHash: signedContract?.sha256_hash ?? null,
-    events: events.map((e) => ({ ...e, at: normalizeTime(e.at) })),
+    events: buildAuditEvents({
+      room,
+      participants: participants.results,
+      terms,
+      history: history.results,
+      signatures: signatures.results,
+      signedContract,
+      finalOffer,
+    }),
   })
 }
