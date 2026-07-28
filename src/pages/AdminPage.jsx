@@ -243,22 +243,25 @@ export default function AdminPage() {
       <h2>사용자 ({users.length})</h2>
       <div className="table-scroll">
       <table className="admin-table">
+        <caption className="sr-only">등록된 사용자 {users.length}명의 권한과 상태</caption>
         <thead>
           <tr>
-            <th>이메일</th>
-            <th>이름</th>
-            <th>회사명</th>
-            <th>역할</th>
-            <th>권한</th>
-            <th>상태</th>
-            <th>가입일</th>
-            <th>작업</th>
+            <th scope="col">이메일</th>
+            <th scope="col">이름</th>
+            <th scope="col">회사명</th>
+            <th scope="col">역할</th>
+            <th scope="col">권한</th>
+            <th scope="col">상태</th>
+            <th scope="col">가입일</th>
+            <th scope="col">작업</th>
           </tr>
         </thead>
         <tbody>
           {users.map((u) => (
             <tr key={u.id}>
-              <td>{u.email}</td>
+              <th scope="row" className="cell-rowhead">
+                {u.email}
+              </th>
               <td>{u.displayName}</td>
               <td>{u.companyName || '-'}</td>
               <td>{u.role === 'company' ? '회사' : '구직자'}</td>
@@ -351,14 +354,15 @@ export default function AdminPage() {
       <h2>면접방 ({rooms.length})</h2>
       <div className="table-scroll">
       <table className="admin-table">
+        <caption className="sr-only">모든 면접방 {rooms.length}개의 참여자와 진행 상태</caption>
         <thead>
           <tr>
-            <th>제목</th>
-            <th>회사</th>
-            <th>지원자</th>
-            <th>상태</th>
-            <th>생성일</th>
-            <th>작업</th>
+            <th scope="col">제목</th>
+            <th scope="col">회사</th>
+            <th scope="col">지원자</th>
+            <th scope="col">상태</th>
+            <th scope="col">생성일</th>
+            <th scope="col">작업</th>
           </tr>
         </thead>
         <tbody>
@@ -366,7 +370,9 @@ export default function AdminPage() {
             const status = roomStatusInfo(r.status)
             return (
               <tr key={r.id}>
-                <td>{r.title}</td>
+                <th scope="row" className="cell-rowhead">
+                  {r.title}
+                </th>
                 <td>{r.companyName || '-'}</td>
                 <td>{r.candidateName || '-'}</td>
                 <td>
@@ -396,13 +402,16 @@ export default function AdminPage() {
       <h2>감사 로그 (최근 {auditLog.length}건)</h2>
       <div className="table-scroll">
       <table className="admin-table">
+        <caption className="sr-only">
+          관리자 작업 기록 최근 {auditLog.length}건 — 언제 누가 무엇을 했는지
+        </caption>
         <thead>
           <tr>
-            <th>시각</th>
-            <th>수행자</th>
-            <th>작업</th>
-            <th>대상</th>
-            <th>세부정보</th>
+            <th scope="col">시각</th>
+            <th scope="col">수행자</th>
+            <th scope="col">작업</th>
+            <th scope="col">대상</th>
+            <th scope="col">세부정보</th>
           </tr>
         </thead>
         <tbody>

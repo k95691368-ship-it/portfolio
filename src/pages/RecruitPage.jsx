@@ -189,10 +189,20 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
 
             <div className="application-block">
               <h3>개인정보 동의</h3>
+              {/* 그림문자만 두면 "체크 표시 버튼"처럼 엉뚱하게 읽힌다.
+                  동의 여부는 법적 근거가 되는 값이라 말로도 분명히 남긴다. */}
               <p>
-                필수 {detail.consent.required ? '✅' : '❌'} · 선택{' '}
-                {detail.consent.optional ? '✅' : '❌'} · 제3자 제공{' '}
-                {detail.consent.thirdParty ? '✅' : '❌'}
+                {[
+                  ['필수', detail.consent.required],
+                  ['선택', detail.consent.optional],
+                  ['제3자 제공', detail.consent.thirdParty],
+                ].map(([label, agreed], i) => (
+                  <span key={label}>
+                    {i > 0 && ' · '}
+                    {label} <span aria-hidden="true">{agreed ? '✅' : '❌'}</span>
+                    <span className="sr-only">{agreed ? '동의함' : '동의하지 않음'}</span>
+                  </span>
+                ))}
               </p>
             </div>
 
@@ -445,7 +455,7 @@ export default function RecruitPage() {
         <h2>채용 공고 등록</h2>
         <form onSubmit={handleCreate} className="posting-form">
           <label>
-            공고 제목 <span className="consent-required">*</span>
+            공고 제목 <span className="consent-required" aria-hidden="true">*</span>
             <input
               value={form.title}
               onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
@@ -485,7 +495,7 @@ export default function RecruitPage() {
             </label>
           </div>
           <label>
-            상세 내용 <span className="consent-required">*</span>
+            상세 내용 <span className="consent-required" aria-hidden="true">*</span>
             <textarea
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
@@ -508,20 +518,23 @@ export default function RecruitPage() {
         ) : (
           <div className="table-scroll">
             <table className="admin-table">
+              <caption className="sr-only">내가 등록한 채용 공고 {postings.length}건</caption>
               <thead>
                 <tr>
-                  <th>제목</th>
-                  <th>상태</th>
-                  <th>마감일</th>
-                  <th>지원자</th>
-                  <th>등록일</th>
-                  <th>관리</th>
+                  <th scope="col">제목</th>
+                  <th scope="col">상태</th>
+                  <th scope="col">마감일</th>
+                  <th scope="col">지원자</th>
+                  <th scope="col">등록일</th>
+                  <th scope="col">관리</th>
                 </tr>
               </thead>
               <tbody>
                 {postings.map((p) => (
                   <tr key={p.id}>
-                    <td>{p.title}</td>
+                    <th scope="row" className="cell-rowhead">
+                      {p.title}
+                    </th>
                     <td>
                       <span className={`badge ${p.status === 'open' ? 'badge-success' : 'badge-neutral'}`}>
                         {p.status === 'open' ? '모집 중' : '마감'}
@@ -595,20 +608,27 @@ export default function RecruitPage() {
             ) : (
               <div className="table-scroll">
                 <table className="admin-table">
+                  <caption className="sr-only">
+                    조건에 맞는 지원서 {filteredApps.length}건
+                  </caption>
                   <thead>
                     <tr>
-                      <th>이름</th>
-                      <th>공고</th>
-                      <th>이메일</th>
-                      <th>상태</th>
-                      <th>지원일</th>
-                      <th></th>
+                      <th scope="col">이름</th>
+                      <th scope="col">공고</th>
+                      <th scope="col">이메일</th>
+                      <th scope="col">상태</th>
+                      <th scope="col">지원일</th>
+                      <th scope="col">
+                        <span className="sr-only">지원서 상세</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredApps.map((a) => (
                   <tr key={a.id}>
-                    <td>{a.applicantName}</td>
+                    <th scope="row" className="cell-rowhead">
+                      {a.applicantName}
+                    </th>
                     <td>{a.postingTitle}</td>
                     <td>{a.applicantEmail}</td>
                     <td>
@@ -618,7 +638,12 @@ export default function RecruitPage() {
                     </td>
                     <td>{a.createdAt?.slice(0, 10)}</td>
                     <td>
-                      <button type="button" className="btn-sm" onClick={() => setSelectedApp(a.id)}>
+                      <button
+                        type="button"
+                        className="btn-sm"
+                        onClick={() => setSelectedApp(a.id)}
+                        aria-label={`${a.applicantName} 지원서 상세`}
+                      >
                         상세
                       </button>
                     </td>

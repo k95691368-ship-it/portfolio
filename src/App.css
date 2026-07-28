@@ -654,6 +654,19 @@
   white-space: nowrap;
 }
 
+/* 각 행의 첫 칸은 그 행이 누구/무엇에 관한 것인지 알려 주는 머리다.
+   화면을 읽어 주는 도구가 나머지 칸을 읽을 때 이 값을 함께 붙여 주므로
+   th로 두되, 열 머리처럼 보이지는 않게 한다. */
+.admin-table th.cell-rowhead {
+  background: transparent;
+  color: var(--text);
+  font-size: inherit;
+  font-weight: 500;
+  text-align: left;
+  padding: 10px 16px;
+  white-space: normal;
+}
+
 .admin-table td {
   padding: 10px 16px;
   border-bottom: 1px solid var(--border);

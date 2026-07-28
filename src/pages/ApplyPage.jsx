@@ -197,7 +197,7 @@ export default function ApplyPage() {
         </Link>
         <h1>{posting ? posting.title : '지원서 작성'}</h1>
         <p className="apply-required-note">
-          <span className="consent-required">*</span> 표시는 필수 입력 항목입니다.
+          <span className="consent-required" aria-hidden="true">*</span> 표시는 필수 입력 항목입니다.
         </p>
       </header>
 
@@ -205,11 +205,11 @@ export default function ApplyPage() {
         <section className="apply-section">
           <h2>기본정보</h2>
           <label>
-            이름 <span className="consent-required">*</span>
+            이름 <span className="consent-required" aria-hidden="true">*</span>
             <input value={name} onChange={(e) => setName(e.target.value)} maxLength={100} required />
           </label>
           <label>
-            이메일주소 <span className="consent-required">*</span>
+            이메일주소 <span className="consent-required" aria-hidden="true">*</span>
             <input
               type="email"
               value={email}
@@ -219,7 +219,7 @@ export default function ApplyPage() {
             />
           </label>
           <label>
-            연락처 <span className="consent-required">*</span>
+            연락처 <span className="consent-required" aria-hidden="true">*</span>
             <input
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
@@ -331,7 +331,7 @@ export default function ApplyPage() {
           <h2>제출서류</h2>
           <div className="file-field">
             <span className="file-field-label">
-              이력서 / 경력기술서 <span className="consent-required">*</span>{' '}
+              이력서 / 경력기술서 <span className="consent-required" aria-hidden="true">*</span>{' '}
               <em>PDF, DOC, DOCX, HWP · 10MB 이하</em>
             </span>
             <label className="upload-button">
