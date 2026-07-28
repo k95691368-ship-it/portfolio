@@ -1559,6 +1559,32 @@
   border-radius: var(--radius);
   background: var(--bg);
 }
+.compare-summary {
+  font-size: 15px;
+  font-weight: 600;
+}
+.compare-note {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.compare-basis {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.compare-companies {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.compare-points {
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 320px;
+}
+.compare-concern {
+  color: var(--warning);
+}
 .interview-summary {
   display: flex;
   flex-direction: column;

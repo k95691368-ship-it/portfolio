@@ -4,6 +4,7 @@ import { api } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import NotificationBell from '../components/NotificationBell.jsx'
+import ApplicantCompare from '../components/ApplicantCompare.jsx'
 
 const STATUS_LABEL = {
   submitted: { label: '심사 대기', badge: 'badge-warning' },
@@ -348,6 +349,7 @@ export default function RecruitPage() {
   const [applications, setApplications] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedApp, setSelectedApp] = useState(null)
+  const [comparePosting, setComparePosting] = useState(null)
 
   // 새 공고 폼
   const [form, setForm] = useState({
@@ -529,6 +531,14 @@ export default function RecruitPage() {
                     <td>{p.applicationCount}명</td>
                     <td>{p.createdAt?.slice(0, 10)}</td>
                     <td>
+                      <button
+                        type="button"
+                        className="btn-sm"
+                        onClick={() => setComparePosting({ id: p.id, title: p.title })}
+                        disabled={p.applicationCount === 0}
+                      >
+                        지원자 비교
+                      </button>{' '}
                       <button type="button" className="btn-sm" onClick={() => toggleStatus(p)}>
                         {p.status === 'open' ? '마감하기' : '다시 모집'}
                       </button>{' '}
@@ -547,6 +557,15 @@ export default function RecruitPage() {
           </div>
         )}
       </section>
+
+      {comparePosting && (
+        <ApplicantCompare
+          postingId={comparePosting.id}
+          postingTitle={comparePosting.title}
+          onClose={() => setComparePosting(null)}
+          onOpenApplication={setSelectedApp}
+        />
+      )}
 
       <section className="recruit-section">
         <h2>지원서</h2>
