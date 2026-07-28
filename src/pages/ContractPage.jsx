@@ -189,6 +189,12 @@ function ContractLifecycle({ continuity, retention, linkableRooms, canLink, onLi
               정함이 없는 근로계약으로 보게 될 수 있습니다.
             </p>
           )}
+          {continuity.truncated && (
+            <p className="period-alert">
+              이어진 계약이 너무 많아 일부까지만 합산했습니다. 실제 계속근로기간은 아래에 표시된
+              것보다 깁니다.
+            </p>
+          )}
           {continuity.gaps?.length > 0 && (
             <p className="period-detail">
               계약 사이에 {continuity.gaps.map((g) => `${g.days}일`).join(', ')}의 공백이 있어 계속근로로

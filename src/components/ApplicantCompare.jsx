@@ -63,6 +63,12 @@ export default function ApplicantCompare({ postingId, postingTitle, onClose, onO
             {data.summary.byFit.medium} · 낮음 {data.summary.byFit.low} · 서류합격{' '}
             {data.summary.passed}
           </p>
+          {data.truncated && (
+            <p className="notice">
+              지원자가 많아 최근 {data.limit}명까지만 비교했습니다. 나머지는 지원서 목록에서
+              확인해주세요.
+            </p>
+          )}
           {data.summary.unscreened > 0 && (
             <p className="notice">
               아직 AI 심사를 하지 않은 지원서가 {data.summary.unscreened}건 있습니다. 심사를 마치면

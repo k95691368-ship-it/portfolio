@@ -68,15 +68,42 @@ export async function onRequestPost({ request, env, data, params }) {
     return jsonError('같은 근로자의 계약만 이전 계약으로 연결할 수 있습니다.', 400)
   }
 
+  // 한 계약의 갱신은 하나뿐이다. 두 계약이 같은 계약을 이전으로 삼으면
+  // 계속근로기간이 두 갈래로 갈라져 어느 쪽도 사실이 아니게 된다.
+  const alreadyLinked = await env.DB.prepare(
+    `SELECT r.title FROM contract_terms c
+       JOIN interview_rooms r ON r.id = c.room_id
+      WHERE c.previous_room_id = ? AND c.room_id != ?`
+  )
+    .bind(previousRoomId, params.roomId)
+    .first()
+  if (alreadyLinked) {
+    return jsonError(
+      `이 계약은 이미 다른 계약(${alreadyLinked.title})의 이전 계약으로 연결되어 있습니다.`,
+      409
+    )
+  }
+
   // 이전 계약을 거슬러 올라가다 이 방이 나오면 고리가 돈다.
+  // 동시에 사슬 길이도 센다. 조회 쪽이 일정 깊이까지만 거슬러 올라가므로,
+  // 그보다 길어지면 계속근로기간이 실제보다 짧게 계산되고 2년 초과 경고를
+  // 놓치게 된다. 그렇게 되기 전에 막는다.
   let cursor = previousRoomId
-  for (let i = 0; i < MAX_CHAIN && cursor; i += 1) {
+  let depth = 1
+  while (cursor) {
     const row = await env.DB.prepare('SELECT previous_room_id FROM contract_terms WHERE room_id = ?')
       .bind(cursor)
       .first()
     cursor = row?.previous_room_id ?? null
     if (cursor === params.roomId) {
       return jsonError('계약 연결이 순환합니다. 다른 계약을 선택해주세요.', 400)
+    }
+    if (cursor) depth += 1
+    if (depth >= MAX_CHAIN) {
+      return jsonError(
+        `이어 붙일 수 있는 계약은 ${MAX_CHAIN}건까지입니다. 더 이어지면 계속근로기간이 실제보다 짧게 계산됩니다.`,
+        409
+      )
     }
   }
 

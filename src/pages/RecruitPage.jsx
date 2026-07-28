@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import NotificationBell from '../components/NotificationBell.jsx'
 import ApplicantCompare from '../components/ApplicantCompare.jsx'
+import Modal from '../components/Modal.jsx'
 
 const STATUS_LABEL = {
   submitted: { label: '심사 대기', badge: 'badge-warning' },
@@ -86,8 +87,12 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content application-modal" onClick={(e) => e.stopPropagation()}>
+    <Modal
+      title={detail ? `${detail.applicantName} 지원서 상세` : '지원서 상세'}
+      onClose={onClose}
+      className="application-modal"
+    >
+      <>
         {!detail ? (
           <p>불러오는 중...</p>
         ) : (
@@ -281,8 +286,8 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
             )}
           </>
         )}
-      </div>
-    </div>
+      </>
+    </Modal>
   )
 }
 

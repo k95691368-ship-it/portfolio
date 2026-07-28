@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import { roomStatusInfo } from '../lib/roomStatus.js'
+import Modal from '../components/Modal.jsx'
 
 const EMPTY_NEW_ACCOUNT = { email: '', displayName: '', role: 'candidate', companyName: '', isRecruiter: false }
 
@@ -435,34 +436,36 @@ export default function AdminPage() {
       </div>
 
       {viewingRoom && (
-        <div className="modal-overlay" onClick={() => setViewingRoom(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3>{viewingRoom.title} — 채팅 내역</h3>
-            {messagesLoading && <p>불러오는 중...</p>}
-            {messagesError && <p className="error">{messagesError}</p>}
-            {!messagesLoading && !messagesError && (
-              <div className="chat-message-list">
-                {roomMessages.length === 0 ? (
-                  <p>대화 내역이 없습니다.</p>
-                ) : (
-                  roomMessages.map((m) => (
-                    <div key={m.id} className="chat-message">
-                      <span className="chat-sender">
-                        {m.senderName} ({m.role === 'company' ? '회사' : m.role === 'candidate' ? '지원자' : '알 수 없음'})
-                      </span>
-                      <p>{m.body}</p>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-            <div className="modal-actions">
-              <button type="button" onClick={() => setViewingRoom(null)}>
-                닫기
-              </button>
+        <Modal title={`${viewingRoom.title} 채팅 내역`} onClose={() => setViewingRoom(null)}>
+          <h3>{viewingRoom.title} — 채팅 내역</h3>
+          {messagesLoading && <p>불러오는 중...</p>}
+          {messagesError && (
+            <p className="error" role="alert">
+              {messagesError}
+            </p>
+          )}
+          {!messagesLoading && !messagesError && (
+            <div className="chat-message-list">
+              {roomMessages.length === 0 ? (
+                <p>대화 내역이 없습니다.</p>
+              ) : (
+                roomMessages.map((m) => (
+                  <div key={m.id} className="chat-message">
+                    <span className="chat-sender">
+                      {m.senderName} ({m.role === 'company' ? '회사' : m.role === 'candidate' ? '지원자' : '알 수 없음'})
+                    </span>
+                    <p>{m.body}</p>
+                  </div>
+                ))
+              )}
             </div>
+          )}
+          <div className="modal-actions">
+            <button type="button" onClick={() => setViewingRoom(null)}>
+              닫기
+            </button>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )

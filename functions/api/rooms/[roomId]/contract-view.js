@@ -17,6 +17,9 @@ import {
   describeRetention,
 } from '../../../_lib/contractPeriod.js'
 import { checkContractDocument } from '../../../_lib/documentCheck.js'
+
+// 갱신 사슬을 거슬러 올라가는 최대 깊이 (link-previous의 제한과 같아야 한다)
+const MAX_CHAIN_DEPTH = 10
 import { findLanguage } from '../../../_lib/languages.js'
 
 // 계약서 화면이 필요한 모든 정보를 한 번에 돌려준다.
@@ -121,11 +124,11 @@ export async function onRequestGet({ env, data, params }) {
   if (termsRow?.previous_room_id) {
     const { results: chain } = await env.DB.prepare(
       `WITH RECURSIVE chain(room_id, previous_room_id, depth) AS (
-         SELECT room_id, previous_room_id, 0 FROM contract_terms WHERE room_id = ?
+         SELECT room_id, previous_room_id, 0 FROM contract_terms WHERE room_id = ?1
          UNION ALL
          SELECT ct.room_id, ct.previous_room_id, chain.depth + 1
            FROM contract_terms ct, chain
-          WHERE ct.room_id = chain.previous_room_id AND chain.depth < 10
+          WHERE ct.room_id = chain.previous_room_id AND chain.depth < ?2
        )
        SELECT chain.depth, ct.room_id, ct.contract_start_date, ct.contract_end_date, r.title
          FROM chain
@@ -133,7 +136,7 @@ export async function onRequestGet({ env, data, params }) {
          JOIN interview_rooms r ON r.id = chain.room_id
         ORDER BY chain.depth DESC`
     )
-      .bind(roomId)
+      .bind(roomId, MAX_CHAIN_DEPTH)
       .all()
     continuity = describeContinuousEmployment(
       chain.map((c) => ({
@@ -144,6 +147,9 @@ export async function onRequestGet({ env, data, params }) {
       }))
     )
     continuity.previousRoomId = termsRow.previous_room_id
+    // 위 조회는 열 단계까지만 거슬러 올라간다. 거기서 끊겼다면 합산된 기간이
+    // 실제보다 짧다는 뜻이므로, 그 사실을 감추지 않고 함께 알린다.
+    continuity.truncated = chain.some((c) => c.depth >= MAX_CHAIN_DEPTH)
   }
 
   // 체결이 끝난 계약은 보존 의무 기간을 관리해야 한다 (근로기준법 제42조).

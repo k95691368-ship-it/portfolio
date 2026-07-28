@@ -61,7 +61,14 @@ const company = makeClient()
 const candidate = makeClient()
 const admin = makeClient()
 
-const state = { roomId: null, renewalRoomId: null, companyId: null, candidateId: null, requestId: null }
+const state = {
+  roomId: null,
+  renewalRoomId: null,
+  duplicateRoomId: null,
+  companyId: null,
+  candidateId: null,
+  requestId: null,
+}
 const hasAdmin = Boolean(ADMIN_EMAIL && ADMIN_PASSWORD)
 
 describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
@@ -126,7 +133,7 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
   afterAll(async () => {
     // 만든 것은 반드시 지운다. 실패해도 다음 정리를 계속 시도한다.
     // 갱신 계약이 이전 계약을 참조하므로 갱신 쪽을 먼저 지운다.
-    for (const id of [state.renewalRoomId, state.roomId]) {
+    for (const id of [state.duplicateRoomId, state.renewalRoomId, state.roomId]) {
       if (id) await admin(`/api/admin/rooms/${id}`, { method: 'DELETE' }).catch(() => {})
     }
     // 빌려 쓴 계정은 지우지 않는다. 이번 실행에서 만든 계정만 정리한다.
@@ -478,6 +485,24 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
     const issue = joined.json.preSignCheck.legalIssues.find((i) => i.title.includes('계속근로'))
     expect(issue, '계속근로 2년 초과를 잡지 못했습니다.').toBeTruthy()
     expect(issue.severity).toBe('high')
+
+    // 한 계약의 갱신은 하나뿐이다. 두 계약이 같은 계약을 이전으로 삼으면
+    // 계속근로기간이 두 갈래로 갈라져 어느 쪽도 사실이 아니게 된다.
+    const third = await company('/api/rooms/create', {
+      method: 'POST',
+      body: { title: `E2E 중복연결 ${RUN}` },
+    })
+    state.duplicateRoomId = third.json.id
+    await candidate('/api/rooms/join', {
+      method: 'POST',
+      body: { inviteCode: third.json.inviteCode },
+    })
+    const duplicate = await company(`/api/rooms/${state.duplicateRoomId}/link-previous`, {
+      method: 'POST',
+      body: { previousRoomId: state.roomId },
+    })
+    expect(duplicate.status, `같은 계약을 두 번 이전으로 삼는 것을 막지 못했습니다.`).toBe(409)
+    expect(duplicate.json.error).toContain('이미')
 
     // 연결을 풀면 경고도 사라진다.
     const unlinked = await company(`/api/rooms/${state.renewalRoomId}/link-previous`, {

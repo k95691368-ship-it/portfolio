@@ -53,7 +53,13 @@ export async function onRequestGet({ env, data, params }) {
 
   const ranked = rankApplicants(rows)
 
+  // 상한에 걸려 일부만 보여 주면서 전부를 견준 것처럼 보이면, 빠진 사람이
+  // 있다는 사실 자체를 알 수 없다. 잘렸으면 잘렸다고 알린다.
+  const truncated = results.length >= MAX_APPLICANTS
+
   return jsonResponse({
+    truncated,
+    limit: MAX_APPLICANTS,
     posting: {
       id: posting.id,
       title: posting.title,
