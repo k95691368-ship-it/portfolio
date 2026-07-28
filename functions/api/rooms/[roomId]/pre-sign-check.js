@@ -22,16 +22,16 @@ export async function onRequestGet({ env, data, params }) {
 
   // 수정 이력은 오래된 것부터 필요 (각 필드의 최초 from = 합의 값)
   const { results: history } = await env.DB.prepare(
-    'SELECT changes FROM contract_edit_history WHERE room_id = ? ORDER BY id ASC'
+    'SELECT changes, source FROM contract_edit_history WHERE room_id = ? ORDER BY id ASC'
   )
     .bind(params.roomId)
     .all()
 
   const parsedHistory = history.map((h) => {
     try {
-      return { changes: JSON.parse(h.changes) }
+      return { changes: JSON.parse(h.changes), source: h.source }
     } catch {
-      return { changes: [] }
+      return { changes: [], source: h.source }
     }
   })
 

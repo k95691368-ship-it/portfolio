@@ -93,6 +93,19 @@ describe('checkLegalCompliance', () => {
     expect(issues.some((i) => i.title.includes('최저임금') && i.severity === 'high')).toBe(true)
   })
 
+  it('suggests the lawful minimum wage so it can be requested directly', () => {
+    const issues = checkLegalCompliance({ ...lawful, wageBaseAmount: 1800000 })
+    const wageIssue = issues.find((i) => i.title.includes('최저임금'))
+    expect(wageIssue.field).toBe('wageBaseAmount')
+    // 주 40시간 → 월 209시간 × 10,320원 ≈ 2,156,880원
+    const suggested = Number(wageIssue.suggestedValue)
+    expect(suggested).toBeGreaterThan(2150000)
+    expect(suggested).toBeLessThan(2160000)
+    // 제안값을 그대로 넣으면 더 이상 위반이 아니어야 한다.
+    const fixed = checkLegalCompliance({ ...lawful, wageBaseAmount: suggested })
+    expect(fixed.some((i) => i.title.includes('최저임금'))).toBe(false)
+  })
+
   it('accepts a wage exactly at the minimum', () => {
     const atMinimum = Math.ceil(MINIMUM_HOURLY_WAGE_2026 * 209)
     const issues = checkLegalCompliance({ ...lawful, wageBaseAmount: atMinimum })
@@ -225,6 +238,26 @@ describe('diffAgreedVsCurrent', () => {
   it('does not flag filling in a previously empty field', () => {
     const history = [{ changes: [{ field: 'employerAddress', from: null, to: '서울시 강남구' }] }]
     expect(diffAgreedVsCurrent(history, { employerAddress: '서울시 강남구' })).toEqual([])
+  })
+
+  it('does not flag a change the candidate requested and the company accepted', () => {
+    // 지원자가 요청해 회사가 수락한 값은 양측 합의이므로 불일치가 아니다.
+    const history = [
+      { source: 'manual', changes: [{ field: 'wageBaseAmount', from: 3000000, to: 1700000 }] },
+      { source: 'change_request', changes: [{ field: 'wageBaseAmount', from: 1700000, to: 2152460 }] },
+    ]
+    expect(diffAgreedVsCurrent(history, { wageBaseAmount: 2152460 })).toEqual([])
+  })
+
+  it('flags a unilateral change made after an agreed one', () => {
+    const history = [
+      { source: 'change_request', changes: [{ field: 'wageBaseAmount', from: 1700000, to: 2200000 }] },
+      { source: 'manual', changes: [{ field: 'wageBaseAmount', from: 2200000, to: 1900000 }] },
+    ]
+    const diffs = diffAgreedVsCurrent(history, { wageBaseAmount: 1900000 })
+    expect(diffs).toHaveLength(1)
+    expect(diffs[0].agreed).toBe('2,200,000')
+    expect(diffs[0].current).toBe('1,900,000')
   })
 
   it('returns empty when there is no edit history', () => {

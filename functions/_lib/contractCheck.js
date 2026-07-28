@@ -138,10 +138,14 @@ export function checkLegalCompliance(terms) {
     if (hours > 0) {
       const hourly = Math.round(wage / hours)
       if (hourly < MINIMUM_HOURLY_WAGE_2026) {
+        // 적법한 최소 월급을 함께 계산해, 지원자가 바로 이 값으로 수정을 요청할 수 있게 한다.
+        const lawfulMinimum = Math.ceil((MINIMUM_HOURLY_WAGE_2026 * hours) / 10) * 10
         issues.push({
           severity: 'high',
           title: '최저임금 미달 소지',
-          detail: `기본급 ${wage.toLocaleString('ko-KR')}원을 월 소정근로시간(약 ${Math.round(hours)}시간)으로 나누면 시급 약 ${hourly.toLocaleString('ko-KR')}원으로, 2026년 최저시급(${MINIMUM_HOURLY_WAGE_2026.toLocaleString('ko-KR')}원)에 미달합니다.`,
+          detail: `기본급 ${wage.toLocaleString('ko-KR')}원을 월 소정근로시간(약 ${Math.round(hours)}시간)으로 나누면 시급 약 ${hourly.toLocaleString('ko-KR')}원으로, 2026년 최저시급(${MINIMUM_HOURLY_WAGE_2026.toLocaleString('ko-KR')}원)에 미달합니다. 이 근로시간에서 최저임금을 지키려면 기본급이 최소 ${lawfulMinimum.toLocaleString('ko-KR')}원이어야 합니다.`,
+          field: 'wageBaseAmount',
+          suggestedValue: String(lawfulMinimum),
         })
       }
     }
@@ -213,12 +217,19 @@ export function normalizeForCompare(value) {
 }
 
 // 채팅에서 합의된 값 vs 현재 계약서 값 비교.
-// history는 오래된 것부터 정렬된 [{changes:[{field, from, to}]}] 형태.
+// history는 오래된 것부터 정렬된 [{changes:[{field, from, to}], source}] 형태.
 // 각 필드의 "최초 from"이 AI가 대화에서 추출한 합의 값이다.
+//
+// 단, 지원자가 요청하고 회사가 수락한 변경(source: 'change_request')은 양측이
+// 합의한 것이므로 불일치가 아니다. 그 값이 새로운 합의 기준이 된다.
 export function diffAgreedVsCurrent(history, currentTerms) {
   const agreed = new Map()
   for (const entry of history) {
     for (const change of entry.changes || []) {
+      if (entry.source === 'change_request') {
+        agreed.set(change.field, change.to)
+        continue
+      }
       if (!agreed.has(change.field)) agreed.set(change.field, change.from)
     }
   }

@@ -44,7 +44,7 @@ export async function onRequestGet({ env, data, params }) {
         .all(),
       env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?').bind(roomId).first(),
       env.DB.prepare(
-        `SELECT h.id, h.created_at, h.changes, u.display_name, rp.role_in_room AS editor_role
+        `SELECT h.id, h.created_at, h.changes, h.source, u.display_name, rp.role_in_room AS editor_role
          FROM contract_edit_history h
          JOIN users u ON u.id = h.editor_user_id
          LEFT JOIN room_participants rp ON rp.room_id = h.room_id AND rp.user_id = h.editor_user_id
@@ -89,9 +89,9 @@ export async function onRequestGet({ env, data, params }) {
   // 수정 이력은 오래된 것부터라 그대로 합의값 비교에 쓸 수 있다.
   const parsedHistory = history.map((h) => {
     try {
-      return { changes: JSON.parse(h.changes) }
+      return { changes: JSON.parse(h.changes), source: h.source }
     } catch {
-      return { changes: [] }
+      return { changes: [], source: h.source }
     }
   })
 

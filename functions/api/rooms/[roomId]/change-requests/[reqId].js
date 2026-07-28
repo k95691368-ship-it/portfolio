@@ -64,8 +64,9 @@ export async function onRequestPost({ request, env, data, params }) {
          VALUES (?, ?, datetime('now'))
          ON CONFLICT(room_id) DO UPDATE SET ${column} = excluded.${column}, updated_at = datetime('now')`
       ).bind(params.roomId, value),
+      // 양측이 합의한 변경임을 남긴다 — 서명 전 점검이 이를 불일치로 보지 않도록.
       env.DB.prepare(
-        'INSERT INTO contract_edit_history (room_id, editor_user_id, changes) VALUES (?, ?, ?)'
+        "INSERT INTO contract_edit_history (room_id, editor_user_id, changes, source) VALUES (?, ?, ?, 'change_request')"
       ).bind(
         params.roomId,
         data.user.id,

@@ -64,10 +64,18 @@ const REQUEST_STATUS = {
 }
 
 // 계약 조건 수정 요청 — 지원자가 보내고 회사가 수락·거절한다.
-function ChangeRequests({ requests, myRole, canRequest, onCreate, onRespond, busy }) {
+function ChangeRequests({ requests, myRole, canRequest, onCreate, onRespond, busy, prefill }) {
   const [field, setField] = useState('')
   const [value, setValue] = useState('')
   const [reason, setReason] = useState('')
+
+  // 점검 결과에서 "이 값으로 수정 요청"을 누르면 폼이 채워진 채로 열린다.
+  useEffect(() => {
+    if (!prefill) return
+    setField(prefill.field)
+    setValue(prefill.requestedValue)
+    setReason(prefill.reason)
+  }, [prefill])
 
   const submit = async (e) => {
     e.preventDefault()
@@ -190,7 +198,7 @@ function ChangeRequests({ requests, myRole, canRequest, onCreate, onRespond, bus
 }
 
 // 서명 전 최종 안전 점검 — 합의 불일치 / 법적 문제 / 필수 누락
-function PreSignCheck({ check }) {
+function PreSignCheck({ check, onRequestFix }) {
   const { diffs, legalIssues, missingFields } = check
   const clean = diffs.length === 0 && legalIssues.length === 0 && missingFields.length === 0
 
@@ -215,6 +223,7 @@ function PreSignCheck({ check }) {
                 <th>항목</th>
                 <th>대화에서 합의</th>
                 <th>현재 계약서</th>
+                {onRequestFix && <th></th>}
               </tr>
             </thead>
             <tbody>
@@ -223,6 +232,23 @@ function PreSignCheck({ check }) {
                   <td>{d.label}</td>
                   <td className="presign-agreed">{d.agreed}</td>
                   <td className="presign-current">{d.current}</td>
+                  {onRequestFix && (
+                    <td>
+                      <button
+                        type="button"
+                        className="btn-sm"
+                        onClick={() =>
+                          onRequestFix({
+                            field: d.field,
+                            requestedValue: d.agreed.replace(/,/g, ''),
+                            reason: `면접에서 합의한 ${d.label}(${d.agreed})과(와) 다릅니다.`,
+                          })
+                        }
+                      >
+                        합의대로 요청
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -240,6 +266,24 @@ function PreSignCheck({ check }) {
                   {issue.title}
                 </span>{' '}
                 {issue.detail}
+                {onRequestFix && issue.field && issue.suggestedValue && (
+                  <>
+                    {' '}
+                    <button
+                      type="button"
+                      className="btn-sm"
+                      onClick={() =>
+                        onRequestFix({
+                          field: issue.field,
+                          requestedValue: issue.suggestedValue,
+                          reason: `${issue.title} — ${issue.detail}`,
+                        })
+                      }
+                    >
+                      최소 적법 금액으로 요청
+                    </button>
+                  </>
+                )}
               </li>
             ))}
           </ul>
@@ -284,6 +328,7 @@ export default function ContractPage() {
   const [acknowledged, setAcknowledged] = useState(false)
   const [changeRequests, setChangeRequests] = useState([])
   const [requestBusy, setRequestBusy] = useState(false)
+  const [requestPrefill, setRequestPrefill] = useState(null)
   const printRef = useRef(null)
 
   const loadAll = useCallback(async () => {
@@ -619,6 +664,7 @@ export default function ContractPage() {
           onCreate={handleCreateRequest}
           onRespond={handleRespondRequest}
           busy={requestBusy}
+          prefill={requestPrefill}
         />
       )}
 
@@ -652,7 +698,22 @@ export default function ContractPage() {
         </div>
         {(myRole === 'company' || myRole === 'candidate') && !mySignature && (
           <>
-            {preSign?.ready && <PreSignCheck check={preSign} />}
+            {preSign?.ready && (
+              <PreSignCheck
+                check={preSign}
+                onRequestFix={
+                  myRole === 'candidate'
+                    ? (fix) => {
+                        setRequestPrefill({ ...fix, at: Date.now() })
+                        document
+                          .querySelector('.change-requests')
+                          ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                        toast.info('수정 요청 내용을 채워두었습니다. 확인 후 보내주세요.')
+                      }
+                    : null
+                }
+              />
+            )}
             {preSign?.hasBlocking && (
               <label className="checkbox-label presign-ack">
                 <input
