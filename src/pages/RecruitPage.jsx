@@ -431,7 +431,9 @@ export default function RecruitPage() {
         <h1>채용 관리</h1>
         <div className="header-actions">
           <NotificationBell />
-          <Link to="/dashboard">대시보드</Link>
+          <Link to="/dashboard" className="btn-nav">
+            대시보드
+          </Link>
         </div>
       </header>
 

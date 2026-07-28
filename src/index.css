@@ -194,6 +194,24 @@ textarea:focus-visible {
   padding: 6px 14px;
   font-size: 13px;
 }
+
+/* 헤더 내비게이션용 버튼형 링크 (주 버튼과 경쟁하지 않도록 보조 스타일) */
+.btn-nav {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 20px;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+.btn-nav:hover {
+  background: var(--border);
+  text-decoration: none;
+}
 .btn-block {
   width: 100%;
 }
