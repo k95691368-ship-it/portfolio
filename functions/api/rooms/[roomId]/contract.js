@@ -1,26 +1,6 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
-import { rowToCamelTerms } from '../../../_lib/contract.js'
+import { rowToCamelTerms, EDITABLE_FIELDS } from '../../../_lib/contract.js'
 import { getRoomParticipant, getRoomAccess } from '../../../_lib/rooms.js'
-
-const EDITABLE_FIELDS = {
-  employerName: 'employer_name',
-  employerAddress: 'employer_address',
-  employeeName: 'employee_name',
-  employeeAddress: 'employee_address',
-  workLocation: 'work_location',
-  jobDescription: 'job_description',
-  contractStartDate: 'contract_start_date',
-  contractEndDate: 'contract_end_date',
-  workHoursStart: 'work_hours_start',
-  workHoursEnd: 'work_hours_end',
-  workDays: 'work_days',
-  restDays: 'rest_days',
-  wageBaseAmount: 'wage_base_amount',
-  wagePayMethod: 'wage_pay_method',
-  wagePayDate: 'wage_pay_date',
-  annualLeave: 'annual_leave',
-  uniformSize: 'uniform_size',
-}
 
 export async function onRequestGet({ env, data, params }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)

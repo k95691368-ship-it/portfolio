@@ -3,6 +3,7 @@ import { getRoomAccess } from '../../../_lib/rooms.js'
 import { rowToCamelTerms } from '../../../_lib/contract.js'
 import { buildAuditEvents } from '../../../_lib/auditTrail.js'
 import { maskEmail, isEmailConfigured } from '../../../_lib/email.js'
+import { mapRequestRow } from '../../../_lib/changeRequests.js'
 import {
   checkLegalCompliance,
   findMissingFields,
@@ -21,8 +22,16 @@ export async function onRequestGet({ env, data, params }) {
   if (!access) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
 
   const roomId = params.roomId
-  const [room, participants, termsRow, historyRows, signatureRows, storedRow, finalOffer] =
-    await Promise.all([
+  const [
+    room,
+    participants,
+    termsRow,
+    historyRows,
+    signatureRows,
+    storedRow,
+    finalOffer,
+    changeRequestRows,
+  ] = await Promise.all([
       env.DB.prepare('SELECT id, title, invite_code, status, created_at FROM interview_rooms WHERE id = ?')
         .bind(roomId)
         .first(),
@@ -59,6 +68,14 @@ export async function onRequestGet({ env, data, params }) {
       env.DB.prepare('SELECT sent_at, status FROM final_offer_emails WHERE room_id = ?')
         .bind(roomId)
         .first(),
+      env.DB.prepare(
+        `SELECT c.*, u.display_name AS requester_name
+         FROM contract_change_requests c
+         JOIN users u ON u.id = c.requested_by_user_id
+         WHERE c.room_id = ? ORDER BY c.id DESC LIMIT 50`
+      )
+        .bind(roomId)
+        .all(),
     ])
 
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
@@ -150,6 +167,7 @@ export async function onRequestGet({ env, data, params }) {
       }),
     },
     preSignCheck,
+    changeRequests: changeRequestRows.results.map(mapRequestRow),
     signedContract: storedRow
       ? {
           stored: {

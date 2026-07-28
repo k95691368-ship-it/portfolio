@@ -1,3 +1,25 @@
+// 계약서에서 값을 고칠 수 있는 항목 (API 이름 → DB 컬럼).
+// 계약 조건 수정과 수정 요청이 같은 목록을 공유한다.
+export const EDITABLE_FIELDS = {
+  employerName: 'employer_name',
+  employerAddress: 'employer_address',
+  employeeName: 'employee_name',
+  employeeAddress: 'employee_address',
+  workLocation: 'work_location',
+  jobDescription: 'job_description',
+  contractStartDate: 'contract_start_date',
+  contractEndDate: 'contract_end_date',
+  workHoursStart: 'work_hours_start',
+  workHoursEnd: 'work_hours_end',
+  workDays: 'work_days',
+  restDays: 'rest_days',
+  wageBaseAmount: 'wage_base_amount',
+  wagePayMethod: 'wage_pay_method',
+  wagePayDate: 'wage_pay_date',
+  annualLeave: 'annual_leave',
+  uniformSize: 'uniform_size',
+}
+
 export function rowToCamelTerms(row) {
   if (!row) return null
   return {

@@ -57,6 +57,137 @@ const EMPTY_FORM = {
 }
 
 const SEVERITY_BADGE = { high: 'badge-danger', medium: 'badge-warning', info: 'badge-neutral' }
+const REQUEST_STATUS = {
+  pending: { label: '검토 중', badge: 'badge-warning' },
+  accepted: { label: '반영됨', badge: 'badge-success' },
+  declined: { label: '반려됨', badge: 'badge-neutral' },
+}
+
+// 계약 조건 수정 요청 — 지원자가 보내고 회사가 수락·거절한다.
+function ChangeRequests({ requests, myRole, canRequest, onCreate, onRespond, busy }) {
+  const [field, setField] = useState('')
+  const [value, setValue] = useState('')
+  const [reason, setReason] = useState('')
+
+  const submit = async (e) => {
+    e.preventDefault()
+    await onCreate({ field, requestedValue: value, reason })
+    setField('')
+    setValue('')
+    setReason('')
+  }
+
+  const pending = requests.filter((r) => r.status === 'pending')
+  const resolved = requests.filter((r) => r.status !== 'pending')
+
+  return (
+    <section className="change-requests">
+      <h2>계약 조건 수정 요청</h2>
+
+      {pending.length === 0 && resolved.length === 0 && (
+        <p className="notice">
+          {myRole === 'candidate'
+            ? '계약 내용 중 다르게 합의했거나 조정이 필요한 항목이 있으면 수정을 요청할 수 있습니다.'
+            : '지원자가 보낸 수정 요청이 여기에 표시됩니다.'}
+        </p>
+      )}
+
+      {pending.length > 0 && (
+        <ul className="request-list">
+          {pending.map((r) => (
+            <li key={r.id} className="request-item">
+              <div className="request-head">
+                <strong>{r.label}</strong>
+                <span className={`badge ${REQUEST_STATUS.pending.badge}`}>검토 중</span>
+              </div>
+              <p className="request-values">
+                <span className="request-from">{r.currentValue || '(비어 있음)'}</span>
+                {' → '}
+                <span className="request-to">{r.requestedValue}</span>
+              </p>
+              {r.reason && <p className="request-reason">사유: {r.reason}</p>}
+              {myRole === 'company' && (
+                <div className="request-actions">
+                  <button
+                    type="button"
+                    className="btn-primary btn-sm"
+                    disabled={busy}
+                    onClick={() => onRespond(r.id, 'accept')}
+                  >
+                    수락하고 계약서에 반영
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-sm"
+                    disabled={busy}
+                    onClick={() => onRespond(r.id, 'decline')}
+                  >
+                    거절
+                  </button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {resolved.length > 0 && (
+        <ul className="request-list resolved">
+          {resolved.map((r) => (
+            <li key={r.id} className="request-item">
+              <div className="request-head">
+                <strong>{r.label}</strong>
+                <span className={`badge ${REQUEST_STATUS[r.status].badge}`}>
+                  {REQUEST_STATUS[r.status].label}
+                </span>
+              </div>
+              <p className="request-values">
+                <span className="request-from">{r.currentValue || '(비어 있음)'}</span>
+                {' → '}
+                <span className="request-to">{r.requestedValue}</span>
+              </p>
+              {r.responseNote && <p className="request-reason">회사 회신: {r.responseNote}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {canRequest && (
+        <form className="request-form" onSubmit={submit}>
+          <div className="career-row">
+            <label>
+              항목
+              <select value={field} onChange={(e) => setField(e.target.value)} required>
+                <option value="">선택</option>
+                {[...IDENTITY_FIELDS, ...TERM_FIELDS].map((f) => (
+                  <option key={f.key} value={f.key}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              요청하는 값
+              <input value={value} onChange={(e) => setValue(e.target.value)} maxLength={500} required />
+            </label>
+          </div>
+          <label>
+            사유 (선택)
+            <input
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              maxLength={500}
+              placeholder="예: 면접에서 합의한 금액과 다릅니다."
+            />
+          </label>
+          <button type="submit" className="btn-primary" disabled={busy}>
+            수정 요청 보내기
+          </button>
+        </form>
+      )}
+    </section>
+  )
+}
 
 // 서명 전 최종 안전 점검 — 합의 불일치 / 법적 문제 / 필수 누락
 function PreSignCheck({ check }) {
@@ -151,6 +282,8 @@ export default function ContractPage() {
   const [storing, setStoring] = useState(false)
   const [preSign, setPreSign] = useState(null)
   const [acknowledged, setAcknowledged] = useState(false)
+  const [changeRequests, setChangeRequests] = useState([])
+  const [requestBusy, setRequestBusy] = useState(false)
   const printRef = useRef(null)
 
   const loadAll = useCallback(async () => {
@@ -199,6 +332,7 @@ export default function ContractPage() {
       customTerms: t.customTerms ?? [],
     })
     setSignatures(sigData.signatures)
+    setChangeRequests(view.changeRequests ?? [])
 
     // 서명 전 최종 안전 점검은 아직 체결되지 않은 계약서에만 보여준다.
     setPreSign(roomData.status === 'signed' ? null : preSignData)
@@ -272,6 +406,34 @@ export default function ContractPage() {
       toast.error(err.message)
     } finally {
       setDrafting(false)
+    }
+  }
+
+  const handleCreateRequest = async ({ field, requestedValue, reason }) => {
+    setRequestBusy(true)
+    try {
+      await api.post(`/rooms/${roomId}/change-requests`, { field, requestedValue, reason })
+      await loadAll()
+      toast.success('수정 요청을 보냈습니다. 회사 측 검토를 기다려주세요.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setRequestBusy(false)
+    }
+  }
+
+  const handleRespondRequest = async (requestId, action) => {
+    const note =
+      action === 'decline' ? window.prompt('거절 사유를 입력해주세요. (선택)') ?? '' : ''
+    setRequestBusy(true)
+    try {
+      await api.post(`/rooms/${roomId}/change-requests/${requestId}`, { action, note })
+      await loadAll()
+      toast.success(action === 'accept' ? '요청을 반영했습니다.' : '요청을 반려했습니다.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setRequestBusy(false)
     }
   }
 
@@ -447,6 +609,17 @@ export default function ContractPage() {
             {drafting ? 'AI가 계약서를 작성하는 중...' : aiDocument ? 'AI 계약서 다시 작성하기' : 'AI로 계약서 작성하기'}
           </button>
         </section>
+      )}
+
+      {(myRole === 'company' || myRole === 'candidate') && (
+        <ChangeRequests
+          requests={changeRequests}
+          myRole={myRole}
+          canRequest={myRole === 'candidate' && !isSigned}
+          onCreate={handleCreateRequest}
+          onRespond={handleRespondRequest}
+          busy={requestBusy}
+        />
       )}
 
       <section className="signature-section">

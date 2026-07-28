@@ -1460,6 +1460,87 @@
   padding: 8px 14px;
 }
 
+/* 계약 조건 수정 요청 (양방향 협상) */
+.change-requests {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.change-requests h2 {
+  margin: 0;
+}
+.request-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.request-list.resolved {
+  opacity: 0.75;
+}
+.request-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.request-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-h);
+}
+.request-values {
+  font-size: 14px;
+}
+.request-from {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+.request-to {
+  font-weight: 700;
+  color: var(--accent);
+}
+.request-reason {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.request-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+.request-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.request-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+  flex: 1;
+  min-width: 180px;
+}
+.request-form .btn-primary {
+  align-self: flex-start;
+}
+
 /* 서명 전 최종 안전 점검 */
 .presign-check {
   display: flex;
