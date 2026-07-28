@@ -5,6 +5,7 @@ import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import DocumentManager from '../components/DocumentManager.jsx'
 import NotificationBell from '../components/NotificationBell.jsx'
+import MyApplications from '../components/MyApplications.jsx'
 import { roomStatusInfo } from '../lib/roomStatus.js'
 
 export default function DashboardPage() {
@@ -102,6 +103,8 @@ export default function DashboardPage() {
           </button>
         </form>
       )}
+
+      <MyApplications />
 
       {user.role === 'candidate' && <DocumentManager />}
 
