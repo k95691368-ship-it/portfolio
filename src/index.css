@@ -1,11 +1,14 @@
 :root {
   --text: #4e5968;
   --text-h: #191f28;
-  --text-muted: #8b95a1;
+  /* 흰 바탕에서 작은 글씨도 읽히도록 (WCAG AA 4.5:1). 이전 값은 3.2:1이었다. */
+  --text-muted: #6b7684;
   --bg: #fff;
   --surface: #f2f4f6;
   --border: #e5e8eb;
   --code-bg: #f2f4f6;
+  /* 진한 바탕 위에 얹는 글자색 (두 테마 모두 흰색) */
+  --on-accent: #fff;
 
   --accent: #0064ff;
   --accent-bg: rgba(0, 100, 255, 0.08);
@@ -24,6 +27,12 @@
   --warning-bg: rgba(255, 159, 26, 0.1);
   --warning-border: rgba(255, 159, 26, 0.35);
 
+  /* 면·테두리에 쓰는 색을 그대로 글자에 쓰면 옅은 바탕에서 읽히지 않는다.
+     글자로 쓸 때는 아래 값을 쓴다. */
+  --danger-text: #d0323f;
+  --success-text: #00885a;
+  --warning-text: #a35c00;
+
   --social-bg: rgba(244, 243, 236, 0.5);
   --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.08);
   --shadow:
@@ -41,7 +50,7 @@
   letter-spacing: 0.18px;
   color-scheme: light;
   color: var(--text);
-  background: #fff;
+  background: var(--bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -52,13 +61,94 @@
   }
 }
 
+/* 어두운 화면.
+   기기 설정이 어두움이면 따라가고, 사용자가 직접 고르면 그 선택이 이긴다.
+   (선택은 <html data-theme="..."> 로 표시된다) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --text: #b0b8c1;
+    --text-h: #f2f4f6;
+    --text-muted: #98a2ad;
+    --bg: #17171c;
+    --surface: #23232a;
+    --border: #33333d;
+    --code-bg: #23232a;
+
+    --accent: #4d94ff;
+    --accent-bg: rgba(77, 148, 255, 0.14);
+    --accent-border: rgba(77, 148, 255, 0.45);
+    --accent-hover: #6ba6ff;
+
+    --danger: #ff6b76;
+    --danger-bg: rgba(255, 107, 118, 0.14);
+    --danger-border: rgba(255, 107, 118, 0.4);
+
+    --success: #2ee08f;
+    --success-bg: rgba(46, 224, 143, 0.14);
+    --success-border: rgba(46, 224, 143, 0.4);
+
+    --warning: #ffb84d;
+    --warning-bg: rgba(255, 184, 77, 0.14);
+    --warning-border: rgba(255, 184, 77, 0.4);
+
+    /* 어두운 바탕에서는 밝은 쪽이 잘 읽힌다 */
+    --danger-text: #ff8e97;
+    --success-text: #4ee7a2;
+    --warning-text: #ffc670;
+
+    --social-bg: rgba(255, 255, 255, 0.04);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+    --shadow: rgba(0, 0, 0, 0.6) 0 10px 15px -3px, rgba(0, 0, 0, 0.4) 0 4px 6px -2px;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --text: #b0b8c1;
+  --text-h: #f2f4f6;
+  --text-muted: #98a2ad;
+  --bg: #17171c;
+  --surface: #23232a;
+  --border: #33333d;
+  --code-bg: #23232a;
+
+  --accent: #4d94ff;
+  --accent-bg: rgba(77, 148, 255, 0.14);
+  --accent-border: rgba(77, 148, 255, 0.45);
+  --accent-hover: #6ba6ff;
+
+  --danger: #ff6b76;
+  --danger-bg: rgba(255, 107, 118, 0.14);
+  --danger-border: rgba(255, 107, 118, 0.4);
+
+  --success: #2ee08f;
+  --success-bg: rgba(46, 224, 143, 0.14);
+  --success-border: rgba(46, 224, 143, 0.4);
+
+  --warning: #ffb84d;
+  --warning-bg: rgba(255, 184, 77, 0.14);
+  --warning-border: rgba(255, 184, 77, 0.4);
+
+  --danger-text: #ff8e97;
+  --success-text: #4ee7a2;
+  --warning-text: #ffc670;
+
+  --social-bg: rgba(255, 255, 255, 0.04);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow: rgba(0, 0, 0, 0.6) 0 10px 15px -3px, rgba(0, 0, 0, 0.4) 0 4px 6px -2px;
+}
+
 * {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  background: #fff;
+  background: var(--bg);
+  color: var(--text);
 }
 
 #root {
@@ -70,7 +160,60 @@ body {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  background: #fff;
+  background: var(--bg);
+}
+
+#main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+/* 건너뛴 뒤 초점이 본문에 있다는 것만 알리고, 마우스 사용자에게는 테두리를 남기지 않는다 */
+#main:focus {
+  outline: none;
+}
+
+/* 키보드로 탭을 눌렀을 때만 나타나는 건너뛰기 링크 */
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -100px;
+  z-index: 100;
+  padding: 10px 18px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  transition: top 0.15s ease;
+}
+.skip-link:focus {
+  top: 12px;
+  text-decoration: none;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--text-h);
+  font-size: 17px;
+  line-height: 1;
+}
+.theme-toggle:hover:not(:disabled) {
+  background: var(--border);
+}
+.theme-toggle-fixed {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 50;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
 }
 
 h1,
@@ -170,7 +313,7 @@ textarea:focus-visible {
 
 .btn-primary {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   box-shadow: var(--shadow-sm);
 }
 .btn-primary:hover:not(:disabled) {
@@ -182,7 +325,7 @@ textarea:focus-visible {
 }
 .btn-danger:hover:not(:disabled) {
   background: var(--danger);
-  color: #fff;
+  color: var(--on-accent);
 }
 .btn-ghost {
   background: transparent;
@@ -232,9 +375,15 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-  outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-bg);
+}
+/* 마우스로 눌렀을 때는 테두리 강조만, 키보드로 왔을 때는 외곽선까지 남긴다.
+   (이 규칙이 위 :focus보다 뒤에 있어야 외곽선이 지워지지 않는다) */
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible) {
+  outline: none;
 }
 input:disabled,
 select:disabled,
@@ -272,21 +421,21 @@ input[type='checkbox'] {
 }
 .badge-success {
   background: var(--success-bg);
-  color: var(--success);
+  color: var(--success-text);
   border-color: var(--success-border);
 }
 .badge-danger {
   background: var(--danger-bg);
-  color: var(--danger);
+  color: var(--danger-text);
   border-color: var(--danger-border);
 }
 .badge-warning {
   background: var(--warning-bg);
-  color: var(--warning);
+  color: var(--warning-text);
   border-color: var(--warning-border);
 }
 .badge-developer {
   background: var(--text-h);
-  color: #fff;
+  color: var(--on-accent);
   border-color: var(--text-h);
 }

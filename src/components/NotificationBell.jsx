@@ -75,11 +75,17 @@ export default function NotificationBell() {
       <button
         type="button"
         className="notif-bell"
-        aria-label={`알림 ${unread}개 안 읽음`}
+        aria-label={unread > 0 ? `알림 ${unread}개 안 읽음` : '알림 없음'}
+        aria-haspopup="true"
+        aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        🔔
-        {unread > 0 && <span className="notif-badge">{unread > 9 ? '9+' : unread}</span>}
+        <span aria-hidden="true">🔔</span>
+        {unread > 0 && (
+          <span className="notif-badge" aria-hidden="true">
+            {unread > 9 ? '9+' : unread}
+          </span>
+        )}
       </button>
 
       {open && (

@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom'
 import LandingPage from './pages/LandingPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
+import ThemeToggle from './components/ThemeToggle.jsx'
 import './App.css'
 
 // 첫 화면(랜딩·로그인)만 즉시 포함하고 나머지는 필요할 때 불러온다.
@@ -23,34 +24,43 @@ const Loading = <p>불러오는 중...</p>
 
 function App() {
   return (
-    <Suspense fallback={Loading}>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
+    <>
+      {/* 키보드로 들어온 사람이 매번 머리말을 지나치지 않아도 되게 한다. */}
+      <a href="#main" className="skip-link">
+        본문으로 건너뛰기
+      </a>
+      <ThemeToggle className="theme-toggle-fixed" />
+      <main id="main" tabIndex={-1}>
+        <Suspense fallback={Loading}>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/signup" element={<SignupPage />} />
 
-        {/* 공개: 채용 공고 · 지원 (로그인 불필요) */}
-        <Route path="/jobs" element={<JobsPage />} />
-        <Route path="/jobs/:id" element={<JobDetailPage />} />
-        <Route path="/jobs/:id/apply" element={<ApplyPage />} />
-        <Route path="/application-status" element={<ApplicationStatusPage />} />
+            {/* 공개: 채용 공고 · 지원 (로그인 불필요) */}
+            <Route path="/jobs" element={<JobsPage />} />
+            <Route path="/jobs/:id" element={<JobDetailPage />} />
+            <Route path="/jobs/:id/apply" element={<ApplyPage />} />
+            <Route path="/application-status" element={<ApplicationStatusPage />} />
 
-        <Route element={<ProtectedRoute allowMustChangePassword />}>
-          <Route path="/change-password" element={<ChangePasswordPage />} />
-        </Route>
-        <Route element={<ProtectedRoute />}>
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/rooms/:roomId" element={<RoomPage />} />
-          <Route path="/rooms/:roomId/contract" element={<ContractPage />} />
-        </Route>
-        <Route element={<ProtectedRoute requireRecruiter />}>
-          <Route path="/recruit" element={<RecruitPage />} />
-        </Route>
-        <Route element={<ProtectedRoute requireAdmin />}>
-          <Route path="/admin" element={<AdminPage />} />
-        </Route>
-      </Routes>
-    </Suspense>
+            <Route element={<ProtectedRoute allowMustChangePassword />}>
+              <Route path="/change-password" element={<ChangePasswordPage />} />
+            </Route>
+            <Route element={<ProtectedRoute />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/rooms/:roomId" element={<RoomPage />} />
+              <Route path="/rooms/:roomId/contract" element={<ContractPage />} />
+            </Route>
+            <Route element={<ProtectedRoute requireRecruiter />}>
+              <Route path="/recruit" element={<RecruitPage />} />
+            </Route>
+            <Route element={<ProtectedRoute requireAdmin />}>
+              <Route path="/admin" element={<AdminPage />} />
+            </Route>
+          </Routes>
+        </Suspense>
+      </main>
+    </>
   )
 }
 

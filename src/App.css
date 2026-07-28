@@ -1190,6 +1190,16 @@
 }
 
 /* 상단 팝업 알림 (토스트) */
+/* 오류용·안내용 두 영역으로 나뉘어 있으므로 안쪽도 같은 세로 배치를 따른다 */
+.toast-viewport > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.toast-viewport > div:empty {
+  display: none;
+}
 .toast-viewport {
   position: fixed;
   top: 16px;
@@ -1669,7 +1679,7 @@
   max-width: 320px;
 }
 .compare-concern {
-  color: var(--warning);
+  color: var(--warning-text);
 }
 .interview-summary {
   display: flex;
@@ -1742,7 +1752,7 @@
 .period-alert {
   font-size: 14px;
   font-weight: 600;
-  color: var(--warning);
+  color: var(--warning-text);
   padding: 10px 14px;
   background: var(--warning-bg);
   border: 1px solid var(--warning-border);
