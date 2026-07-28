@@ -23,3 +23,20 @@ export async function checkRateLimit(env, bucket, maxHits, windowSeconds) {
   await env.DB.prepare('INSERT INTO rate_limit_hits (bucket) VALUES (?)').bind(bucket).run()
   return true
 }
+
+// 방금 기록한 시도 하나를 되돌린다.
+//
+// 한도는 "몇 번 해냈는가"를 세는 것이지 "몇 번 틀렸는가"를 세는 것이 아니다.
+// 이력서 형식을 잘못 고른 사람이 두어 번 되돌려 받고 나면 정작 제대로 된
+// 파일로는 낼 수 없게 되는데, 그건 막으려던 남용이 아니라 그냥 지원 실패다.
+// 그래서 요청이 실패로 끝나면 그 시도는 세지 않는다.
+export async function releaseRateLimit(env, bucket) {
+  await env.DB.prepare(
+    `DELETE FROM rate_limit_hits WHERE rowid = (
+       SELECT rowid FROM rate_limit_hits WHERE bucket = ? ORDER BY rowid DESC LIMIT 1
+     )`
+  )
+    .bind(bucket)
+    .run()
+    .catch(() => {})
+}

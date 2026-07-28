@@ -3,7 +3,7 @@ import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { rowToCamelTerms, buildArticlesFromTerms } from '../../../_lib/contract.js'
 import { findLanguage } from '../../../_lib/languages.js'
 import { translateContract } from '../../../_lib/claude.js'
-import { checkRateLimit } from '../../../_lib/rateLimit.js'
+import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
 import { notifyUser } from '../../../_lib/notify.js'
 
 // 계약서를 근로자의 언어로 번역한다.
@@ -24,7 +24,8 @@ export async function onRequestPost({ request, env, data, params }) {
   const language = findLanguage(body?.language)
   if (!language) return jsonError('지원하지 않는 언어입니다.', 400)
 
-  const allowed = await checkRateLimit(env, `translate:${params.roomId}`, 5, 300)
+  const bucket = `translate:${params.roomId}`
+  const allowed = await checkRateLimit(env, bucket, 5, 300)
   if (!allowed) return jsonError('번역 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)
 
   const termsRow = await env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?')
@@ -38,6 +39,7 @@ export async function onRequestPost({ request, env, data, params }) {
       : buildArticlesFromTerms(terms)
 
   if (articles.length === 0) {
+    await releaseRateLimit(env, bucket)
     return jsonError('번역할 계약 내용이 없습니다. 계약 조건을 먼저 입력해주세요.', 400)
   }
 
@@ -48,11 +50,14 @@ export async function onRequestPost({ request, env, data, params }) {
       languageLabel: `${language.label} (${language.nativeLabel})`,
     })
   } catch (err) {
+    // 번역이 실패했는데 한도만 깎이면, 될 때까지 시도할 방법이 없어진다.
+    await releaseRateLimit(env, bucket)
     return jsonError(err.message, 502)
   }
 
   // 조항 수가 어긋나면 대조가 불가능하므로 저장하지 않는다.
   if (translated.length !== articles.length) {
+    await releaseRateLimit(env, bucket)
     return jsonError('번역 결과가 원본과 맞지 않습니다. 다시 시도해주세요.', 502)
   }
 

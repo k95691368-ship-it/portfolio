@@ -1,7 +1,7 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { summarizeInterview } from '../../../_lib/claude.js'
-import { checkRateLimit } from '../../../_lib/rateLimit.js'
+import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
 
 // 면접 대화의 회사 보관용 요약 기록.
 //
@@ -62,7 +62,8 @@ export async function onRequestPost({ env, data, params }) {
     return jsonError('면접 요약은 채용자 또는 관리자 권한이 있는 계정만 작성할 수 있습니다.', 403)
   }
 
-  const allowed = await checkRateLimit(env, `interview-summary:${params.roomId}`, 5, 300)
+  const bucket = `interview-summary:${params.roomId}`
+  const allowed = await checkRateLimit(env, bucket, 5, 300)
   if (!allowed) return jsonError('요약 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)
 
   const { results: messages } = await env.DB.prepare(
@@ -80,6 +81,7 @@ export async function onRequestPost({ env, data, params }) {
     .all()
 
   if (messages.length < MIN_MESSAGES) {
+    await releaseRateLimit(env, bucket)
     return jsonError(
       `요약할 대화가 아직 충분하지 않습니다. (현재 ${messages.length}건, 최소 ${MIN_MESSAGES}건 필요)`,
       400
@@ -94,6 +96,8 @@ export async function onRequestPost({ env, data, params }) {
   try {
     summary = await summarizeInterview(env, transcript)
   } catch (err) {
+    // 실패한 시도는 한도에서 뺀다 (다시 시도할 수 있어야 한다).
+    await releaseRateLimit(env, bucket)
     return jsonError(err.message, 502)
   }
 

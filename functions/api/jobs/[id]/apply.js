@@ -1,6 +1,6 @@
 import { genId } from '../../../_lib/db.js'
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
-import { checkRateLimit } from '../../../_lib/rateLimit.js'
+import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
 import { parseBool, validateApplication, normalizeCareer } from '../../../_lib/application.js'
 import { fileExt, mimeForExt, validateUploadFile, validateFileContent } from '../../../_lib/uploads.js'
 
@@ -21,8 +21,17 @@ function genLookupCode() {
 // 공개: 특정 채용 공고에 지원. 로그인 불필요, multipart(파일 포함) 한 번의 요청.
 export async function onRequestPost({ request, env, params }) {
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
-  const allowed = await checkRateLimit(env, `apply:${ip}`, 5, 3600)
+  const bucket = `apply:${ip}`
+  const allowed = await checkRateLimit(env, bucket, 5, 3600)
   if (!allowed) return jsonError('지원이 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)
+
+  // 끝내 제출되지 못한 요청은 한도를 소모하지 않는다. 이력서 형식을 잘못 고른
+  // 사람이 고쳐서 다시 내려 할 때 막히면, 그건 막으려던 남용이 아니라
+  // 그냥 지원 실패다.
+  const fail = async (message, status) => {
+    await releaseRateLimit(env, bucket)
+    return jsonError(message, status)
+  }
 
   const posting = await env.DB.prepare(
     `SELECT id, title, status,
@@ -32,11 +41,11 @@ export async function onRequestPost({ request, env, params }) {
     .bind(params.id)
     .first()
   if (!posting || posting.status !== 'open' || posting.expired) {
-    return jsonError('마감되었거나 존재하지 않는 채용 공고입니다.', 404)
+    return fail('마감되었거나 존재하지 않는 채용 공고입니다.', 404)
   }
 
   const form = await request.formData().catch(() => null)
-  if (!form) return jsonError('잘못된 요청입니다.', 400)
+  if (!form) return fail('잘못된 요청입니다.', 400)
 
   const name = (form.get('applicantName') || '').toString().trim().slice(0, NAME_MAX)
   const email = (form.get('applicantEmail') || '').toString().trim().toLowerCase()
@@ -48,25 +57,25 @@ export async function onRequestPost({ request, env, params }) {
   const consentThirdParty = parseBool(form.get('consentThirdParty'))
 
   const validationError = validateApplication({ name, email, phone, consentRequired })
-  if (validationError) return jsonError(validationError, 400)
+  if (validationError) return fail(validationError, 400)
 
   const career = normalizeCareer(form.get('careerJson'))
-  if (!career.ok) return jsonError(career.error, 400)
+  if (!career.ok) return fail(career.error, 400)
 
   // 파일: 이력서 필수, 포트폴리오 선택
   const resumeFile = form.get('resume')
   const resumeError = validateUploadFile(resumeFile)
-  if (resumeError) return jsonError(`이력서: ${resumeError}`, 400)
+  if (resumeError) return fail(`이력서: ${resumeError}`, 400)
   const resumeContentError = await validateFileContent(resumeFile)
-  if (resumeContentError) return jsonError(`이력서: ${resumeContentError}`, 400)
+  if (resumeContentError) return fail(`이력서: ${resumeContentError}`, 400)
 
   const portfolioFile = form.get('portfolio')
   const hasPortfolio = portfolioFile && typeof portfolioFile !== 'string' && portfolioFile.size > 0
   if (hasPortfolio) {
     const portfolioError = validateUploadFile(portfolioFile)
-    if (portfolioError) return jsonError(`포트폴리오: ${portfolioError}`, 400)
+    if (portfolioError) return fail(`포트폴리오: ${portfolioError}`, 400)
     const portfolioContentError = await validateFileContent(portfolioFile)
-    if (portfolioContentError) return jsonError(`포트폴리오: ${portfolioContentError}`, 400)
+    if (portfolioContentError) return fail(`포트폴리오: ${portfolioContentError}`, 400)
   }
 
   // 같은 공고에 같은 이메일로 심사 대기 중인 지원이 있으면 중복 차단
@@ -76,7 +85,7 @@ export async function onRequestPost({ request, env, params }) {
   )
     .bind(params.id, email)
     .first()
-  if (dup) return jsonError('이미 이 공고에 지원하셨습니다. 심사 결과를 기다려주세요.', 409)
+  if (dup) return fail('이미 이 공고에 지원하셨습니다. 심사 결과를 기다려주세요.', 409)
 
   const appId = genId()
 
@@ -104,7 +113,7 @@ export async function onRequestPost({ request, env, params }) {
     console.error(`Application upload failed (posting ${params.id}):`, err)
     // 이미 올라간 파일 정리 시도
     await Promise.allSettled(uploads.map((u) => env.DOCUMENTS.delete(u.r2Key)))
-    return jsonError('파일 업로드에 실패했습니다. 잠시 후 다시 시도해주세요.', 502)
+    return fail('파일 업로드에 실패했습니다. 잠시 후 다시 시도해주세요.', 502)
   }
 
   const lookupCode = genLookupCode()
@@ -144,9 +153,9 @@ export async function onRequestPost({ request, env, params }) {
     await Promise.allSettled(uploads.map((u) => env.DOCUMENTS.delete(u.r2Key)))
     // 동시 제출 경쟁으로 부분 유니크 인덱스를 위반한 경우 중복 안내로 응답
     if (String(err?.message || err).includes('UNIQUE')) {
-      return jsonError('이미 이 공고에 지원하셨습니다. 심사 결과를 기다려주세요.', 409)
+      return fail('이미 이 공고에 지원하셨습니다. 심사 결과를 기다려주세요.', 409)
     }
-    return jsonError('지원서 저장에 실패했습니다. 잠시 후 다시 시도해주세요.', 500)
+    return fail('지원서 저장에 실패했습니다. 잠시 후 다시 시도해주세요.', 500)
   }
 
   return jsonResponse({ ok: true, applicationId: appId, lookupCode }, 201)

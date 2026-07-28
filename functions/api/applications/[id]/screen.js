@@ -1,7 +1,7 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { requireManageableApplication, parseCareer } from '../../../_lib/applications.js'
 import { screenApplication } from '../../../_lib/claude.js'
-import { checkRateLimit } from '../../../_lib/rateLimit.js'
+import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
 
 // 관리: 지원서 AI 스크리닝 실행. 결과는 저장되어 상세 조회에서 재사용된다.
 export async function onRequestPost({ env, data, params }) {
@@ -9,7 +9,8 @@ export async function onRequestPost({ env, data, params }) {
   if (access.error) return access.error
   const a = access.application
 
-  const allowed = await checkRateLimit(env, `screen:${params.id}`, 3, 60)
+  const bucket = `screen:${params.id}`
+  const allowed = await checkRateLimit(env, bucket, 3, 60)
   if (!allowed) return jsonError('너무 잦은 요청입니다. 잠시 후 다시 시도해주세요.', 429)
 
   const posting = await env.DB.prepare(
@@ -36,6 +37,8 @@ export async function onRequestPost({ env, data, params }) {
       },
     })
   } catch (err) {
+    // 실패한 시도는 한도에서 뺀다 (한도가 3회라 특히 금방 막힌다).
+    await releaseRateLimit(env, bucket)
     return jsonError(err.message, 502)
   }
 
