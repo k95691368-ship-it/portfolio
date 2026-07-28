@@ -825,6 +825,11 @@
   font-weight: 600;
   color: var(--accent);
 }
+/* 마감이 임박한 공고는 색만이 아니라 글자로도 "오늘 마감"이라고 말한다 */
+.job-card-deadline.urgent,
+.job-detail-meta.deadline-urgent {
+  color: var(--danger-text);
+}
 
 .job-detail-meta {
   color: var(--text-muted);

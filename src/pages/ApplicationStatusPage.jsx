@@ -66,12 +66,19 @@ export default function ApplicationStatusPage() {
         <p>지원 완료 시 발급된 접수번호로 심사 상태를 확인할 수 있습니다.</p>
       </header>
 
+      {/* 안내 문구만 칸 안에 넣어 두면, 입력을 시작하는 순간 이 칸이 무엇을
+          입력하는 칸인지 알 방법이 없어진다. 이름을 따로 붙인다. */}
       <form className="status-form" onSubmit={handleSubmit}>
+        <label htmlFor="lookup-code" className="sr-only">
+          접수번호
+        </label>
         <input
+          id="lookup-code"
           value={code}
           onChange={(e) => setCode(e.target.value)}
           placeholder="접수번호 입력 (예: ABCD2345EF)"
           maxLength={20}
+          autoComplete="off"
         />
         <button type="submit" className="btn-primary" disabled={loading}>
           {loading ? '조회 중...' : '조회하기'}
@@ -79,7 +86,7 @@ export default function ApplicationStatusPage() {
       </form>
 
       {result && info && (
-        <div className="status-card">
+        <div className="status-card" role="status" aria-live="polite">
           <span className={`badge ${info.badge}`}>{info.label}</span>
           <h2>{result.postingTitle}</h2>
           <p className="status-meta">

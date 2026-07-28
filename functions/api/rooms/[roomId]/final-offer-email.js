@@ -7,6 +7,12 @@ import { notifyUser } from '../../../_lib/notify.js'
 const SUBJECT_MAX_LENGTH = 150
 const BODY_MAX_LENGTH = 5000
 
+// 발송 중(sending)으로 잡아 둔 뒤 응답을 끝내지 못하면 그 상태가 그대로 남는다.
+// (요청이 도중에 끊기거나 워커가 회수되는 경우) 그러면 "이미 진행 중"이라는
+// 이유로 최종합격 이메일을 영영 다시 보낼 수 없게 된다. 발송은 몇 초면 끝나므로,
+// 이 시간이 지나도록 그대로인 것은 끊긴 것으로 보고 다시 잡을 수 있게 한다.
+const STUCK_SENDING_SECONDS = 300
+
 async function getCandidate(env, roomId) {
   return env.DB.prepare(
     `SELECT u.id, u.email, u.display_name
@@ -112,9 +118,19 @@ export async function onRequestPost({ request, env, data, params }) {
        attempt_count=final_offer_emails.attempt_count + 1,
        error_message=NULL,
        updated_at=datetime('now')
-     WHERE final_offer_emails.status = 'failed'`
+     WHERE final_offer_emails.status = 'failed'
+        OR (final_offer_emails.status = 'sending'
+            AND final_offer_emails.updated_at < datetime('now', '-' || ?7 || ' seconds'))`
   )
-    .bind(genId(), params.roomId, data.user.id, candidate.email, subject, bodyText)
+    .bind(
+      genId(),
+      params.roomId,
+      data.user.id,
+      candidate.email,
+      subject,
+      bodyText,
+      STUCK_SENDING_SECONDS
+    )
     .run()
 
   if (claim.meta.changes === 0) {
@@ -122,7 +138,7 @@ export async function onRequestPost({ request, env, data, params }) {
     if (existing?.status === 'sent') {
       return jsonError('최종합격 이메일은 이미 발송되었습니다.', 409)
     }
-    return jsonError('최종합격 이메일 발송이 이미 진행 중입니다.', 409)
+    return jsonError('최종합격 이메일 발송이 이미 진행 중입니다. 잠시 후 다시 시도해주세요.', 409)
   }
 
   try {
