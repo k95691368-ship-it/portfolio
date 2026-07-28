@@ -2,6 +2,7 @@ import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { getRoomAccess } from '../../../_lib/rooms.js'
 import { rowToCamelTerms } from '../../../_lib/contract.js'
 import { checkLegalCompliance, findMissingFields, diffAgreedVsCurrent } from '../../../_lib/contractCheck.js'
+import { checkPeriodCompliance } from '../../../_lib/contractPeriod.js'
 
 // 서명 전 최종 안전 점검.
 // 채팅 합의 내용과 현재 계약서의 차이, 최종 조건 기준 법적 재검토, 필수 누락을
@@ -36,7 +37,7 @@ export async function onRequestGet({ env, data, params }) {
   })
 
   const diffs = diffAgreedVsCurrent(parsedHistory, terms)
-  const legalIssues = checkLegalCompliance(terms)
+  const legalIssues = [...checkLegalCompliance(terms), ...checkPeriodCompliance(terms)]
   const missingFields = findMissingFields(terms)
 
   const hasBlocking = legalIssues.some((i) => i.severity === 'high') || diffs.length > 0

@@ -9,6 +9,7 @@ import {
   findMissingFields,
   diffAgreedVsCurrent,
 } from '../../../_lib/contractCheck.js'
+import { describeContractPeriod, checkPeriodCompliance } from '../../../_lib/contractPeriod.js'
 
 // 계약서 화면이 필요한 모든 정보를 한 번에 돌려준다.
 //
@@ -95,10 +96,13 @@ export async function onRequestGet({ env, data, params }) {
     }
   })
 
+  // 계약 기간 상태는 체결 전후 모두 필요하다 (체결 후에는 만료 관리에 쓰인다).
+  const period = terms ? describeContractPeriod(terms) : null
+
   let preSignCheck = null
   if (!isSigned && terms) {
     const diffs = diffAgreedVsCurrent(parsedHistory, terms)
-    const legalIssues = checkLegalCompliance(terms)
+    const legalIssues = [...checkLegalCompliance(terms), ...checkPeriodCompliance(terms)]
     const missingFields = findMissingFields(terms)
     preSignCheck = {
       ready: true,
@@ -167,6 +171,7 @@ export async function onRequestGet({ env, data, params }) {
       }),
     },
     preSignCheck,
+    period,
     changeRequests: changeRequestRows.results.map(mapRequestRow),
     signedContract: storedRow
       ? {

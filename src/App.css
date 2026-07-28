@@ -1460,6 +1460,43 @@
   padding: 8px 14px;
 }
 
+/* 계약 기간 (체결 이후 만료까지 관리) */
+.contract-period {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.period-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.period-head h2 {
+  margin: 0;
+}
+.period-detail {
+  font-size: 15px;
+  color: var(--text);
+}
+.period-alert {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--warning);
+  padding: 10px 14px;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-sm);
+}
+.room-period-alert {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--warning);
+}
+
 /* 채용 확정 안내 (AI 미인식 시 담당자 직접 확정) */
 .hire-confirm-box {
   display: flex;

@@ -57,6 +57,61 @@ const EMPTY_FORM = {
 }
 
 const SEVERITY_BADGE = { high: 'badge-danger', medium: 'badge-warning', info: 'badge-neutral' }
+
+const PERIOD_BADGE = {
+  open_ended: 'badge-accent',
+  scheduled: 'badge-neutral',
+  active: 'badge-success',
+  expiring_soon: 'badge-warning',
+  expired: 'badge-danger',
+  unknown: 'badge-neutral',
+}
+
+// 계약 기간 — 체결로 끝이 아니라 만료까지 관리해야 한다.
+function ContractPeriod({ period }) {
+  if (!period?.known) return null
+
+  return (
+    <section className="contract-period">
+      <div className="period-head">
+        <h2>계약 기간</h2>
+        <span className={`badge ${PERIOD_BADGE[period.status] || 'badge-neutral'}`}>
+          {period.label}
+        </span>
+      </div>
+
+      {period.openEnded ? (
+        <p className="period-detail">
+          {period.startDate} 개시 · {period.detail}
+        </p>
+      ) : (
+        <>
+          <p className="period-detail">
+            {period.startDate ?? '개시일 미기재'} ~ {period.endDate}
+            {period.months !== null && ` · 약 ${period.months}개월`}
+          </p>
+          {period.status === 'expiring_soon' && (
+            <p className="period-alert">
+              계약 만료가 {period.remainingDays}일 남았습니다. 갱신 또는 종료 여부를 상대방에게 미리
+              안내해주세요.
+            </p>
+          )}
+          {period.status === 'expired' && (
+            <p className="period-alert">
+              계약 기간이 종료되었습니다. 계속 근무 중이라면 갱신 계약을 새로 체결해야 합니다.
+            </p>
+          )}
+          {period.exceedsFixedTermLimit && (
+            <p className="period-alert">
+              기간이 2년을 초과합니다. 기간제법 제4조에 따라 기간의 정함이 없는 근로계약으로 보게 될 수
+              있습니다.
+            </p>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
 const REQUEST_STATUS = {
   pending: { label: '검토 중', badge: 'badge-warning' },
   accepted: { label: '반영됨', badge: 'badge-success' },
@@ -330,6 +385,7 @@ export default function ContractPage() {
   const [requestBusy, setRequestBusy] = useState(false)
   const [requestPrefill, setRequestPrefill] = useState(null)
   const [confirmingHire, setConfirmingHire] = useState(false)
+  const [period, setPeriod] = useState(null)
   const printRef = useRef(null)
 
   const loadAll = useCallback(async () => {
@@ -379,6 +435,7 @@ export default function ContractPage() {
     })
     setSignatures(sigData.signatures)
     setChangeRequests(view.changeRequests ?? [])
+    setPeriod(view.period ?? null)
 
     // 서명 전 최종 안전 점검은 아직 체결되지 않은 계약서에만 보여준다.
     setPreSign(roomData.status === 'signed' ? null : preSignData)
@@ -691,6 +748,8 @@ export default function ContractPage() {
           </button>
         </section>
       )}
+
+      <ContractPeriod period={period} />
 
       {(myRole === 'company' || myRole === 'candidate') && (
         <ChangeRequests

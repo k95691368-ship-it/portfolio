@@ -1,4 +1,5 @@
 import { jsonResponse, jsonError } from '../../_lib/http.js'
+import { describeContractPeriod } from '../../_lib/contractPeriod.js'
 
 export async function onRequestGet({ env, data }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
@@ -13,7 +14,9 @@ export async function onRequestGet({ env, data }) {
           JOIN users u ON u.id = rp2.user_id
           WHERE rp2.room_id = r.id AND rp2.role_in_room = 'candidate') AS candidate_name,
        (SELECT COUNT(*) FROM signatures s WHERE s.room_id = r.id) AS signature_count,
-       EXISTS(SELECT 1 FROM signatures s WHERE s.room_id = r.id AND s.signer_user_id = ?) AS i_signed
+       EXISTS(SELECT 1 FROM signatures s WHERE s.room_id = r.id AND s.signer_user_id = ?) AS i_signed,
+       (SELECT ct.contract_start_date FROM contract_terms ct WHERE ct.room_id = r.id) AS start_date,
+       (SELECT ct.contract_end_date FROM contract_terms ct WHERE ct.room_id = r.id) AS end_date
      FROM interview_rooms r
      JOIN room_participants rp ON rp.room_id = r.id
      WHERE rp.user_id = ?
@@ -32,6 +35,19 @@ export async function onRequestGet({ env, data }) {
     } else if (r.status === 'open') {
       nextAction = '지원자 대기 중'
     }
+
+    // 체결된 계약은 만료가 다가오면 목록에서 바로 보이게 한다.
+    let periodAlert = null
+    if (r.status === 'signed') {
+      const period = describeContractPeriod({
+        contractStartDate: r.start_date,
+        contractEndDate: r.end_date,
+      })
+      if (period.status === 'expiring_soon' || period.status === 'expired') {
+        periodAlert = period.label
+      }
+    }
+
     return {
       id: r.id,
       title: r.title,
@@ -41,6 +57,7 @@ export async function onRequestGet({ env, data }) {
       companyName: r.company_name,
       candidateName: r.candidate_name,
       nextAction,
+      periodAlert,
     }
   })
 
