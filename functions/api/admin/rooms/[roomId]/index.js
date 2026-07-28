@@ -25,6 +25,7 @@ export async function onRequestDelete({ env, data, params }) {
       env.DB.prepare('UPDATE applications SET room_id = NULL WHERE room_id = ?').bind(params.roomId),
       env.DB.prepare('UPDATE admin_audit_log SET target_room_id = NULL WHERE target_room_id = ?').bind(params.roomId),
       env.DB.prepare('DELETE FROM signed_contracts WHERE room_id = ?').bind(params.roomId),
+      env.DB.prepare('DELETE FROM contract_change_requests WHERE room_id = ?').bind(params.roomId),
       env.DB.prepare('DELETE FROM contract_edit_history WHERE room_id = ?').bind(params.roomId),
       env.DB.prepare('DELETE FROM final_offer_emails WHERE room_id = ?').bind(params.roomId),
       env.DB.prepare('DELETE FROM chat_messages WHERE room_id = ?').bind(params.roomId),

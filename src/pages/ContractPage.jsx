@@ -329,6 +329,7 @@ export default function ContractPage() {
   const [changeRequests, setChangeRequests] = useState([])
   const [requestBusy, setRequestBusy] = useState(false)
   const [requestPrefill, setRequestPrefill] = useState(null)
+  const [confirmingHire, setConfirmingHire] = useState(false)
   const printRef = useRef(null)
 
   const loadAll = useCallback(async () => {
@@ -454,6 +455,22 @@ export default function ContractPage() {
     }
   }
 
+  const handleConfirmHire = async () => {
+    if (!window.confirm('이 지원자의 채용을 확정하시겠습니까? 확정 후에는 양측이 서명할 수 있습니다.')) {
+      return
+    }
+    setConfirmingHire(true)
+    try {
+      await api.post(`/rooms/${roomId}/confirm-hire`, {})
+      await loadAll()
+      toast.success('채용이 확정되었습니다. 이제 서명할 수 있습니다.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setConfirmingHire(false)
+    }
+  }
+
   const handleCreateRequest = async ({ field, requestedValue, reason }) => {
     setRequestBusy(true)
     try {
@@ -571,9 +588,28 @@ export default function ContractPage() {
       </header>
 
       {!contractMeta.hireConfirmed && (
-        <p className="notice">
-          아직 채용이 확정되지 않았습니다. 계약 조건은 지금 미리 작성할 수 있지만, 서명은 채용이 확정된 후에 가능합니다.
-        </p>
+        <div className="notice hire-confirm-box">
+          <p>
+            아직 채용이 확정되지 않았습니다. 계약 조건은 지금 미리 작성할 수 있지만, 서명은 채용이 확정된
+            후에 가능합니다.
+          </p>
+          {myRole === 'company' && (
+            <>
+              <p className="hire-confirm-hint">
+                면접방 대화에서 AI가 채용 확정을 인식하면 자동으로 확정됩니다. 면접을 별도로 진행했거나
+                대화에 확정 표현이 없었다면 아래에서 직접 확정할 수 있습니다.
+              </p>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={confirmingHire}
+                onClick={handleConfirmHire}
+              >
+                {confirmingHire ? '처리 중...' : '채용 확정하기'}
+              </button>
+            </>
+          )}
+        </div>
       )}
       {isSigned && <p className="signed-banner">양측 서명이 완료되었습니다.</p>}
 

@@ -1460,6 +1460,19 @@
   padding: 8px 14px;
 }
 
+/* 채용 확정 안내 (AI 미인식 시 담당자 직접 확정) */
+.hire-confirm-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+.hire-confirm-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
 /* 계약 조건 수정 요청 (양방향 협상) */
 .change-requests {
   display: flex;

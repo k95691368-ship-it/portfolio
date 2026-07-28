@@ -128,8 +128,12 @@ export async function onRequestDelete({ env, data, params }) {
   try {
     await env.DB.batch([
       env.DB.prepare('UPDATE applications SET reviewed_by_user_id = NULL WHERE reviewed_by_user_id = ?').bind(params.id),
+      // 서류합격으로 만들어진 계정을 지울 때 지원서가 고아 참조를 남기지 않도록.
+      env.DB.prepare('UPDATE applications SET created_user_id = NULL WHERE created_user_id = ?').bind(params.id),
       env.DB.prepare('UPDATE admin_audit_log SET target_user_id = NULL WHERE target_user_id = ?').bind(params.id),
       env.DB.prepare('DELETE FROM admin_audit_log WHERE actor_user_id = ?').bind(params.id),
+      // 알림은 사용자를 참조하므로 함께 지우지 않으면 계정 삭제가 실패한다.
+      env.DB.prepare('DELETE FROM notifications WHERE user_id = ?').bind(params.id),
       env.DB.prepare('DELETE FROM documents WHERE user_id = ?').bind(params.id),
       env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(params.id),
       env.DB.prepare('DELETE FROM users WHERE id = ?').bind(params.id),
