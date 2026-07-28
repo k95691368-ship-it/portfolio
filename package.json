@@ -8,7 +8,8 @@
     "dev:full": "wrangler pages dev -- npm run dev",
     "build": "vite build",
     "lint": "oxlint",
-    "test": "vitest run",
+    "test": "vitest run --exclude tests/smoke.test.js",
+    "smoke": "vitest run tests/smoke.test.js",
     "preview": "vite preview"
   },
   "dependencies": {

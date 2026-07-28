@@ -1,0 +1,153 @@
+// 배포된 서비스를 실제로 두드려 보는 스모크 테스트.
+//
+// 순수 로직 테스트(다른 파일들)와 달리 여기서는 진짜 HTTP 요청을 보낸다.
+// 목적은 세 가지다.
+//   1) 모든 API 경로가 살아 있는가 — 이 프로젝트는 과거 라우트 충돌로
+//      /api/* 전체가 404가 된 적이 있다. 배포 직후 바로 잡혀야 하는 사고다.
+//   2) 권한 차단이 뚫리지 않았는가 — 비로그인/타역할 접근이 막히는지.
+//   3) 공개 화면이 정상 동작하는가 — 공고 목록·상세·현황 조회.
+//
+// 데이터를 만들지 않으므로 운영 환경에 그대로 돌려도 안전하다.
+//
+// 실행: npm run smoke            (기본: 운영 도메인)
+//       SMOKE_URL=<배포URL> npm run smoke
+import { describe, expect, it } from 'vitest'
+
+const BASE = process.env.SMOKE_URL || 'https://portfolio-epa.pages.dev'
+
+async function call(path, options = {}) {
+  const res = await fetch(`${BASE}${path}`, options)
+  const text = await res.text()
+  let json = null
+  try {
+    json = JSON.parse(text)
+  } catch {
+    // JSON이 아니면 라우트가 없어 SPA HTML이 돌아온 것 — 아래에서 잡힌다.
+  }
+  return { status: res.status, json, text, contentType: res.headers.get('content-type') || '' }
+}
+
+// 로그인 없이 부르면 401/403이어야 하는 경로들.
+// 여기서 확인하려는 건 "막혔는가"와 함께 "경로가 살아 있는가"다.
+// 라우트가 사라지면 Pages가 SPA HTML(200)을 돌려주므로 즉시 드러난다.
+const PROTECTED = [
+  ['GET', '/api/rooms/list'],
+  ['GET', '/api/notifications'],
+  ['POST', '/api/notifications/read'],
+  ['GET', '/api/documents/mine'],
+  ['POST', '/api/documents/upload'],
+  ['GET', '/api/postings'],
+  ['POST', '/api/postings'],
+  ['GET', '/api/applications'],
+  ['GET', '/api/admin/users'],
+  ['GET', '/api/admin/rooms'],
+  ['GET', '/api/admin/audit-log'],
+  ['POST', '/api/rooms/create'],
+  ['POST', '/api/rooms/join'],
+  ['GET', '/api/rooms/smoke-nonexistent'],
+  ['GET', '/api/rooms/smoke-nonexistent/messages'],
+  ['GET', '/api/rooms/smoke-nonexistent/contract'],
+  ['GET', '/api/rooms/smoke-nonexistent/contract-view'],
+  ['GET', '/api/rooms/smoke-nonexistent/contract-history'],
+  ['GET', '/api/rooms/smoke-nonexistent/signatures'],
+  ['GET', '/api/rooms/smoke-nonexistent/documents'],
+  ['GET', '/api/rooms/smoke-nonexistent/audit-trail'],
+  ['GET', '/api/rooms/smoke-nonexistent/pre-sign-check'],
+  ['GET', '/api/rooms/smoke-nonexistent/signed-contract'],
+  ['GET', '/api/rooms/smoke-nonexistent/signed-contract-file'],
+  ['GET', '/api/rooms/smoke-nonexistent/invite-email'],
+  ['GET', '/api/rooms/smoke-nonexistent/final-offer-email'],
+  ['POST', '/api/rooms/smoke-nonexistent/analyze'],
+  ['POST', '/api/rooms/smoke-nonexistent/sign'],
+  ['POST', '/api/rooms/smoke-nonexistent/contract-draft'],
+  ['GET', '/api/applications/smoke-nonexistent'],
+  ['POST', '/api/applications/smoke-nonexistent/screen'],
+  ['POST', '/api/applications/smoke-nonexistent/pass'],
+  ['POST', '/api/applications/smoke-nonexistent/reject'],
+  ['GET', '/api/applications/smoke-nonexistent/doc/smoke'],
+  ['GET', '/api/documents/smoke-nonexistent/download'],
+]
+
+describe(`배포 스모크 (${BASE})`, () => {
+  it('첫 화면이 응답한다', async () => {
+    const res = await fetch(BASE)
+    expect(res.status).toBe(200)
+  })
+
+  describe('보호된 경로는 살아 있고, 비로그인은 막힌다', () => {
+    for (const [method, path] of PROTECTED) {
+      it(`${method} ${path}`, async () => {
+        const res = await call(path, { method })
+        // 라우트가 사라지면 SPA HTML이 200으로 돌아온다 — 그것부터 잡는다.
+        expect(
+          res.contentType.includes('application/json'),
+          `${path} 가 JSON이 아닌 응답을 반환했습니다. 라우트가 사라졌을 수 있습니다.`
+        ).toBe(true)
+        expect([401, 403]).toContain(res.status)
+        expect(res.json?.error).toBeTruthy()
+      })
+    }
+  })
+
+  describe('공개 경로', () => {
+    it('채용 공고 목록을 반환한다', async () => {
+      const res = await call('/api/jobs')
+      expect(res.status).toBe(200)
+      expect(Array.isArray(res.json?.postings)).toBe(true)
+    })
+
+    it('없는 공고는 404로 안내한다', async () => {
+      const res = await call('/api/jobs/smoke-nonexistent')
+      expect(res.status).toBe(404)
+      expect(res.json?.error).toBeTruthy()
+    })
+
+    it('마감·미존재 공고에는 지원할 수 없다', async () => {
+      const res = await call('/api/jobs/smoke-nonexistent/apply', { method: 'POST' })
+      expect([400, 404, 429]).toContain(res.status)
+      expect(res.json?.error).toBeTruthy()
+    })
+
+    it('접수번호 없이 현황을 조회하면 안내한다', async () => {
+      const res = await call('/api/application-status')
+      expect([400, 429]).toContain(res.status)
+      expect(res.json?.error).toBeTruthy()
+    })
+
+    it('없는 접수번호는 404로 안내한다', async () => {
+      const res = await call('/api/application-status?code=SMOKENONE1')
+      expect([404, 429]).toContain(res.status)
+    })
+  })
+
+  describe('로그인', () => {
+    it('빈 요청을 거부한다', async () => {
+      const res = await call('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      expect(res.status).toBe(400)
+    })
+
+    it('틀린 비밀번호를 거부하고 계정 존재 여부를 흘리지 않는다', async () => {
+      const res = await call('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'smoke-nobody@example.com', password: 'wrong-password' }),
+      })
+      expect([401, 429]).toContain(res.status)
+      if (res.status === 401) {
+        // 있는 계정과 없는 계정의 응답이 같아야 계정 존재 여부가 새지 않는다.
+        expect(res.json.error).toBe('이메일 또는 비밀번호가 올바르지 않습니다.')
+      }
+    })
+  })
+
+  it('로그인하지 않으면 사용자 정보가 비어 있다', async () => {
+    // /api/me는 로그인 여부를 확인하는 용도라 비로그인도 정상 응답한다.
+    const res = await call('/api/me')
+    expect(res.status).toBe(200)
+    expect(res.json).toEqual({ user: null })
+  })
+})
