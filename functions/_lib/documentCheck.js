@@ -98,14 +98,42 @@ function variantsFor(kind, value) {
   return text ? [text] : []
 }
 
-// 본문의 임금 조항에서 "기본급 ○○원"을 뽑아낸다.
-// 식대·수당 같은 다른 금액을 잘못 집지 않도록 기본급/월급 표현 바로 뒤만 본다.
-export function findStatedBaseWage(strippedText) {
-  const m = strippedText.match(/(?:기본급|월급여|월급|월정액|임금은)[^。.\n]{0,20}?(\d[\d]{4,}|\d{1,5}만)원/)
-  if (!m) return null
-  const token = m[1]
+// 기본급이 아닌 것이 분명한 금액 (이 단어들이 금액 바로 앞에 있으면 건너뛴다)
+const NOT_BASE_WAGE = /식대|수당|상여|퇴직|교통비|보험료|위약|장려금|성과급|중식|숙식/
+
+function toAmount(token) {
   const value = token.endsWith('만') ? Number(token.slice(0, -1)) * 10000 : Number(token)
   return Number.isFinite(value) && value > 0 ? value : null
+}
+
+// 본문의 임금 조항에서 실제로 적힌 기본급을 뽑아낸다.
+//
+// AI가 매번 같은 문장을 쓰지 않는다("기본급은 월 240만원으로 한다",
+// "월 2,400,000원을 기본급으로 지급한다"). 그래서 기본급 표현 뒤를 먼저 보고,
+// 없으면 임금 조항 안의 금액을 훑되 식대·수당처럼 기본급이 아닌 것이 분명한
+// 금액은 건너뛴다.
+export function findStatedBaseWage(wageText) {
+  if (!wageText) return null
+
+  const direct = wageText.match(/(?:기본급|월급여|월급|월정액)[^。.\n]{0,20}?(\d{5,}|\d{1,5}만)원/)
+  if (direct) return toAmount(direct[1])
+
+  const scan = /(\d{5,}|\d{1,5}만)원/g
+  let m
+  while ((m = scan.exec(wageText)) !== null) {
+    // 금액 "바로 앞"만 본다. 넓게 잡으면 앞 문장의 식대까지 걸려 정작 기본급을 놓친다.
+    const before = wageText.slice(Math.max(0, m.index - 6), m.index)
+    if (NOT_BASE_WAGE.test(before)) continue
+    return toAmount(m[1])
+  }
+  return null
+}
+
+// 임금을 다루는 조항만 모은다. 다른 조항의 금액을 기본급으로 오인하지 않기 위함.
+function wageArticleText(articles) {
+  const wageOnly = articles.filter((a) => /임금|급여|기본급|보수/.test(`${a?.heading ?? ''} ${a?.body ?? ''}`))
+  const picked = wageOnly.length > 0 ? wageOnly : articles
+  return strip(picked.map((a) => `${a?.heading ?? ''} ${a?.body ?? ''}`).join('\n'))
 }
 
 // 계약 조건 ↔ 계약서 본문 대조.
@@ -130,7 +158,7 @@ export function checkDocumentConsistency(articles, terms) {
     // 기본급은 본문에 적힌 값을 함께 찾아서 보여준다. 서로 다른 금액이
     // 명확히 확인되면 그것만으로 서명을 막을 근거가 된다.
     if (field === 'wageBaseAmount') {
-      const stated = findStatedBaseWage(stripped)
+      const stated = findStatedBaseWage(wageArticleText(articles))
       if (stated !== null) {
         issues.push({
           field,

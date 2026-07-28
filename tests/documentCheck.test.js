@@ -122,10 +122,35 @@ describe('checkDocumentConsistency', () => {
 })
 
 describe('findStatedBaseWage', () => {
-  it('기본급 뒤의 금액만 읽는다', () => {
+  it('기본급 뒤의 금액을 읽는다', () => {
     expect(findStatedBaseWage('기본급3200000원식대200000원')).toBe(3200000)
     expect(findStatedBaseWage('기본급320만원')).toBe(3200000)
+    expect(findStatedBaseWage('기본급은월2400000원으로한다')).toBe(2400000)
+  })
+
+  it('금액이 기본급 표현보다 앞에 와도 읽는다', () => {
+    expect(findStatedBaseWage('월2156880원을기본급으로지급한다')).toBe(2156880)
+  })
+
+  it('기본급이 아닌 것이 분명한 금액은 건너뛴다', () => {
     expect(findStatedBaseWage('식대200000원')).toBe(null)
+    expect(findStatedBaseWage('식대200000원과기타수당300000원')).toBe(null)
+    expect(findStatedBaseWage('식대200000원외에월2400000원을지급한다')).toBe(2400000)
+  })
+
+  it('본문이 비면 아무것도 읽지 않는다', () => {
+    expect(findStatedBaseWage('')).toBe(null)
+  })
+})
+
+describe('임금 조항이 아닌 곳의 금액', () => {
+  it('다른 조항의 금액을 기본급으로 오인하지 않는다', () => {
+    const articles = [
+      { heading: '제1조 (임금)', body: '월 2,400,000원을 지급한다.' },
+      { heading: '제2조 (교육비)', body: '교육비로 연 5,000,000원을 지원한다.' },
+    ]
+    const issues = checkDocumentConsistency(articles, { wageBaseAmount: '2900000' })
+    expect(issues[0].stated).toBe('2,400,000원')
   })
 })
 

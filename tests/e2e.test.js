@@ -248,6 +248,62 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
     expect(view.json.room.status).toBe('contract_pending')
   })
 
+  it('본문이 조건과 어긋나면 서명이 막힌다', async () => {
+    // 계약서 본문은 채용자 권한이 있어야 작성할 수 있다.
+    const granted = await admin(`/api/admin/users/${state.companyId}`, {
+      method: 'PATCH',
+      body: { isRecruiter: true },
+    })
+    expect(granted.status, `채용자 권한 부여 실패: ${granted.text}`).toBe(200)
+
+    const before = await company(`/api/rooms/${state.roomId}/contract-view`)
+    const draft = await company(`/api/rooms/${state.roomId}/contract-draft`, {
+      method: 'POST',
+      body: before.json.contract.terms,
+    })
+    expect(draft.status, `AI 계약서 작성 실패: ${draft.text}`).toBe(200)
+    expect(draft.json.articles.length).toBeGreaterThan(0)
+
+    // 방금 만든 본문은 현재 조건과 같아야 한다.
+    const fresh = await candidate(`/api/rooms/${state.roomId}/contract-view`)
+    const doc = fresh.json.preSignCheck.documentCheck
+    expect(doc.hasDocument).toBe(true)
+    expect(doc.issues.find((i) => i.field === 'wageBaseAmount')).toBeUndefined()
+
+    // 본문은 그대로 두고 기본급만 바꾼다 — 예전에는 이 상태로 서명이 됐다.
+    const bumped = Number(state.suggested) + 500000
+    await company(`/api/rooms/${state.roomId}/contract`, {
+      method: 'PATCH',
+      body: { wageBaseAmount: bumped },
+    })
+
+    const stale = await candidate(`/api/rooms/${state.roomId}/contract-view`)
+    const wage = stale.json.preSignCheck.documentCheck.issues.find(
+      (i) => i.field === 'wageBaseAmount'
+    )
+    expect(wage, '본문과 조건의 임금 불일치를 잡지 못했습니다.').toBeTruthy()
+    expect(wage.conflict).toBe(true)
+    expect(stale.json.preSignCheck.hasBlocking).toBe(true)
+
+    const blocked = await company(`/api/rooms/${state.roomId}/sign`, {
+      method: 'POST',
+      body: { imageDataUrl: 'data:image/png;base64,iVBORw0KGgo=' },
+    })
+    expect(blocked.status, `본문 불일치 상태에서 서명이 막히지 않았습니다: ${blocked.text}`).toBe(409)
+    expect(blocked.json.error).toContain('본문')
+
+    // 본문에 적힌 금액으로 되돌리면 다시 서명할 수 있다.
+    await company(`/api/rooms/${state.roomId}/contract`, {
+      method: 'PATCH',
+      body: { wageBaseAmount: Number(state.suggested) },
+    })
+    const fixed = await candidate(`/api/rooms/${state.roomId}/contract-view`)
+    expect(
+      fixed.json.preSignCheck.documentCheck.issues.find((i) => i.field === 'wageBaseAmount')
+    ).toBeUndefined()
+    // AI가 계약서 본문을 쓰는 데 시간이 걸려 기본 제한(5초)으로는 부족하다.
+  }, 120000)
+
   it('양측이 서명하면 계약이 체결된다', async () => {
     const sig =
       'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
