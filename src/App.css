@@ -1460,6 +1460,15 @@
   padding: 8px 14px;
 }
 
+/* 서명 증거 (접속 환경) */
+.signature-evidence {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin-top: 4px;
+  word-break: break-all;
+}
+
 /* 계약 기간 (체결 이후 만료까지 관리) */
 .contract-period {
   display: flex;

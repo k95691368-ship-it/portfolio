@@ -270,6 +270,12 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
     expect(view.json.room.status).toBe('signed')
     // 체결된 계약서에는 서명 전 점검을 더 보여주지 않는다.
     expect(view.json.preSignCheck).toBeNull()
+
+    // 서명이 이루어진 접속 환경이 증거로 남아야 한다.
+    for (const sig of view.json.signatures) {
+      expect(sig.environment, `${sig.role} 서명에 접속 환경이 기록되지 않았습니다.`).toBeTruthy()
+      expect(sig.environment).toContain('IP ')
+    }
   })
 
   it('계약 이력이 시간순으로 증명된다', async () => {
@@ -280,6 +286,10 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
     expect(events).toContain('계약 조건 수정')
     expect(events).toContain('회사 서명')
     expect(events).toContain('지원자 서명')
+
+    // 감사추적증명서에는 서명 환경까지 담겨야 증거로서 의미가 있다.
+    const signEvent = view.json.auditTrail.events.find((e) => e.event === '지원자 서명')
+    expect(signEvent.detail).toContain('IP ')
 
     const times = view.json.auditTrail.events.map((e) => e.at)
     expect(times).toEqual([...times].sort())

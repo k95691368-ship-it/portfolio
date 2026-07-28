@@ -766,30 +766,25 @@ export default function ContractPage() {
       <section className="signature-section">
         <h2>서명</h2>
         <div className="signature-status-row">
-          <div>
-            <p>회사</p>
-            {signatures.find((s) => s.role === 'company') ? (
-              <img
-                src={signatures.find((s) => s.role === 'company').imageDataUrl}
-                alt="회사 서명"
-                className="signature-thumb"
-              />
-            ) : (
-              <p>미서명</p>
-            )}
-          </div>
-          <div>
-            <p>지원자</p>
-            {signatures.find((s) => s.role === 'candidate') ? (
-              <img
-                src={signatures.find((s) => s.role === 'candidate').imageDataUrl}
-                alt="지원자 서명"
-                className="signature-thumb"
-              />
-            ) : (
-              <p>미서명</p>
-            )}
-          </div>
+          {[
+            { role: 'company', label: '회사' },
+            { role: 'candidate', label: '지원자' },
+          ].map(({ role, label }) => {
+            const sig = signatures.find((s) => s.role === role)
+            return (
+              <div key={role}>
+                <p>{label}</p>
+                {sig ? (
+                  <>
+                    <img src={sig.imageDataUrl} alt={`${label} 서명`} className="signature-thumb" />
+                    {sig.environment && <p className="signature-evidence">{sig.environment}</p>}
+                  </>
+                ) : (
+                  <p>미서명</p>
+                )}
+              </div>
+            )
+          })}
         </div>
         {(myRole === 'company' || myRole === 'candidate') && !mySignature && (
           <>

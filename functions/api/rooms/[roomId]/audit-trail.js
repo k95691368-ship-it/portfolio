@@ -35,7 +35,8 @@ export async function onRequestGet({ env, data, params }) {
         .bind(params.roomId)
         .all(),
       env.DB.prepare(
-        `SELECT s.signer_role, s.signed_at, u.display_name
+        `SELECT s.signer_role, s.signed_at, s.signer_ip, s.signer_user_agent, s.signer_country,
+                u.display_name
          FROM signatures s JOIN users u ON u.id = s.signer_user_id
          WHERE s.room_id = ?`
       )

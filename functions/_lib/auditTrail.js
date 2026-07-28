@@ -7,6 +7,38 @@ export function normalizeTime(t) {
   return String(t).replace('T', ' ').replace('Z', '').slice(0, 19)
 }
 
+// 원시 User-Agent는 사람이 읽을 수 없으므로 브라우저·운영체제만 뽑는다.
+export function summarizeUserAgent(ua) {
+  if (!ua) return null
+  const s = String(ua)
+  const browser =
+    (/Edg\//.test(s) && 'Edge') ||
+    (/OPR\//.test(s) && 'Opera') ||
+    (/Chrome\//.test(s) && 'Chrome') ||
+    (/Safari\//.test(s) && !/Chrome\//.test(s) && 'Safari') ||
+    (/Firefox\//.test(s) && 'Firefox') ||
+    null
+  const os =
+    (/Windows NT/.test(s) && 'Windows') ||
+    (/iPhone|iPad/.test(s) && 'iOS') ||
+    (/Android/.test(s) && 'Android') ||
+    (/Mac OS X/.test(s) && 'macOS') ||
+    (/Linux/.test(s) && 'Linux') ||
+    null
+  const parts = [browser, os].filter(Boolean)
+  return parts.length > 0 ? parts.join(' · ') : null
+}
+
+// 서명이 이루어진 접속 환경을 한 줄로 정리한다.
+export function describeSigningEnvironment(sig) {
+  const parts = []
+  if (sig.signer_ip) parts.push(`IP ${sig.signer_ip}`)
+  const device = summarizeUserAgent(sig.signer_user_agent)
+  if (device) parts.push(device)
+  if (sig.signer_country) parts.push(sig.signer_country)
+  return parts.length > 0 ? parts.join(' · ') : null
+}
+
 export function buildAuditEvents({
   room,
   participants,
@@ -46,10 +78,11 @@ export function buildAuditEvents({
     })
   }
   for (const s of signatures) {
+    const environment = describeSigningEnvironment(s)
     events.push({
       at: s.signed_at,
       event: s.signer_role === 'company' ? '회사 서명' : '지원자 서명',
-      detail: s.display_name,
+      detail: environment ? `${s.display_name} · ${environment}` : s.display_name,
     })
   }
   if (finalOffer?.sent_at) {

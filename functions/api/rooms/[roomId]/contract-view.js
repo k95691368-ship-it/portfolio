@@ -1,7 +1,7 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { getRoomAccess } from '../../../_lib/rooms.js'
 import { rowToCamelTerms } from '../../../_lib/contract.js'
-import { buildAuditEvents } from '../../../_lib/auditTrail.js'
+import { buildAuditEvents, describeSigningEnvironment } from '../../../_lib/auditTrail.js'
 import { maskEmail, isEmailConfigured } from '../../../_lib/email.js'
 import { mapRequestRow } from '../../../_lib/changeRequests.js'
 import {
@@ -54,7 +54,8 @@ export async function onRequestGet({ env, data, params }) {
         .bind(roomId)
         .all(),
       env.DB.prepare(
-        `SELECT s.signer_role, s.image_data_url, s.signed_at, u.display_name
+        `SELECT s.signer_role, s.image_data_url, s.signed_at, s.signer_ip,
+                s.signer_user_agent, s.signer_country, u.display_name
          FROM signatures s JOIN users u ON u.id = s.signer_user_id
          WHERE s.room_id = ?`
       )
@@ -140,6 +141,7 @@ export async function onRequestGet({ env, data, params }) {
       imageDataUrl: s.image_data_url,
       signedAt: s.signed_at,
       displayName: s.display_name,
+      environment: describeSigningEnvironment(s),
     })),
     history: history
       .slice()

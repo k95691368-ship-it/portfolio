@@ -37,15 +37,34 @@ export async function onRequestPost({ env, data, params, request }) {
     return jsonError('서명 이미지 용량이 너무 큽니다.', 400)
   }
 
+  // 서명이 이루어진 접속 환경을 함께 남긴다 (감사추적증명서의 증거 항목).
+  const ip = request.headers.get('CF-Connecting-IP') || null
+  const userAgent = (request.headers.get('User-Agent') || '').slice(0, 300) || null
+  const country = request.headers.get('CF-IPCountry') || null
+
   await env.DB.prepare(
-    `INSERT INTO signatures (id, room_id, signer_user_id, signer_role, image_data_url, signed_at)
-     VALUES (?, ?, ?, ?, ?, datetime('now'))
+    `INSERT INTO signatures
+       (id, room_id, signer_user_id, signer_role, image_data_url, signed_at,
+        signer_ip, signer_user_agent, signer_country)
+     VALUES (?, ?, ?, ?, ?, datetime('now'), ?, ?, ?)
      ON CONFLICT(room_id, signer_role) DO UPDATE SET
        signer_user_id = excluded.signer_user_id,
        image_data_url = excluded.image_data_url,
-       signed_at = datetime('now')`
+       signed_at = datetime('now'),
+       signer_ip = excluded.signer_ip,
+       signer_user_agent = excluded.signer_user_agent,
+       signer_country = excluded.signer_country`
   )
-    .bind(genId(), params.roomId, data.user.id, participant.role_in_room, imageDataUrl)
+    .bind(
+      genId(),
+      params.roomId,
+      data.user.id,
+      participant.role_in_room,
+      imageDataUrl,
+      ip,
+      userAgent,
+      country
+    )
     .run()
 
   const { results: sigs } = await env.DB.prepare('SELECT signer_role FROM signatures WHERE room_id = ?')
