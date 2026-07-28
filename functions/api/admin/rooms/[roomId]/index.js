@@ -28,6 +28,7 @@ export async function onRequestDelete({ env, data, params }) {
       env.DB.prepare('DELETE FROM contract_change_requests WHERE room_id = ?').bind(params.roomId),
       // 번역본도 방을 참조한다. 빠뜨리면 번역한 적 있는 방은 삭제가 실패한다.
       env.DB.prepare('DELETE FROM contract_translations WHERE room_id = ?').bind(params.roomId),
+      env.DB.prepare('DELETE FROM interview_summaries WHERE room_id = ?').bind(params.roomId),
       // 이 방을 이전 계약으로 삼은 갱신 계약이 있으면 연결부터 끊어야 한다.
       env.DB.prepare('UPDATE contract_terms SET previous_room_id = NULL WHERE previous_room_id = ?').bind(params.roomId),
       env.DB.prepare('DELETE FROM contract_edit_history WHERE room_id = ?').bind(params.roomId),

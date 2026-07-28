@@ -137,6 +137,7 @@ export async function onRequestDelete({ env, data, params }) {
       // 번역본은 번역한 사람을 참조한다. 참여 이력이 없어도 이 행이 남아 있으면
       // 계정 삭제가 외래키 위반으로 실패한다.
       env.DB.prepare('DELETE FROM contract_translations WHERE translated_by_user_id = ?').bind(params.id),
+      env.DB.prepare('DELETE FROM interview_summaries WHERE created_by_user_id = ?').bind(params.id),
       env.DB.prepare('DELETE FROM documents WHERE user_id = ?').bind(params.id),
       env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(params.id),
       env.DB.prepare('DELETE FROM users WHERE id = ?').bind(params.id),

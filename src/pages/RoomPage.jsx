@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 import { useChatPolling } from '../hooks/useChatPolling.js'
 import ChatMessageList from '../components/ChatMessageList.jsx'
 import ChatComposer from '../components/ChatComposer.jsx'
@@ -9,10 +10,12 @@ import RoomDocuments from '../components/RoomDocuments.jsx'
 import ContractFieldsForm from '../components/ContractFieldsForm.jsx'
 import FinalOfferEmailForm from '../components/FinalOfferEmailForm.jsx'
 import RoomInviteEmailForm from '../components/RoomInviteEmailForm.jsx'
+import InterviewSummary from '../components/InterviewSummary.jsx'
 
 export default function RoomPage() {
   const { roomId } = useParams()
   const toast = useToast()
+  const { user } = useAuth()
   const [room, setRoom] = useState(null)
   const [error, setError] = useState('')
   const { messages, sendMessage } = useChatPolling(roomId)
@@ -104,6 +107,14 @@ export default function RoomPage() {
           </Link>
         </p>
       </section>
+
+      {room.myRole === 'company' && (
+        <InterviewSummary
+          roomId={roomId}
+          canWrite={!!(user?.isAdmin || user?.isRecruiter)}
+          messageCount={messages.length}
+        />
+      )}
 
       {room.myRole === 'company' && (
         <>

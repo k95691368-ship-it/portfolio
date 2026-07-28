@@ -157,6 +157,98 @@ export async function draftContractDocument(env, terms) {
   return toolUse.input
 }
 
+const SUMMARY_TOOL = {
+  name: 'record_interview_summary',
+  description: '면접 채팅 대화를 회사 보관용 기록으로 정리한다.',
+  input_schema: {
+    type: 'object',
+    required: ['overview', 'discussed_conditions', 'candidate_statements', 'open_questions'],
+    properties: {
+      overview: {
+        type: 'string',
+        description: '면접에서 오간 내용을 3~5문장으로 정리한 한국어 요약',
+      },
+      discussed_conditions: {
+        type: 'array',
+        description: '대화에서 오간 근로조건. 확정된 것과 협의 중인 것을 구분해 적는다.',
+        items: {
+          type: 'object',
+          required: ['topic', 'detail'],
+          properties: {
+            topic: { type: 'string', description: '항목 (예: 임금, 근무시간, 근무장소)' },
+            detail: { type: 'string', description: '대화에서 오간 내용' },
+            settled: { type: 'boolean', description: '양측이 합의에 이르렀는지' },
+          },
+        },
+      },
+      candidate_statements: {
+        type: 'array',
+        description: '지원자가 직접 밝힌 직무 관련 사실 (경력, 자격, 근무 가능 시점 등). 추측하지 말고 발언한 것만.',
+        items: { type: 'string' },
+      },
+      open_questions: {
+        type: 'array',
+        description: '아직 정해지지 않았거나 확인이 필요한 사항',
+        items: { type: 'string' },
+      },
+      next_steps: {
+        type: 'array',
+        description: '대화에서 합의된 다음 절차',
+        items: { type: 'string' },
+      },
+    },
+  },
+}
+
+const SUMMARY_SYSTEM_PROMPT = `당신은 한국 채용 면접 대화를 회사 보관용 기록으로 정리하는 어시스턴트입니다.
+
+규칙:
+1. 대화에 실제로 나온 내용만 적으세요. 추측하거나 없는 사실을 지어내지 마세요.
+2. 지원자를 평가하거나 점수를 매기지 마세요. 이 기록은 평가서가 아니라 "무슨 이야기가 오갔는가"의 기록입니다.
+3. 직무와 무관한 개인정보는 대화에 나왔더라도 요약에 담지 마세요 — 연령, 성별, 출신지역, 혼인·가족관계, 재산, 외모·신체조건, 종교, 정치적 견해. (채용절차의 공정화에 관한 법률 제4조의3 취지)
+4. 근로조건은 확정된 것과 아직 협의 중인 것을 구분해 적으세요.
+5. 한국어로, 짧고 사실 위주의 문장으로 쓰세요.`
+
+export async function summarizeInterview(env, transcript) {
+  const apiKey = env.CLAUDE_API_KEY
+  if (!apiKey) throw new Error('CLAUDE_API_KEY가 설정되지 않았습니다. Cloudflare 시크릿을 등록해주세요.')
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 4096,
+      system: SUMMARY_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: `[면접 대화]\n${transcript}` }],
+      tools: [SUMMARY_TOOL],
+      tool_choice: { type: 'tool', name: 'record_interview_summary' },
+    }),
+  })
+
+  if (!res.ok) {
+    const errText = await res.text()
+    throw new Error(`Claude API 오류 (${res.status}): ${errText.slice(0, 300)}`)
+  }
+
+  const data = await res.json()
+  const toolUse = Array.isArray(data.content)
+    ? data.content.find((block) => block.type === 'tool_use')
+    : null
+  if (!toolUse?.input?.overview) {
+    if (data.stop_reason === 'max_tokens') {
+      throw new Error('대화가 길어 요약이 중간에 끊겼습니다. 잠시 후 다시 시도해주세요.')
+    }
+    throw new Error('요약 결과를 받지 못했습니다. 잠시 후 다시 시도해주세요.')
+  }
+
+  return toolUse.input
+}
+
 const TRANSLATION_TOOL = {
   name: 'record_contract_translation',
   description: '한국어 근로계약서 조항을 근로자의 언어로 번역해 기록한다.',

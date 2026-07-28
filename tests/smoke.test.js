@@ -65,6 +65,8 @@ const PROTECTED = [
   ['POST', '/api/rooms/smoke-nonexistent/sign'],
   ['POST', '/api/rooms/smoke-nonexistent/contract-draft'],
   ['POST', '/api/rooms/smoke-nonexistent/translate'],
+  ['GET', '/api/rooms/smoke-nonexistent/interview-summary'],
+  ['POST', '/api/rooms/smoke-nonexistent/interview-summary'],
   ['POST', '/api/rooms/smoke-nonexistent/link-previous'],
   ['DELETE', '/api/rooms/smoke-nonexistent/link-previous'],
   ['GET', '/api/applications/smoke-nonexistent'],
