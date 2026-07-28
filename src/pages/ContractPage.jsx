@@ -342,9 +342,15 @@ function ChangeRequests({ requests, myRole, canRequest, onCreate, onRespond, bus
 }
 
 // 서명 전 최종 안전 점검 — 합의 불일치 / 법적 문제 / 필수 누락
-function PreSignCheck({ check, onRequestFix }) {
+function PreSignCheck({ check, onRequestFix, onRedraft, redrafting }) {
   const { diffs, legalIssues, missingFields } = check
-  const clean = diffs.length === 0 && legalIssues.length === 0 && missingFields.length === 0
+  const doc = check.documentCheck ?? { hasDocument: false, issues: [], missingArticles: [] }
+  const clean =
+    diffs.length === 0 &&
+    legalIssues.length === 0 &&
+    missingFields.length === 0 &&
+    doc.issues.length === 0 &&
+    doc.missingArticles.length === 0
 
   return (
     <section className={`presign-check${clean ? ' clean' : ''}`}>
@@ -352,8 +358,50 @@ function PreSignCheck({ check, onRequestFix }) {
 
       {clean && (
         <p className="presign-ok">
-          ✓ 채팅에서 합의한 조건과 계약서 내용이 일치하며, 법적 검토에서도 문제가 발견되지 않았습니다.
+          ✓ 채팅에서 합의한 조건과 계약서 내용이 일치하며, 계약서 본문도 조건과 같습니다. 법적 검토에서도
+          문제가 발견되지 않았습니다.
         </p>
+      )}
+
+      {doc.issues.length > 0 && (
+        <div className="presign-group">
+          <p className="presign-group-title">
+            <span className="badge badge-danger">본문과 조건이 다름</span> 실제로 서명·보관되는 것은
+            아래 계약서 본문입니다.
+          </p>
+          <ul className="presign-list">
+            {doc.issues.map((issue) => (
+              <li key={issue.field}>
+                <span className={`badge ${SEVERITY_BADGE[issue.severity] || 'badge-neutral'}`}>
+                  {issue.label}
+                </span>{' '}
+                {issue.message}
+              </li>
+            ))}
+          </ul>
+          {onRedraft && (
+            <button type="button" className="btn-sm" onClick={onRedraft} disabled={redrafting}>
+              {redrafting ? '본문을 다시 쓰는 중...' : '현재 조건으로 본문 다시 작성'}
+            </button>
+          )}
+          {doc.issues.some((i) => i.conflict) && (
+            <p className="presign-missing">
+              본문에 다른 금액이 적혀 있어 이 상태로는 서명할 수 없습니다. 본문을 다시 작성해주세요.
+            </p>
+          )}
+        </div>
+      )}
+
+      {doc.missingArticles.length > 0 && (
+        <div className="presign-group">
+          <p className="presign-group-title">
+            <span className="badge badge-warning">본문 필수 조항 누락</span>
+          </p>
+          <p className="presign-missing">
+            계약서 본문에 {doc.missingArticles.map((m) => m.label).join(', ')} 관련 내용이 보이지
+            않습니다. (근로기준법 제17조 명시사항)
+          </p>
+        </div>
       )}
 
       {diffs.length > 0 && (
@@ -906,6 +954,10 @@ export default function ContractPage() {
             {preSign?.ready && (
               <PreSignCheck
                 check={preSign}
+                redrafting={drafting}
+                onRedraft={
+                  canEdit && (user.isAdmin || user.isRecruiter) ? handleDraftDocument : null
+                }
                 onRequestFix={
                   myRole === 'candidate'
                     ? (fix) => {

@@ -10,6 +10,7 @@ import {
   diffAgreedVsCurrent,
 } from '../../../_lib/contractCheck.js'
 import { describeContractPeriod, checkPeriodCompliance } from '../../../_lib/contractPeriod.js'
+import { checkContractDocument } from '../../../_lib/documentCheck.js'
 import { findLanguage } from '../../../_lib/languages.js'
 
 // 계약서 화면이 필요한 모든 정보를 한 번에 돌려준다.
@@ -112,12 +113,19 @@ export async function onRequestGet({ env, data, params }) {
     const diffs = diffAgreedVsCurrent(parsedHistory, terms)
     const legalIssues = [...checkLegalCompliance(terms), ...checkPeriodCompliance(terms)]
     const missingFields = findMissingFields(terms)
+    // 서명 대상은 계약 조건이 아니라 계약서 본문이므로 본문도 함께 대조한다.
+    const documentCheck = checkContractDocument(terms)
     preSignCheck = {
       ready: true,
       diffs,
       legalIssues,
       missingFields,
-      hasBlocking: legalIssues.some((i) => i.severity === 'high') || diffs.length > 0,
+      documentCheck,
+      hasBlocking:
+        legalIssues.some((i) => i.severity === 'high') ||
+        diffs.length > 0 ||
+        documentCheck.issues.length > 0 ||
+        documentCheck.missingArticles.length > 0,
     }
   }
 

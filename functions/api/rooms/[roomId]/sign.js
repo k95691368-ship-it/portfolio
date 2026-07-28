@@ -2,6 +2,8 @@ import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { genId } from '../../../_lib/db.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { notifyUser } from '../../../_lib/notify.js'
+import { rowToCamelTerms } from '../../../_lib/contract.js'
+import { checkContractDocument } from '../../../_lib/documentCheck.js'
 
 const MAX_DATA_URL_LENGTH = 2_000_000
 
@@ -17,10 +19,22 @@ export async function onRequestPost({ env, data, params, request }) {
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
   if (room.status === 'signed') return jsonError('이미 서명이 완료된 계약서입니다.', 409)
 
-  const contract = await env.DB.prepare('SELECT hire_confirmed FROM contract_terms WHERE room_id = ?')
+  const contract = await env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?')
     .bind(params.roomId)
     .first()
   if (!contract?.hire_confirmed) return jsonError('아직 채용이 확정되지 않아 서명할 수 없습니다.', 400)
+
+  // 서명하는 문서는 계약 조건이 아니라 계약서 본문이다. 조건을 고친 뒤 본문을
+  // 다시 작성하지 않으면 본문에 옛 금액이 남는데, 여기서 서로 다른 금액이
+  // 확실하게 확인되면 확인 절차로 넘기지 않고 서명 자체를 막는다.
+  const docCheck = checkContractDocument(rowToCamelTerms(contract))
+  if (docCheck.hasConflict) {
+    const conflict = docCheck.issues.find((i) => i.conflict)
+    return jsonError(
+      `계약서 본문이 계약 조건과 다릅니다. ${conflict.message} (AI 계약서 다시 작성하기)`,
+      409
+    )
+  }
 
   let body
   try {
