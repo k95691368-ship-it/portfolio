@@ -6,6 +6,7 @@ import { mergeValue, mergeSocialInsurance } from '../../../_lib/merge.js'
 import { notifyUser } from '../../../_lib/notify.js'
 
 const COOLDOWN_SECONDS = 45
+const TRANSCRIPT_LIMIT = 300 // AI에 넘길 최근 대화 수 상한
 
 export async function onRequestPost({ env, data, params }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
@@ -13,15 +14,21 @@ export async function onRequestPost({ env, data, params }) {
   const participant = await getRoomParticipant(env, params.roomId, data.user.id)
   if (!participant) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
 
+  // 대화 전체를 매번 읽어 AI에 넘기면 면접이 길어질수록 읽기량·토큰·응답 시간이
+  // 계속 늘어난다. 이전에 확정된 조건은 previousTerms로 함께 전달되므로,
+  // 최근 대화만 보면 충분하다.
   const { results: messages } = await env.DB.prepare(
-    `SELECT m.id, m.body, rp.role_in_room, u.display_name
-     FROM chat_messages m
-     JOIN users u ON u.id = m.sender_user_id
-     JOIN room_participants rp ON rp.room_id = m.room_id AND rp.user_id = m.sender_user_id
-     WHERE m.room_id = ?
-     ORDER BY m.id ASC`
+    `SELECT * FROM (
+       SELECT m.id, m.body, rp.role_in_room, u.display_name
+       FROM chat_messages m
+       JOIN users u ON u.id = m.sender_user_id
+       JOIN room_participants rp ON rp.room_id = m.room_id AND rp.user_id = m.sender_user_id
+       WHERE m.room_id = ?
+       ORDER BY m.id DESC
+       LIMIT ?
+     ) ORDER BY id ASC`
   )
-    .bind(params.roomId)
+    .bind(params.roomId, TRANSCRIPT_LIMIT)
     .all()
 
   if (messages.length === 0) return jsonError('분석할 대화 내용이 없습니다.', 400)
