@@ -157,6 +157,81 @@ export async function draftContractDocument(env, terms) {
   return toolUse.input
 }
 
+const TRANSLATION_TOOL = {
+  name: 'record_contract_translation',
+  description: '한국어 근로계약서 조항을 근로자의 언어로 번역해 기록한다.',
+  input_schema: {
+    type: 'object',
+    required: ['articles'],
+    properties: {
+      articles: {
+        type: 'array',
+        description: '원본과 같은 순서·같은 개수의 조항 번역본',
+        items: {
+          type: 'object',
+          required: ['heading', 'body'],
+          properties: {
+            heading: { type: 'string', description: '번역된 조항 제목' },
+            body: { type: 'string', description: '번역된 조항 본문' },
+          },
+        },
+      },
+    },
+  },
+}
+
+const TRANSLATION_SYSTEM_PROMPT = `당신은 대한민국 근로계약서를 외국인 근로자의 언어로 번역하는 전문 번역가입니다.
+
+규칙:
+1. 원본 조항의 순서와 개수를 그대로 유지하세요. 조항을 합치거나 나누지 마세요.
+2. 내용을 더하거나 빼지 말고, 원문에 있는 사실만 옮기세요.
+3. 금액·날짜·시각·숫자는 원문 그대로 유지하세요 (통화 단위는 "원(KRW)"처럼 병기해도 좋습니다).
+4. 고유명사(회사명, 사람 이름, 지명)는 원문 표기를 유지하되 필요하면 음차를 병기하세요.
+5. 법률 용어는 해당 언어권에서 통용되는 노동법 용어를 사용하고, 대응 용어가 없으면 뜻이 통하도록 풀어 쓰세요.
+6. 근로자가 자신의 권리와 의무를 정확히 이해할 수 있도록 명확하고 쉬운 문장으로 옮기세요.`
+
+export async function translateContract(env, { articles, languageLabel }) {
+  const apiKey = env.CLAUDE_API_KEY
+  if (!apiKey) throw new Error('CLAUDE_API_KEY가 설정되지 않았습니다. Cloudflare 시크릿을 등록해주세요.')
+
+  const userContent = `[번역 대상 언어]\n${languageLabel}\n\n[한국어 근로계약서 조항]\n${JSON.stringify(articles)}`
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 8192,
+      system: TRANSLATION_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: userContent }],
+      tools: [TRANSLATION_TOOL],
+      tool_choice: { type: 'tool', name: 'record_contract_translation' },
+    }),
+  })
+
+  if (!res.ok) {
+    const errText = await res.text()
+    throw new Error(`Claude API 오류 (${res.status}): ${errText.slice(0, 300)}`)
+  }
+
+  const data = await res.json()
+  const toolUse = Array.isArray(data.content)
+    ? data.content.find((block) => block.type === 'tool_use')
+    : null
+  if (!toolUse || !Array.isArray(toolUse.input?.articles) || toolUse.input.articles.length === 0) {
+    if (data.stop_reason === 'max_tokens') {
+      throw new Error('계약서가 길어 번역이 중간에 끊겼습니다. 조항을 줄여 다시 시도해주세요.')
+    }
+    throw new Error('번역 결과를 받지 못했습니다. 잠시 후 다시 시도해주세요.')
+  }
+
+  return toolUse.input.articles
+}
+
 const SCREENING_TOOL = {
   name: 'record_application_screening',
   description: '채용 공고 요건과 지원서를 비교 분석한 서류 스크리닝 결과를 기록한다.',

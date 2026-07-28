@@ -20,6 +20,57 @@ export const EDITABLE_FIELDS = {
   uniformSize: 'uniform_size',
 }
 
+// AI 초안이 아직 없는 계약서도 번역할 수 있도록, 입력된 조건을 조항 형태로 만든다.
+export function buildArticlesFromTerms(terms) {
+  if (!terms) return []
+  const rows = [
+    ['근로계약기간', [terms.contractStartDate, terms.contractEndDate].filter(Boolean).join(' ~ ')],
+    ['근무장소', terms.workLocation],
+    ['업무의 내용', terms.jobDescription],
+    [
+      '소정근로시간',
+      [terms.workHoursStart, terms.workHoursEnd].filter(Boolean).join(' ~ '),
+    ],
+    ['근무일 및 휴일', [terms.workDays, terms.restDays].filter(Boolean).join(' / ')],
+    [
+      '임금',
+      [
+        terms.wageBaseAmount ? `기본급 ${Number(terms.wageBaseAmount).toLocaleString('ko-KR')}원` : '',
+        terms.wagePayMethod,
+        terms.wagePayDate,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    ],
+    ['연차유급휴가', terms.annualLeave],
+  ]
+
+  const articles = rows
+    .filter(([, value]) => value && String(value).trim() !== '')
+    .map(([heading, body], i) => ({ heading: `제${i + 1}조 (${heading})`, body: String(body) }))
+
+  const insurance = terms.socialInsurance
+  if (insurance && typeof insurance === 'object') {
+    const labels = {
+      employment_insurance: '고용보험',
+      health_insurance: '건강보험',
+      national_pension: '국민연금',
+      industrial_accident_insurance: '산재보험',
+    }
+    const applied = Object.entries(insurance)
+      .filter(([, v]) => v === true)
+      .map(([k]) => labels[k] || k)
+    if (applied.length > 0) {
+      articles.push({
+        heading: `제${articles.length + 1}조 (사회보험 적용여부)`,
+        body: `${applied.join(', ')}을(를) 적용한다.`,
+      })
+    }
+  }
+
+  return articles
+}
+
 export function rowToCamelTerms(row) {
   if (!row) return null
   return {

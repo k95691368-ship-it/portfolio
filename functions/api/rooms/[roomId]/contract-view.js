@@ -1,6 +1,6 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { getRoomAccess } from '../../../_lib/rooms.js'
-import { rowToCamelTerms } from '../../../_lib/contract.js'
+import { rowToCamelTerms, buildArticlesFromTerms } from '../../../_lib/contract.js'
 import { buildAuditEvents, describeSigningEnvironment } from '../../../_lib/auditTrail.js'
 import { maskEmail, isEmailConfigured } from '../../../_lib/email.js'
 import { mapRequestRow } from '../../../_lib/changeRequests.js'
@@ -10,6 +10,7 @@ import {
   diffAgreedVsCurrent,
 } from '../../../_lib/contractCheck.js'
 import { describeContractPeriod, checkPeriodCompliance } from '../../../_lib/contractPeriod.js'
+import { findLanguage } from '../../../_lib/languages.js'
 
 // 계약서 화면이 필요한 모든 정보를 한 번에 돌려준다.
 //
@@ -32,6 +33,7 @@ export async function onRequestGet({ env, data, params }) {
     storedRow,
     finalOffer,
     changeRequestRows,
+    translationRows,
   ] = await Promise.all([
       env.DB.prepare('SELECT id, title, invite_code, status, created_at FROM interview_rooms WHERE id = ?')
         .bind(roomId)
@@ -75,6 +77,11 @@ export async function onRequestGet({ env, data, params }) {
          FROM contract_change_requests c
          JOIN users u ON u.id = c.requested_by_user_id
          WHERE c.room_id = ? ORDER BY c.id DESC LIMIT 50`
+      )
+        .bind(roomId)
+        .all(),
+      env.DB.prepare(
+        'SELECT language, articles_json, created_at FROM contract_translations WHERE room_id = ?'
       )
         .bind(roomId)
         .all(),
@@ -174,6 +181,27 @@ export async function onRequestGet({ env, data, params }) {
     },
     preSignCheck,
     period,
+    // 번역과 나란히 대조할 원본 조항 (번역 시 쓰는 것과 같은 기준)
+    sourceArticles:
+      terms?.aiDocument && terms.aiDocument.length > 0
+        ? terms.aiDocument
+        : buildArticlesFromTerms(terms),
+    translations: translationRows.results.map((t) => {
+      const lang = findLanguage(t.language)
+      let articles = []
+      try {
+        articles = JSON.parse(t.articles_json)
+      } catch {
+        articles = []
+      }
+      return {
+        language: t.language,
+        label: lang?.label ?? t.language,
+        nativeLabel: lang?.nativeLabel ?? t.language,
+        articles,
+        createdAt: t.created_at,
+      }
+    }),
     changeRequests: changeRequestRows.results.map(mapRequestRow),
     signedContract: storedRow
       ? {

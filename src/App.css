@@ -1460,6 +1460,85 @@
   padding: 8px 14px;
 }
 
+/* 외국어 계약서 (원본 대조) */
+.contract-translation {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.contract-translation h2 {
+  margin: 0;
+}
+.translation-note {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.translation-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.translation-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.translation-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+.translation-tabs .active {
+  background: var(--accent);
+  color: #fff;
+}
+.translation-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.translation-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-soft, var(--border));
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+@media (min-width: 760px) {
+  .translation-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+}
+.translation-source,
+.translation-target {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  line-height: 1.65;
+  min-width: 0;
+}
+.translation-source {
+  color: var(--text-muted);
+}
+.translation-target {
+  color: var(--text-h);
+}
+.translation-source p,
+.translation-target p {
+  word-break: break-word;
+}
+
 /* 서명 증거 (접속 환경) */
 .signature-evidence {
   font-size: 11px;

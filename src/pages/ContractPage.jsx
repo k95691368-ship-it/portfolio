@@ -58,6 +58,95 @@ const EMPTY_FORM = {
 
 const SEVERITY_BADGE = { high: 'badge-danger', medium: 'badge-warning', info: 'badge-neutral' }
 
+// 지원 언어 (서버의 _lib/languages.js와 같은 목록)
+const LANGUAGES = [
+  { code: 'en', label: 'English', nativeLabel: 'English' },
+  { code: 'zh', label: '중국어', nativeLabel: '中文' },
+  { code: 'vi', label: '베트남어', nativeLabel: 'Tiếng Việt' },
+  { code: 'th', label: '태국어', nativeLabel: 'ไทย' },
+  { code: 'id', label: '인도네시아어', nativeLabel: 'Bahasa Indonesia' },
+  { code: 'uz', label: '우즈베크어', nativeLabel: "O'zbekcha" },
+  { code: 'ne', label: '네팔어', nativeLabel: 'नेपाली' },
+  { code: 'km', label: '크메르어', nativeLabel: 'ភាសាខ្មែរ' },
+  { code: 'my', label: '미얀마어', nativeLabel: 'မြန်မာဘာသာ' },
+  { code: 'mn', label: '몽골어', nativeLabel: 'Монгол' },
+]
+
+// 외국인 근로자용 번역본 — 원본과 나란히 보여준다(공식 표준근로계약서 외국어본 방식).
+function ContractTranslations({ translations, sourceArticles, canTranslate, onTranslate, busy }) {
+  const [language, setLanguage] = useState('en')
+  const [shown, setShown] = useState(translations[0]?.language ?? null)
+
+  const current = translations.find((t) => t.language === shown) ?? null
+
+  if (!canTranslate && translations.length === 0) return null
+
+  return (
+    <section className="contract-translation">
+      <h2>외국어 계약서</h2>
+      <p className="translation-note">
+        법적 효력은 한국어 원본에 있으며, 번역본은 근로자가 내용을 정확히 이해하도록 돕기 위한
+        참고본입니다.
+      </p>
+
+      {canTranslate && (
+        <div className="translation-controls">
+          <select value={language} onChange={(e) => setLanguage(e.target.value)}>
+            {LANGUAGES.map((l) => (
+              <option key={l.code} value={l.code}>
+                {l.label} ({l.nativeLabel})
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={busy || sourceArticles.length === 0}
+            onClick={() => onTranslate(language)}
+          >
+            {busy ? '번역 중...' : '이 언어로 번역하기'}
+          </button>
+          {sourceArticles.length === 0 && (
+            <span className="translation-hint">계약 조건을 먼저 입력해주세요.</span>
+          )}
+        </div>
+      )}
+
+      {translations.length > 0 && (
+        <div className="translation-tabs">
+          {translations.map((t) => (
+            <button
+              key={t.language}
+              type="button"
+              className={`btn-sm${shown === t.language ? ' active' : ''}`}
+              onClick={() => setShown(shown === t.language ? null : t.language)}
+            >
+              {t.nativeLabel}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {current && (
+        <div className="translation-body">
+          {current.articles.map((a, i) => (
+            <div className="translation-row" key={i}>
+              <div className="translation-source">
+                <strong>{sourceArticles[i]?.heading}</strong>
+                <p>{sourceArticles[i]?.body}</p>
+              </div>
+              <div className="translation-target" lang={current.language}>
+                <strong>{a.heading}</strong>
+                <p>{a.body}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
 const PERIOD_BADGE = {
   open_ended: 'badge-accent',
   scheduled: 'badge-neutral',
@@ -386,6 +475,9 @@ export default function ContractPage() {
   const [requestPrefill, setRequestPrefill] = useState(null)
   const [confirmingHire, setConfirmingHire] = useState(false)
   const [period, setPeriod] = useState(null)
+  const [translations, setTranslations] = useState([])
+  const [sourceArticles, setSourceArticles] = useState([])
+  const [translating, setTranslating] = useState(false)
   const printRef = useRef(null)
 
   const loadAll = useCallback(async () => {
@@ -436,6 +528,8 @@ export default function ContractPage() {
     setSignatures(sigData.signatures)
     setChangeRequests(view.changeRequests ?? [])
     setPeriod(view.period ?? null)
+    setTranslations(view.translations ?? [])
+    setSourceArticles(view.sourceArticles ?? [])
 
     // 서명 전 최종 안전 점검은 아직 체결되지 않은 계약서에만 보여준다.
     setPreSign(roomData.status === 'signed' ? null : preSignData)
@@ -509,6 +603,19 @@ export default function ContractPage() {
       toast.error(err.message)
     } finally {
       setDrafting(false)
+    }
+  }
+
+  const handleTranslate = async (language) => {
+    setTranslating(true)
+    try {
+      await api.post(`/rooms/${roomId}/translate`, { language })
+      await loadAll()
+      toast.success('번역본이 준비되었습니다.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setTranslating(false)
     }
   }
 
@@ -750,6 +857,14 @@ export default function ContractPage() {
       )}
 
       <ContractPeriod period={period} />
+
+      <ContractTranslations
+        translations={translations}
+        sourceArticles={sourceArticles}
+        canTranslate={myRole === 'company'}
+        onTranslate={handleTranslate}
+        busy={translating}
+      />
 
       {(myRole === 'company' || myRole === 'candidate') && (
         <ChangeRequests
