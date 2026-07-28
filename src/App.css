@@ -1460,6 +1460,88 @@
   padding: 8px 14px;
 }
 
+/* 서명 전 최종 안전 점검 */
+.presign-check {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 24px;
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius);
+  background: var(--danger-bg);
+}
+.presign-check.clean {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+}
+.presign-check h3 {
+  margin: 0;
+}
+.presign-ok {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--success);
+}
+.presign-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.presign-group-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+.presign-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.presign-table th,
+.presign-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.presign-table th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface);
+}
+.presign-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.presign-agreed {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+.presign-current {
+  font-weight: 700;
+  color: var(--danger);
+}
+.presign-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.presign-list li {
+  margin-bottom: 4px;
+}
+.presign-missing {
+  font-size: 14px;
+  line-height: 1.6;
+}
+.presign-ack {
+  font-size: 14px;
+  font-weight: 600;
+  gap: 8px;
+}
+
 /* 서명 완료 계약서 보관/전송 */
 .signed-contract-section {
   display: flex;

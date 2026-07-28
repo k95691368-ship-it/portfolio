@@ -1,4 +1,4 @@
-const MODEL = 'claude-opus-4-8'
+const MODEL = 'claude-opus-5'
 
 const ANALYSIS_TOOL = {
   name: 'record_interview_analysis',

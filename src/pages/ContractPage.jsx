@@ -58,6 +58,79 @@ const EMPTY_FORM = {
   customTerms: [],
 }
 
+const SEVERITY_BADGE = { high: 'badge-danger', medium: 'badge-warning', info: 'badge-neutral' }
+
+// 서명 전 최종 안전 점검 — 합의 불일치 / 법적 문제 / 필수 누락
+function PreSignCheck({ check }) {
+  const { diffs, legalIssues, missingFields } = check
+  const clean = diffs.length === 0 && legalIssues.length === 0 && missingFields.length === 0
+
+  return (
+    <section className={`presign-check${clean ? ' clean' : ''}`}>
+      <h3>서명 전 최종 확인</h3>
+
+      {clean && (
+        <p className="presign-ok">
+          ✓ 채팅에서 합의한 조건과 계약서 내용이 일치하며, 법적 검토에서도 문제가 발견되지 않았습니다.
+        </p>
+      )}
+
+      {diffs.length > 0 && (
+        <div className="presign-group">
+          <p className="presign-group-title">
+            <span className="badge badge-danger">합의 내용과 다름</span> 면접 대화에서 합의된 조건이 이후 수정되었습니다.
+          </p>
+          <table className="presign-table">
+            <thead>
+              <tr>
+                <th>항목</th>
+                <th>대화에서 합의</th>
+                <th>현재 계약서</th>
+              </tr>
+            </thead>
+            <tbody>
+              {diffs.map((d) => (
+                <tr key={d.field}>
+                  <td>{d.label}</td>
+                  <td className="presign-agreed">{d.agreed}</td>
+                  <td className="presign-current">{d.current}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {legalIssues.length > 0 && (
+        <div className="presign-group">
+          <p className="presign-group-title">법적 검토</p>
+          <ul className="presign-list">
+            {legalIssues.map((issue, i) => (
+              <li key={i}>
+                <span className={`badge ${SEVERITY_BADGE[issue.severity] || 'badge-neutral'}`}>
+                  {issue.title}
+                </span>{' '}
+                {issue.detail}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {missingFields.length > 0 && (
+        <div className="presign-group">
+          <p className="presign-group-title">
+            <span className="badge badge-warning">필수 항목 누락</span>
+          </p>
+          <p className="presign-missing">
+            {missingFields.map((m) => m.label).join(', ')} 항목이 비어 있습니다. (근로기준법 제17조 명시사항)
+          </p>
+        </div>
+      )}
+    </section>
+  )
+}
+
 export default function ContractPage() {
   const { roomId } = useParams()
   const { user } = useAuth()
@@ -78,6 +151,8 @@ export default function ContractPage() {
   const [signedContract, setSignedContract] = useState(null)
   const [signedMeta, setSignedMeta] = useState({ emailConfigured: true, candidateEmailMasked: null })
   const [storing, setStoring] = useState(false)
+  const [preSign, setPreSign] = useState(null)
+  const [acknowledged, setAcknowledged] = useState(false)
   const printRef = useRef(null)
 
   const loadAll = useCallback(async () => {
@@ -124,6 +199,12 @@ export default function ContractPage() {
       customTerms: t.customTerms ?? [],
     })
     setSignatures(sigData.signatures)
+
+    // 서명 전 최종 안전 점검 (아직 서명이 완료되지 않은 계약서만)
+    if (roomData.status !== 'signed') {
+      const check = await api.get(`/rooms/${roomId}/pre-sign-check`).catch(() => null)
+      setPreSign(check)
+    }
 
     if (roomData.status === 'signed') {
       const signed = await api.get(`/rooms/${roomId}/signed-contract`).catch(() => null)
@@ -397,11 +478,22 @@ export default function ContractPage() {
         </div>
         {(myRole === 'company' || myRole === 'candidate') && !mySignature && (
           <>
+            {preSign?.ready && <PreSignCheck check={preSign} />}
+            {preSign?.hasBlocking && (
+              <label className="checkbox-label presign-ack">
+                <input
+                  type="checkbox"
+                  checked={acknowledged}
+                  onChange={(e) => setAcknowledged(e.target.checked)}
+                />
+                위 확인 사항을 모두 검토했으며, 이 내용으로 서명합니다.
+              </label>
+            )}
             <button
               type="button"
               className="btn-primary"
               onClick={() => setSigningRole(myRole)}
-              disabled={!contractMeta.hireConfirmed}
+              disabled={!contractMeta.hireConfirmed || (preSign?.hasBlocking && !acknowledged)}
             >
               서명하기
             </button>
