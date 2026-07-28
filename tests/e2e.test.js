@@ -16,6 +16,16 @@ import { describe, expect, it, beforeAll, afterAll } from 'vitest'
 const BASE = process.env.SMOKE_URL || 'https://portfolio-epa.pages.dev'
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD
+// 가입은 IP당 시간당 10회로 제한된다. 그 한도에 걸렸거나 계정을 새로 만들고
+// 싶지 않을 때는 이미 있는 계정으로 돌릴 수 있게 한다. 이 경우 계정은 지우지
+// 않고 이번 실행에서 만든 면접방만 정리한다.
+const REUSE_COMPANY_EMAIL = process.env.E2E_COMPANY_EMAIL
+const REUSE_COMPANY_PASSWORD = process.env.E2E_COMPANY_PASSWORD
+const REUSE_CANDIDATE_EMAIL = process.env.E2E_CANDIDATE_EMAIL
+const REUSE_CANDIDATE_PASSWORD = process.env.E2E_CANDIDATE_PASSWORD
+const REUSE = Boolean(
+  REUSE_COMPANY_EMAIL && REUSE_COMPANY_PASSWORD && REUSE_CANDIDATE_EMAIL && REUSE_CANDIDATE_PASSWORD
+)
 const RUN = `e2e${Date.now().toString(36)}`
 const PASSWORD = 'e2e-test-password-2026'
 
@@ -62,6 +72,24 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
     })
     expect(res.status, '관리자 로그인에 실패했습니다. 자격 증명을 확인하세요.').toBe(200)
 
+    if (REUSE) {
+      const c = await company('/api/login', {
+        method: 'POST',
+        body: { email: REUSE_COMPANY_EMAIL, password: REUSE_COMPANY_PASSWORD },
+      })
+      expect(c.status, `회사 계정 로그인 실패: ${c.text}`).toBe(200)
+      expect(c.json.role, '회사 역할 계정이어야 면접방을 만들 수 있습니다.').toBe('company')
+      state.companyId = c.json.id
+
+      const k = await candidate('/api/login', {
+        method: 'POST',
+        body: { email: REUSE_CANDIDATE_EMAIL, password: REUSE_CANDIDATE_PASSWORD },
+      })
+      expect(k.status, `지원자 계정 로그인 실패: ${k.text}`).toBe(200)
+      state.candidateId = k.json.id
+      return
+    }
+
     // 계정 생성은 여기서 끝낸다. 가입 제한에 걸리면 이후 검사가 줄줄이
     // 실패해 원인이 묻히므로, 한 줄로 분명히 알린다.
     const c = await company('/api/signup', {
@@ -101,8 +129,11 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
     for (const id of [state.renewalRoomId, state.roomId]) {
       if (id) await admin(`/api/admin/rooms/${id}`, { method: 'DELETE' }).catch(() => {})
     }
-    for (const id of [state.candidateId, state.companyId]) {
-      if (id) await admin(`/api/admin/users/${id}`, { method: 'DELETE' }).catch(() => {})
+    // 빌려 쓴 계정은 지우지 않는다. 이번 실행에서 만든 계정만 정리한다.
+    if (!REUSE) {
+      for (const id of [state.candidateId, state.companyId]) {
+        if (id) await admin(`/api/admin/users/${id}`, { method: 'DELETE' }).catch(() => {})
+      }
     }
   })
 
@@ -252,11 +283,14 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
 
   it('본문이 조건과 어긋나면 서명이 막힌다', async () => {
     // 계약서 본문은 채용자 권한이 있어야 작성할 수 있다.
-    const granted = await admin(`/api/admin/users/${state.companyId}`, {
-      method: 'PATCH',
-      body: { isRecruiter: true },
-    })
-    expect(granted.status, `채용자 권한 부여 실패: ${granted.text}`).toBe(200)
+    // 빌려 쓴 계정은 이미 권한을 갖고 있으므로 건드리지 않는다.
+    if (!REUSE) {
+      const granted = await admin(`/api/admin/users/${state.companyId}`, {
+        method: 'PATCH',
+        body: { isRecruiter: true },
+      })
+      expect(granted.status, `채용자 권한 부여 실패: ${granted.text}`).toBe(200)
+    }
 
     const before = await company(`/api/rooms/${state.roomId}/contract-view`)
     const draft = await company(`/api/rooms/${state.roomId}/contract-draft`, {
