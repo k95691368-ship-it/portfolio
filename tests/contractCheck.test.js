@@ -8,6 +8,7 @@ import {
   checkLegalCompliance,
   findMissingFields,
   diffAgreedVsCurrent,
+  normalizeForCompare,
   MINIMUM_HOURLY_WAGE_2026,
 } from '../functions/_lib/contractCheck.js'
 
@@ -149,7 +150,51 @@ describe('findMissingFields', () => {
   })
 })
 
+describe('normalizeForCompare', () => {
+  it('treats Korean and ISO dates as the same value', () => {
+    expect(normalizeForCompare('2026년 9월 1일')).toBe('2026-09-01')
+    expect(normalizeForCompare('2026-09-01')).toBe('2026-09-01')
+    expect(normalizeForCompare('2026.9.1')).toBe('2026-09-01')
+    expect(normalizeForCompare('2026/09/01')).toBe('2026-09-01')
+  })
+  it('treats spoken and clock times as the same value', () => {
+    expect(normalizeForCompare('9시')).toBe('09:00')
+    expect(normalizeForCompare('09:00')).toBe('09:00')
+    expect(normalizeForCompare('9:00')).toBe('09:00')
+  })
+  it('treats formatted and raw amounts as the same value', () => {
+    expect(normalizeForCompare('3,200,000')).toBe('3200000')
+    expect(normalizeForCompare(3200000)).toBe('3200000')
+    expect(normalizeForCompare('3200000원')).toBe('3200000')
+  })
+  it('collapses incidental whitespace', () => {
+    expect(normalizeForCompare('  서울   본사 ')).toBe('서울 본사')
+  })
+  it('maps empty-ish values to an empty string', () => {
+    expect(normalizeForCompare(null)).toBe('')
+    expect(normalizeForCompare('   ')).toBe('')
+  })
+})
+
 describe('diffAgreedVsCurrent', () => {
+  it('does not flag a date that only changed notation', () => {
+    // AI는 "2026년 9월 1일"로 추출하고 폼은 "2026-09-01"로 저장한다 — 같은 날짜다.
+    const history = [{ changes: [{ field: 'contractStartDate', from: '2026년 9월 1일', to: '2026-09-01' }] }]
+    expect(diffAgreedVsCurrent(history, { contractStartDate: '2026-09-01' })).toEqual([])
+  })
+
+  it('does not flag an amount that only changed formatting', () => {
+    const history = [{ changes: [{ field: 'wageBaseAmount', from: '3,200,000', to: 3200000 }] }]
+    expect(diffAgreedVsCurrent(history, { wageBaseAmount: 3200000 })).toEqual([])
+  })
+
+  it('still flags a genuine date change', () => {
+    const history = [{ changes: [{ field: 'contractStartDate', from: '2026년 9월 1일', to: '2026-12-01' }] }]
+    const diffs = diffAgreedVsCurrent(history, { contractStartDate: '2026-12-01' })
+    expect(diffs).toHaveLength(1)
+    expect(diffs[0].label).toBe('근로개시일')
+  })
+
   it('detects a wage lowered after the chat agreement', () => {
     const history = [{ changes: [{ field: 'wageBaseAmount', from: 2800000, to: 2000000 }] }]
     const diffs = diffAgreedVsCurrent(history, { wageBaseAmount: 2000000 })

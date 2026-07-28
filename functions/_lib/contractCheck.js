@@ -179,6 +179,39 @@ function displayValue(v) {
   return String(v)
 }
 
+// 같은 뜻인데 표기만 다른 값을 비교 가능한 형태로 통일한다.
+// AI는 대화체("2026년 9월 1일", "9시")로 추출하고, 계약서 폼은 입력 위젯
+// 형식("2026-09-01", "09:00")으로 저장하기 때문에, 그대로 비교하면 실제로는
+// 같은 값이 "변경됨"으로 잡힌다. 허위 경고는 진짜 경고의 신뢰를 떨어뜨리므로
+// 비교 전에 반드시 정규화한다.
+export function normalizeForCompare(value) {
+  if (value === null || value === undefined) return ''
+  const raw = String(value).trim()
+  if (raw === '') return ''
+
+  // 날짜: 2026년 9월 1일 / 2026.09.01 / 2026/9/1 / 2026-09-01 → 2026-09-01
+  const date = raw.match(/(\d{4})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})\s*일?/)
+  if (date) {
+    const [, y, m, d] = date
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+  }
+
+  // 시각: 9시 / 9:00 / 09:00 → 09:00 (날짜가 아닌 순수 시각 표기일 때만)
+  const time = raw.match(/^(\d{1,2})\s*[:시]\s*(\d{1,2})?\s*분?$/)
+  if (time) {
+    const h = time[1].padStart(2, '0')
+    const min = (time[2] || '0').padStart(2, '0')
+    return `${h}:${min}`
+  }
+
+  // 금액·수량: 3,200,000 / 3200000원 → 3200000
+  const numeric = raw.replace(/[,\s]/g, '').replace(/원$/, '')
+  if (/^\d+$/.test(numeric)) return String(Number(numeric))
+
+  // 그 외에는 연속 공백만 정리해서 비교
+  return raw.replace(/\s+/g, ' ')
+}
+
 // 채팅에서 합의된 값 vs 현재 계약서 값 비교.
 // history는 오래된 것부터 정렬된 [{changes:[{field, from, to}]}] 형태.
 // 각 필드의 "최초 from"이 AI가 대화에서 추출한 합의 값이다.
@@ -196,11 +229,11 @@ export function diffAgreedVsCurrent(history, currentTerms) {
     if (field === 'socialInsurance' || field === 'customTerms') continue
 
     const current = currentTerms[field]
-    const before = agreedValue === null || agreedValue === undefined ? '' : String(agreedValue)
-    const after = current === null || current === undefined ? '' : String(current)
+    const before = normalizeForCompare(agreedValue)
+    const after = normalizeForCompare(current)
     if (before === after) continue
     // 비어 있던 항목을 채운 것은 "변경"이 아니라 보완이므로 알리지 않는다.
-    if (before.trim() === '') continue
+    if (before === '') continue
 
     diffs.push({
       field,
