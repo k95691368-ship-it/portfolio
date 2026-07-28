@@ -51,7 +51,7 @@ const company = makeClient()
 const candidate = makeClient()
 const admin = makeClient()
 
-const state = { roomId: null, companyId: null, candidateId: null, requestId: null }
+const state = { roomId: null, renewalRoomId: null, companyId: null, candidateId: null, requestId: null }
 const hasAdmin = Boolean(ADMIN_EMAIL && ADMIN_PASSWORD)
 
 describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
@@ -97,8 +97,9 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
 
   afterAll(async () => {
     // 만든 것은 반드시 지운다. 실패해도 다음 정리를 계속 시도한다.
-    if (state.roomId) {
-      await admin(`/api/admin/rooms/${state.roomId}`, { method: 'DELETE' }).catch(() => {})
+    // 갱신 계약이 이전 계약을 참조하므로 갱신 쪽을 먼저 지운다.
+    for (const id of [state.renewalRoomId, state.roomId]) {
+      if (id) await admin(`/api/admin/rooms/${id}`, { method: 'DELETE' }).catch(() => {})
     }
     for (const id of [state.candidateId, state.companyId]) {
       if (id) await admin(`/api/admin/users/${id}`, { method: 'DELETE' }).catch(() => {})
@@ -147,6 +148,7 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
         workLocation: '서울 본사',
         jobDescription: '개발',
         contractStartDate: '2026-09-01',
+        contractEndDate: '2027-08-31',
         workHoursStart: '09:00',
         workHoursEnd: '18:00',
         workDays: '주 5일 (월~금)',
@@ -349,6 +351,79 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
 
     const times = view.json.auditTrail.events.map((e) => e.at)
     expect(times).toEqual([...times].sort())
+  })
+
+  it('갱신 계약을 이전 계약과 이으면 계속근로기간이 합산된다', async () => {
+    // 같은 근로자와 두 번째 계약을 맺는다 (계정은 그대로 쓴다).
+    const room = await company('/api/rooms/create', {
+      method: 'POST',
+      body: { title: `E2E 갱신 ${RUN}` },
+    })
+    expect(room.status).toBe(201)
+    state.renewalRoomId = room.json.id
+    const join = await candidate('/api/rooms/join', {
+      method: 'POST',
+      body: { inviteCode: room.json.inviteCode },
+    })
+    expect(join.status).toBe(200)
+
+    // 이 계약 하나만 보면 딱 2년 이내라 아무 문제가 없다.
+    await company(`/api/rooms/${state.renewalRoomId}/contract`, {
+      method: 'PATCH',
+      body: { contractStartDate: '2027-09-01', contractEndDate: '2029-08-31' },
+    })
+    const alone = await company(`/api/rooms/${state.renewalRoomId}/contract-view`)
+    expect(alone.json.period.exceedsFixedTermLimit).toBe(false)
+    expect(alone.json.continuity.linked).toBe(false)
+    // 회사에게는 이을 수 있는 이전 계약이 보여야 한다.
+    expect(alone.json.linkableRooms.map((r) => r.id)).toContain(state.roomId)
+
+    // 지원자는 연결을 설정할 수 없다.
+    const denied = await candidate(`/api/rooms/${state.renewalRoomId}/link-previous`, {
+      method: 'POST',
+      body: { previousRoomId: state.roomId },
+    })
+    expect(denied.status).toBe(403)
+
+    // 자기 자신과는 이을 수 없다.
+    const self = await company(`/api/rooms/${state.renewalRoomId}/link-previous`, {
+      method: 'POST',
+      body: { previousRoomId: state.renewalRoomId },
+    })
+    expect(self.status).toBe(400)
+
+    const linked = await company(`/api/rooms/${state.renewalRoomId}/link-previous`, {
+      method: 'POST',
+      body: { previousRoomId: state.roomId },
+    })
+    expect(linked.status, `연결 실패: ${linked.text}`).toBe(200)
+
+    // 이어서 보면 2년을 넘고, 그때만 경고가 나온다.
+    const joined = await candidate(`/api/rooms/${state.renewalRoomId}/contract-view`)
+    expect(joined.json.continuity.linked).toBe(true)
+    expect(joined.json.continuity.count).toBe(2)
+    expect(joined.json.continuity.totalMonths).toBeGreaterThan(24)
+    expect(joined.json.continuity.exceedsFixedTermLimit).toBe(true)
+    const issue = joined.json.preSignCheck.legalIssues.find((i) => i.title.includes('계속근로'))
+    expect(issue, '계속근로 2년 초과를 잡지 못했습니다.').toBeTruthy()
+    expect(issue.severity).toBe('high')
+
+    // 연결을 풀면 경고도 사라진다.
+    const unlinked = await company(`/api/rooms/${state.renewalRoomId}/link-previous`, {
+      method: 'DELETE',
+    })
+    expect(unlinked.status).toBe(200)
+    const after = await company(`/api/rooms/${state.renewalRoomId}/contract-view`)
+    expect(after.json.continuity.linked).toBe(false)
+    expect(after.json.preSignCheck.legalIssues.find((i) => i.title.includes('계속근로'))).toBeUndefined()
+  })
+
+  it('체결된 계약은 보존 의무 기간을 알려준다', async () => {
+    const view = await candidate(`/api/rooms/${state.roomId}/contract-view`)
+    expect(view.json.retention.known).toBe(true)
+    // 근로관계 종료일(2027-08-31)부터 3년
+    expect(view.json.retention.until).toBe('2030-08-31')
+    expect(view.json.retention.expired).toBe(false)
   })
 
   it('양측이 알림을 받았다', async () => {
