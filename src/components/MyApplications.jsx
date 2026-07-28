@@ -1,6 +1,4 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api } from '../api/client.js'
 
 const STATUS_BADGE = {
   submitted: { label: '심사 대기', badge: 'badge-warning' },
@@ -22,30 +20,10 @@ const STEP_STATE_TEXT = {
 // 접수번호를 따로 들고 다니며 공개 조회 화면에서 한 건씩 확인하지 않아도 되고,
 // 각 지원이 채용 절차의 어디쯤 와 있는지 한눈에 보인다. 지금 할 수 있는 일이
 // 있으면(면접방 입장, 계약서 서명) 바로 그리로 이어준다.
-export default function MyApplications() {
-  const [applications, setApplications] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    let alive = true
-    api
-      .get('/my-applications')
-      .then((d) => {
-        if (alive) setApplications(d.applications)
-      })
-      .catch(() => {
-        /* 지원 이력이 없는 사용자에게는 조용히 넘어간다 */
-      })
-      .finally(() => {
-        if (alive) setLoading(false)
-      })
-    return () => {
-      alive = false
-    }
-  }, [])
-
+// applications: 대시보드가 한 번의 요청으로 함께 받아 온 목록
+export default function MyApplications({ applications = [] }) {
   // 지원한 적이 없으면 아무것도 보여주지 않는다.
-  if (loading || applications.length === 0) return null
+  if (applications.length === 0) return null
 
   return (
     <section className="my-applications">

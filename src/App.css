@@ -966,6 +966,12 @@
   font-size: 14px;
   font-weight: 500;
 }
+.consent-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
 .consent-toggle {
   margin-left: auto;
   padding: 4px 12px;

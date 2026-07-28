@@ -12,6 +12,7 @@ export default function DashboardPage() {
   const { user, logout } = useAuth()
   const toast = useToast()
   const [rooms, setRooms] = useState([])
+  const [applications, setApplications] = useState([])
   const [loading, setLoading] = useState(true)
 
   const [title, setTitle] = useState('')
@@ -19,9 +20,21 @@ export default function DashboardPage() {
   const [submitting, setSubmitting] = useState(false)
   const [createdRoom, setCreatedRoom] = useState(null)
 
+  // 관리자는 모든 면접방을 보므로 그 목록만 따로 받고, 그 밖에는 면접방과
+  // 내 지원 현황을 한 번에 받는다.
   const loadRooms = useCallback(async () => {
-    const data = await api.get(user.isAdmin ? '/admin/rooms' : '/rooms/list')
+    if (user.isAdmin) {
+      const [roomData, dashboard] = await Promise.all([
+        api.get('/admin/rooms'),
+        api.get('/dashboard'),
+      ])
+      setRooms(roomData.rooms)
+      setApplications(dashboard.applications)
+      return
+    }
+    const data = await api.get('/dashboard')
     setRooms(data.rooms)
+    setApplications(data.applications)
   }, [user.isAdmin])
 
   useEffect(() => {
@@ -104,7 +117,7 @@ export default function DashboardPage() {
         </form>
       )}
 
-      <MyApplications />
+      <MyApplications applications={applications} />
 
       {user.role === 'candidate' && <DocumentManager />}
 

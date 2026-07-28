@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { CONSENT_ITEMS } from '../lib/consentText.js'
+import { isApplyFormDirty, LEAVE_CONFIRM_MESSAGE } from '../lib/applyForm.js'
 
 const EMPLOYMENT_TYPES = ['정규직', '계약직', '인턴', '아르바이트', '프리랜서', '기타']
 const SOURCES = ['채용 사이트', '회사 홈페이지', '지인 추천', '검색', 'SNS', '기타']
@@ -24,21 +25,37 @@ function emptyCareer(key) {
 
 function ConsentItem({ item, checked, onToggle }) {
   const [open, setOpen] = useState(false)
+  const bodyId = `consent-text-${item.key}`
   return (
     <div className="consent-item">
-      <label className="consent-head">
-        <input type="checkbox" checked={checked} onChange={(e) => onToggle(e.target.checked)} />
-        <span>
-          {item.label}{' '}
-          <span className={item.required ? 'consent-required' : 'consent-optional'}>
-            ({item.required ? '필수' : '선택'})
+      {/* 전문 보기 버튼이 label 안에 있으면 그 글자까지 동의 항목의 이름으로 읽혀
+          "…동의 (필수) 전문 보기 체크박스"가 된다. 무엇에 동의하는지가 흐려지므로
+          버튼을 label 밖으로 뺐다. */}
+      <div className="consent-head">
+        <label className="consent-label">
+          <input type="checkbox" checked={checked} onChange={(e) => onToggle(e.target.checked)} />
+          <span>
+            {item.label}{' '}
+            <span className={item.required ? 'consent-required' : 'consent-optional'}>
+              ({item.required ? '필수' : '선택'})
+            </span>
           </span>
-        </span>
-        <button type="button" className="consent-toggle" onClick={(e) => { e.preventDefault(); setOpen((v) => !v) }}>
+        </label>
+        <button
+          type="button"
+          className="consent-toggle"
+          aria-expanded={open}
+          aria-controls={bodyId}
+          onClick={() => setOpen((v) => !v)}
+        >
           {open ? '접기' : '전문 보기'}
         </button>
-      </label>
-      {open && <pre className="consent-text">{item.text}</pre>}
+      </div>
+      {open && (
+        <pre className="consent-text" id={bodyId}>
+          {item.text}
+        </pre>
+      )}
     </div>
   )
 }
@@ -88,6 +105,25 @@ export default function ApplyPage() {
       .then((data) => setPosting(data.posting))
       .catch((err) => setLoadError(err.message))
   }, [id])
+
+  // 로그인 없이 지원하는 구조라 쓰다 만 지원서는 어디에도 남지 않는다.
+  // 실수로 탭을 닫거나 새로고침하면 전부 사라지므로 한 번 되묻는다.
+  const dirty = isApplyFormDirty({ name, email, phone, source, coverLetter, careers, resume, portfolio })
+  useEffect(() => {
+    if (!dirty || done) return undefined
+    const onBeforeUnload = (event) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [dirty, done])
+
+  // 화면 안에서 이동하는 링크는 브라우저가 막아 주지 않으므로 직접 확인한다.
+  const confirmLeave = (event) => {
+    if (!dirty || done) return
+    if (!window.confirm(LEAVE_CONFIRM_MESSAGE)) event.preventDefault()
+  }
 
   const allChecked = useMemo(
     () => CONSENT_ITEMS.every((c) => consents[c.key]),
@@ -192,7 +228,7 @@ export default function ApplyPage() {
   return (
     <div className="apply-page">
       <header className="page-header">
-        <Link to={`/jobs/${id}`} className="back-link">
+        <Link to={`/jobs/${id}`} className="back-link" onClick={confirmLeave}>
           ← 공고로 돌아가기
         </Link>
         <h1>{posting ? posting.title : '지원서 작성'}</h1>
