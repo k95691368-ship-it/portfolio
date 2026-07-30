@@ -23,14 +23,14 @@ export async function onRequestPost({ env, data, params, request }) {
   if (room.status === 'signed') return jsonError('이미 서명이 완료된 계약서는 다시 작성할 수 없습니다.', 409)
 
   const bucket = `contract-draft:${params.roomId}`
-  const allowed = await checkRateLimit(env, bucket, 5, 60)
-  if (!allowed) return jsonError('너무 잦은 요청입니다. 잠시 후 다시 시도해주세요.', 429)
+  const ticket = await checkRateLimit(env, bucket, 5, 60)
+  if (!ticket) return jsonError('너무 잦은 요청입니다. 잠시 후 다시 시도해주세요.', 429)
 
   let terms
   try {
     terms = await request.json()
   } catch {
-    await releaseRateLimit(env, bucket)
+    await releaseRateLimit(env, bucket, ticket)
     return jsonError('잘못된 요청입니다.', 400)
   }
 
@@ -40,7 +40,7 @@ export async function onRequestPost({ env, data, params, request }) {
   } catch (err) {
     // AI 호출이 실패한 것은 사용자가 무언가를 해낸 것이 아니다. 다시 시도할 수
     // 있어야 하므로 이 시도는 한도에서 빼 준다.
-    await releaseRateLimit(env, bucket)
+    await releaseRateLimit(env, bucket, ticket)
     return jsonError(err.message, 502)
   }
 

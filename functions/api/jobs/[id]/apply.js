@@ -22,14 +22,14 @@ function genLookupCode() {
 export async function onRequestPost({ request, env, params }) {
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
   const bucket = `apply:${ip}`
-  const allowed = await checkRateLimit(env, bucket, 5, 3600)
-  if (!allowed) return jsonError('지원이 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)
+  const ticket = await checkRateLimit(env, bucket, 5, 3600)
+  if (!ticket) return jsonError('지원이 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)
 
   // 끝내 제출되지 못한 요청은 한도를 소모하지 않는다. 이력서 형식을 잘못 고른
   // 사람이 고쳐서 다시 내려 할 때 막히면, 그건 막으려던 남용이 아니라
   // 그냥 지원 실패다.
   const fail = async (message, status) => {
-    await releaseRateLimit(env, bucket)
+    await releaseRateLimit(env, bucket, ticket)
     return jsonError(message, status)
   }
 

@@ -71,6 +71,18 @@ export function buildArticlesFromTerms(terms) {
   return articles
 }
 
+// DB에 담긴 JSON 컬럼을 읽는다. 이 함수는 계약서 화면·서명·번역·분석이 모두
+// 거쳐 가는 길목이라, 컬럼 하나가 깨져 있다고 여기서 예외가 나면 계약서를
+// 열지도 서명하지도 못하게 된다. 읽지 못한 값은 비운 것으로 보고 넘어간다.
+function parseJsonColumn(value, fallback) {
+  if (!value) return fallback
+  try {
+    return JSON.parse(value)
+  } catch {
+    return fallback
+  }
+}
+
 export function rowToCamelTerms(row) {
   if (!row) return null
   return {
@@ -90,10 +102,10 @@ export function rowToCamelTerms(row) {
     wagePayMethod: row.wage_pay_method ?? null,
     wagePayDate: row.wage_pay_date ?? null,
     annualLeave: row.annual_leave ?? null,
-    socialInsurance: row.social_insurance_json ? JSON.parse(row.social_insurance_json) : null,
+    socialInsurance: parseJsonColumn(row.social_insurance_json, null),
     uniformSize: row.uniform_size ?? null,
-    customTerms: row.custom_terms_json ? JSON.parse(row.custom_terms_json) : [],
-    aiDocument: row.ai_document_json ? JSON.parse(row.ai_document_json) : null,
-    analysisWarnings: row.analysis_warnings_json ? JSON.parse(row.analysis_warnings_json) : [],
+    customTerms: parseJsonColumn(row.custom_terms_json, []),
+    aiDocument: parseJsonColumn(row.ai_document_json, null),
+    analysisWarnings: parseJsonColumn(row.analysis_warnings_json, []),
   }
 }

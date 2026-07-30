@@ -393,10 +393,15 @@ export default function RecruitPage() {
     })
   }, [applications, appSearch, appStatus])
 
+  const [appsTruncated, setAppsTruncated] = useState(null)
+
   const loadAll = useCallback(async () => {
     const [p, a] = await Promise.all([api.get('/postings'), api.get('/applications')])
     setPostings(p.postings)
     setApplications(a.applications)
+    // 상한에 걸려 일부만 받았으면 화면에서도 그 사실을 밝힌다. 검색·통계가
+    // 받아 온 범위 안에서만 계산되기 때문이다.
+    setAppsTruncated(a.truncated ? a.limit : null)
   }, [])
 
   useEffect(() => {
@@ -593,6 +598,12 @@ export default function RecruitPage() {
           <p className="notice">아직 접수된 지원서가 없습니다.</p>
         ) : (
           <>
+            {appsTruncated && (
+              <p className="notice">
+                지원서가 많아 최근 {appsTruncated}건만 불러왔습니다. 아래 검색·통계도 이 범위
+                안에서만 계산됩니다.
+              </p>
+            )}
             <div className="filter-row">
               <input
                 type="search"

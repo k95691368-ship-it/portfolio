@@ -14,22 +14,25 @@ export default function DashboardPage() {
   const [rooms, setRooms] = useState([])
   const [applications, setApplications] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
 
   const [title, setTitle] = useState('')
   const [inviteCode, setInviteCode] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [createdRoom, setCreatedRoom] = useState(null)
 
-  // 관리자는 모든 면접방을 보므로 그 목록만 따로 받고, 그 밖에는 면접방과
-  // 내 지원 현황을 한 번에 받는다.
+  // 관리자는 모든 면접방을 보므로 방 목록과 지원 현황을 각각 받는다.
+  // (통합 조회는 본인 참여 방만 담아 관리자에게는 쓸모가 없고, 그것까지 함께
+  //  읽으면 관리자 화면마다 쓰지 않을 조회가 한 번 더 도는 셈이 된다.)
+  // 그 밖에는 면접방과 지원 현황을 한 번에 받는다.
   const loadRooms = useCallback(async () => {
     if (user.isAdmin) {
-      const [roomData, dashboard] = await Promise.all([
+      const [roomData, mine] = await Promise.all([
         api.get('/admin/rooms'),
-        api.get('/dashboard'),
+        api.get('/my-applications'),
       ])
       setRooms(roomData.rooms)
-      setApplications(dashboard.applications)
+      setApplications(mine.applications)
       return
     }
     const data = await api.get('/dashboard')
@@ -37,8 +40,13 @@ export default function DashboardPage() {
     setApplications(data.applications)
   }, [user.isAdmin])
 
+  // 실패를 삼키면 "참여 중인 면접방이 없습니다"가 떠서, 불러오지 못한 것과
+  // 정말 없는 것을 구분할 수 없다.
   useEffect(() => {
-    loadRooms().finally(() => setLoading(false))
+    setLoadError('')
+    loadRooms()
+      .catch((err) => setLoadError(err.message))
+      .finally(() => setLoading(false))
   }, [loadRooms])
 
   const handleCreate = async (e) => {
@@ -130,6 +138,10 @@ export default function DashboardPage() {
       <h2>{user.isAdmin ? '모든 면접방' : '내 면접방'}</h2>
       {loading ? (
         <p>불러오는 중...</p>
+      ) : loadError ? (
+        <p className="error" role="alert">
+          목록을 불러오지 못했습니다 — {loadError}
+        </p>
       ) : rooms.length === 0 ? (
         <p>{user.isAdmin ? '등록된 면접방이 없습니다.' : '참여 중인 면접방이 없습니다.'}</p>
       ) : (

@@ -75,46 +75,48 @@ export async function onRequestPost({ env, data, params }) {
     return jsonError('이미 심사가 완료된 지원서입니다.', 409)
   }
 
-  // 초대코드 충돌 방지 재시도
   const roomId = genId()
-  let inviteCode = genInviteCode()
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const clash = await env.DB.prepare('SELECT id FROM interview_rooms WHERE invite_code = ?')
-      .bind(inviteCode)
-      .first()
-    if (!clash) break
-    inviteCode = genInviteCode()
-  }
-
   const roomTitle = `${application.applicant_name} · ${application.posting_title}`
 
-  try {
-    await env.DB.batch([
-      ...newUserStatements,
-      env.DB.prepare(
-        `INSERT INTO interview_rooms (id, company_user_id, title, invite_code, status)
-         VALUES (?, ?, ?, ?, 'active')`
-      ).bind(roomId, data.user.id, roomTitle, inviteCode),
-      env.DB.prepare(
-        `INSERT INTO room_participants (room_id, user_id, role_in_room) VALUES (?, ?, 'company')`
-      ).bind(roomId, data.user.id),
-      env.DB.prepare(
-        `INSERT INTO room_participants (room_id, user_id, role_in_room) VALUES (?, ?, 'candidate')`
-      ).bind(roomId, candidateUserId),
-      env.DB.prepare(
-        `UPDATE applications SET created_user_id = ?, room_id = ? WHERE id = ?`
-      ).bind(candidateUserId, roomId, params.id),
-    ])
-  } catch (err) {
-    console.error(`Application pass failed (application ${params.id}):`, err)
-    // 선점만 되고 계정·면접방 생성이 실패했으면 지원서 상태를 되돌린다.
-    await env.DB.prepare(
-      `UPDATE applications SET status = 'submitted', reviewed_by_user_id = NULL, reviewed_at = NULL WHERE id = ?`
-    )
-      .bind(params.id)
-      .run()
-      .catch(() => {})
-    return jsonError('서류합격 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', 500)
+  // 초대코드는 UNIQUE 제약이 막아 주므로 미리 조회하지 않는다. 겹치면 다시
+  // 뽑아 넣고, 그래도 안 되면 지원서 선점을 되돌린다. 미리 조회하는 방식은
+  // 왕복을 늘리면서도 동시 생성을 막지 못했다.
+  let inviteCode = genInviteCode()
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await env.DB.batch([
+        ...newUserStatements,
+        env.DB.prepare(
+          `INSERT INTO interview_rooms (id, company_user_id, title, invite_code, status)
+           VALUES (?, ?, ?, ?, 'active')`
+        ).bind(roomId, data.user.id, roomTitle, inviteCode),
+        env.DB.prepare(
+          `INSERT INTO room_participants (room_id, user_id, role_in_room) VALUES (?, ?, 'company')`
+        ).bind(roomId, data.user.id),
+        env.DB.prepare(
+          `INSERT INTO room_participants (room_id, user_id, role_in_room) VALUES (?, ?, 'candidate')`
+        ).bind(roomId, candidateUserId),
+        env.DB.prepare(
+          `UPDATE applications SET created_user_id = ?, room_id = ? WHERE id = ?`
+        ).bind(candidateUserId, roomId, params.id),
+      ])
+      break
+    } catch (err) {
+      // 초대코드가 겹친 것뿐이면 코드만 새로 뽑아 다시 시도한다.
+      if (String(err?.message || err).includes('UNIQUE') && attempt < 4) {
+        inviteCode = genInviteCode()
+        continue
+      }
+      console.error(`Application pass failed (application ${params.id}):`, err)
+      // 선점만 되고 계정·면접방 생성이 실패했으면 지원서 상태를 되돌린다.
+      await env.DB.prepare(
+        `UPDATE applications SET status = 'submitted', reviewed_by_user_id = NULL, reviewed_at = NULL WHERE id = ?`
+      )
+        .bind(params.id)
+        .run()
+        .catch(() => {})
+      return jsonError('서류합격 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', 500)
+    }
   }
 
   const companyName = data.user.company_name || data.user.display_name

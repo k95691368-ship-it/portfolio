@@ -10,8 +10,8 @@ export async function onRequestPost({ env, data, params }) {
   const a = access.application
 
   const bucket = `screen:${params.id}`
-  const allowed = await checkRateLimit(env, bucket, 3, 60)
-  if (!allowed) return jsonError('너무 잦은 요청입니다. 잠시 후 다시 시도해주세요.', 429)
+  const ticket = await checkRateLimit(env, bucket, 3, 60)
+  if (!ticket) return jsonError('너무 잦은 요청입니다. 잠시 후 다시 시도해주세요.', 429)
 
   const posting = await env.DB.prepare(
     'SELECT title, department, employment_type, location, description FROM job_postings WHERE id = ?'
@@ -38,7 +38,7 @@ export async function onRequestPost({ env, data, params }) {
     })
   } catch (err) {
     // 실패한 시도는 한도에서 뺀다 (한도가 3회라 특히 금방 막힌다).
-    await releaseRateLimit(env, bucket)
+    await releaseRateLimit(env, bucket, ticket)
     return jsonError(err.message, 502)
   }
 

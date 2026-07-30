@@ -24,7 +24,14 @@ export async function onRequestGet({ env, data, params }) {
       id: r.id,
       editorName: r.editor_name,
       editorRole: r.editor_role,
-      changes: JSON.parse(r.changes),
+      // 한 줄이 깨져 있다고 이력 전체를 못 보게 만들지 않는다.
+      changes: (() => {
+        try {
+          return JSON.parse(r.changes)
+        } catch {
+          return []
+        }
+      })(),
       createdAt: r.created_at,
     })),
   })

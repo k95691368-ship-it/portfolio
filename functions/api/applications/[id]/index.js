@@ -35,7 +35,15 @@ export async function onRequestGet({ env, data, params }) {
       createdUserId: a.created_user_id,
       reviewedAt: a.reviewed_at,
       createdAt: a.created_at,
-      aiScreening: a.ai_screening_json ? JSON.parse(a.ai_screening_json) : null,
+      // 심사 결과가 깨져 있어도 지원서 자체는 열려야 한다.
+      aiScreening: (() => {
+        if (!a.ai_screening_json) return null
+        try {
+          return JSON.parse(a.ai_screening_json)
+        } catch {
+          return null
+        }
+      })(),
       screenedAt: a.screened_at,
       documents: docs.map((d) => ({
         id: d.id,

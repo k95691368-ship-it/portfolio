@@ -25,8 +25,8 @@ export async function onRequestPost({ request, env, data, params }) {
   if (!language) return jsonError('지원하지 않는 언어입니다.', 400)
 
   const bucket = `translate:${params.roomId}`
-  const allowed = await checkRateLimit(env, bucket, 5, 300)
-  if (!allowed) return jsonError('번역 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)
+  const ticket = await checkRateLimit(env, bucket, 5, 300)
+  if (!ticket) return jsonError('번역 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)
 
   const termsRow = await env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?')
     .bind(params.roomId)
@@ -39,7 +39,7 @@ export async function onRequestPost({ request, env, data, params }) {
       : buildArticlesFromTerms(terms)
 
   if (articles.length === 0) {
-    await releaseRateLimit(env, bucket)
+    await releaseRateLimit(env, bucket, ticket)
     return jsonError('번역할 계약 내용이 없습니다. 계약 조건을 먼저 입력해주세요.', 400)
   }
 
@@ -51,13 +51,13 @@ export async function onRequestPost({ request, env, data, params }) {
     })
   } catch (err) {
     // 번역이 실패했는데 한도만 깎이면, 될 때까지 시도할 방법이 없어진다.
-    await releaseRateLimit(env, bucket)
+    await releaseRateLimit(env, bucket, ticket)
     return jsonError(err.message, 502)
   }
 
   // 조항 수가 어긋나면 대조가 불가능하므로 저장하지 않는다.
   if (translated.length !== articles.length) {
-    await releaseRateLimit(env, bucket)
+    await releaseRateLimit(env, bucket, ticket)
     return jsonError('번역 결과가 원본과 맞지 않습니다. 다시 시도해주세요.', 502)
   }
 

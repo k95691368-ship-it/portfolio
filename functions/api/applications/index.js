@@ -1,6 +1,8 @@
 import { jsonResponse, jsonError } from '../../_lib/http.js'
 import { canManageRecruiting } from '../../_lib/recruiter.js'
 
+const MAX_ROWS = 500
+
 function mapRow(row) {
   return {
     id: row.id,
@@ -45,10 +47,17 @@ export async function onRequestGet({ env, data, request }) {
      FROM applications a
      JOIN job_postings p ON p.id = a.posting_id
      ${whereClause}
-     ORDER BY a.created_at DESC`
+     ORDER BY a.created_at DESC
+     LIMIT ?`
   )
-    .bind(...binds)
+    .bind(...binds, MAX_ROWS)
     .all()
 
-  return jsonResponse({ applications: results.map(mapRow) })
+  // 상한을 두지 않으면 지원서가 쌓일수록 응답이 계속 커진다. 잘렸으면
+  // 잘렸다고 알려, 화면이 일부만 보여 주면서 전부인 것처럼 보이지 않게 한다.
+  return jsonResponse({
+    applications: results.map(mapRow),
+    truncated: results.length >= MAX_ROWS,
+    limit: MAX_ROWS,
+  })
 }

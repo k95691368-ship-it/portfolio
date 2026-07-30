@@ -11,7 +11,17 @@ export function mergeValue(newVal, oldVal) {
 // Returns { merged, json } where json is null when every field ended up
 // null/undefined (so we don't persist an all-null object).
 export function mergeSocialInsurance(newSI, oldJson) {
-  const old = oldJson ? JSON.parse(oldJson) : {}
+  // 저장된 값이 깨져 있으면 이번 분석이 통째로 실패한다. 읽지 못한 이전 값은
+  // 없는 것으로 보고, 새로 확인된 값만으로 이어 간다.
+  let old = {}
+  if (oldJson) {
+    try {
+      const parsed = JSON.parse(oldJson)
+      if (parsed && typeof parsed === 'object') old = parsed
+    } catch {
+      old = {}
+    }
+  }
   const n = newSI || {}
   const merged = {
     employment_insurance: mergeValue(n.employment_insurance, old.employment_insurance),

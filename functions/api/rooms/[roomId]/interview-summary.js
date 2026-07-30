@@ -63,8 +63,8 @@ export async function onRequestPost({ env, data, params }) {
   }
 
   const bucket = `interview-summary:${params.roomId}`
-  const allowed = await checkRateLimit(env, bucket, 5, 300)
-  if (!allowed) return jsonError('요약 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)
+  const ticket = await checkRateLimit(env, bucket, 5, 300)
+  if (!ticket) return jsonError('요약 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)
 
   const { results: messages } = await env.DB.prepare(
     `SELECT * FROM (
@@ -81,7 +81,7 @@ export async function onRequestPost({ env, data, params }) {
     .all()
 
   if (messages.length < MIN_MESSAGES) {
-    await releaseRateLimit(env, bucket)
+    await releaseRateLimit(env, bucket, ticket)
     return jsonError(
       `요약할 대화가 아직 충분하지 않습니다. (현재 ${messages.length}건, 최소 ${MIN_MESSAGES}건 필요)`,
       400
@@ -97,7 +97,7 @@ export async function onRequestPost({ env, data, params }) {
     summary = await summarizeInterview(env, transcript)
   } catch (err) {
     // 실패한 시도는 한도에서 뺀다 (다시 시도할 수 있어야 한다).
-    await releaseRateLimit(env, bucket)
+    await releaseRateLimit(env, bucket, ticket)
     return jsonError(err.message, 502)
   }
 
