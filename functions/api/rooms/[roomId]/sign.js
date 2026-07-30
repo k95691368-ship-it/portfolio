@@ -6,6 +6,7 @@ import { rowToCamelTerms } from '../../../_lib/contract.js'
 import { checkContractDocument } from '../../../_lib/documentCheck.js'
 import { findMissingFields, checkLegalCompliance } from '../../../_lib/contractCheck.js'
 import { checkPeriodCompliance } from '../../../_lib/contractPeriod.js'
+import { contractFingerprint } from '../../../_lib/contractDocument.js'
 
 const MAX_DATA_URL_LENGTH = 2_000_000
 
@@ -87,18 +88,32 @@ export async function onRequestPost({ env, data, params, request }) {
   const userAgent = (request.headers.get('User-Agent') || '').slice(0, 300) || null
   const country = request.headers.get('CF-IPCountry') || null
 
+  // 서명하는 순간의 계약 내용 지문. 서명과 문서를 묶어, 나중에 "무엇에
+  // 동의했는가"를 서명 기록만으로 특정할 수 있게 한다.
+  const documentSha256 = await contractFingerprint(terms)
+
+  // 화면이 보여 준 내용과 지금 저장된 내용이 다르면, 사용자는 자기가 본 것과
+  // 다른 문서에 서명하게 된다. 화면이 보낸 지문과 다르면 새로 고치게 한다.
+  if (typeof body.documentSha256 === 'string' && body.documentSha256 !== documentSha256) {
+    return jsonError(
+      '계약 내용이 변경되었습니다. 화면을 새로 고쳐 바뀐 내용을 확인한 뒤 서명해주세요.',
+      409
+    )
+  }
+
   await env.DB.prepare(
     `INSERT INTO signatures
        (id, room_id, signer_user_id, signer_role, image_data_url, signed_at,
-        signer_ip, signer_user_agent, signer_country)
-     VALUES (?, ?, ?, ?, ?, datetime('now'), ?, ?, ?)
+        signer_ip, signer_user_agent, signer_country, document_sha256)
+     VALUES (?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, ?)
      ON CONFLICT(room_id, signer_role) DO UPDATE SET
        signer_user_id = excluded.signer_user_id,
        image_data_url = excluded.image_data_url,
        signed_at = datetime('now'),
        signer_ip = excluded.signer_ip,
        signer_user_agent = excluded.signer_user_agent,
-       signer_country = excluded.signer_country`
+       signer_country = excluded.signer_country,
+       document_sha256 = excluded.document_sha256`
   )
     .bind(
       genId(),
@@ -108,7 +123,8 @@ export async function onRequestPost({ env, data, params, request }) {
       imageDataUrl,
       ip,
       userAgent,
-      country
+      country,
+      documentSha256
     )
     .run()
 

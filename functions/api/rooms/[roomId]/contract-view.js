@@ -18,6 +18,8 @@ import {
 } from '../../../_lib/contractPeriod.js'
 import { checkContractDocument } from '../../../_lib/documentCheck.js'
 
+import { contractFingerprint } from '../../../_lib/contractDocument.js'
+
 // 갱신 사슬을 거슬러 올라가는 최대 깊이 (link-previous의 제한과 같아야 한다)
 const MAX_CHAIN_DEPTH = 10
 import { findLanguage } from '../../../_lib/languages.js'
@@ -68,7 +70,7 @@ export async function onRequestGet({ env, data, params }) {
         .all(),
       env.DB.prepare(
         `SELECT s.signer_role, s.image_data_url, s.signed_at, s.signer_ip,
-                s.signer_user_agent, s.signer_country, u.display_name
+                s.signer_user_agent, s.signer_country, s.document_sha256, u.display_name
          FROM signatures s JOIN users u ON u.id = s.signer_user_id
          WHERE s.room_id = ?`
       )
@@ -240,7 +242,12 @@ export async function onRequestGet({ env, data, params }) {
       signedAt: s.signed_at,
       displayName: s.display_name,
       environment: describeSigningEnvironment(s),
+      // 이 서명이 어떤 내용에 붙었는지를 나타내는 지문
+      documentSha256: s.document_sha256,
     })),
+    // 지금 화면에 보이는 내용의 지문. 서명할 때 함께 보내, 화면과 저장된 내용이
+    // 어긋난 상태로 서명되는 것을 막는다.
+    documentSha256: terms ? await contractFingerprint(terms) : null,
     history: history
       .slice()
       .reverse()

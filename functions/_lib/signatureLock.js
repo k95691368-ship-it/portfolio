@@ -12,7 +12,8 @@ import { notifyUser } from './notify.js'
 // 되었는지 남기고 다시 서명받게 한다.
 export async function revokeSignaturesOnChange(env, roomId, { actorUserId, reason }) {
   const { results: signatures } = await env.DB.prepare(
-    `SELECT signer_role, signer_user_id, signed_at, signer_ip, signer_user_agent, signer_country
+    `SELECT signer_role, signer_user_id, signed_at, signer_ip, signer_user_agent,
+            signer_country, document_sha256
        FROM signatures WHERE room_id = ?`
   )
     .bind(roomId)
@@ -24,8 +25,8 @@ export async function revokeSignaturesOnChange(env, roomId, { actorUserId, reaso
     env.DB.prepare(
       `INSERT INTO signature_revocations
          (room_id, signer_role, signer_user_id, signed_at, signer_ip, signer_user_agent,
-          signer_country, revoked_by_user_id, reason)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          signer_country, document_sha256, revoked_by_user_id, reason)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       roomId,
       s.signer_role,
@@ -34,6 +35,8 @@ export async function revokeSignaturesOnChange(env, roomId, { actorUserId, reaso
       s.signer_ip,
       s.signer_user_agent,
       s.signer_country,
+      // 무효가 된 서명이 어떤 문서에 붙어 있었는지도 남긴다.
+      s.document_sha256 ?? null,
       actorUserId ?? null,
       reason
     )

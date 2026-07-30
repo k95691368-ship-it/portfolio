@@ -612,6 +612,7 @@ export default function ContractPage() {
   const [translations, setTranslations] = useState([])
   const [sourceArticles, setSourceArticles] = useState([])
   const [translating, setTranslating] = useState(false)
+  const [documentSha256, setDocumentSha256] = useState(null)
   const [revokedSignatures, setRevokedSignatures] = useState([])
   const [continuity, setContinuity] = useState(null)
   const [retention, setRetention] = useState(null)
@@ -667,6 +668,7 @@ export default function ContractPage() {
     setSignatures(sigData.signatures)
     setChangeRequests(view.changeRequests ?? [])
     setPeriod(view.period ?? null)
+    setDocumentSha256(view.documentSha256 ?? null)
     setRevokedSignatures(view.revokedSignatures ?? [])
     setContinuity(view.continuity ?? null)
     setRetention(view.retention ?? null)
@@ -844,6 +846,8 @@ export default function ContractPage() {
       await api.post(`/rooms/${roomId}/sign`, {
         imageDataUrl,
         acknowledgedIssues: acknowledged,
+        // 화면이 보여 준 내용의 지문. 그동안 내용이 바뀌었으면 서버가 막는다.
+        documentSha256,
       })
       setSigningRole(null)
       await loadAll()
@@ -1099,6 +1103,16 @@ export default function ContractPage() {
                   <>
                     <img src={sig.imageDataUrl} alt={`${label} 서명`} className="signature-thumb" />
                     {sig.environment && <p className="signature-evidence">{sig.environment}</p>}
+                    {/* 이 서명이 어떤 내용에 붙었는지를 나타내는 지문.
+                        지금 계약 내용과 같으면 그대로 유효하다는 뜻이다. */}
+                    {sig.documentSha256 && (
+                      <p className="signature-evidence">
+                        문서 지문 {sig.documentSha256.slice(0, 12)}…
+                        {documentSha256 && sig.documentSha256 !== documentSha256 && (
+                          <span className="compare-concern"> · 현재 내용과 다름</span>
+                        )}
+                      </p>
+                    )}
                   </>
                 ) : (
                   <p>미서명</p>
