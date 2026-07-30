@@ -84,19 +84,59 @@ describe('describeContractPeriod', () => {
     expect(p.remainingDays).toBeLessThan(0)
   })
 
-  it('2년 초과 여부를 계산한다', () => {
-    const two = describeContractPeriod(
+  // 기간제법 제4조의 "2년을 초과"는 일 단위 기준이다. 개월 내림으로 판정하면
+  // 2년 하루부터 2년 한 달까지가 사각지대로 남아 경고가 아예 나가지 않는다.
+  it('꼭 2년까지는 초과가 아니다', () => {
+    const exactly = describeContractPeriod(
+      // 2026-01-01 ~ 2027-12-31 = 종료일 포함 정확히 2년
+      { contractStartDate: '2026-01-01', contractEndDate: '2027-12-31' },
+      NOW
+    )
+    expect(exactly.exceedsFixedTermLimit).toBe(false)
+  })
+
+  it('2년을 하루라도 넘기면 초과로 잡는다', () => {
+    const oneDayOver = describeContractPeriod(
+      // 종료일까지 근무하므로 이 계약은 2년 + 1일이다
       { contractStartDate: '2026-01-01', contractEndDate: '2028-01-01' },
       NOW
     )
-    expect(two.months).toBe(24)
-    expect(two.exceedsFixedTermLimit).toBe(false)
+    // 개월 라벨은 여전히 24개월로 보여 주되, 판정은 초과다
+    expect(oneDayOver.months).toBe(24)
+    expect(oneDayOver.exceedsFixedTermLimit).toBe(true)
+  })
 
-    const over = describeContractPeriod(
+  it('개월로는 24라서 놓쳤던 구간을 잡는다', () => {
+    // 2년 31일 — 이전에는 months=24로 계산돼 경고가 없었다
+    const gap = describeContractPeriod(
+      { contractStartDate: '2026-01-01', contractEndDate: '2028-01-31' },
+      NOW
+    )
+    expect(gap.months).toBe(24)
+    expect(gap.exceedsFixedTermLimit).toBe(true)
+
+    const clearlyOver = describeContractPeriod(
       { contractStartDate: '2026-01-01', contractEndDate: '2028-03-01' },
       NOW
     )
-    expect(over.exceedsFixedTermLimit).toBe(true)
+    expect(clearlyOver.exceedsFixedTermLimit).toBe(true)
+  })
+
+  it('월말 시작 계약도 같은 기준으로 본다', () => {
+    // 2026-01-31 ~ 2028-01-30 = 정확히 2년
+    expect(
+      describeContractPeriod(
+        { contractStartDate: '2026-01-31', contractEndDate: '2028-01-30' },
+        NOW
+      ).exceedsFixedTermLimit
+    ).toBe(false)
+    // 하루 더
+    expect(
+      describeContractPeriod(
+        { contractStartDate: '2026-01-31', contractEndDate: '2028-01-31' },
+        NOW
+      ).exceedsFixedTermLimit
+    ).toBe(true)
   })
 })
 

@@ -1,6 +1,6 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { genId } from '../../../_lib/db.js'
-import { hashPassword } from '../../../_lib/auth.js'
+import { hashPassword, normalizeEmail } from '../../../_lib/auth.js'
 import { genTempPassword } from '../../../_lib/tempPassword.js'
 import { logAdminAction } from '../../../_lib/auditLog.js'
 
@@ -36,7 +36,9 @@ export async function onRequestGet({ env }) {
 
 export async function onRequestPost({ request, env, data }) {
   const body = await request.json().catch(() => null)
-  const { email, displayName, role, companyName, isRecruiter } = body || {}
+  const { displayName, role, companyName, isRecruiter } = body || {}
+  // 관리자가 대문자를 섞어 만들면 본인이 소문자로 로그인할 때 계정을 못 찾는다.
+  const email = normalizeEmail(body?.email)
   if (!email || !displayName || !role) {
     return jsonError('이메일, 이름, 역할은 필수입니다.', 400)
   }

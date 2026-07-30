@@ -41,6 +41,20 @@ function timingSafeEqual(a, b) {
   return diff === 0
 }
 
+// 계정 이메일을 저장·조회 전에 한 가지 표기로 통일한다.
+//
+// users.email의 UNIQUE는 대소문자를 구분하는데 지원서 쪽(apply.js)은 항상
+// 소문자로 저장한다. 그래서 이메일에 대문자가 한 글자만 있어도 같은 사람이
+// 두 계정으로 갈라졌다 — 지원자는 자기 면접방에 403으로 막히고, 반대로
+// 대소문자만 바꿔 가입하면 남의 지원 내역이 "내 지원 현황"에 보였다.
+// 이메일은 도메인이 대소문자를 구분하지 않고, 실무에서 로컬파트도 구분하지
+// 않으므로 소문자로 통일한다.
+export function normalizeEmail(value) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+}
+
 export async function hashPassword(password) {
   const salt = crypto.getRandomValues(new Uint8Array(16))
   const hashBytes = await pbkdf2(password, salt)

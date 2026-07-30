@@ -1,4 +1,4 @@
-import { verifyPassword, createSession, sessionCookieHeader } from '../_lib/auth.js'
+import { verifyPassword, createSession, sessionCookieHeader, normalizeEmail } from '../_lib/auth.js'
 import { jsonResponse, jsonError } from '../_lib/http.js'
 import { checkRateLimit } from '../_lib/rateLimit.js'
 
@@ -12,7 +12,10 @@ export async function onRequestPost({ request, env }) {
   const allowed = await checkRateLimit(env, `login:${ip}`, 20, 600)
   if (!allowed) return jsonError('로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)
 
-  const user = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(body.email).first()
+  // 저장된 표기와 대소문자가 달라 로그인이 막히지 않도록 같은 규칙으로 맞춘다.
+  const user = await env.DB.prepare('SELECT * FROM users WHERE email = ?')
+    .bind(normalizeEmail(body.email))
+    .first()
   if (!user) return jsonError('이메일 또는 비밀번호가 올바르지 않습니다.', 401)
 
   const valid = await verifyPassword(body.password, user.password_hash, user.password_salt)

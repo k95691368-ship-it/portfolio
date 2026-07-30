@@ -9,7 +9,11 @@
 // 2년을 초과해 사용하면 기간의 정함이 없는 근로계약을 체결한 것으로 본다.
 
 const DAY_MS = 24 * 60 * 60 * 1000
-export const FIXED_TERM_LIMIT_MONTHS = 24 // 기간제 상한 (2년)
+export const FIXED_TERM_LIMIT_MONTHS = 24 // 기간제 상한 (2년) — 화면 표시용
+// 여러 계약을 합산할 때 쓰는 일 단위 상한. 윤년을 포함하지 않는 2년(730일)을
+// 기준으로 삼아, 애매한 경우 조금 이르게 알린다 — 법정 상한 경고는 늦게 뜨는
+// 쪽이 위험하다.
+export const FIXED_TERM_LIMIT_DAYS = 730
 export const EXPIRY_SOON_DAYS = 30 // 만료 임박으로 볼 기간
 
 // "2026-09-01", "2026년 9월 1일", "2026.9.1", "2026/09/01" → Date (UTC 자정)
@@ -38,6 +42,22 @@ function daysBetween(from, to) {
   return Math.round((to.getTime() - from.getTime()) / DAY_MS)
 }
 
+// 기간제 2년 상한은 "2년을 초과"라는 일 단위 기준이다.
+//
+// 이것을 달력 개월 내림(monthsBetween)으로 판정하면 사각지대가 생긴다.
+// 2026-01-01 ~ 2028-01-31 계약은 2년 31일인데도 개월로는 24가 되어 경고가
+// 나가지 않았다. 시작일 + 2년에 이르는 날부터는 2년을 넘긴 것이므로 그 날짜와
+// 직접 견준다. months는 화면에 보여 주는 라벨로만 계속 쓴다.
+function exceedsFixedTerm(start, end) {
+  if (!start || !end) return false
+  const years = FIXED_TERM_LIMIT_MONTHS / 12
+  const limit = new Date(
+    Date.UTC(start.getUTCFullYear() + years, start.getUTCMonth(), start.getUTCDate())
+  )
+  // 종료일까지 근무하므로, 종료일이 "시작일 + 2년" 당일이면 이미 2년 + 1일이다.
+  return end.getTime() >= limit.getTime()
+}
+
 // 계약 기간 상태. 날짜를 알 수 없으면 known:false 로 돌려준다.
 export function describeContractPeriod(terms, now = new Date()) {
   const start = parseContractDate(terms?.contractStartDate)
@@ -62,7 +82,7 @@ export function describeContractPeriod(terms, now = new Date()) {
 
   const months = start ? monthsBetween(start, end) : null
   const remainingDays = daysBetween(today, end)
-  const exceedsFixedTermLimit = months !== null && months > FIXED_TERM_LIMIT_MONTHS
+  const exceedsFixedTermLimit = exceedsFixedTerm(start, end)
 
   let status
   let label
@@ -140,6 +160,7 @@ export function describeContinuousEmployment(segments, now = new Date()) {
 
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
   let totalMonths = 0
+  let totalDays = 0
   const gaps = []
 
   parsed.forEach((s, i) => {
@@ -147,7 +168,11 @@ export function describeContinuousEmployment(segments, now = new Date()) {
     const end = s.end || (i === parsed.length - 1 ? today : null)
     // 종료일도 일한 날이다. "3월 1일 ~ 이듬해 2월 28일"은 11개월이 아니라 1년이므로
     // 하루를 더해 센다. 계속근로기간은 실제로 일한 기간이어야 한다.
-    if (end) totalMonths += Math.max(0, monthsBetween(s.start, new Date(end.getTime() + DAY_MS)) ?? 0)
+    if (end) {
+      totalMonths += Math.max(0, monthsBetween(s.start, new Date(end.getTime() + DAY_MS)) ?? 0)
+      // 2년 초과 판정은 개월 내림이 아니라 일수로 한다 (단일 계약과 같은 기준).
+      totalDays += Math.max(0, daysBetween(s.start, end) + 1)
+    }
 
     const next = parsed[i + 1]
     if (next && s.end) {
@@ -165,9 +190,10 @@ export function describeContinuousEmployment(segments, now = new Date()) {
     linked: true,
     count: parsed.length,
     totalMonths,
+    totalDays,
     startDate: first.start.toISOString().slice(0, 10),
     endDate: (last.end || null)?.toISOString().slice(0, 10) ?? null,
-    exceedsFixedTermLimit: totalMonths > FIXED_TERM_LIMIT_MONTHS,
+    exceedsFixedTermLimit: totalDays > FIXED_TERM_LIMIT_DAYS,
     gaps,
     segments: parsed.map((s) => ({
       roomId: s.roomId,

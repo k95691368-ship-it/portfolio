@@ -722,6 +722,11 @@ export default function ContractPage() {
       }
       await api.patch(`/rooms/${roomId}/contract`, payload)
       setForm((f) => ({ ...f, customTerms: filteredCustomTerms }))
+      // 저장 후 다시 읽지 않으면 서명 전 점검이 저장 이전 상태로 남는다.
+      // 이미 해결한 경고가 계속 보이는 것보다 위험한 방향이 있다 — 저장으로
+      // 임금을 최저임금 미달로 낮춰도 낡은 점검이 "문제 없음"을 유지하고
+      // 확인 체크박스가 아예 뜨지 않아, 안전망이 조용히 열린 채로 서명된다.
+      await loadAll()
       toast.success(
         droppedCount > 0
           ? `저장되었습니다. (라벨/값이 비어있는 기타 항목 ${droppedCount}개는 저장되지 않았습니다.)`

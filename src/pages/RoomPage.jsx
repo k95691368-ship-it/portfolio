@@ -81,12 +81,18 @@ export default function RoomPage() {
 
       <section className="ai-analysis">
         <h2>채용 조건 분석</h2>
-        {room.myRole === 'company' && (
-          <>
-            <button type="button" className="btn-primary" onClick={handleAnalyze} disabled={analyzing}>
-              {analyzing ? '분석 중...' : 'AI로 조건 정리하기'}
-            </button>
-          </>
+        {/* 체결이 끝난 계약의 조건을 다시 정리하면 근로자가 보는 근로조건이
+            바뀐다. 서버에서도 막지만 버튼부터 내린다. */}
+        {room.myRole === 'company' && room.status !== 'signed' && (
+          <button type="button" className="btn-primary" onClick={handleAnalyze} disabled={analyzing}>
+            {analyzing ? '분석 중...' : 'AI로 조건 정리하기'}
+          </button>
+        )}
+        {room.myRole === 'company' && room.status === 'signed' && (
+          <p className="notice">
+            서명이 완료된 계약이라 조건을 다시 정리할 수 없습니다. 변경이 필요하면 새 계약을
+            체결해주세요.
+          </p>
         )}
         <ContractFieldsForm
           terms={contract?.terms}

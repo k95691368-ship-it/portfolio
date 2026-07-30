@@ -415,7 +415,17 @@ export default function RecruitPage() {
     setCreating(true)
     try {
       await api.post('/postings', form)
-      setForm({ title: '', department: '', employmentType: '', location: '', description: '' })
+      // deadline을 빠뜨리면 undefined가 되어 날짜 칸이 제어를 벗어난다. 화면에는
+      // 앞 공고의 마감일이 남아 있는데 다음 공고는 '상시 모집'으로 저장됐다.
+      // 마감일을 고치는 화면이 없어 되돌릴 방법도 없었다.
+      setForm({
+        title: '',
+        department: '',
+        employmentType: '',
+        location: '',
+        deadline: '',
+        description: '',
+      })
       await loadAll()
       toast.success('공고가 정상 등록되었습니다.')
     } catch (err) {

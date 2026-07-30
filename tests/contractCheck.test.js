@@ -264,3 +264,84 @@ describe('diffAgreedVsCurrent', () => {
     expect(diffAgreedVsCurrent([], { wageBaseAmount: 2800000 })).toEqual([])
   })
 })
+
+// 반증 검증에서 확인된 파싱 결함의 회귀 방지.
+// 이 두 함수는 최저임금·주52시간 판정의 입력이라, 여기서 어긋나면 적법한
+// 계약에 허위 위법 경고가 나가고 진짜 미달 계약이 통과한다.
+describe('parseTimeToMinutes — 오전/오후 표기', () => {
+  it('오후는 12시간을 더한다', () => {
+    expect(parseTimeToMinutes('오후 6시')).toBe(18 * 60)
+    expect(parseTimeToMinutes('오후 6시 30분')).toBe(18 * 60 + 30)
+  })
+
+  it('오전 12시는 자정, 오후 12시는 정오', () => {
+    expect(parseTimeToMinutes('오전 12시')).toBe(0)
+    expect(parseTimeToMinutes('오후 12시')).toBe(12 * 60)
+  })
+
+  it('오전 표기는 그대로 읽는다', () => {
+    expect(parseTimeToMinutes('오전 9시')).toBe(9 * 60)
+  })
+
+  it('24시간제 표기는 영향을 받지 않는다', () => {
+    expect(parseTimeToMinutes('18:00')).toBe(18 * 60)
+    expect(parseTimeToMinutes('09:00')).toBe(9 * 60)
+    expect(parseTimeToMinutes('9시')).toBe(9 * 60)
+  })
+
+  it('오전 9시 ~ 오후 6시는 주 40시간으로 계산된다', () => {
+    const weekly = computeWeeklyHours({
+      workHoursStart: '오전 9시',
+      workHoursEnd: '오후 6시',
+      workDays: '주 5일 (월~금)',
+    })
+    expect(weekly).toBe(40)
+  })
+})
+
+describe('parseDaysPerWeek — "요일"을 붙여 쓴 표기', () => {
+  it('월요일~금요일은 5일이다', () => {
+    expect(parseDaysPerWeek('월요일~금요일')).toBe(5)
+    expect(parseDaysPerWeek('화요일~토요일')).toBe(5)
+  })
+
+  it('토요일~일요일은 2일이다', () => {
+    expect(parseDaysPerWeek('토요일~일요일')).toBe(2)
+  })
+
+  it('월요일~토요일은 6일이다', () => {
+    expect(parseDaysPerWeek('월요일~토요일')).toBe(6)
+  })
+
+  it('나열 표기도 요일을 붙여도 센다', () => {
+    expect(parseDaysPerWeek('토요일, 일요일')).toBe(2)
+  })
+
+  it('기존 축약 표기는 그대로 동작한다', () => {
+    expect(parseDaysPerWeek('월~금')).toBe(5)
+    expect(parseDaysPerWeek('월~토')).toBe(6)
+    expect(parseDaysPerWeek('주 5일 (월~금)')).toBe(5)
+  })
+
+  it('주말만 일하는 계약의 최저임금 미달을 잡아낸다', () => {
+    // 토·일 각 12시간 = 주 24시간. 이전에는 주 1일 12시간으로 읽혀 통과했다.
+    const issues = checkLegalCompliance({
+      workHoursStart: '09:00',
+      workHoursEnd: '22:00',
+      workDays: '토요일~일요일',
+      wageBaseAmount: 1100000,
+    })
+    expect(issues.some((i) => i.title.includes('최저임금'))).toBe(true)
+  })
+
+  it('적법한 월요일~금요일 계약에는 허위 경고를 내지 않는다', () => {
+    const issues = checkLegalCompliance({
+      workHoursStart: '09:00',
+      workHoursEnd: '18:00',
+      workDays: '월요일~금요일',
+      wageBaseAmount: 2200000,
+    })
+    expect(issues.some((i) => i.title.includes('최저임금'))).toBe(false)
+    expect(issues.some((i) => i.title.includes('52시간'))).toBe(false)
+  })
+})

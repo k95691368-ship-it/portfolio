@@ -2,6 +2,7 @@ import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { summarizeInterview } from '../../../_lib/claude.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
+import { buildTranscript } from '../../../_lib/transcript.js'
 
 // 면접 대화의 회사 보관용 요약 기록.
 //
@@ -88,9 +89,8 @@ export async function onRequestPost({ env, data, params }) {
     )
   }
 
-  const transcript = messages
-    .map((m) => `${m.role_in_room === 'company' ? '회사' : '지원자'}(${m.display_name}): ${m.body}`)
-    .join('\n')
+  // 요약도 같은 대화를 쓰므로 위조를 같은 방식으로 막는다.
+  const transcript = buildTranscript(messages)
 
   let summary
   try {

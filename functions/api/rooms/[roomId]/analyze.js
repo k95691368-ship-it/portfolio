@@ -4,6 +4,7 @@ import { rowToCamelTerms } from '../../../_lib/contract.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { mergeValue, mergeSocialInsurance } from '../../../_lib/merge.js'
 import { notifyUser } from '../../../_lib/notify.js'
+import { buildTranscript } from '../../../_lib/transcript.js'
 
 const COOLDOWN_SECONDS = 45
 const TRANSCRIPT_LIMIT = 300 // AI에 넘길 최근 대화 수 상한
@@ -13,6 +14,23 @@ export async function onRequestPost({ env, data, params }) {
 
   const participant = await getRoomParticipant(env, params.roomId, data.user.id)
   if (!participant) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
+  // 조건을 저장하는 다른 경로(contract, contract-draft, confirm-hire, translate,
+  // link-previous, interview-summary)와 마찬가지로 회사 측만 실행할 수 있다.
+  // 화면에서만 막고 있었고 서버에는 검사가 없었다.
+  if (participant.role_in_room !== 'company') {
+    return jsonError('채용 조건 정리는 회사(고용) 측만 실행할 수 있습니다.', 403)
+  }
+
+  // 체결이 끝난 계약의 조건을 다시 덮어쓰지 못하게 한다.
+  // 이 경로만 status 검사가 없어서, 서명·보관까지 끝난 뒤에도 화면의 버튼 한
+  // 번으로 근로자가 보는 근로조건과 계약 기간·보존 기한이 바뀔 수 있었다.
+  const room = await env.DB.prepare('SELECT status FROM interview_rooms WHERE id = ?')
+    .bind(params.roomId)
+    .first()
+  if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
+  if (room.status === 'signed') {
+    return jsonError('이미 서명이 완료된 계약은 조건을 다시 정리할 수 없습니다.', 409)
+  }
 
   // 대화 전체를 매번 읽어 AI에 넘기면 면접이 길어질수록 읽기량·토큰·응답 시간이
   // 계속 늘어난다. 이전에 확정된 조건은 previousTerms로 함께 전달되므로,
@@ -64,9 +82,9 @@ export async function onRequestPost({ env, data, params }) {
     return jsonError(`너무 잦은 요청입니다. ${remaining}초 후 다시 시도해주세요.`, 429)
   }
 
-  const transcript = messages
-    .map((m) => `${m.role_in_room === 'company' ? '회사' : '지원자'}(${m.display_name}): ${m.body}`)
-    .join('\n')
+  // 한 메시지가 한 줄을 넘지 못하게 해, 본문에 줄바꿈을 넣어 상대방 발언을
+  // 위조하는 것을 막는다.
+  const transcript = buildTranscript(messages)
 
   const previousTerms = rowToCamelTerms(existing)
   if (previousTerms) {

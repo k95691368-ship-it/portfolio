@@ -51,13 +51,25 @@ export async function onRequestPost({ request, env, data, params }) {
     ).bind(action === 'accept' ? 'accepted' : 'declined', note || null, data.user.id, params.reqId),
   ]
 
-  if (action === 'accept') {
+  let value = req.requested_value
+  if (action === 'accept' && req.field === 'wageBaseAmount') {
     // 숫자 항목은 숫자로 저장해 이후 계산(최저임금 등)이 그대로 동작하게 한다.
-    const value =
-      req.field === 'wageBaseAmount'
-        ? Number(String(req.requested_value).replace(/[,\s원]/g, '')) || null
-        : req.requested_value
+    //
+    // 수정 요청의 값은 자유 입력이라 "300만원", "2500000 이상" 같은 것이 들어온다.
+    // 예전에는 이런 값이 `|| null`을 타고 기본급을 조용히 지워 버렸고, 지원자에게는
+    // "수정 요청이 반영되었습니다" 알림이 갔다. 임금이 비어 있는 계약서가 되는
+    // 것보다, 수락을 거절하고 무엇이 문제인지 알려 주는 편이 낫다.
+    const parsed = Number(String(req.requested_value).replace(/[,\s원]/g, ''))
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return jsonError(
+        `요청된 기본급 "${req.requested_value}"을(를) 금액으로 읽을 수 없어 반영할 수 없습니다. 숫자만 적힌 값으로 다시 요청해 달라고 안내해주세요.`,
+        400
+      )
+    }
+    value = parsed
+  }
 
+  if (action === 'accept') {
     statements.push(
       env.DB.prepare(
         `INSERT INTO contract_terms (room_id, ${column}, updated_at)

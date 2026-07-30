@@ -47,35 +47,55 @@ const REQUIRED_FIELDS = [
   'wagePayDate',
 ]
 
-// "09:00", "9:00", "9시" 형태를 분 단위로. 실패 시 null.
+// "09:00", "9:00", "9시", "오후 6시" 형태를 분 단위로. 실패 시 null.
+//
+// 오전/오후를 무시하면 "오후 6시"가 06:00이 되어, 09:00~오후 6시(=9시간) 계약이
+// 자정을 넘긴 것으로 처리돼 하루 21시간·주 100시간으로 계산된다. 그 결과 적법한
+// 계약에 "주 52시간 초과"와 "최저임금 미달"이 동시에 뜨고, 근로자에게 잘못된
+// 인상 금액이 제안된다. 이 값은 AI가 대화체로 뽑아 오기도 하고 회사가 직접
+// 자유 입력하기도 하므로 반드시 12시간제 표기를 읽어야 한다.
 export function parseTimeToMinutes(value) {
   if (typeof value !== 'string') return null
   const colon = value.match(/(\d{1,2})\s*[:시]\s*(\d{1,2})?/)
   if (!colon) return null
-  const h = Number(colon[1])
+  let h = Number(colon[1])
   const m = Number(colon[2] || 0)
   if (!Number.isFinite(h) || h < 0 || h > 24 || m < 0 || m > 59) return null
+
+  // 오전 12시는 자정(0시), 오후 12시는 정오(12시)다.
+  const pm = /오후|PM|pm/.test(value)
+  const am = /오전|AM|am/.test(value)
+  if (pm && h < 12) h += 12
+  else if (am && h === 12) h = 0
+
   return h * 60 + m
 }
 
-// "주 5일 (월~금)", "월~금", "주5일" → 5. 실패 시 null.
+// "주 5일 (월~금)", "월~금", "월요일~금요일", "주5일" → 5. 실패 시 null.
 export function parseDaysPerWeek(value) {
   if (typeof value !== 'string') return null
-  const explicit = value.match(/주\s*(\d)\s*일/)
+
+  // "요일"의 '일'이 요일 글자로 잡히면 범위가 어긋난다.
+  // "월요일~금요일"은 '월'~'일'로 읽혀 6일이 되고, "토요일~일요일"은 '요'가
+  // 아닌 '토'~'일'... 이 아니라 '일'~'일'로 읽혀 1일이 된다. 전자는 적법한
+  // 계약에 최저임금 미달 경고를 띄우고, 후자는 진짜 미달 계약을 통과시킨다.
+  const text = value.replace(/요일/g, '')
+
+  const explicit = text.match(/주\s*(\d)\s*일/)
   if (explicit) {
     const n = Number(explicit[1])
     if (n >= 1 && n <= 7) return n
   }
   // "월~금" 같은 요일 범위
   const order = ['월', '화', '수', '목', '금', '토', '일']
-  const range = value.match(/([월화수목금토일])\s*[~-]\s*([월화수목금토일])/)
+  const range = text.match(/([월화수목금토일])\s*[~-]\s*([월화수목금토일])/)
   if (range) {
     const from = order.indexOf(range[1])
     const to = order.indexOf(range[2])
     if (from >= 0 && to >= 0) return to >= from ? to - from + 1 : 7 - from + to + 1
   }
   // "월, 화, 수" 나열
-  const listed = value.match(/[월화수목금토일]/g)
+  const listed = text.match(/[월화수목금토일]/g)
   if (listed) {
     const unique = new Set(listed)
     if (unique.size >= 1 && unique.size <= 7) return unique.size

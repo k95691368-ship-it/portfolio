@@ -1,5 +1,5 @@
 import { genId } from '../_lib/db.js'
-import { hashPassword, createSession, sessionCookieHeader } from '../_lib/auth.js'
+import { hashPassword, createSession, sessionCookieHeader, normalizeEmail } from '../_lib/auth.js'
 import { jsonResponse, jsonError } from '../_lib/http.js'
 import { checkRateLimit } from '../_lib/rateLimit.js'
 
@@ -7,7 +7,9 @@ export async function onRequestPost({ request, env }) {
   const body = await request.json().catch(() => null)
   if (!body) return jsonError('잘못된 요청입니다.', 400)
 
-  const { email, password, role, displayName, companyName } = body
+  const { password, role, displayName, companyName } = body
+  // 지원서 쪽과 같은 표기로 통일해 같은 사람이 두 계정으로 갈라지지 않게 한다.
+  const email = normalizeEmail(body.email)
   if (!email || !password || !role || !displayName) {
     return jsonError('필수 항목이 누락되었습니다.', 400)
   }
