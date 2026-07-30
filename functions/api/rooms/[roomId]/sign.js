@@ -4,6 +4,8 @@ import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { notifyUser } from '../../../_lib/notify.js'
 import { rowToCamelTerms } from '../../../_lib/contract.js'
 import { checkContractDocument } from '../../../_lib/documentCheck.js'
+import { findMissingFields, checkLegalCompliance } from '../../../_lib/contractCheck.js'
+import { checkPeriodCompliance } from '../../../_lib/contractPeriod.js'
 
 const MAX_DATA_URL_LENGTH = 2_000_000
 
@@ -24,10 +26,18 @@ export async function onRequestPost({ env, data, params, request }) {
     .first()
   if (!contract?.hire_confirmed) return jsonError('아직 채용이 확정되지 않아 서명할 수 없습니다.', 400)
 
+  let body
+  try {
+    body = await request.json()
+  } catch {
+    return jsonError('잘못된 요청입니다.', 400)
+  }
+
   // 서명하는 문서는 계약 조건이 아니라 계약서 본문이다. 조건을 고친 뒤 본문을
   // 다시 작성하지 않으면 본문에 옛 금액이 남는데, 여기서 서로 다른 금액이
   // 확실하게 확인되면 확인 절차로 넘기지 않고 서명 자체를 막는다.
-  const docCheck = checkContractDocument(rowToCamelTerms(contract))
+  const terms = rowToCamelTerms(contract)
+  const docCheck = checkContractDocument(terms)
   if (docCheck.hasConflict) {
     const conflict = docCheck.issues.find((i) => i.conflict)
     return jsonError(
@@ -36,11 +46,32 @@ export async function onRequestPost({ env, data, params, request }) {
     )
   }
 
-  let body
-  try {
-    body = await request.json()
-  } catch {
-    return jsonError('잘못된 요청입니다.', 400)
+  // 서명 전 점검은 지금까지 화면에만 있었다. API를 직접 호출하면 필수 항목이 빈
+  // 계약과 최저임금 미달 계약이 그대로 서명됐다. 서면 명시사항 누락은
+  // 근로기준법 제114조 벌금 대상이고 최저임금 미달도 형사 대상이라, 계산은 이미
+  // 하고 있으면서 강제하지 않는 것은 점검이 없는 것과 같다.
+  const missingFields = findMissingFields(terms)
+  if (missingFields.length > 0) {
+    return jsonError(
+      `근로기준법 제17조 명시사항이 비어 있어 서명할 수 없습니다: ${missingFields
+        .map((m) => m.label)
+        .join(', ')}`,
+      409
+    )
+  }
+
+  // 최저임금 미달·주 52시간 초과 같은 높은 등급 문제는, 당사자가 화면에서 그
+  // 내용을 확인했다고 밝힌 경우에만 서명을 허용한다.
+  const highIssues = [...checkLegalCompliance(terms), ...checkPeriodCompliance(terms)].filter(
+    (i) => i.severity === 'high'
+  )
+  if (highIssues.length > 0 && body.acknowledgedIssues !== true) {
+    return jsonError(
+      `법적 검토에서 확인이 필요한 사항이 있습니다: ${highIssues
+        .map((i) => i.title)
+        .join(', ')}. 계약서 화면에서 내용을 확인한 뒤 서명해주세요.`,
+      409
+    )
   }
 
   const imageDataUrl = body.imageDataUrl

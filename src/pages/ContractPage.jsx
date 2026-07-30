@@ -839,7 +839,12 @@ export default function ContractPage() {
 
   const handleSign = async (imageDataUrl) => {
     try {
-      await api.post(`/rooms/${roomId}/sign`, { imageDataUrl })
+      // 화면에서 확인 사항을 검토했다고 밝힌 사실을 서버에도 함께 보낸다.
+      // 이전에는 이 체크가 화면에만 있어, 서버는 무엇을 확인했는지 알 수 없었다.
+      await api.post(`/rooms/${roomId}/sign`, {
+        imageDataUrl,
+        acknowledgedIssues: acknowledged,
+      })
       setSigningRole(null)
       await loadAll()
       toast.success('서명이 완료되었습니다.')

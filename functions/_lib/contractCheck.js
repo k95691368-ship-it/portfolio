@@ -34,7 +34,12 @@ export const FIELD_LABELS = {
   customTerms: '그 밖의 사항',
 }
 
-// 계약서에 반드시 있어야 하는 항목 (근로기준법 제17조 명시사항 기준)
+// 계약서에 반드시 있어야 하는 항목 (근로기준법 제17조 제1항 명시사항).
+//
+// 제17조 제1항이 직접 열거하는 것은 임금(구성항목·계산방법·지급방법),
+// 소정근로시간, 제55조에 따른 휴일, 제60조에 따른 연차 유급휴가다. 그런데
+// 휴일·연차·임금 지급방법이 목록에서 빠져 있어, 이 셋이 비어 있어도 "필수 항목
+// 누락"으로 잡히지 않았다. 서면 명시 위반은 제114조 벌금 대상이다.
 const REQUIRED_FIELDS = [
   'employerName',
   'employeeName',
@@ -43,8 +48,11 @@ const REQUIRED_FIELDS = [
   'jobDescription',
   'workHoursStart',
   'workHoursEnd',
+  'restDays',
   'wageBaseAmount',
+  'wagePayMethod',
   'wagePayDate',
+  'annualLeave',
 ]
 
 // "09:00", "9:00", "9시", "오후 6시" 형태를 분 단위로. 실패 시 null.

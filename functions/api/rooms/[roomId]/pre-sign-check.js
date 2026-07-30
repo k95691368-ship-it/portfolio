@@ -40,7 +40,8 @@ export async function onRequestGet({ env, data, params }) {
   const legalIssues = [...checkLegalCompliance(terms), ...checkPeriodCompliance(terms)]
   const missingFields = findMissingFields(terms)
 
-  const hasBlocking = legalIssues.some((i) => i.severity === 'high') || diffs.length > 0
+  const hasBlocking =
+    legalIssues.some((i) => i.severity === 'high') || diffs.length > 0 || missingFields.length > 0
 
   return jsonResponse({
     ready: true,

@@ -157,9 +157,25 @@ describe('findMissingFields', () => {
     const complete = {
       employerName: 'A', employeeName: 'B', contractStartDate: '2026-09-01',
       workLocation: '서울', jobDescription: '운영', workHoursStart: '09:00',
-      workHoursEnd: '18:00', wageBaseAmount: 2800000, wagePayDate: '매월 10일',
+      workHoursEnd: '18:00', restDays: '토, 일', wageBaseAmount: 2800000,
+      wagePayMethod: '계좌이체', wagePayDate: '매월 10일', annualLeave: '근로기준법에 따름',
     }
     expect(findMissingFields(complete)).toEqual([])
+  })
+
+  // 근로기준법 제17조 제1항이 직접 열거하는 항목인데 목록에서 빠져 있었다.
+  // 이 셋이 비어 있어도 "필수 항목 누락"으로 잡히지 않아, 서면 명시 위반
+  // (제114조 벌금 대상) 상태로 서명이 가능했다.
+  it('휴일·연차·임금 지급방법도 필수로 본다', () => {
+    const withoutThree = {
+      employerName: 'A', employeeName: 'B', contractStartDate: '2026-09-01',
+      workLocation: '서울', jobDescription: '운영', workHoursStart: '09:00',
+      workHoursEnd: '18:00', wageBaseAmount: 2800000, wagePayDate: '매월 10일',
+    }
+    const fields = findMissingFields(withoutThree).map((m) => m.field)
+    expect(fields).toContain('restDays')
+    expect(fields).toContain('annualLeave')
+    expect(fields).toContain('wagePayMethod')
   })
 })
 

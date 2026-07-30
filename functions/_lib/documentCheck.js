@@ -9,6 +9,7 @@
 // 조항이 본문에 실제로 담겨 있는지 확인한다(필수 조항).
 
 import { FIELD_LABELS } from './contractCheck.js'
+import { buildArticlesFromTerms } from './contract.js'
 
 // 비교용으로 공백·쉼표·가운뎃점을 없앤다. "3,200,000 원" → "3200000원"
 function strip(text) {
@@ -209,11 +210,22 @@ export function checkRequiredArticles(articles) {
   }))
 }
 
-// 본문 점검 전체. AI 본문이 없으면 조건에서 바로 조항을 만들어 쓰므로 점검 대상이 아니다.
+// 본문 점검 전체.
+//
+// AI 본문이 없으면 조건에서 바로 조항을 만들어 인쇄하므로 값 대조는 의미가 없다
+// (같은 값에서 만들어졌으니 항상 일치한다). 그러나 필수 조항 점검은 그때도
+// 필요하다 — 예전에는 본문이 없으면 조용히 통과해, 조건 표만으로 서명하는
+// 경로가 조항 점검을 아예 받지 않았다.
 export function checkContractDocument(terms) {
   const articles = terms?.aiDocument
   if (!Array.isArray(articles) || articles.length === 0) {
-    return { hasDocument: false, issues: [], missingArticles: [], hasConflict: false }
+    const derived = buildArticlesFromTerms(terms)
+    return {
+      hasDocument: false,
+      issues: [],
+      missingArticles: checkRequiredArticles(derived),
+      hasConflict: false,
+    }
   }
   const issues = checkDocumentConsistency(articles, terms)
   return {

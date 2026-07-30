@@ -206,6 +206,9 @@ export async function onRequestGet({ env, data, params }) {
       hasBlocking:
         legalIssues.some((i) => i.severity === 'high') ||
         diffs.length > 0 ||
+        // 제17조 명시사항이 비어 있는 계약은 확인 절차 없이 서명될 수 없다.
+        // 예전에는 임금·휴일이 비어도 확인 체크박스조차 뜨지 않았다.
+        missingFields.length > 0 ||
         documentCheck.issues.length > 0 ||
         documentCheck.missingArticles.length > 0,
     }

@@ -190,8 +190,11 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
         workHoursStart: '09:00',
         workHoursEnd: '18:00',
         workDays: '주 5일 (월~금)',
+        restDays: '토요일, 일요일',
         wageBaseAmount: 1700000, // 최저임금 미달 — 점검이 잡아야 한다
+        wagePayMethod: '근로자 명의 예금통장 입금',
         wagePayDate: '매월 25일',
+        annualLeave: '근로기준법에 따름',
       },
     })
     expect(ok.status).toBe(200)
@@ -346,6 +349,27 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
     ).toBeUndefined()
     // AI가 계약서 본문을 쓰는 데 시간이 걸려 기본 제한(5초)으로는 부족하다.
   }, 120000)
+
+  it('필수 명시사항이 비면 서버가 서명을 막는다', async () => {
+    const sig = 'data:image/png;base64,iVBORw0KGgo='
+    // 임금 지급방법을 비운다 — 근로기준법 제17조 제1항 명시사항이다.
+    await company(`/api/rooms/${state.roomId}/contract`, {
+      method: 'PATCH',
+      body: { wagePayMethod: '' },
+    })
+    const blocked = await company(`/api/rooms/${state.roomId}/sign`, {
+      method: 'POST',
+      body: { imageDataUrl: sig },
+    })
+    expect(blocked.status, `필수 항목이 비어도 서명이 통과했습니다: ${blocked.text}`).toBe(409)
+    expect(blocked.json.error).toContain('제17조')
+
+    // 다시 채우면 서명할 수 있다.
+    await company(`/api/rooms/${state.roomId}/contract`, {
+      method: 'PATCH',
+      body: { wagePayMethod: '근로자 명의 예금통장 입금' },
+    })
+  })
 
   it('한쪽만 서명한 상태에서 내용이 바뀌면 그 서명은 무효가 된다', async () => {
     const sig =
