@@ -2,6 +2,7 @@ import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { draftContractDocument } from '../../../_lib/claude.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
+import { revokeSignaturesOnChange } from '../../../_lib/signatureLock.js'
 
 export async function onRequestPost({ env, data, params, request }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
@@ -51,5 +52,11 @@ export async function onRequestPost({ env, data, params, request }) {
     .bind(params.roomId, JSON.stringify(document.articles))
     .run()
 
-  return jsonResponse({ articles: document.articles })
+  // 서명하는 문서가 바뀌었으므로 그 전에 받은 서명은 무효다.
+  const revocation = await revokeSignaturesOnChange(env, params.roomId, {
+    actorUserId: data.user.id,
+    reason: '계약서 본문 재작성',
+  })
+
+  return jsonResponse({ articles: document.articles, revokedSignatures: revocation.revoked })
 }

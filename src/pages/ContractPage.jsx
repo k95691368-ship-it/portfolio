@@ -612,6 +612,7 @@ export default function ContractPage() {
   const [translations, setTranslations] = useState([])
   const [sourceArticles, setSourceArticles] = useState([])
   const [translating, setTranslating] = useState(false)
+  const [revokedSignatures, setRevokedSignatures] = useState([])
   const [continuity, setContinuity] = useState(null)
   const [retention, setRetention] = useState(null)
   const [linkableRooms, setLinkableRooms] = useState([])
@@ -666,6 +667,7 @@ export default function ContractPage() {
     setSignatures(sigData.signatures)
     setChangeRequests(view.changeRequests ?? [])
     setPeriod(view.period ?? null)
+    setRevokedSignatures(view.revokedSignatures ?? [])
     setContinuity(view.continuity ?? null)
     setRetention(view.retention ?? null)
     setLinkableRooms(view.linkableRooms ?? [])
@@ -1062,6 +1064,23 @@ export default function ContractPage() {
 
       <section className="signature-section">
         <h2>서명</h2>
+        {/* 서명 후 내용이 바뀌면 그 서명은 바뀌기 전 내용에 대한 것이므로 무효다.
+            왜 다시 서명해야 하는지 알 수 있게 사유와 시점을 함께 보여 준다. */}
+        {revokedSignatures.length > 0 && (
+          <div className="revoked-signatures" role="status">
+            <p className="period-alert">
+              계약 내용이 변경되어 이전 서명이 무효화되었습니다. 내용을 다시 확인하고 서명해주세요.
+            </p>
+            <ul>
+              {revokedSignatures.map((r, i) => (
+                <li key={i}>
+                  {r.role === 'company' ? '회사' : '지원자'} 서명 ({r.signedAt?.slice(0, 16)}) —{' '}
+                  {r.reason} · {r.revokedAt?.slice(0, 16)} 무효화
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="signature-status-row">
           {[
             { role: 'company', label: '회사' },

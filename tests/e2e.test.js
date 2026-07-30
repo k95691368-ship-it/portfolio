@@ -347,6 +347,40 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
     // AI가 계약서 본문을 쓰는 데 시간이 걸려 기본 제한(5초)으로는 부족하다.
   }, 120000)
 
+  it('한쪽만 서명한 상태에서 내용이 바뀌면 그 서명은 무효가 된다', async () => {
+    const sig =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+
+    // 지원자가 먼저 서명한다. 이 시점에는 방 상태가 아직 'signed'가 아니다.
+    const first = await candidate(`/api/rooms/${state.roomId}/sign`, {
+      method: 'POST',
+      body: { imageDataUrl: sig },
+    })
+    expect(first.status, `지원자 서명 실패: ${first.text}`).toBe(200)
+    expect(first.json.bothSigned).toBe(false)
+
+    // 그 상태에서 회사가 조건을 바꾼다 — 예전에는 지원자 서명이 그대로 남아,
+    // 지원자가 본 적 없는 조건에 지원자 서명이 붙은 계약이 만들어졌다.
+    const changed = await company(`/api/rooms/${state.roomId}/contract`, {
+      method: 'PATCH',
+      body: { workLocation: '부산 지점' },
+    })
+    expect(changed.status).toBe(200)
+    expect(changed.json.revokedSignatures, '서명이 무효화되지 않았습니다.').toBe(1)
+
+    const view = await candidate(`/api/rooms/${state.roomId}/contract-view`)
+    expect(view.json.signatures).toHaveLength(0)
+    expect(view.json.revokedSignatures.length).toBeGreaterThan(0)
+    expect(view.json.revokedSignatures[0].role).toBe('candidate')
+    expect(view.json.revokedSignatures[0].reason).toContain('workLocation')
+
+    // 원래 값으로 되돌려 이후 검사에 영향을 주지 않는다.
+    await company(`/api/rooms/${state.roomId}/contract`, {
+      method: 'PATCH',
+      body: { workLocation: '서울 본사' },
+    })
+  })
+
   it('양측이 서명하면 계약이 체결된다', async () => {
     const sig =
       'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='

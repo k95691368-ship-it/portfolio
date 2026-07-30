@@ -138,6 +138,9 @@ export async function onRequestDelete({ env, data, params }) {
       // 계정 삭제가 외래키 위반으로 실패한다.
       env.DB.prepare('DELETE FROM contract_translations WHERE translated_by_user_id = ?').bind(params.id),
       env.DB.prepare('DELETE FROM interview_summaries WHERE created_by_user_id = ?').bind(params.id),
+      // 무효화된 서명 기록도 사용자를 참조한다.
+      env.DB.prepare('UPDATE signature_revocations SET signer_user_id = NULL WHERE signer_user_id = ?').bind(params.id),
+      env.DB.prepare('UPDATE signature_revocations SET revoked_by_user_id = NULL WHERE revoked_by_user_id = ?').bind(params.id),
       env.DB.prepare('DELETE FROM documents WHERE user_id = ?').bind(params.id),
       env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(params.id),
       env.DB.prepare('DELETE FROM users WHERE id = ?').bind(params.id),

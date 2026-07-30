@@ -44,6 +44,7 @@ export async function onRequestGet({ env, data, params }) {
     finalOffer,
     changeRequestRows,
     translationRows,
+    revocationRows,
   ] = await Promise.all([
       env.DB.prepare('SELECT id, title, invite_code, status, created_at FROM interview_rooms WHERE id = ?')
         .bind(roomId)
@@ -92,6 +93,13 @@ export async function onRequestGet({ env, data, params }) {
         .all(),
       env.DB.prepare(
         'SELECT language, articles_json, created_at FROM contract_translations WHERE room_id = ?'
+      )
+        .bind(roomId)
+        .all(),
+      // 서명 후 내용이 바뀌어 무효가 된 서명. 왜 다시 서명해야 하는지 알리는 근거다.
+      env.DB.prepare(
+        `SELECT signer_role, signed_at, revoked_at, reason
+           FROM signature_revocations WHERE room_id = ? ORDER BY id DESC LIMIT 20`
       )
         .bind(roomId)
         .all(),
@@ -259,6 +267,13 @@ export async function onRequestGet({ env, data, params }) {
         finalOffer,
       }),
     },
+    // 서명 후 내용이 바뀌어 무효가 된 서명 (다시 서명해야 하는 이유)
+    revokedSignatures: revocationRows.results.map((r) => ({
+      role: r.signer_role,
+      signedAt: r.signed_at,
+      revokedAt: r.revoked_at,
+      reason: r.reason,
+    })),
     preSignCheck,
     period,
     continuity,

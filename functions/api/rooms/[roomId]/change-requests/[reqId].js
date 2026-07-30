@@ -3,6 +3,7 @@ import { getRoomParticipant } from '../../../../_lib/rooms.js'
 import { EDITABLE_FIELDS } from '../../../../_lib/contract.js'
 import { FIELD_LABELS } from '../../../../_lib/contractCheck.js'
 import { notifyUser } from '../../../../_lib/notify.js'
+import { revokeSignaturesOnChange } from '../../../../_lib/signatureLock.js'
 
 const NOTE_MAX = 500
 
@@ -89,6 +90,16 @@ export async function onRequestPost({ request, env, data, params }) {
 
   await env.DB.batch(statements)
 
+  // 양측이 합의한 변경이라도 내용이 바뀐 것은 마찬가지다. 이미 받아 둔 서명은
+  // 바뀌기 전 내용에 대한 것이므로 무효화하고 다시 받는다.
+  const revocation =
+    action === 'accept'
+      ? await revokeSignaturesOnChange(env, params.roomId, {
+          actorUserId: data.user.id,
+          reason: `수정 요청 수락 (${label})`,
+        })
+      : { revoked: 0 }
+
   await notifyUser(env, req.requested_by_user_id, {
     type: 'change_request_result',
     message:
@@ -98,5 +109,9 @@ export async function onRequestPost({ request, env, data, params }) {
     link: `/rooms/${params.roomId}/contract`,
   })
 
-  return jsonResponse({ ok: true, status: action === 'accept' ? 'accepted' : 'declined' })
+  return jsonResponse({
+    ok: true,
+    status: action === 'accept' ? 'accepted' : 'declined',
+    revokedSignatures: revocation.revoked,
+  })
 }

@@ -1,6 +1,7 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { rowToCamelTerms, EDITABLE_FIELDS } from '../../../_lib/contract.js'
 import { getRoomParticipant, getRoomAccess } from '../../../_lib/rooms.js'
+import { revokeSignaturesOnChange } from '../../../_lib/signatureLock.js'
 
 export async function onRequestGet({ env, data, params }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
@@ -106,6 +107,16 @@ export async function onRequestPatch({ env, data, params, request }) {
       .run()
   }
 
+  // 상대방이 이미 서명해 둔 상태에서 내용을 바꾸면 그 서명은 더 이상 이 내용에
+  // 대한 동의가 아니다. 무효화하고 다시 받는다.
+  const revocation =
+    changes.length > 0
+      ? await revokeSignaturesOnChange(env, params.roomId, {
+          actorUserId: data.user.id,
+          reason: `계약 조건 변경 (${changes.map((c) => c.field).join(', ')})`,
+        })
+      : { revoked: 0 }
+
   const row = await env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?')
     .bind(params.roomId)
     .first()
@@ -116,5 +127,6 @@ export async function onRequestPatch({ env, data, params, request }) {
     hireConfirmedAt: row.hire_confirmed_at,
     confirmationExcerpt: row.hire_confirmation_excerpt,
     updatedAt: row.updated_at,
+    revokedSignatures: revocation.revoked,
   })
 }

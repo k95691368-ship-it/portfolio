@@ -1686,6 +1686,18 @@
   flex-wrap: wrap;
 }
 /* 표 안의 행 머리(이름)는 열 머리처럼 굵게 보이지 않아야 한다 */
+.revoked-signatures {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.revoked-signatures ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
 .compare-name {
   font-weight: 600;
   text-align: left;
