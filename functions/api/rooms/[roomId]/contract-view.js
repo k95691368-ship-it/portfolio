@@ -19,6 +19,7 @@ import {
 import { checkContractDocument } from '../../../_lib/documentCheck.js'
 
 import { contractFingerprint } from '../../../_lib/contractDocument.js'
+import { markFirstViewed, listDeliveries, describeDeliveryState } from '../../../_lib/delivery.js'
 
 // 갱신 사슬을 거슬러 올라가는 최대 깊이 (link-previous의 제한과 같아야 한다)
 const MAX_CHAIN_DEPTH = 10
@@ -109,6 +110,12 @@ export async function onRequestGet({ env, data, params }) {
 
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
 
+  // 근로자가 체결된 계약서를 처음 열어 본 시각을 남긴다. 전자문서법 제5조가
+  // 요구하는 수신 기록이면서, 교부가 실제로 닿았다는 증거다.
+  if (room.status === 'signed' && access.role_in_room === 'candidate') {
+    await markFirstViewed(env, roomId)
+  }
+
   const participantRows = participants.results
   const history = historyRows.results
   const signatures = signatureRows.results
@@ -164,6 +171,10 @@ export async function onRequestGet({ env, data, params }) {
 
   // 체결이 끝난 계약은 보존 의무 기간을 관리해야 한다 (근로기준법 제42조).
   const retention = isSigned && terms ? describeRetention(terms, storedRow?.created_at) : null
+
+  // 교부 이력 (근로기준법 제17조 제2항 · 전자문서법 제5조)
+  const deliveries = isSigned ? await listDeliveries(env, roomId) : []
+  const deliveryState = isSigned ? describeDeliveryState(deliveries) : null
 
   // 회사가 이 계약을 어떤 계약의 갱신으로 이을지 고를 수 있게, 같은 근로자의
   // 이미 체결된 계약 목록을 함께 내려준다.
@@ -284,6 +295,8 @@ export async function onRequestGet({ env, data, params }) {
       revokedAt: r.revoked_at,
       reason: r.reason,
     })),
+    deliveries,
+    deliveryState,
     preSignCheck,
     period,
     continuity,

@@ -7,6 +7,7 @@ import { checkContractDocument } from '../../../_lib/documentCheck.js'
 import { findMissingFields, checkLegalCompliance } from '../../../_lib/contractCheck.js'
 import { checkPeriodCompliance } from '../../../_lib/contractPeriod.js'
 import { contractFingerprint } from '../../../_lib/contractDocument.js'
+import { recordDelivery } from '../../../_lib/delivery.js'
 
 const MAX_DATA_URL_LENGTH = 2_000_000
 
@@ -139,6 +140,23 @@ export async function onRequestPost({ env, data, params, request }) {
     await env.DB.prepare("UPDATE interview_rooms SET status = 'signed' WHERE id = ?")
       .bind(params.roomId)
       .run()
+
+    // 교부 의무(근로기준법 제17조 제2항)를 회사의 수동 클릭에 맡기지 않는다.
+    // 체결이 끝나는 순간, 근로자가 계약서를 열람할 수 있게 된 사실을 교부로
+    // 기록한다. 회사가 버튼을 누르지 않아도 교부물과 그 기록이 존재한다.
+    const candidate = await env.DB.prepare(
+      `SELECT u.id, u.email FROM room_participants rp JOIN users u ON u.id = rp.user_id
+        WHERE rp.room_id = ? AND rp.role_in_room = 'candidate' LIMIT 1`
+    )
+      .bind(params.roomId)
+      .first()
+    if (candidate) {
+      await recordDelivery(env, params.roomId, {
+        channel: 'in_app',
+        recipientUserId: candidate.id,
+        recipientAddress: candidate.email,
+      })
+    }
   }
 
   // 상대방에게 알림 (모두 서명 완료 시에는 양측 모두)

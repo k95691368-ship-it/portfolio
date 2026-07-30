@@ -8,6 +8,7 @@ import {
   arrayBufferToBase64,
 } from '../../../_lib/email.js'
 import { notifyUser } from '../../../_lib/notify.js'
+import { recordDelivery } from '../../../_lib/delivery.js'
 
 const MAX_PDF_SIZE = 8 * 1024 * 1024 // 8MB
 
@@ -151,6 +152,16 @@ export async function onRequestPost({ request, env, data, params }) {
     )
       .bind(emailStatus, emailError, emailStatus, params.roomId)
       .run()
+
+    // 교부 이력에도 남긴다. PDF를 다시 저장하면 signed_contracts 의 emailed_at 이
+    // 리셋되는데, 교부는 한 번 일어난 사실이므로 별도 표에 보존한다.
+    await recordDelivery(env, params.roomId, {
+      channel: 'email',
+      recipientUserId: candidate.id,
+      recipientAddress: candidate.email,
+      status: emailStatus === 'sent' ? 'delivered' : 'failed',
+      errorMessage: emailError,
+    })
   }
 
   await notifyUser(env, candidate?.id, {

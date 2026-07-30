@@ -1,5 +1,6 @@
 import { jsonError } from '../../../_lib/http.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
+import { markDownloaded } from '../../../_lib/delivery.js'
 
 // 저장된 서명 완료 계약서 PDF 다운로드 (면접방 참여자 양측 모두 가능).
 export async function onRequestGet({ env, data, params }) {
@@ -16,6 +17,11 @@ export async function onRequestGet({ env, data, params }) {
 
   const object = await env.DOCUMENTS.get(row.r2_key)
   if (!object) return jsonError('계약서 파일을 찾을 수 없습니다.', 404)
+
+  // 근로자가 직접 내려받은 것은 교부가 닿았다는 가장 분명한 기록이다.
+  if (participant.role_in_room === 'candidate') {
+    await markDownloaded(env, params.roomId, data.user.id)
+  }
 
   return new Response(object.body, {
     headers: {

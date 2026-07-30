@@ -435,6 +435,23 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
     }
   })
 
+  it('체결되면 회사 클릭 없이도 교부 기록이 생긴다', async () => {
+    // 회사가 계약서 저장 버튼을 누르지 않은 상태다. 예전에는 교부물도 기록도
+    // 없이 계약이 'signed'로 끝났다.
+    const view = await company(`/api/rooms/${state.roomId}/contract-view`)
+    expect(view.json.deliveryState, '교부 상태가 없습니다.').toBeTruthy()
+    expect(view.json.deliveryState.delivered, '체결 후에도 교부 기록이 없습니다.').toBe(true)
+    const inApp = view.json.deliveries.find((d) => d.channel === 'in_app')
+    expect(inApp).toBeTruthy()
+    expect(inApp.status).toBe('delivered')
+
+    // 지원자가 계약서를 열면 확인 시각이 남는다 (전자문서법 제5조 수신 기록).
+    await candidate(`/api/rooms/${state.roomId}/contract-view`)
+    const after = await company(`/api/rooms/${state.roomId}/contract-view`)
+    expect(after.json.deliveryState.viewed, '근로자 열람이 기록되지 않았습니다.').toBe(true)
+    expect(after.json.deliveries.find((d) => d.channel === 'in_app').firstViewedAt).toBeTruthy()
+  })
+
   it('계약 이력이 시간순으로 증명된다', async () => {
     const view = await candidate(`/api/rooms/${state.roomId}/contract-view`)
     const events = view.json.auditTrail.events.map((e) => e.event)

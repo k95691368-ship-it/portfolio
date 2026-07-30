@@ -612,6 +612,8 @@ export default function ContractPage() {
   const [translations, setTranslations] = useState([])
   const [sourceArticles, setSourceArticles] = useState([])
   const [translating, setTranslating] = useState(false)
+  const [deliveries, setDeliveries] = useState([])
+  const [deliveryState, setDeliveryState] = useState(null)
   const [documentSha256, setDocumentSha256] = useState(null)
   const [revokedSignatures, setRevokedSignatures] = useState([])
   const [continuity, setContinuity] = useState(null)
@@ -668,6 +670,8 @@ export default function ContractPage() {
     setSignatures(sigData.signatures)
     setChangeRequests(view.changeRequests ?? [])
     setPeriod(view.period ?? null)
+    setDeliveries(view.deliveries ?? [])
+    setDeliveryState(view.deliveryState ?? null)
     setDocumentSha256(view.documentSha256 ?? null)
     setRevokedSignatures(view.revokedSignatures ?? [])
     setContinuity(view.continuity ?? null)
@@ -1036,6 +1040,36 @@ export default function ContractPage() {
           <button type="button" onClick={handleDraftDocument} disabled={drafting}>
             {drafting ? 'AI가 계약서를 작성하는 중...' : aiDocument ? 'AI 계약서 다시 작성하기' : 'AI로 계약서 작성하기'}
           </button>
+        </section>
+      )}
+
+      {/* 교부 의무(근로기준법 제17조 제2항)는 사업주에게 있고 위반은 벌금
+          대상이다. 이행 여부와 근로자가 실제로 확인했는지를 함께 보여 준다. */}
+      {deliveryState && (
+        <section className="contract-delivery">
+          <div className="period-head">
+            <h2>계약서 교부</h2>
+            <span
+              className={`badge ${deliveryState.viewed ? 'badge-success' : deliveryState.delivered ? 'badge-accent' : 'badge-warning'}`}
+            >
+              {deliveryState.label}
+            </span>
+          </div>
+          <p className={deliveryState.delivered ? 'period-detail' : 'period-alert'}>
+            {deliveryState.detail}
+          </p>
+          {deliveries.length > 0 && (
+            <ul className="delivery-list">
+              {deliveries.map((d) => (
+                <li key={d.channel}>
+                  <strong>{d.channelLabel}</strong> · {d.deliveredAt?.slice(0, 16)}
+                  {d.status === 'failed' && <span className="compare-concern"> · 발송 실패</span>}
+                  {d.firstViewedAt && ` · 열람 ${d.firstViewedAt.slice(0, 16)}`}
+                  {d.downloadedAt && ` · 내려받음 ${d.downloadedAt.slice(0, 16)}`}
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       )}
 
