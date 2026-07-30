@@ -22,11 +22,14 @@ export async function onRequestGet({ env, data, params }) {
     return jsonError('이 공고의 지원자를 볼 권한이 없습니다.', 403)
   }
 
+  // 상한에 걸려 잘라야 할 때 먼저 지원한 쪽을 남기면 새로 들어온 지원자가
+  // 비교 화면에서 아예 보이지 않는다. 최근 것부터 가져오고, 정렬은 아래
+  // rankApplicants가 같은 기준(적합도 → 경력 → 먼저 지원한 순)으로 다시 한다.
   const { results } = await env.DB.prepare(
     `SELECT id, applicant_name, status, created_at, career_json, ai_screening_json
        FROM applications
       WHERE posting_id = ?
-      ORDER BY created_at ASC
+      ORDER BY created_at DESC
       LIMIT ?`
   )
     .bind(params.id, MAX_APPLICANTS)

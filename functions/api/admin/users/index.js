@@ -4,14 +4,20 @@ import { hashPassword } from '../../../_lib/auth.js'
 import { genTempPassword } from '../../../_lib/tempPassword.js'
 import { logAdminAction } from '../../../_lib/auditLog.js'
 
+const MAX_USERS = 500
+
 export async function onRequestGet({ env }) {
   const { results } = await env.DB.prepare(
     `SELECT id, email, display_name, company_name, role, is_admin, is_recruiter, is_developer, is_suspended,
             must_change_password, created_at
-     FROM users ORDER BY created_at DESC`
-  ).all()
+     FROM users ORDER BY created_at DESC LIMIT ?`
+  )
+    .bind(MAX_USERS)
+    .all()
 
   return jsonResponse({
+    truncated: results.length >= MAX_USERS,
+    limit: MAX_USERS,
     users: results.map((u) => ({
       id: u.id,
       email: u.email,

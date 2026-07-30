@@ -38,10 +38,13 @@ export default function AdminPage() {
 
   const [viewingRoom, setViewingRoom] = useState(null)
   const [roomMessages, setRoomMessages] = useState([])
+  const [messagesCap, setMessagesCap] = useState(null)
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [messagesError, setMessagesError] = useState('')
 
   const [auditLog, setAuditLog] = useState([])
+  // 목록이 상한에 걸려 잘렸으면 제목의 개수가 전체인 것처럼 보이지 않게 알린다.
+  const [caps, setCaps] = useState({ users: null, rooms: null })
 
   const loadAll = useCallback(async () => {
     const [usersData, roomsData, auditData] = await Promise.all([
@@ -52,6 +55,10 @@ export default function AdminPage() {
     setUsers(usersData.users)
     setRooms(roomsData.rooms)
     setAuditLog(auditData.entries)
+    setCaps({
+      users: usersData.truncated ? usersData.limit : null,
+      rooms: roomsData.truncated ? roomsData.limit : null,
+    })
   }, [])
 
   useEffect(() => {
@@ -186,11 +193,13 @@ export default function AdminPage() {
   const handleViewMessages = async (room) => {
     setViewingRoom(room)
     setRoomMessages([])
+    setMessagesCap(null)
     setMessagesError('')
     setMessagesLoading(true)
     try {
       const data = await api.get(`/admin/rooms/${room.id}/messages`)
       setRoomMessages(data.messages)
+      setMessagesCap(data.truncated ? data.limit : null)
     } catch (err) {
       setMessagesError(err.message)
     } finally {
@@ -242,6 +251,9 @@ export default function AdminPage() {
       </section>
 
       <h2>사용자 ({users.length})</h2>
+      {caps.users && (
+        <p className="notice">계정이 많아 최근 {caps.users}건만 불러왔습니다.</p>
+      )}
       <div className="table-scroll">
       <table className="admin-table">
         <caption className="sr-only">등록된 사용자 {users.length}명의 권한과 상태</caption>
@@ -353,6 +365,9 @@ export default function AdminPage() {
       </div>
 
       <h2>면접방 ({rooms.length})</h2>
+      {caps.rooms && (
+        <p className="notice">면접방이 많아 최근 {caps.rooms}건만 불러왔습니다.</p>
+      )}
       <div className="table-scroll">
       <table className="admin-table">
         <caption className="sr-only">모든 면접방 {rooms.length}개의 참여자와 진행 상태</caption>
@@ -442,6 +457,11 @@ export default function AdminPage() {
           {messagesError && (
             <p className="error" role="alert">
               {messagesError}
+            </p>
+          )}
+          {messagesCap && (
+            <p className="notice">
+              대화가 길어 최근 {messagesCap}건만 불러왔습니다. 앞부분은 표시되지 않습니다.
             </p>
           )}
           {!messagesLoading && !messagesError && (
