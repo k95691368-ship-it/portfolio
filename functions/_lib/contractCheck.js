@@ -119,7 +119,9 @@ export function breakMinutesFor(spanMinutes) {
 }
 
 // 근무 시각·근무일에서 주간 실근로시간을 계산. 정보 부족 시 null.
-export function computeWeeklyHours({ workHoursStart, workHoursEnd, workDays }) {
+// 계약 조건이 아직 없는 방에서도 호출되므로 빈 값을 받아도 깨지지 않게 한다.
+export function computeWeeklyHours(terms) {
+  const { workHoursStart, workHoursEnd, workDays } = terms || {}
   const start = parseTimeToMinutes(workHoursStart)
   const end = parseTimeToMinutes(workHoursEnd)
   const days = parseDaysPerWeek(workDays)

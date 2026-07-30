@@ -1686,6 +1686,89 @@
   flex-wrap: wrap;
 }
 /* 표 안의 행 머리(이름)는 열 머리처럼 굵게 보이지 않아야 한다 */
+.contract-explainer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 20px 24px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius);
+  background: var(--accent-bg);
+}
+.explain-note {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+.explain-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  text-align: left;
+}
+.explain-section h3 {
+  font-size: 14px;
+  margin: 0 0 6px;
+}
+.explain-section ul {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.explain-section li {
+  display: grid;
+  grid-template-columns: 116px 1fr;
+  gap: 4px 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border-left: 3px solid var(--border);
+  font-size: 14px;
+}
+/* 근거는 값 아래 줄에 붙여, 숫자만 보고 넘기지 않게 한다 */
+.explain-reason {
+  grid-column: 2;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+.explain-label {
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.explain-value {
+  font-weight: 600;
+  color: var(--text-h);
+}
+.explain-section li.explain-ok {
+  border-left-color: var(--success);
+}
+.explain-section li.explain-caution {
+  border-left-color: var(--warning);
+}
+.explain-section li.explain-caution .explain-value {
+  color: var(--warning-text);
+}
+/* 확인 목록은 라벨이 없어 값이 첫 칸부터 차지한다 */
+.explain-section li:not(:has(.explain-label)) .explain-value {
+  grid-column: 1 / -1;
+  font-weight: 500;
+}
+@media (max-width: 640px) {
+  .explain-section li {
+    grid-template-columns: 1fr;
+  }
+  .explain-reason {
+    grid-column: 1;
+  }
+}
+
 .contract-delivery {
   display: flex;
   flex-direction: column;

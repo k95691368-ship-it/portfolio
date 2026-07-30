@@ -4,6 +4,7 @@ import { api } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import SignatureModal from '../components/SignatureModal.jsx'
+import ContractExplainer from '../components/ContractExplainer.jsx'
 import { IDENTITY_FIELDS, TERM_FIELDS, SOCIAL_INSURANCE_FIELDS } from '../lib/contractTemplate.js'
 
 const FIELD_LABELS = {
@@ -612,6 +613,7 @@ export default function ContractPage() {
   const [translations, setTranslations] = useState([])
   const [sourceArticles, setSourceArticles] = useState([])
   const [translating, setTranslating] = useState(false)
+  const [explanation, setExplanation] = useState(null)
   const [deliveries, setDeliveries] = useState([])
   const [deliveryState, setDeliveryState] = useState(null)
   const [documentSha256, setDocumentSha256] = useState(null)
@@ -670,6 +672,7 @@ export default function ContractPage() {
     setSignatures(sigData.signatures)
     setChangeRequests(view.changeRequests ?? [])
     setPeriod(view.period ?? null)
+    setExplanation(view.explanation ?? null)
     setDeliveries(view.deliveries ?? [])
     setDeliveryState(view.deliveryState ?? null)
     setDocumentSha256(view.documentSha256 ?? null)
@@ -1042,6 +1045,10 @@ export default function ContractPage() {
           </button>
         </section>
       )}
+
+      {/* 근로자가 자기 계약을 이해하도록 돕는다. 서명 전에 보이는 것이 중요하므로
+          서명 영역보다 위에 둔다. */}
+      <ContractExplainer explanation={explanation} myRole={myRole} />
 
       {/* 교부 의무(근로기준법 제17조 제2항)는 사업주에게 있고 위반은 벌금
           대상이다. 이행 여부와 근로자가 실제로 확인했는지를 함께 보여 준다. */}

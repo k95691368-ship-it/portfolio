@@ -211,6 +211,33 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
     state.suggested = issue.suggestedValue
   })
 
+  it('근로자에게 계약을 해설해 준다', async () => {
+    // 최저임금 미달 상태(기본급 170만원 · 주 40시간)에서 근로자가 보는 해설
+    const view = await candidate(`/api/rooms/${state.roomId}/contract-view`)
+    const explanation = view.json.explanation
+    expect(explanation, '계약 해설이 없습니다.').toBeTruthy()
+
+    const wage = explanation.sections.find((s) => s.title === '임금')
+    const hourly = wage.lines.find((l) => l.label === '시급 환산')
+    // 계약서에는 월급만 적혀 있는데, 근로자가 알아야 하는 것은 시급이다.
+    expect(hourly.value).toMatch(/원$/)
+    expect(hourly.note).toContain('주휴시간 포함')
+
+    const compare = wage.lines.find((l) => l.label === '최저임금 비교')
+    expect(compare.tone).toBe('caution')
+    expect(compare.value).toContain('미달')
+    expect(compare.note).toContain('최소')
+
+    // 하루 실근로시간은 휴게시간을 뺀 값이어야 한다 (09:00~18:00 → 8시간)
+    const hoursSection = explanation.sections.find((s) => s.title === '근로시간')
+    expect(hoursSection.lines.find((l) => l.label === '하루 근로시간').value).toBe('8시간')
+
+    // 서명 전 확인 목록에 교부 안내가 들어 있다
+    const checklist = explanation.sections.find((s) => s.title === '서명 전에 확인할 것')
+    expect(checklist.lines.some((l) => l.value.includes('교부'))).toBe(true)
+    expect(explanation.cautionCount).toBeGreaterThan(0)
+  })
+
   it('지원자가 제안 금액으로 수정을 요청한다', async () => {
     const req = await candidate(`/api/rooms/${state.roomId}/change-requests`, {
       method: 'POST',

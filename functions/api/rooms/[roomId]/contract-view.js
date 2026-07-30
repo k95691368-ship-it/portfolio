@@ -20,6 +20,7 @@ import { checkContractDocument } from '../../../_lib/documentCheck.js'
 
 import { contractFingerprint } from '../../../_lib/contractDocument.js'
 import { markFirstViewed, listDeliveries, describeDeliveryState } from '../../../_lib/delivery.js'
+import { explainContract } from '../../../_lib/contractExplainer.js'
 
 // 갱신 사슬을 거슬러 올라가는 최대 깊이 (link-previous의 제한과 같아야 한다)
 const MAX_CHAIN_DEPTH = 10
@@ -172,6 +173,11 @@ export async function onRequestGet({ env, data, params }) {
   // 체결이 끝난 계약은 보존 의무 기간을 관리해야 한다 (근로기준법 제42조).
   const retention = isSigned && terms ? describeRetention(terms, storedRow?.created_at) : null
 
+  // 근로자용 계약 해설. 계약서에 적힌 값만으로는 알 수 없는 것(환산 시급, 하루
+  // 실근로시간, 무기계약 전환 여부)을 계산해 문장으로 돌려준다. AI를 쓰지 않으므로
+  // 같은 계약이면 언제나 같은 설명이 나온다.
+  const explanation = terms ? explainContract(terms) : null
+
   // 교부 이력 (근로기준법 제17조 제2항 · 전자문서법 제5조)
   const deliveries = isSigned ? await listDeliveries(env, roomId) : []
   const deliveryState = isSigned ? describeDeliveryState(deliveries) : null
@@ -295,6 +301,7 @@ export async function onRequestGet({ env, data, params }) {
       revokedAt: r.revoked_at,
       reason: r.reason,
     })),
+    explanation,
     deliveries,
     deliveryState,
     preSignCheck,
