@@ -69,8 +69,15 @@ export async function loadMyRooms(env, user) {
 }
 
 // 지원은 로그인 없이도 할 수 있고 합격하면 그 이메일로 계정이 만들어진다.
-// 그래서 지원서와 계정을 잇는 끈은 두 가지다 — 합격 시 만들어진 계정 연결과,
-// 아이디로 쓰는 이메일. 둘 중 하나라도 맞으면 본인 지원서로 본다.
+//
+// 예전에는 "계정 이메일이 지원서 이메일과 같으면 본인"으로 보았다. 그런데 이
+// 서비스에는 이메일 소유 확인이 없다. 가입은 아무 이메일로나 되고 즉시 로그인
+// 세션이 생긴다. 그래서 남이 지원할 때 쓴 이메일로 가입하기만 하면 그 사람의
+// 지원 이력과 접수번호까지 보였다 — 접수번호는 로그인 없이 현황을 조회하는
+// 열쇠이므로, 이메일 하나로 남의 전형 상태를 계속 들여다볼 수 있었다.
+//
+// 이제 명시적으로 이어진 것(합격 시 만들어진 계정, 또는 접수번호로 직접 연결한
+// 것)만 본인 지원서로 본다. 증명 없이 추측으로 소유를 인정하지 않는다.
 export async function loadMyApplications(env, user) {
   const { results } = await env.DB.prepare(
     `SELECT a.id, a.status, a.created_at, a.reviewed_at, a.room_id, a.lookup_code,
@@ -81,11 +88,11 @@ export async function loadMyApplications(env, user) {
        JOIN job_postings p ON p.id = a.posting_id
        LEFT JOIN interview_rooms r ON r.id = a.room_id
        LEFT JOIN signed_contracts sc ON sc.room_id = a.room_id
-      WHERE a.created_user_id = ? OR LOWER(a.applicant_email) = LOWER(?)
+      WHERE a.created_user_id = ?
       ORDER BY a.created_at DESC
       LIMIT ?`
   )
-    .bind(user.id, user.email, APPLICATION_LIMIT)
+    .bind(user.id, APPLICATION_LIMIT)
     .all()
 
   const applications = results.map((r) => {

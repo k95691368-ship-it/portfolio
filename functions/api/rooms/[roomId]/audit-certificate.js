@@ -1,6 +1,6 @@
 import { genId } from '../../../_lib/db.js'
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
-import { getRoomAccess } from '../../../_lib/rooms.js'
+import { getRoomAccess, getRoomParticipant } from '../../../_lib/rooms.js'
 import { rowToCamelTerms } from '../../../_lib/contract.js'
 import { mapRequestRow } from '../../../_lib/changeRequests.js'
 import { findLanguage } from '../../../_lib/languages.js'
@@ -117,8 +117,13 @@ async function loadSource(env, roomId) {
 
 export async function onRequestPost({ env, data, params }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
-  const access = await getRoomAccess(env, params.roomId, data.user)
-  if (!access) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
+  // 발급은 열람과 다르다. 증명서에는 발급한 사람의 이름이 박히고, 그 문서가
+  // 제3자에게 제시된다. getRoomAccess 는 참여하지 않은 관리자에게도 열람 권한을
+  // 주므로, 발급까지 허용하면 계약 당사자가 아닌 사람이 발급자로 남는다.
+  const participant = await getRoomParticipant(env, params.roomId, data.user.id)
+  if (!participant) {
+    return jsonError('증명서는 계약 당사자만 발급할 수 있습니다.', 403)
+  }
 
   const src = await loadSource(env, params.roomId)
   if (!src.room) return jsonError('면접방을 찾을 수 없습니다.', 404)

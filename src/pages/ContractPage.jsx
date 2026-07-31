@@ -844,8 +844,11 @@ export default function ContractPage() {
   const handleDraftDocument = async () => {
     setDrafting(true)
     try {
-      const data = await api.post(`/rooms/${roomId}/contract-draft`, form)
-      setAiDocument(data.articles)
+      await api.post(`/rooms/${roomId}/contract-draft`, form)
+      // 본문이 바뀌면 서명 대상 문서가 바뀐 것이고, 서버의 문서 지문도 따라
+      // 바뀐다. 화면이 들고 있는 옛 지문으로 서명하면 서버가 409로 막는다.
+      // 본문만 갈아 끼우지 말고 지문과 점검 결과까지 함께 다시 읽는다.
+      await loadAll()
       toast.success('AI 계약서 문장이 작성되었습니다.')
     } catch (err) {
       toast.error(err.message)
@@ -1041,6 +1044,11 @@ export default function ContractPage() {
           ? '계약서를 저장하고 이메일로 사본을 전송했습니다.'
           : '계약서가 저장되었습니다.'
       )
+      // 이 요청은 저장만 하는 것이 아니다. 서버가 교부 이력을 남기고 감사추적에
+      // '서명 계약서 보관'을 더한다. 다시 읽지 않으면 방금 일어난 교부가 화면에
+      // 없는 것처럼 보인다. 저장은 이미 성공했으므로 재조회 실패로 성공 메시지가
+      // 뒤집히지 않게 따로 감싼다.
+      await loadAll().catch(() => {})
     } catch (err) {
       toast.error(err.message)
     } finally {

@@ -230,16 +230,27 @@ export async function onRequestGet({ env, data, params }) {
   // 이미 체결된 계약 목록을 함께 내려준다.
   let linkableRooms = []
   if (!isSigned && access.role_in_room === 'company' && candidateRow) {
+    // 요청자도 그 방의 참여자여야 한다.
+    //
+    // 예전에는 "이 근로자가 참여한 체결 계약"만으로 목록을 만들어서, 같은
+    // 사람을 채용한 다른 회사의 계약 제목과 기간이 그대로 보였다. 실제로
+    // 연결이 허용되는 범위(link-previous.js 의 참여자 검사)와 목록이
+    // 어긋나 있었던 것이라, 고를 수도 없는 것을 보여 주면서 남의 계약을
+    // 알려 주고 있었다.
     const { results } = await env.DB.prepare(
       `SELECT r.id, r.title, ct.contract_start_date, ct.contract_end_date
          FROM room_participants rp
          JOIN interview_rooms r ON r.id = rp.room_id
          LEFT JOIN contract_terms ct ON ct.room_id = r.id
-        WHERE rp.user_id = ? AND rp.role_in_room = 'candidate'
-          AND r.status = 'signed' AND r.id != ?
+        WHERE rp.user_id = ?1 AND rp.role_in_room = 'candidate'
+          AND r.status = 'signed' AND r.id != ?2
+          AND EXISTS (
+            SELECT 1 FROM room_participants me
+             WHERE me.room_id = r.id AND me.user_id = ?3
+          )
         ORDER BY ct.contract_start_date DESC LIMIT 20`
     )
-      .bind(candidateRow.id, roomId)
+      .bind(candidateRow.id, roomId, data.user.id)
       .all()
     linkableRooms = results.map((r) => ({
       id: r.id,

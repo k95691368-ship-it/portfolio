@@ -1,5 +1,5 @@
-import { jsonResponse, jsonError } from '../_lib/http.js'
-import { loadMyApplications } from '../_lib/dashboard.js'
+import { jsonResponse, jsonError } from '../../_lib/http.js'
+import { loadMyApplications } from '../../_lib/dashboard.js'
 
 // 로그인한 사용자가 자기 지원서를 모아 본다.
 export async function onRequestGet({ env, data }) {

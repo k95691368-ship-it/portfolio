@@ -20,6 +20,7 @@ export default function VerifyCertificatePage() {
   const [serial, setSerial] = useState(searchParams.get('serial') || '')
   const [fingerprint, setFingerprint] = useState('')
   const [result, setResult] = useState(null)
+  const [failure, setFailure] = useState(null)
   const [loading, setLoading] = useState(false)
 
   const lookup = async (serialValue, sha) => {
@@ -30,13 +31,17 @@ export default function VerifyCertificatePage() {
     }
     setLoading(true)
     setResult(null)
+    setFailure(null)
     try {
       const query = new URLSearchParams({ serial: trimmed })
       if (sha) query.set('sha256', sha)
       const data = await api.get(`/verify-certificate?${query.toString()}`)
       setResult(data)
     } catch (err) {
-      toast.error(err.message)
+      // 확인 실패는 화면에 남아 있어야 한다. 링크로 들어온 사람에게 토스트는
+      // 몇 초 뒤 사라지고 빈 화면만 남는데, 그 사람은 "확인되지 않았다"는
+      // 사실을 받으러 온 것이다. 사라지는 알림으로 답할 일이 아니다.
+      setFailure(err.message)
     } finally {
       setLoading(false)
     }
@@ -117,6 +122,17 @@ export default function VerifyCertificatePage() {
           {loading ? '확인 중...' : '확인하기'}
         </button>
       </form>
+
+      {failure && (
+        <div className="verify-result verify-bad" role="status" aria-live="polite">
+          <span className="badge badge-danger">확인되지 않았습니다</span>
+          <p className="verify-detail">{failure}</p>
+          <p className="verify-note">
+            발급번호를 다시 확인해주세요. 번호가 맞는데도 확인되지 않는다면, 그 문서는 이곳에서 발급된
+            증명서가 아닙니다.
+          </p>
+        </div>
+      )}
 
       {result && (
         <div

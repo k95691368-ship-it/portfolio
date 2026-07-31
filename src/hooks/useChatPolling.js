@@ -6,6 +6,18 @@ import { api } from '../api/client.js'
 const MAX_IDLE_MS = 15000
 const BACKOFF_AFTER = 6 // 이만큼 연속으로 새 메시지가 없으면 간격을 늘린다
 
+// 이미 가진 것과 새로 받은 것을 id 기준으로 합친다.
+//
+// 내가 보낸 메시지는 응답을 받자마자 화면에 붙이고, 그 뒤 폴링이 같은 것을 다시
+// 가져온다. 중복을 지우고 id 순서를 지켜야 대화 순서가 어긋나지 않는다
+// (낙관적으로 붙인 내 메시지가 그보다 먼저 온 상대 메시지 앞에 놓일 수 있다).
+export function mergeById(existing, incoming) {
+  const seen = new Set(existing.map((m) => m.id))
+  const fresh = incoming.filter((m) => !seen.has(m.id))
+  if (fresh.length === 0) return existing
+  return [...existing, ...fresh].sort((a, b) => a.id - b.id)
+}
+
 // initialMessages: 면접방 화면이 한 번의 요청으로 이미 받아 둔 첫 묶음.
 // 이것이 올 때까지 기다렸다가 그다음부터 증분으로만 확인한다. 같은 대화를
 // 두 번 받지 않기 위해서다.
@@ -46,7 +58,8 @@ export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null
       const data = await api.get(`/rooms/${roomId}/messages?after=${lastIdRef.current}`)
       if (data.messages.length > 0) {
         lastIdRef.current = data.messages[data.messages.length - 1].id
-        setMessages((prev) => [...prev, ...data.messages])
+        // 내가 보낸 메시지는 화면에 먼저 붙여 두었으므로 다시 받아도 한 번만 남긴다.
+        setMessages((prev) => mergeById(prev, data.messages))
         emptyRunsRef.current = 0
       } else {
         emptyRunsRef.current += 1
@@ -102,10 +115,14 @@ export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null
   const sendMessage = useCallback(
     async (body) => {
       const message = await api.post(`/rooms/${roomId}/messages`, { body })
-      lastIdRef.current = message.id
-      // 내가 말을 걸었으니 상대 답변을 빠르게 확인한다.
+      // 수신 커서(lastIdRef)는 폴링이 실제로 받아 온 것만 반영해야 한다.
+      //
+      // 예전에는 여기서 커서를 내 메시지 id로 앞당겼다. 그러면 상대가 방금
+      // 보낸 메시지(내 것보다 작은 id)를 아직 받지 못한 상태에서 커서가 그것을
+      // 뛰어넘어, 다음 폴링이 after=내id 로 묻는다. 그 메시지는 영영 오지 않는다.
+      // 면접 대화는 계약 조건의 근거가 되는 기록이라 한 줄이 사라지면 안 된다.
       emptyRunsRef.current = 0
-      setMessages((prev) => [...prev, message])
+      setMessages((prev) => mergeById(prev, [message]))
     },
     [roomId]
   )
