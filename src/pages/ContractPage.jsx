@@ -707,6 +707,7 @@ export default function ContractPage() {
   // 근로관계가 실제로 끝난 날. 계약 조건이 아니라 그 뒤에 일어난 사실이므로
   // 계약서 입력 폼과 분리해 둔다.
   const [employmentEnd, setEmploymentEnd] = useState({ endedAt: null, reason: null })
+  const [certificates, setCertificates] = useState([])
   const [linkableRooms, setLinkableRooms] = useState([])
   const [linking, setLinking] = useState(false)
   const printRef = useRef(null)
@@ -766,6 +767,7 @@ export default function ContractPage() {
     setDeliveryState(view.deliveryState ?? null)
     setDocumentSha256(view.documentSha256 ?? null)
     setRevokedSignatures(view.revokedSignatures ?? [])
+    setCertificates(view.certificates ?? [])
     setContinuity(view.continuity ?? null)
     setRetention(view.retention ?? null)
     setLinkableRooms(view.linkableRooms ?? [])
@@ -1431,7 +1433,12 @@ export default function ContractPage() {
 
       {/* 계약 이력을 계약서에서 떼어낸 독립 문서. 계약 내용을 보이지 않고도
           체결 사실을 제3자에게 확인시키는 출구다. */}
-      <AuditCertificate roomId={roomId} canIssue={Boolean(myRole)} hasSignature={signatures.length > 0} />
+      <AuditCertificate
+        roomId={roomId}
+        canIssue={Boolean(myRole)}
+        hasSignature={signatures.length > 0}
+        initial={certificates}
+      />
 
       {history.length > 0 && (
         <section className="contract-history">

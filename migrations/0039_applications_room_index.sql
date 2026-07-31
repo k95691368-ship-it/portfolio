@@ -1,0 +1,14 @@
+-- 계약서 화면은 열릴 때마다 "이 방이 어느 공고에서 왔는가"를 묻는다.
+--
+--   SELECT ... FROM applications a JOIN job_postings p ON p.id = a.posting_id
+--    WHERE a.room_id = ? LIMIT 1
+--
+-- 채용절차법 제4조 제3항 대조(공고에 제시한 조건보다 불리해졌는지)가 이 조회
+-- 하나에 달려 있어서, 계약서를 열 때마다 반드시 실행된다. 그런데 applications
+-- 에는 room_id 인덱스가 없어 매번 표 전체를 훑었다. 방 단위로 조회되는 다른
+-- 표(chat_messages, contract_deliveries, signature_revocations, audit_certificates,
+-- contract_change_requests, contract_edit_history)는 모두 인덱스나 UNIQUE 제약을
+-- 갖고 있는데 여기만 빠져 있었다.
+--
+-- 지원서가 쌓일수록 계약서 화면이 느려지는 종류의 문제라, 지금은 티가 나지 않는다.
+CREATE INDEX IF NOT EXISTS idx_applications_room ON applications(room_id);

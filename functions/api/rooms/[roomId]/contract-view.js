@@ -110,9 +110,10 @@ export async function onRequestGet({ env, data, params }) {
       )
         .bind(roomId)
         .all(),
-      // 이미 발급된 증명서 — 감사추적에 함께 싣는다.
+      // 이미 발급된 증명서 — 감사추적에 함께 싣고, 화면에도 그대로 내려준다.
       env.DB.prepare(
-        'SELECT serial, issued_at FROM audit_certificates WHERE room_id = ? ORDER BY issued_at ASC LIMIT 20'
+        `SELECT serial, issued_at, certificate_sha256, document_sha256, event_count, revoked_at
+           FROM audit_certificates WHERE room_id = ? ORDER BY issued_at ASC LIMIT 20`
       )
         .bind(roomId)
         .all(),
@@ -275,9 +276,14 @@ export async function onRequestGet({ env, data, params }) {
     revoked_at: r.revoked_at,
     reason: r.reason,
   }))
+  // 감사추적은 오래된 순으로 읽지만, 화면 목록은 최근 발급이 위로 온다.
   const certificates = certificateRows.results.map((c) => ({
     serial: c.serial,
     issuedAt: c.issued_at,
+    certificateSha256: c.certificate_sha256,
+    documentSha256: c.document_sha256,
+    eventCount: c.event_count,
+    revokedAt: c.revoked_at,
   }))
 
   let preSignCheck = null
@@ -376,6 +382,10 @@ export async function onRequestGet({ env, data, params }) {
     },
     // 서명 후 내용이 바뀌어 무효가 된 서명 (다시 서명해야 하는 이유)
     revokedSignatures,
+    // 이 화면은 필요한 것을 한 번에 받는다는 원칙으로 만들어져 있는데,
+    // 증명서 목록만 화면이 따로 한 번 더 요청하고 있었다. 이미 여기서 읽으므로
+    // 함께 내려준다. (최근 발급이 위로 오게 뒤집어서)
+    certificates: [...certificates].reverse(),
     explanation,
     postingComparison,
     deliveries,

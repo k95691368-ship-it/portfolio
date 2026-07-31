@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
 
@@ -8,27 +8,26 @@ import { useToast } from '../context/ToastContext.jsx'
 // PDF 바이트가 조금만 달라져도 지문이 달라진다. 증명서는 발급번호와 재현 가능한
 // 지문을 달고 따로 나가, 계약 내용을 보이지 않고도 "이 계약이 언제 어떻게
 // 체결됐는지"를 제3자에게 확인시킬 수 있다.
-export default function AuditCertificate({ roomId, canIssue, hasSignature }) {
+// initial: 계약서 화면이 한 번의 요청으로 함께 받아 온 발급 목록.
+// 예전에는 이 화면이 마운트될 때마다 목록을 따로 한 번 더 요청했다. 같은 데이터를
+// 이미 받아 놓고 다시 묻는 것이라, 계약서를 열 때마다 요청이 하나씩 더 나갔다.
+// 발급 뒤에만 다시 읽는다.
+export default function AuditCertificate({ roomId, canIssue, hasSignature, initial }) {
   const toast = useToast()
-  const [certificates, setCertificates] = useState([])
+  const [refreshed, setRefreshed] = useState(null)
   const [issuing, setIssuing] = useState(false)
   const [issued, setIssued] = useState(null)
-  const [loaded, setLoaded] = useState(false)
+
+  const certificates = refreshed ?? initial ?? []
 
   const load = useCallback(async () => {
     try {
       const data = await api.get(`/rooms/${roomId}/audit-certificate`)
-      setCertificates(data.certificates ?? [])
+      setRefreshed(data.certificates ?? [])
     } catch {
       // 목록을 못 읽는 것으로 계약서 화면 전체를 막지 않는다.
-    } finally {
-      setLoaded(true)
     }
   }, [roomId])
-
-  useEffect(() => {
-    load()
-  }, [load])
 
   const handleIssue = async () => {
     setIssuing(true)
@@ -65,7 +64,6 @@ export default function AuditCertificate({ roomId, canIssue, hasSignature }) {
     URL.revokeObjectURL(url)
   }
 
-  if (!loaded) return null
   if (!hasSignature && certificates.length === 0) return null
 
   const verifyUrl = (serial) => `${window.location.origin}/verify?serial=${serial}`
