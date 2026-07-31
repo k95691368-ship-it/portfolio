@@ -105,8 +105,9 @@ export async function onRequestPost({ env, data, params, request }) {
   await env.DB.prepare(
     `INSERT INTO signatures
        (id, room_id, signer_user_id, signer_role, image_data_url, signed_at,
-        signer_ip, signer_user_agent, signer_country, document_sha256)
-     VALUES (?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, ?)
+        signer_ip, signer_user_agent, signer_country, document_sha256,
+        verified_email, session_started_at, verification_method)
+     VALUES (?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(room_id, signer_role) DO UPDATE SET
        signer_user_id = excluded.signer_user_id,
        image_data_url = excluded.image_data_url,
@@ -114,7 +115,10 @@ export async function onRequestPost({ env, data, params, request }) {
        signer_ip = excluded.signer_ip,
        signer_user_agent = excluded.signer_user_agent,
        signer_country = excluded.signer_country,
-       document_sha256 = excluded.document_sha256`
+       document_sha256 = excluded.document_sha256,
+       verified_email = excluded.verified_email,
+       session_started_at = excluded.session_started_at,
+       verification_method = excluded.verification_method`
   )
     .bind(
       genId(),
@@ -125,7 +129,12 @@ export async function onRequestPost({ env, data, params, request }) {
       ip,
       userAgent,
       country,
-      documentSha256
+      documentSha256,
+      // 어느 계정으로, 언제 로그인한 세션에서 서명했는지. 접속 환경만으로는
+      // "내가 서명하지 않았다"는 주장에 답할 수 없다.
+      data.user.email ?? null,
+      data.user.session_started_at ?? null,
+      data.user.must_change_password ? 'temp_password' : 'account_password'
     )
     .run()
 

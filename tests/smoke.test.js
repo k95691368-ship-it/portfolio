@@ -46,6 +46,8 @@ const PROTECTED = [
   ['POST', '/api/rooms/join'],
   ['GET', '/api/rooms/smoke-nonexistent'],
   ['GET', '/api/rooms/smoke-nonexistent/view'],
+  ['GET', '/api/rooms/smoke-nonexistent/audit-certificate'],
+  ['POST', '/api/rooms/smoke-nonexistent/audit-certificate'],
   ['GET', '/api/rooms/smoke-nonexistent/messages'],
   ['GET', '/api/rooms/smoke-nonexistent/contract'],
   ['GET', '/api/rooms/smoke-nonexistent/contract-view'],
@@ -113,6 +115,20 @@ describe(`배포 스모크 (${BASE})`, () => {
       const res = await call('/api/jobs/smoke-nonexistent')
       expect(res.status).toBe(404)
       expect(res.json?.error).toBeTruthy()
+    })
+
+    // 증명서는 계약 당사자가 아닌 사람에게 제시된다. 로그인 없이 확인할 수
+    // 있어야 증명서로서 쓸모가 있다.
+    it('증명서 확인은 로그인 없이 열려 있다', async () => {
+      const res = await call('/api/verify-certificate?serial=AC-ABCD-EFGH-JKMN')
+      expect(res.status).toBe(404) // 형식은 맞지만 발급된 적 없는 번호
+      expect(res.json?.error).toBeTruthy()
+    })
+
+    it('형식이 틀린 발급번호는 400으로 안내한다', async () => {
+      const res = await call('/api/verify-certificate?serial=abc')
+      expect(res.status).toBe(400)
+      expect(res.json?.error).toContain('AC-')
     })
 
     it('마감·미존재 공고에는 지원할 수 없다', async () => {

@@ -106,7 +106,10 @@ export async function getSessionUser(db, request) {
   const tokenHash = await sha256Hex(token)
   const row = await db
     .prepare(
-      `SELECT users.* FROM sessions
+      // 서명이 어느 로그인 세션에서 이루어졌는지 남기기 위해 세션 시작 시각을
+      // 함께 읽는다. 서명 증거는 "누가 언제 어디서"인데, 지금까지 "언제 로그인한
+      // 세션인지"가 어디에도 없었다.
+      `SELECT users.*, sessions.created_at AS session_started_at FROM sessions
        JOIN users ON users.id = sessions.user_id
        WHERE sessions.token_hash = ? AND sessions.expires_at > datetime('now')`
     )

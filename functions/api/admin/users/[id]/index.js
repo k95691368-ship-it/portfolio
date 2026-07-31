@@ -143,6 +143,8 @@ export async function onRequestDelete({ env, data, params }) {
       env.DB.prepare('UPDATE signature_revocations SET revoked_by_user_id = NULL WHERE revoked_by_user_id = ?').bind(params.id),
       // 교부 이력도 수신자를 참조한다. 기록 자체는 남기고 참조만 끊는다.
       env.DB.prepare('UPDATE contract_deliveries SET recipient_user_id = NULL WHERE recipient_user_id = ?').bind(params.id),
+      // 증명서 발급 기록도 사용자를 참조한다. 발급 사실은 남기고 참조만 끊는다.
+      env.DB.prepare('UPDATE audit_certificates SET issued_by_user_id = NULL WHERE issued_by_user_id = ?').bind(params.id),
       env.DB.prepare('DELETE FROM documents WHERE user_id = ?').bind(params.id),
       env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(params.id),
       env.DB.prepare('DELETE FROM users WHERE id = ?').bind(params.id),
