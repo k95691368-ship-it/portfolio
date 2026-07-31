@@ -2,6 +2,8 @@ import { genId } from '../../../_lib/db.js'
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { getRoomAccess } from '../../../_lib/rooms.js'
 import { rowToCamelTerms } from '../../../_lib/contract.js'
+import { mapRequestRow } from '../../../_lib/changeRequests.js'
+import { findLanguage } from '../../../_lib/languages.js'
 import { contractFingerprint } from '../../../_lib/contractDocument.js'
 import { buildAuditEvents, describeSigningEnvironment } from '../../../_lib/auditTrail.js'
 import { describeContractPeriod, describeRetention } from '../../../_lib/contractPeriod.js'
@@ -20,8 +22,19 @@ import {
 // 발급 시점의 사실을 그대로 동결해 보관하므로, 이후 계약 내용이 바뀌어도 발급된
 // 증명서는 그대로 검증된다.
 async function loadSource(env, roomId) {
-  const [room, participants, termsRow, historyRows, signatureRows, storedRow, finalOffer, revocationRows] =
-    await Promise.all([
+  const [
+    room,
+    participants,
+    termsRow,
+    historyRows,
+    signatureRows,
+    storedRow,
+    finalOffer,
+    revocationRows,
+    changeRequestRows,
+    translationRows,
+    certificateRows,
+  ] = await Promise.all([
       env.DB.prepare('SELECT id, title, status, created_at FROM interview_rooms WHERE id = ?')
         .bind(roomId)
         .first(),
@@ -60,6 +73,24 @@ async function loadSource(env, roomId) {
       )
         .bind(roomId)
         .all(),
+      // 이력에 함께 실어야 할 사건들. 각자의 표에만 남아 있어서 그동안
+      // 증명서의 이력이 실제보다 성겼다.
+      env.DB.prepare(
+        `SELECT field, status, created_at, resolved_at
+           FROM contract_change_requests WHERE room_id = ? ORDER BY id ASC LIMIT 100`
+      )
+        .bind(roomId)
+        .all(),
+      env.DB.prepare(
+        'SELECT language, created_at FROM contract_translations WHERE room_id = ?'
+      )
+        .bind(roomId)
+        .all(),
+      env.DB.prepare(
+        'SELECT serial, issued_at FROM audit_certificates WHERE room_id = ? ORDER BY issued_at ASC LIMIT 20'
+      )
+        .bind(roomId)
+        .all(),
     ])
 
   return {
@@ -71,6 +102,16 @@ async function loadSource(env, roomId) {
     storedRow,
     finalOffer,
     revocations: revocationRows.results,
+    changeRequests: changeRequestRows.results.map(mapRequestRow),
+    translations: translationRows.results.map((t) => {
+      const lang = findLanguage(t.language)
+      return {
+        language: t.language,
+        nativeLabel: lang?.nativeLabel ?? t.language,
+        createdAt: t.created_at,
+      }
+    }),
+    certificates: certificateRows.results.map((c) => ({ serial: c.serial, issuedAt: c.issued_at })),
   }
 }
 
@@ -105,6 +146,11 @@ export async function onRequestPost({ env, data, params }) {
     signatures: src.signatures,
     signedContract: src.storedRow,
     finalOffer: src.finalOffer,
+    revocations: src.revocations,
+    changeRequests: src.changeRequests,
+    deliveries,
+    translations: src.translations,
+    certificates: src.certificates,
   })
 
   // 발급 시각을 한 번만 만들어 증명서 본문과 저장 행이 같은 값을 쓰게 한다.

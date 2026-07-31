@@ -25,6 +25,9 @@ export default function FinalOfferEmailForm({ roomId, initial, candidateName, co
   const candidate = initial?.candidate ?? null
   const delivery = sentDelivery ?? initial?.delivery ?? null
   const loading = !initial
+  // 서버는 이 값을 내려주고 있었는데 화면이 읽지 않아, 이메일이 설정되지 않은
+  // 상태에서도 버튼이 눌리고 503만 돌아왔다. 초대 폼과 같은 방식으로 막는다.
+  const emailConfigured = initial?.emailConfigured ?? true
   const setDelivery = setSentDelivery
 
   const handleSend = async (event) => {
@@ -86,6 +89,11 @@ export default function FinalOfferEmailForm({ roomId, initial, candidateName, co
         <p className="notice">이전 발송이 완료되지 않았습니다. 내용을 확인하고 다시 시도해주세요.</p>
       )}
       {delivery?.status === 'sending' && <p className="notice">현재 이메일을 발송하고 있습니다.</p>}
+      {!emailConfigured && (
+        <p className="notice">
+          이메일 발송 기능이 아직 설정되지 않았습니다. 지원자에게는 앱 알림으로 안내됩니다.
+        </p>
+      )}
       <form className="final-offer-form" onSubmit={handleSend}>
         <label>
           제목
@@ -108,7 +116,7 @@ export default function FinalOfferEmailForm({ roomId, initial, candidateName, co
         <button
           type="submit"
           className="btn-primary"
-          disabled={sending || delivery?.status === 'sending'}
+          disabled={sending || delivery?.status === 'sending' || !emailConfigured}
         >
           {sending ? '발송 중...' : '최종합격 이메일 보내기'}
         </button>

@@ -51,6 +51,7 @@ export async function onRequestGet({ env, data, params }) {
     changeRequestRows,
     translationRows,
     revocationRows,
+    certificateRows,
   ] = await Promise.all([
       env.DB.prepare('SELECT id, title, invite_code, status, created_at FROM interview_rooms WHERE id = ?')
         .bind(roomId)
@@ -106,6 +107,12 @@ export async function onRequestGet({ env, data, params }) {
       env.DB.prepare(
         `SELECT signer_role, signed_at, revoked_at, reason
            FROM signature_revocations WHERE room_id = ? ORDER BY id DESC LIMIT 20`
+      )
+        .bind(roomId)
+        .all(),
+      // 이미 발급된 증명서 — 감사추적에 함께 싣는다.
+      env.DB.prepare(
+        'SELECT serial, issued_at FROM audit_certificates WHERE room_id = ? ORDER BY issued_at ASC LIMIT 20'
       )
         .bind(roomId)
         .all(),
@@ -241,6 +248,38 @@ export async function onRequestGet({ env, data, params }) {
     }))
   }
 
+  // 감사추적과 응답이 같은 목록을 쓰도록 먼저 만들어 둔다. 예전에는 응답을
+  // 조립하는 자리에서만 변환해서, 이력에는 이 사건들이 들어가지 못했다.
+  const mappedRequests = changeRequestRows.results.map(mapRequestRow)
+  const mappedTranslations = translationRows.results.map((t) => {
+    const lang = findLanguage(t.language)
+    let articles = []
+    try {
+      articles = JSON.parse(t.articles_json)
+    } catch {
+      articles = []
+    }
+    return {
+      language: t.language,
+      label: lang?.label ?? t.language,
+      nativeLabel: lang?.nativeLabel ?? t.language,
+      articles,
+      createdAt: t.created_at,
+    }
+  })
+  const revokedSignatures = revocationRows.results.map((r) => ({
+    role: r.signer_role,
+    signer_role: r.signer_role,
+    signedAt: r.signed_at,
+    revokedAt: r.revoked_at,
+    revoked_at: r.revoked_at,
+    reason: r.reason,
+  }))
+  const certificates = certificateRows.results.map((c) => ({
+    serial: c.serial,
+    issuedAt: c.issued_at,
+  }))
+
   let preSignCheck = null
   if (!isSigned && terms) {
     const diffs = diffAgreedVsCurrent(parsedHistory, terms)
@@ -328,15 +367,15 @@ export async function onRequestGet({ env, data, params }) {
         signatures,
         signedContract: storedRow,
         finalOffer,
+        revocations: revokedSignatures,
+        changeRequests: mappedRequests,
+        deliveries,
+        translations: mappedTranslations,
+        certificates,
       }),
     },
     // 서명 후 내용이 바뀌어 무효가 된 서명 (다시 서명해야 하는 이유)
-    revokedSignatures: revocationRows.results.map((r) => ({
-      role: r.signer_role,
-      signedAt: r.signed_at,
-      revokedAt: r.revoked_at,
-      reason: r.reason,
-    })),
+    revokedSignatures,
     explanation,
     postingComparison,
     deliveries,
@@ -351,23 +390,8 @@ export async function onRequestGet({ env, data, params }) {
       terms?.aiDocument && terms.aiDocument.length > 0
         ? terms.aiDocument
         : buildArticlesFromTerms(terms),
-    translations: translationRows.results.map((t) => {
-      const lang = findLanguage(t.language)
-      let articles = []
-      try {
-        articles = JSON.parse(t.articles_json)
-      } catch {
-        articles = []
-      }
-      return {
-        language: t.language,
-        label: lang?.label ?? t.language,
-        nativeLabel: lang?.nativeLabel ?? t.language,
-        articles,
-        createdAt: t.created_at,
-      }
-    }),
-    changeRequests: changeRequestRows.results.map(mapRequestRow),
+    translations: mappedTranslations,
+    changeRequests: mappedRequests,
     signedContract: storedRow
       ? {
           stored: {

@@ -55,7 +55,17 @@ export function buildFinalOfferEmailHtml({ bodyText, companyName }) {
 // True when the environment has everything needed to actually send mail.
 // Used by the route to return a clear "not configured" error instead of
 // attempting a doomed send.
+//
+// 자격 증명이 있다고 발송이 되는 것은 아니다. 공급자 계정이 막혀 있으면 앱은
+// "설정됨"으로 믿고 매번 시도하다 실패하고, 그 실패가 합격 처리·계약서 저장
+// 화면에 "전송 실패"로 새어 나오며 교부 이력에도 실패 행을 남긴다. 미구현인데
+// 구현된 척하다 넘어지는 것이 가장 나쁘다.
+//
+// 그래서 명시적으로 켜야 켜진다. EMAIL_ENABLED가 '1'이 아니면 앱 전체가 이
+// 기능을 아직 만들지 않은 것으로 취급하고, 화면은 그렇게 안내한다.
+// 발송을 되살릴 때는 자격 증명과 함께 EMAIL_ENABLED=1을 넣으면 된다.
 export function isEmailConfigured(env) {
+  if (env.EMAIL_ENABLED !== '1') return false
   return !!(env.MAILJET_API_KEY && env.MAILJET_SECRET_KEY && env.FINAL_OFFER_FROM_EMAIL)
 }
 
