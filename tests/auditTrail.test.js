@@ -4,6 +4,7 @@ import {
   describeSigningEnvironment,
   buildAuditEvents,
 } from '../functions/_lib/auditTrail.js'
+import { mapRequestRow } from '../functions/_lib/changeRequests.js'
 
 describe('summarizeUserAgent', () => {
   it('브라우저와 운영체제만 뽑아낸다', () => {
@@ -212,6 +213,31 @@ describe('buildAuditEvents', () => {
     })
     expect(events.find((e) => e.event === '감사추적증명서 발급')).toBeUndefined()
     expect(events.every((e) => e.at !== '')).toBe(true)
+  })
+
+  // 값은 빼되 "무엇에 대한 요청인가"는 남아야 이력이 뜻을 갖는다.
+  // DB 행 → 화면용 변환 → 이력까지 실제 라벨이 그대로 흘러가는지 본다.
+  it('DB 행에서 이력까지 항목 이름이 살아서 간다', () => {
+    const events = buildAuditEvents({
+      ...base,
+      changeRequests: [
+        mapRequestRow({
+          id: 'r1',
+          field: 'workLocation',
+          current_value: '서울 본사',
+          requested_value: '서울 강남 지사',
+          reason: '통근 거리 때문입니다',
+          status: 'accepted',
+          created_at: '2026-01-02 11:00:00',
+          resolved_at: '2026-01-02 12:00:00',
+        }),
+      ],
+    })
+    expect(events.find((e) => e.event === '계약 조건 수정 요청').detail).toBe('근무장소')
+    expect(events.find((e) => e.event === '수정 요청 수락').detail).toBe('근무장소')
+    const text = JSON.stringify(events)
+    expect(text).not.toContain('서울 강남 지사')
+    expect(text).not.toContain('통근 거리')
   })
 
   it('모든 사건이 뒤섞여도 시간순을 지킨다', () => {
