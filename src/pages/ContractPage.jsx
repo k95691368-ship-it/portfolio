@@ -614,6 +614,7 @@ export default function ContractPage() {
   const [sourceArticles, setSourceArticles] = useState([])
   const [translating, setTranslating] = useState(false)
   const [explanation, setExplanation] = useState(null)
+  const [postingComparison, setPostingComparison] = useState(null)
   const [deliveries, setDeliveries] = useState([])
   const [deliveryState, setDeliveryState] = useState(null)
   const [documentSha256, setDocumentSha256] = useState(null)
@@ -673,6 +674,7 @@ export default function ContractPage() {
     setChangeRequests(view.changeRequests ?? [])
     setPeriod(view.period ?? null)
     setExplanation(view.explanation ?? null)
+    setPostingComparison(view.postingComparison ?? null)
     setDeliveries(view.deliveries ?? [])
     setDeliveryState(view.deliveryState ?? null)
     setDocumentSha256(view.documentSha256 ?? null)
@@ -1049,6 +1051,50 @@ export default function ContractPage() {
       {/* 근로자가 자기 계약을 이해하도록 돕는다. 서명 전에 보이는 것이 중요하므로
           서명 영역보다 위에 둔다. */}
       <ContractExplainer explanation={explanation} myRole={myRole} />
+
+      {/* 공고를 보고 지원한 사람은 그 조건을 전제로 결정했다. 계약서에서 조건이
+          나빠졌는지 값으로 대조해 알린다 (채용절차법 제4조 제3항). */}
+      {postingComparison?.comparable && (
+        <section className="posting-compare">
+          <div className="period-head">
+            <h2>공고와 대조</h2>
+            <span
+              className={`badge ${postingComparison.issues.length === 0 ? 'badge-success' : postingComparison.hasUnfavorable ? 'badge-danger' : 'badge-warning'}`}
+            >
+              {postingComparison.issues.length === 0
+                ? '공고와 일치'
+                : `다른 항목 ${postingComparison.issues.length}건`}
+            </span>
+          </div>
+          <p className="period-detail">
+            지원한 공고: {postingComparison.postingTitle}
+          </p>
+          <p className={postingComparison.issues.length === 0 ? 'period-detail' : 'period-alert'}>
+            {postingComparison.summary}
+          </p>
+          {postingComparison.issues.length > 0 && (
+            <ul className="compare-issue-list">
+              {postingComparison.issues.map((i) => (
+                <li key={i.field}>
+                  <span className={`badge ${SEVERITY_BADGE[i.severity] || 'badge-neutral'}`}>
+                    {i.label}
+                  </span>{' '}
+                  {i.message}
+                </li>
+              ))}
+            </ul>
+          )}
+          {postingComparison.matched.length > 0 && (
+            <ul className="compare-issue-list matched">
+              {postingComparison.matched.map((m) => (
+                <li key={m.field}>
+                  {m.label} — {m.message}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       {/* 교부 의무(근로기준법 제17조 제2항)는 사업주에게 있고 위반은 벌금
           대상이다. 이행 여부와 근로자가 실제로 확인했는지를 함께 보여 준다. */}

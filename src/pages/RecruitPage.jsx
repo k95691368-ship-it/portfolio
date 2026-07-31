@@ -7,6 +7,22 @@ import NotificationBell from '../components/NotificationBell.jsx'
 import ApplicantCompare from '../components/ApplicantCompare.jsx'
 import Modal from '../components/Modal.jsx'
 
+// 공고 등록 폼의 빈 상태. 한 곳에만 두어, 등록 후 초기화에서 필드를 빠뜨리는 일을 막는다.
+const EMPTY_POSTING = {
+  title: '',
+  department: '',
+  employmentType: '',
+  location: '',
+  deadline: '',
+  description: '',
+  wageType: '',
+  wageMin: '',
+  wageMax: '',
+  workHoursStart: '',
+  workHoursEnd: '',
+  workDays: '',
+}
+
 const STATUS_LABEL = {
   submitted: { label: '심사 대기', badge: 'badge-warning' },
   passed: { label: '서류합격', badge: 'badge-success' },
@@ -367,14 +383,8 @@ export default function RecruitPage() {
   const [comparePosting, setComparePosting] = useState(null)
 
   // 새 공고 폼
-  const [form, setForm] = useState({
-    title: '',
-    department: '',
-    employmentType: '',
-    location: '',
-    deadline: '',
-    description: '',
-  })
+  const [form, setForm] = useState(EMPTY_POSTING)
+
   const [creating, setCreating] = useState(false)
 
   // 지원서 검색·필터
@@ -415,17 +425,10 @@ export default function RecruitPage() {
     setCreating(true)
     try {
       await api.post('/postings', form)
-      // deadline을 빠뜨리면 undefined가 되어 날짜 칸이 제어를 벗어난다. 화면에는
-      // 앞 공고의 마감일이 남아 있는데 다음 공고는 '상시 모집'으로 저장됐다.
-      // 마감일을 고치는 화면이 없어 되돌릴 방법도 없었다.
-      setForm({
-        title: '',
-        department: '',
-        employmentType: '',
-        location: '',
-        deadline: '',
-        description: '',
-      })
+      // 한 곳에 모아 둔 초기값을 그대로 쓴다. 예전에는 여기서 필드를 빠뜨려
+      // 그 칸이 제어를 벗어났고, 화면에는 앞 공고의 값이 남아 있는데 다음 공고는
+      // 비어 있는 채로 저장됐다.
+      setForm(EMPTY_POSTING)
       await loadAll()
       toast.success('공고가 정상 등록되었습니다.')
     } catch (err) {
@@ -514,6 +517,70 @@ export default function RecruitPage() {
               />
             </label>
           </div>
+
+          {/* 공고에 제시한 조건은 나중에 계약서와 대조된다. 값으로 남겨 두면
+              지원자가 무엇을 전제로 지원했는지 확인할 수 있다
+              (채용절차법 제4조 제3항 — 제시한 조건을 불리하게 바꾸는 것을 금지). */}
+          <fieldset className="posting-conditions">
+            <legend>제시 근로조건 (선택 — 적으면 계약서와 자동으로 대조합니다)</legend>
+            <div className="form-grid">
+              <label>
+                임금 종류
+                <select
+                  value={form.wageType}
+                  onChange={(e) => setForm((f) => ({ ...f, wageType: e.target.value }))}
+                >
+                  <option value="">선택 안 함</option>
+                  <option value="monthly">월급</option>
+                  <option value="hourly">시급</option>
+                  <option value="annual">연봉</option>
+                </select>
+              </label>
+              <label>
+                최소 금액
+                <input
+                  value={form.wageMin}
+                  onChange={(e) => setForm((f) => ({ ...f, wageMin: e.target.value }))}
+                  placeholder="2500000"
+                  inputMode="numeric"
+                />
+              </label>
+              <label>
+                최대 금액 (선택)
+                <input
+                  value={form.wageMax}
+                  onChange={(e) => setForm((f) => ({ ...f, wageMax: e.target.value }))}
+                  placeholder="3000000"
+                  inputMode="numeric"
+                />
+              </label>
+              <label>
+                근무 시작
+                <input
+                  value={form.workHoursStart}
+                  onChange={(e) => setForm((f) => ({ ...f, workHoursStart: e.target.value }))}
+                  placeholder="09:00"
+                />
+              </label>
+              <label>
+                근무 종료
+                <input
+                  value={form.workHoursEnd}
+                  onChange={(e) => setForm((f) => ({ ...f, workHoursEnd: e.target.value }))}
+                  placeholder="18:00"
+                />
+              </label>
+              <label>
+                근무일
+                <input
+                  value={form.workDays}
+                  onChange={(e) => setForm((f) => ({ ...f, workDays: e.target.value }))}
+                  placeholder="주 5일 (월~금)"
+                />
+              </label>
+            </div>
+          </fieldset>
+
           <label>
             상세 내용 <span className="consent-required" aria-hidden="true">*</span>
             <textarea
@@ -694,3 +761,5 @@ export default function RecruitPage() {
     </div>
   )
 }
+
+

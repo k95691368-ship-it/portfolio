@@ -1686,6 +1686,42 @@
   flex-wrap: wrap;
 }
 /* 표 안의 행 머리(이름)는 열 머리처럼 굵게 보이지 않아야 한다 */
+.posting-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.compare-issue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: left;
+}
+.compare-issue-list.matched {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+/* 공고 등록 폼의 제시 근로조건 묶음 */
+.posting-conditions {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin: 0;
+}
+.posting-conditions legend {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 0 6px;
+}
 .contract-explainer {
   display: flex;
   flex-direction: column;

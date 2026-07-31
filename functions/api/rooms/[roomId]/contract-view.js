@@ -21,6 +21,8 @@ import { checkContractDocument } from '../../../_lib/documentCheck.js'
 import { contractFingerprint } from '../../../_lib/contractDocument.js'
 import { markFirstViewed, listDeliveries, describeDeliveryState } from '../../../_lib/delivery.js'
 import { explainContract } from '../../../_lib/contractExplainer.js'
+import { comparePostingToContract } from '../../../_lib/postingMatch.js'
+import { postingConditionsFromRow } from '../../../_lib/postingConditions.js'
 
 // 갱신 사슬을 거슬러 올라가는 최대 깊이 (link-previous의 제한과 같아야 한다)
 const MAX_CHAIN_DEPTH = 10
@@ -173,6 +175,33 @@ export async function onRequestGet({ env, data, params }) {
   // 체결이 끝난 계약은 보존 의무 기간을 관리해야 한다 (근로기준법 제42조).
   const retention = isSigned && terms ? describeRetention(terms, storedRow?.created_at) : null
 
+  // 이 면접방이 어느 공고에서 왔는지 찾아, 공고에 제시된 조건과 계약서를 대조한다.
+  // 채용절차법 제4조 제3항은 채용광고에 제시한 근로조건을 구직자에게 불리하게
+  // 변경하는 것을 금지한다. 비교할 값이 없으면 그 위반을 알아차릴 수 없다.
+  let postingComparison = null
+  if (terms) {
+    const posting = await env.DB.prepare(
+      `SELECT p.title, p.employment_type, p.location,
+              p.wage_type, p.wage_min, p.wage_max,
+              p.work_hours_start, p.work_hours_end, p.work_days
+         FROM applications a JOIN job_postings p ON p.id = a.posting_id
+        WHERE a.room_id = ? LIMIT 1`
+    )
+      .bind(roomId)
+      .first()
+    if (posting) {
+      const compared = comparePostingToContract(
+        {
+          ...postingConditionsFromRow(posting),
+          employmentType: posting.employment_type,
+          location: posting.location,
+        },
+        terms
+      )
+      postingComparison = { postingTitle: posting.title, ...compared }
+    }
+  }
+
   // 근로자용 계약 해설. 계약서에 적힌 값만으로는 알 수 없는 것(환산 시급, 하루
   // 실근로시간, 무기계약 전환 여부)을 계산해 문장으로 돌려준다. AI를 쓰지 않으므로
   // 같은 계약이면 언제나 같은 설명이 나온다.
@@ -302,6 +331,7 @@ export async function onRequestGet({ env, data, params }) {
       reason: r.reason,
     })),
     explanation,
+    postingComparison,
     deliveries,
     deliveryState,
     preSignCheck,
