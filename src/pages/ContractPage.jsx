@@ -158,12 +158,81 @@ const PERIOD_BADGE = {
   unknown: 'badge-neutral',
 }
 
+// 근로관계가 실제로 끝난 날 — 보존 기간(제42조)의 기산일.
+function EmploymentEnd({ employmentEnd, canRecord, onRecord, onClear, busy }) {
+  const [endedOn, setEndedOn] = useState('')
+  const [reason, setReason] = useState('')
+
+  if (!canRecord && !employmentEnd?.endedAt) return null
+
+  if (employmentEnd?.endedAt) {
+    return (
+      <div className="employment-end">
+        <p className="period-detail">
+          근로관계 종료 <strong>{employmentEnd.endedAt}</strong>
+          {employmentEnd.reason && ` · ${employmentEnd.reason}`}
+        </p>
+        {canRecord && (
+          <button type="button" className="btn-sm" onClick={onClear} disabled={busy}>
+            종료 기록 취소
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <form
+      className="employment-end"
+      onSubmit={(e) => {
+        e.preventDefault()
+        onRecord({ endedOn, reason })
+      }}
+    >
+      <p className="period-detail">
+        근로관계가 끝났다면 그 날짜를 기록해주세요. 보존 기간 3년은 계약 종료일이 아니라 실제로 근로관계가
+        끝난 날부터 셉니다 (근로기준법 시행령 제22조 제2항).
+      </p>
+      <div className="career-row">
+        <label>
+          근로관계 종료일
+          <input type="date" value={endedOn} onChange={(e) => setEndedOn(e.target.value)} required />
+        </label>
+        <label>
+          사유 (선택)
+          <input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            maxLength={200}
+            placeholder="예: 계약기간 만료"
+          />
+        </label>
+      </div>
+      <button type="submit" className="btn-sm" disabled={busy || !endedOn}>
+        종료 기록하기
+      </button>
+    </form>
+  )
+}
+
 // 계약 기간 — 체결로 끝이 아니라 만료까지 관리해야 한다.
 // 이어진 계약(갱신) — 계속근로기간 합산과 보존 의무 기간
-function ContractLifecycle({ continuity, retention, linkableRooms, canLink, onLink, onUnlink, busy }) {
+function ContractLifecycle({
+  continuity,
+  retention,
+  linkableRooms,
+  canLink,
+  onLink,
+  onUnlink,
+  busy,
+  employmentEnd,
+  canRecordEnd,
+  onRecordEnd,
+  onClearEnd,
+}) {
   const [selected, setSelected] = useState('')
   const showPicker = canLink && linkableRooms.length > 0
-  if (!continuity?.linked && !retention?.known && !showPicker) return null
+  if (!continuity?.linked && !retention?.known && !showPicker && !canRecordEnd) return null
 
   return (
     <section className="contract-lifecycle">
@@ -238,9 +307,22 @@ function ContractLifecycle({ continuity, retention, linkableRooms, canLink, onLi
 
       {retention?.known && (
         <p className={retention.expired ? 'period-alert' : 'period-detail'}>
-          <span className="badge badge-neutral">{retention.label}</span> {retention.detail}
+          {/* 재직 중은 "보존 의무가 계속된다"는 뜻이지 문제가 아니다. 만료가
+              지난 경우만 눈에 띄게 표시한다. */}
+          <span className={`badge ${retention.expired ? 'badge-warning' : 'badge-neutral'}`}>
+            {retention.label}
+          </span>{' '}
+          {retention.detail}
         </p>
       )}
+
+      <EmploymentEnd
+        employmentEnd={employmentEnd}
+        canRecord={canRecordEnd}
+        onRecord={onRecordEnd}
+        onClear={onClearEnd}
+        busy={busy}
+      />
     </section>
   )
 }
@@ -622,6 +704,9 @@ export default function ContractPage() {
   const [revokedSignatures, setRevokedSignatures] = useState([])
   const [continuity, setContinuity] = useState(null)
   const [retention, setRetention] = useState(null)
+  // 근로관계가 실제로 끝난 날. 계약 조건이 아니라 그 뒤에 일어난 사실이므로
+  // 계약서 입력 폼과 분리해 둔다.
+  const [employmentEnd, setEmploymentEnd] = useState({ endedAt: null, reason: null })
   const [linkableRooms, setLinkableRooms] = useState([])
   const [linking, setLinking] = useState(false)
   const printRef = useRef(null)
@@ -671,6 +756,7 @@ export default function ContractPage() {
       socialInsurance: t.socialInsurance ?? {},
       customTerms: t.customTerms ?? [],
     })
+    setEmploymentEnd({ endedAt: t.employmentEndedAt ?? null, reason: t.employmentEndReason ?? null })
     setSignatures(sigData.signatures)
     setChangeRequests(view.changeRequests ?? [])
     setPeriod(view.period ?? null)
@@ -785,6 +871,35 @@ export default function ContractPage() {
       await api.post(`/rooms/${roomId}/link-previous`, { previousRoomId })
       await loadAll()
       toast.success('이전 계약과 연결되었습니다. 계속근로기간을 합산해 확인합니다.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setLinking(false)
+    }
+  }
+
+  const handleRecordEmploymentEnd = async ({ endedOn, reason }) => {
+    setLinking(true)
+    try {
+      await api.post(`/rooms/${roomId}/employment-end`, { endedOn, reason })
+      await loadAll()
+      toast.success('근로관계 종료가 기록되었습니다. 보존 기간은 이 날부터 3년입니다.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setLinking(false)
+    }
+  }
+
+  const handleClearEmploymentEnd = async () => {
+    if (!window.confirm('근로관계 종료 기록을 취소하면 다시 재직 중으로 표시되고 보존 의무가 계속됩니다. 진행할까요?')) {
+      return
+    }
+    setLinking(true)
+    try {
+      await api.delete(`/rooms/${roomId}/employment-end`)
+      await loadAll()
+      toast.success('근로관계 종료 기록을 취소했습니다.')
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -1137,6 +1252,10 @@ export default function ContractPage() {
         onLink={handleLinkPrevious}
         onUnlink={handleUnlinkPrevious}
         busy={linking}
+        employmentEnd={employmentEnd}
+        canRecordEnd={myRole === 'company' && isSigned}
+        onRecordEnd={handleRecordEmploymentEnd}
+        onClearEnd={handleClearEmploymentEnd}
       />
 
       <ContractTranslations

@@ -184,7 +184,21 @@ export default function AdminPage() {
       await loadAll()
       toast.success('면접방이 삭제되었습니다.')
     } catch (err) {
-      toast.error(err.message)
+      // 보존 의무가 남은 계약서는 서버가 한 번 막는다 (근로기준법 제42조).
+      // 무엇을 지우는지 알린 뒤에만 다시 요청한다.
+      if (err.status === 409 && err.message.includes('보존')) {
+        if (window.confirm(`${err.message}\n\n보존 의무를 확인했으며 그래도 삭제하시겠습니까? 이 사실은 감사 로그에 남습니다.`)) {
+          try {
+            await api.delete(`/admin/rooms/${room.id}`, { acknowledgeRetention: true })
+            await loadAll()
+            toast.success('보존 의무 확인 후 면접방이 삭제되었습니다.')
+          } catch (retryErr) {
+            toast.error(retryErr.message)
+          }
+        }
+      } else {
+        toast.error(err.message)
+      }
     } finally {
       setPendingId('')
     }

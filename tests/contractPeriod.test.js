@@ -7,6 +7,7 @@ import {
   describeContinuousEmployment,
   checkContinuityCompliance,
   describeRetention,
+  describeRetentionHold,
 } from '../functions/_lib/contractPeriod.js'
 
 const NOW = new Date(Date.UTC(2026, 8, 15)) // 2026-09-15 기준으로 고정
@@ -260,10 +261,46 @@ describe('describeRetention', () => {
     expect(r.detail).toContain('제42조')
   })
 
-  it('종료일이 없으면 서명일을 기산일로 쓴다', () => {
+  // 시행령 제22조 제2항의 기산일은 "근로관계가 끝난 날"이다. 종료일이 없는
+  // 무기계약은 근로관계가 아직 끝나지 않았으므로 보존 기간이 시작되지도 않는다.
+  // 서명일을 기산일로 쓰면 재직 중인 근로자의 계약서가 3년 뒤 "보존 종료"가 되어,
+  // 지워도 되는 것처럼 보이게 된다.
+  it('종료일이 없으면 재직 중으로 보고 보존 기간을 시작하지 않는다', () => {
     const r = describeRetention({}, '2026-01-10', NOW)
-    expect(r.basis).toBe('2026-01-10')
-    expect(r.until).toBe('2029-01-10')
+    expect(r.known).toBe(true)
+    expect(r.started).toBe(false)
+    expect(r.ongoing).toBe(true)
+    expect(r.expired).toBe(false)
+    expect(r.until).toBeNull()
+    expect(r.label).toContain('재직 중')
+  })
+
+  it('서명한 지 3년이 넘은 무기계약도 보존 종료로 뒤집히지 않는다', () => {
+    const r = describeRetention({}, '2020-01-10', NOW)
+    expect(r.expired).toBe(false)
+    expect(r.ongoing).toBe(true)
+  })
+
+  it('실제 근로관계 종료일이 기록되면 그 날부터 3년을 센다', () => {
+    const r = describeRetention({ contractEndDate: '2027-12-31' }, null, NOW, '2026-06-30')
+    expect(r.basisType).toBe('employment_ended')
+    expect(r.basis).toBe('2026-06-30')
+    expect(r.until).toBe('2029-06-30')
+    expect(r.started).toBe(true)
+  })
+
+  it('계약 종료일이 아직 오지 않았으면 보존 기간은 시작 전이다', () => {
+    const r = describeRetention({ contractEndDate: '2027-08-31' }, null, NOW)
+    expect(r.started).toBe(false)
+    expect(r.expired).toBe(false)
+    expect(r.until).toBe('2030-08-31')
+    expect(r.label).toContain('재직 중')
+  })
+
+  it('실제 종료일이 없으면 계약 종료일이 예정임을 밝힌다', () => {
+    const r = describeRetention({ contractEndDate: '2026-01-31' }, null, NOW)
+    expect(r.basisType).toBe('contract_end')
+    expect(r.detail).toContain('실제 근로관계 종료일이 기록되지 않아')
   })
 
   it('보존 기간이 지나면 종료로 표시한다', () => {
@@ -274,5 +311,33 @@ describe('describeRetention', () => {
 
   it('기산할 날짜가 없으면 알 수 없음', () => {
     expect(describeRetention({}, null, NOW).known).toBe(false)
+  })
+})
+
+describe('describeRetentionHold', () => {
+  it('체결 전 방은 보존 의무로 막지 않는다', () => {
+    expect(describeRetentionHold(null, false).held).toBe(false)
+  })
+
+  it('보존 기간이 남은 계약서는 막는다', () => {
+    const retention = describeRetention({ contractEndDate: '2026-01-31' }, null, NOW)
+    const hold = describeRetentionHold(retention, true)
+    expect(hold.held).toBe(true)
+    expect(hold.reason).toContain('제42조')
+  })
+
+  it('재직 중인 계약서도 막는다 — 보존 의무가 아직 계속된다', () => {
+    const retention = describeRetention({}, '2020-01-10', NOW)
+    expect(describeRetentionHold(retention, true).held).toBe(true)
+  })
+
+  it('보존 기간이 지난 계약서는 막지 않는다', () => {
+    const retention = describeRetention({ contractEndDate: '2020-01-01' }, null, NOW)
+    expect(describeRetentionHold(retention, true).held).toBe(false)
+  })
+
+  it('기산일을 알 수 없는 체결 계약은 보존하는 쪽으로 기운다', () => {
+    const hold = describeRetentionHold({ known: false }, true)
+    expect(hold.held).toBe(true)
   })
 })

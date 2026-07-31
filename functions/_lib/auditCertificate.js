@@ -180,7 +180,14 @@ export function buildCertificate(input) {
     events: (events || []).map((e) => ({ at: e.at, event: e.event, detail: e.detail ?? null })),
     document: document ?? null,
     period: period ? { startDate: period.startDate, endDate: period.endDate, label: period.label } : null,
-    retention: retention?.known ? { until: retention.until, basis: retention.basis } : null,
+    retention: retention?.known
+      ? {
+          basis: retention.basis,
+          basisType: retention.basisType,
+          started: retention.started,
+          until: retention.until,
+        }
+      : null,
     notice:
       '이 증명서는 발급 시점의 기록을 그대로 담은 것입니다. 아래 정본 문자열을 SHA-256으로 해시하면 증명서 지문과 같아야 합니다. 이 검증은 발급 기록과 증명서 지문의 일치를 확인하며, 발급 시스템 자체를 신뢰할 수 없는 상황까지 증명하지는 않습니다.',
   }

@@ -85,6 +85,20 @@ export function buildAuditEvents({
       detail: environment ? `${s.display_name} · ${environment}` : s.display_name,
     })
   }
+  // 근로관계가 끝난 날은 보존 기간(제42조)의 기산일이다. 이력에 남지 않으면
+  // 나중에 "언제부터 3년인가"를 증명서로 답할 수 없다.
+  if (terms?.employment_ended_at) {
+    events.push({
+      at: terms.employment_end_recorded_at || terms.employment_ended_at,
+      event: '근로관계 종료 기록',
+      detail: [
+        `종료일 ${terms.employment_ended_at}`,
+        terms.employment_end_reason || null,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    })
+  }
   if (finalOffer?.sent_at) {
     events.push({ at: finalOffer.sent_at, event: '최종합격 이메일 발송', detail: null })
   }

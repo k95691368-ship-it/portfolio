@@ -173,7 +173,14 @@ export async function onRequestGet({ env, data, params }) {
   }
 
   // 체결이 끝난 계약은 보존 의무 기간을 관리해야 한다 (근로기준법 제42조).
-  const retention = isSigned && terms ? describeRetention(terms, storedRow?.created_at) : null
+  //
+  // 체결 시점은 서명 시각으로 잡는다. 예전에는 회사가 PDF를 저장한 시각을 썼는데,
+  // 그 버튼을 누르지 않으면 체결된 계약에 체결 시점이 없는 것으로 취급됐다.
+  const lastSignedAt = signatures.map((s) => s.signed_at).filter(Boolean).sort().pop() ?? null
+  const retention =
+    isSigned && terms
+      ? describeRetention(terms, lastSignedAt || storedRow?.created_at, new Date(), terms.employmentEndedAt)
+      : null
 
   // 이 면접방이 어느 공고에서 왔는지 찾아, 공고에 제시된 조건과 계약서를 대조한다.
   // 채용절차법 제4조 제3항은 채용광고에 제시한 근로조건을 구직자에게 불리하게

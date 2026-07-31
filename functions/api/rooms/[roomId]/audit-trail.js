@@ -23,7 +23,9 @@ export async function onRequestGet({ env, data, params }) {
         .bind(params.roomId)
         .all(),
       env.DB.prepare(
-        'SELECT hire_confirmed_at, last_analyzed_at FROM contract_terms WHERE room_id = ?'
+        `SELECT hire_confirmed_at, last_analyzed_at,
+                employment_ended_at, employment_end_reason, employment_end_recorded_at
+           FROM contract_terms WHERE room_id = ?`
       )
         .bind(params.roomId)
         .first(),

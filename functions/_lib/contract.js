@@ -102,6 +102,9 @@ export function rowToCamelTerms(row) {
     wagePayMethod: row.wage_pay_method ?? null,
     wagePayDate: row.wage_pay_date ?? null,
     annualLeave: row.annual_leave ?? null,
+    // 근로관계가 실제로 끝난 날. 보존 기간(제42조)의 기산일이 된다.
+    employmentEndedAt: row.employment_ended_at ?? null,
+    employmentEndReason: row.employment_end_reason ?? null,
     socialInsurance: parseJsonColumn(row.social_insurance_json, null),
     uniformSize: row.uniform_size ?? null,
     customTerms: parseJsonColumn(row.custom_terms_json, []),

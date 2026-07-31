@@ -39,6 +39,9 @@ export const api = {
   get: (path) => request(path),
   post: (path, body) => request(path, { method: 'POST', body: JSON.stringify(body) }),
   patch: (path, body) => request(path, { method: 'PATCH', body: JSON.stringify(body) }),
-  delete: (path) => request(path, { method: 'DELETE' }),
+  // DELETE에도 본문을 실을 수 있어야 한다 — 보존 의무처럼 "알고도 지운다"는
+  // 확인을 서버가 받아야 하는 경우가 있다.
+  delete: (path, body) =>
+    request(path, { method: 'DELETE', ...(body ? { body: JSON.stringify(body) } : {}) }),
   upload,
 }

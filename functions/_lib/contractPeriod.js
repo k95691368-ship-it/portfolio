@@ -118,30 +118,107 @@ export const RETENTION_YEARS = 3
 // 갱신 사이 공백이 이보다 길면 계속근로가 끊겼을 수 있다고 본다.
 export const CONTINUITY_GAP_DAYS = 30
 
-// 계약서 보존 의무 기간. 기산일은 근로관계가 끝난 날(계약 종료일),
-// 종료일이 없으면 서명일로 잡는다.
-export function describeRetention(terms, signedAt, now = new Date()) {
-  const base = parseContractDate(terms?.contractEndDate) || parseContractDate(signedAt)
-  if (!base) return { known: false }
+// 계약서 보존 의무 기간.
+//
+// 근로기준법 제42조는 근로계약서 등 근로관계 서류를 3년간 보존하게 하고,
+// 시행령 제22조 제2항은 그 3년의 기산일을 "근로관계가 끝난 날"로 정한다.
+// 서명일이 아니다. 이 둘을 섞으면 판정이 정확히 반대로 뒤집힌다 — 종료일이 없는
+// 무기계약은 근로관계가 아직 끝나지 않아 보존 의무가 계속되는데, 서명일을
+// 기산일로 쓰면 재직 중인 근로자의 계약서가 서명 3년 뒤 "보존 종료"로 표시된다.
+// 지워도 되는 것처럼 보이는 서류를 지우게 만드는 것이 이 계산의 가장 큰 위험이다.
+//
+// 기산일 우선순위:
+//   1) 기록된 실제 근로관계 종료일 — 사실
+//   2) 계약 종료일 — 예정. 그 날이 아직 오지 않았으면 보존 기간은 시작 전이다.
+//   3) 둘 다 없으면 근로관계가 끝나지 않은 것으로 본다 (보존 의무 계속).
+export function describeRetention(terms, signedAt, now = new Date(), employmentEndedAt = null) {
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  const ended = parseContractDate(employmentEndedAt)
+  const contractEnd = parseContractDate(terms?.contractEndDate)
+  const signed = parseContractDate(signedAt)
+
+  const base = ended || contractEnd
+  const basisType = ended ? 'employment_ended' : contractEnd ? 'contract_end' : 'ongoing'
+
+  // 근로관계가 끝난 날을 알 수 없다 = 아직 끝나지 않았다.
+  if (!base) {
+    if (!signed) return { known: false }
+    return {
+      known: true,
+      started: false,
+      ongoing: true,
+      expired: false,
+      basisType: 'ongoing',
+      basis: null,
+      until: null,
+      remainingDays: null,
+      signedAt: signed.toISOString().slice(0, 10),
+      label: '재직 중 · 보존 의무 계속',
+      detail:
+        '종료일이 없는 근로계약이라 근로관계가 아직 끝나지 않았습니다. 근로기준법 제42조·시행령 제22조 제2항에 따라 보존 기간 3년은 근로관계가 끝난 날부터 세므로, 지금은 보존 의무가 계속됩니다.',
+    }
+  }
 
   const until = new Date(
     Date.UTC(base.getUTCFullYear() + RETENTION_YEARS, base.getUTCMonth(), base.getUTCDate())
   )
-  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  const basisDate = base.toISOString().slice(0, 10)
+  const untilDate = until.toISOString().slice(0, 10)
   const remainingDays = daysBetween(today, until)
+  // 종료 예정일이 아직 오지 않았으면 보존 기간은 시작되지도 않았다.
+  const started = base.getTime() <= today.getTime()
+  const expired = started && remainingDays < 0
+
+  let label
+  let detail
+  if (!started) {
+    label = '재직 중 · 보존 의무 계속'
+    detail = `근로관계 종료 예정일은 ${basisDate}입니다. 근로기준법 제42조의 3년 보존 기간은 근로관계가 끝난 날부터 세므로 ${untilDate}까지 보존해야 하며, 지금은 보존 기간이 시작되지도 않았습니다.`
+  } else if (expired) {
+    label = '보존 의무 기간 종료'
+    detail = `근로관계가 끝난 날(${basisDate})부터 근로기준법 제42조의 3년 보존 기간(${untilDate})이 지났습니다.`
+  } else {
+    label = `보존 만료 ${remainingDays}일 전`
+    detail = `근로관계가 끝난 날(${basisDate})을 기산일로, 근로기준법 제42조에 따라 ${untilDate}까지 보존해야 합니다.`
+  }
+
+  // 계약 종료일은 지났는데 실제 종료일이 기록되지 않은 경우, 계속 근무 중일 수
+  // 있다. 기산일이 사실이 아니라 예정임을 밝혀야 잘못 지우지 않는다.
+  if (basisType === 'contract_end' && started) {
+    detail += ' 실제 근로관계 종료일이 기록되지 않아 계약 종료일을 기준으로 계산했습니다. 계속 근무 중이라면 보존 기간은 실제로 끝난 날부터 다시 셉니다.'
+  }
 
   return {
     known: true,
-    basis: base.toISOString().slice(0, 10),
-    until: until.toISOString().slice(0, 10),
+    started,
+    ongoing: !started,
+    basisType,
+    basis: basisDate,
+    until: untilDate,
     remainingDays,
-    expired: remainingDays < 0,
-    label: remainingDays < 0 ? '보존 의무 기간 종료' : `보존 만료 ${remainingDays}일 전`,
-    detail:
-      remainingDays < 0
-        ? `근로기준법 제42조에 따른 3년 보존 의무 기간(${until.toISOString().slice(0, 10)})이 지났습니다.`
-        : `근로기준법 제42조에 따라 ${until.toISOString().slice(0, 10)}까지 보존해야 합니다.`,
+    expired,
+    label,
+    detail,
   }
+}
+
+// 보존 의무가 남은 계약서는 지울 수 없다.
+//
+// 지금까지 관리자 면접방 삭제에는 보존기간 검사가 없었다. 체결된 계약서를
+// 언제든 지울 수 있으면 제42조의 보존 의무는 화면 문구일 뿐이다. 판단이
+// 애매한 쪽(기산일을 알 수 없는 경우)은 보존하는 쪽으로 기운다 — 잘못
+// 남기는 것보다 잘못 지우는 것이 되돌릴 수 없다.
+export function describeRetentionHold(retention, isSigned) {
+  if (!isSigned) return { held: false, reason: null }
+  if (!retention?.known) {
+    return {
+      held: true,
+      reason:
+        '체결된 근로계약서인데 보존 기산일을 알 수 없어, 근로기준법 제42조의 3년 보존 의무가 남아 있는 것으로 봅니다.',
+    }
+  }
+  if (retention.expired) return { held: false, reason: null }
+  return { held: true, reason: retention.detail }
 }
 
 // 이어진 계약들의 계속근로기간을 합산한다.

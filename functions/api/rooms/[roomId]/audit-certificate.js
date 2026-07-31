@@ -95,6 +95,8 @@ export async function onRequestPost({ env, data, params }) {
     currentSha256,
   })
 
+  const lastSignedAt = src.signatures.map((s) => s.signed_at).filter(Boolean).sort().pop() ?? null
+
   const events = buildAuditEvents({
     room: src.room,
     participants: src.participants,
@@ -122,7 +124,16 @@ export async function onRequestPost({ env, data, params }) {
     events,
     document,
     period: terms ? describeContractPeriod(terms) : null,
-    retention: terms ? describeRetention(terms, src.storedRow?.created_at) : null,
+    // 보존 기간의 기산일은 근로관계가 끝난 날이다 (제42조·시행령 제22조 제2항).
+    // 재직 중이면 기산일이 없는 것이 정상이고, 증명서는 그 사실을 그대로 적는다.
+    retention: terms
+      ? describeRetention(
+          terms,
+          lastSignedAt || src.storedRow?.created_at,
+          new Date(),
+          terms.employmentEndedAt
+        )
+      : null,
   })
 
   const canonicalText = canonicalizeCertificate(certificate)
