@@ -144,6 +144,23 @@ async function wipeDemo(env) {
     ),
     inPostings('DELETE FROM applications WHERE posting_id IN (__IN__)'),
     inRooms('room_participants'),
+    // 감사 로그는 방을 외래키로 참조한다(admin_audit_log.target_room_id).
+    // 끊지 않으면 방 삭제가 FK 위반으로 실패하고 batch 전체가 롤백되어,
+    // 데모를 두 번 다시 초기화할 수 없게 된다.
+    //
+    // 도달 경로가 실제로 있다: 평가자가 데모에서 "서류 합격"을 누르면
+    // applications/[id]/pass.js 가 targetRoomId 와 함께 감사 로그를 남긴다.
+    // 그 한 번의 클릭이 데모를 영구히 망가뜨린다.
+    roomIds.length > 0
+      ? env.DB.prepare(
+          `UPDATE admin_audit_log SET target_room_id = NULL WHERE target_room_id IN (${roomIds.map(() => '?').join(',')})`
+        ).bind(...roomIds)
+      : null,
+    // 알림은 방을 외래키로 참조하지 않지만 링크로 가리킨다. 데모 계정이 아닌
+    // 사람이 받은 알림이 남으면 눌러도 404가 나는 항목이 영영 남는다.
+    ...roomIds.map((id) =>
+      env.DB.prepare('DELETE FROM notifications WHERE link LIKE ?').bind(`/rooms/${id}%`)
+    ),
     roomIds.length > 0
       ? env.DB.prepare(
           `DELETE FROM interview_rooms WHERE id IN (${roomIds.map(() => '?').join(',')})`
