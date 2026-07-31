@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "dev:full": "wrangler pages dev -- npm run dev",
-    "build": "vite build",
+    "build": "vite build && npm run build:functions",
+    "//build:functions": "vite build는 프론트엔드만 본다. 서버 코드(functions/)의 import 오류는 Cloudflare에 올라간 뒤에야 드러나 배포가 통째로 실패한다. 실제로 그렇게 한 번 실패했다.",
+    "build:functions": "wrangler pages functions build --outdir=.functions-build",
     "lint": "oxlint",
     "test": "vitest run --exclude tests/smoke.test.js --exclude tests/e2e.test.js",
     "smoke": "vitest run tests/smoke.test.js",

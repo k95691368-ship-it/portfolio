@@ -1,19 +1,19 @@
-import { jsonResponse } from '../../../../_lib/http.js'
-import { genId } from '../../../../_lib/db.js'
-import { hashPassword } from '../../../../_lib/auth.js'
-import { logAdminAction } from '../../../../_lib/auditLog.js'
-import { rowToCamelTerms } from '../../../../_lib/contract.js'
-import { contractFingerprint } from '../../../../_lib/contractDocument.js'
-import { buildAuditEvents, describeSigningEnvironment } from '../../../../_lib/auditTrail.js'
-import { describeContractPeriod, describeRetention } from '../../../../_lib/contractPeriod.js'
-import { describeDeliveryState, channelLabel } from '../../../../_lib/delivery.js'
+import { jsonResponse } from '../../../_lib/http.js'
+import { genId } from '../../../_lib/db.js'
+import { hashPassword } from '../../../_lib/auth.js'
+import { logAdminAction } from '../../../_lib/auditLog.js'
+import { rowToCamelTerms } from '../../../_lib/contract.js'
+import { contractFingerprint } from '../../../_lib/contractDocument.js'
+import { buildAuditEvents, describeSigningEnvironment } from '../../../_lib/auditTrail.js'
+import { describeContractPeriod, describeRetention } from '../../../_lib/contractPeriod.js'
+import { describeDeliveryState, channelLabel } from '../../../_lib/delivery.js'
 import {
   formatSerial,
   buildCertificate,
   canonicalizeCertificate,
   certificateFingerprint,
   resolveDocumentIdentity,
-} from '../../../../_lib/auditCertificate.js'
+} from '../../../_lib/auditCertificate.js'
 import {
   DEMO_DOMAIN,
   DEMO_PASSWORD,
@@ -23,7 +23,7 @@ import {
   DEMO_ROOMS,
   DEMO_MESSAGES,
   demoSignatureDataUrl,
-} from '../../../../_lib/demoSeed.js'
+} from '../../../_lib/demoSeed.js'
 
 // 평가자용 체험 데모를 처음 상태로 만든다.
 //
