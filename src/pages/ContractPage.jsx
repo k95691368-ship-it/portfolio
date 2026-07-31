@@ -77,9 +77,14 @@ const LANGUAGES = [
 // 외국인 근로자용 번역본 — 원본과 나란히 보여준다(공식 표준근로계약서 외국어본 방식).
 function ContractTranslations({ translations, sourceArticles, canTranslate, onTranslate, busy }) {
   const [language, setLanguage] = useState('en')
-  const [shown, setShown] = useState(translations[0]?.language ?? null)
+  // useState 초기값은 첫 렌더에만 쓰인다. 계약서 화면은 한 번만 마운트되므로,
+  // 번역이 없던 상태에서 잡힌 null 이 그대로 남아 번역을 마쳐도 아무것도
+  // 펼쳐지지 않았다. "아직 고르지 않음"과 "사용자가 접음"을 구분해, 고르지
+  // 않았으면 가장 최근 번역을 보여 준다.
+  const [shown, setShown] = useState(undefined)
+  const effectiveShown = shown === undefined ? (translations[translations.length - 1]?.language ?? null) : shown
 
-  const current = translations.find((t) => t.language === shown) ?? null
+  const current = translations.find((t) => t.language === effectiveShown) ?? null
 
   if (!canTranslate && translations.length === 0) return null
 
@@ -120,8 +125,8 @@ function ContractTranslations({ translations, sourceArticles, canTranslate, onTr
             <button
               key={t.language}
               type="button"
-              className={`btn-sm${shown === t.language ? ' active' : ''}`}
-              onClick={() => setShown(shown === t.language ? null : t.language)}
+              className={`btn-sm${effectiveShown === t.language ? ' active' : ''}`}
+              onClick={() => setShown(effectiveShown === t.language ? null : t.language)}
             >
               {t.nativeLabel}
             </button>

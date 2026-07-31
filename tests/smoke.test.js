@@ -79,6 +79,7 @@ const PROTECTED = [
   ['POST', '/api/rooms/smoke-nonexistent/employment-end'],
   ['DELETE', '/api/rooms/smoke-nonexistent/employment-end'],
   ['GET', '/api/my-applications'],
+  ['POST', '/api/my-applications/claim'],
   ['GET', '/api/dashboard'],
   ['GET', '/api/postings/smoke-nonexistent/applications'],
   ['GET', '/api/applications/smoke-nonexistent'],
