@@ -756,6 +756,11 @@
   font-size: 15px;
   margin-bottom: 20px;
 }
+.landing-verify {
+  margin-top: 24px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
 .landing-choices {
   display: flex;
   gap: 16px;
@@ -1821,6 +1826,163 @@
   line-height: 1.7;
   color: var(--text-muted);
 }
+/* 감사추적증명서 — 발급과 진위 확인 */
+.audit-certificate {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.audit-certificate > button {
+  align-self: flex-start;
+}
+.certificate-issued {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius);
+  background: var(--accent-bg);
+}
+.certificate-serial {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 15px;
+  font-weight: 600;
+}
+.certificate-fingerprint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.certificate-fingerprint code,
+.certificate-serial code {
+  word-break: break-all;
+}
+.certificate-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.certificate-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.certificate-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.certificate-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.certificate-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.certificate-verify-link {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* 공개 진위 확인 화면 */
+.verify-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+.verify-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.verify-form label {
+  font-size: 13px;
+  font-weight: 600;
+}
+.verify-file-label {
+  font-weight: 400 !important;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.verify-form button {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+.verify-result {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.verify-result .badge {
+  align-self: flex-start;
+}
+.verify-ok {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+}
+.verify-bad {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+}
+.verify-detail {
+  font-size: 15px;
+}
+.verify-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+  font-size: 13px;
+}
+.verify-facts dt {
+  color: var(--text-muted);
+}
+.verify-facts dd {
+  margin: 0;
+}
+.verify-hash {
+  font-size: 11px;
+  word-break: break-all;
+}
+.verify-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+@media (max-width: 600px) {
+  .verify-facts {
+    grid-template-columns: 1fr;
+  }
+}
+
 .revoked-signatures {
   display: flex;
   flex-direction: column;

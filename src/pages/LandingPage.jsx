@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 export default function LandingPage() {
   const navigate = useNavigate()
@@ -20,6 +20,12 @@ export default function LandingPage() {
             <span className="landing-choice-desc">채용 공고 보기 · 로그인 없이 지원하기</span>
           </button>
         </div>
+
+        {/* 증명서를 제시받은 제3자(근로감독관·법률 상담·은행)는 회사도 지원자도
+            아니다. 그 사람에게도 들어올 문이 있어야 한다. */}
+        <p className="landing-verify">
+          계약 증명서를 제시받으셨나요? <Link to="/verify">발급번호로 진위 확인 →</Link>
+        </p>
       </div>
     </div>
   )

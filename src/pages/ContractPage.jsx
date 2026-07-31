@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import SignatureModal from '../components/SignatureModal.jsx'
 import ContractExplainer from '../components/ContractExplainer.jsx'
+import AuditCertificate from '../components/AuditCertificate.jsx'
 import { IDENTITY_FIELDS, TERM_FIELDS, SOCIAL_INSURANCE_FIELDS } from '../lib/contractTemplate.js'
 
 const FIELD_LABELS = {
@@ -1308,6 +1309,10 @@ export default function ContractPage() {
           )}
         </section>
       )}
+
+      {/* 계약 이력을 계약서에서 떼어낸 독립 문서. 계약 내용을 보이지 않고도
+          체결 사실을 제3자에게 확인시키는 출구다. */}
+      <AuditCertificate roomId={roomId} canIssue={Boolean(myRole)} hasSignature={signatures.length > 0} />
 
       {history.length > 0 && (
         <section className="contract-history">

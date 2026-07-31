@@ -16,6 +16,7 @@ const JobsPage = lazy(() => import('./pages/JobsPage.jsx'))
 const JobDetailPage = lazy(() => import('./pages/JobDetailPage.jsx'))
 const ApplyPage = lazy(() => import('./pages/ApplyPage.jsx'))
 const ApplicationStatusPage = lazy(() => import('./pages/ApplicationStatusPage.jsx'))
+const VerifyCertificatePage = lazy(() => import('./pages/VerifyCertificatePage.jsx'))
 const ContractPage = lazy(() => import('./pages/ContractPage.jsx'))
 const AdminPage = lazy(() => import('./pages/AdminPage.jsx'))
 const RecruitPage = lazy(() => import('./pages/RecruitPage.jsx'))
@@ -42,6 +43,9 @@ function App() {
             <Route path="/jobs/:id" element={<JobDetailPage />} />
             <Route path="/jobs/:id/apply" element={<ApplyPage />} />
             <Route path="/application-status" element={<ApplicationStatusPage />} />
+            {/* 증명서는 계약 당사자가 아닌 사람에게 제시된다. 계정을 만들어야만
+                확인할 수 있다면 증명서로서 쓸모가 없다. */}
+            <Route path="/verify" element={<VerifyCertificatePage />} />
 
             <Route element={<ProtectedRoute allowMustChangePassword />}>
               <Route path="/change-password" element={<ChangePasswordPage />} />
