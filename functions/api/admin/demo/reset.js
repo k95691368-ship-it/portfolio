@@ -218,13 +218,15 @@ async function seedDemo(env) {
       .bind(roomId, accountIds.company, room.title, inviteCode, room.status)
       .run()
 
+    // 계약서에 적힌 이름과 실제로 그 방에 있는 사람이 달라서는 안 된다.
+    const candidateId = accountIds[room.candidateKey ?? 'candidate']
     await env.DB.batch([
       env.DB.prepare(
         `INSERT INTO room_participants (room_id, user_id, role_in_room) VALUES (?, ?, 'company')`
       ).bind(roomId, accountIds.company),
       env.DB.prepare(
         `INSERT INTO room_participants (room_id, user_id, role_in_room) VALUES (?, ?, 'candidate')`
-      ).bind(roomId, accountIds.candidate),
+      ).bind(roomId, candidateId),
     ])
 
     // 계약 조건
@@ -252,7 +254,7 @@ async function seedDemo(env) {
           env.DB.prepare(
             `INSERT INTO chat_messages (room_id, sender_user_id, body, created_at)
              VALUES (?, ?, ?, datetime('now', '-14 days', '+' || ? || ' minutes'))`
-          ).bind(roomId, who === 'company' ? accountIds.company : accountIds.candidate, body, i * 3)
+          ).bind(roomId, who === 'company' ? accountIds.company : candidateId, body, i * 3)
         )
       )
     }
@@ -288,10 +290,10 @@ async function seedDemo(env) {
         ).bind(
           genId(),
           roomId,
-          accountIds.candidate,
+          candidateId,
           demoSignatureDataUrl(t.employeeName),
           documentSha256,
-          DEMO_ACCOUNTS[1].email
+          DEMO_ACCOUNTS.find((a) => a.key === (room.candidateKey ?? 'candidate')).email
         ),
         // 교부 — 체결과 동시에 근로자가 열람 가능해진 사실 (제17조 제2항)
         env.DB.prepare(
@@ -300,7 +302,7 @@ async function seedDemo(env) {
            VALUES (?, ?, ?, 'in_app', ?, 'delivered',
                    datetime('now', '-13 days', '+35 minutes'),
                    datetime('now', '-12 days'))`
-        ).bind(genId(), roomId, accountIds.candidate, DEMO_ACCOUNTS[1].email),
+        ).bind(genId(), roomId, candidateId, DEMO_ACCOUNTS.find((a) => a.key === (room.candidateKey ?? 'candidate')).email),
       ])
     }
   }
@@ -311,13 +313,26 @@ async function seedDemo(env) {
     .bind(roomIds.previous, roomIds.signed)
     .run()
 
-  // 지원서
+  // 지원서.
+  //
+  // 방에 연결하는 것이 중요하다. 계약서 화면은 applications.room_id 로 이 방이
+  // 어느 공고에서 왔는지 찾아, 공고에 제시한 근로조건과 계약서를 대조한다
+  // (채용절차법 제4조 제3항). 연결이 없으면 그 대조가 통째로 사라진다.
+  const roomByApplication = {}
+  for (const room of DEMO_ROOMS) {
+    if (room.applicationKey) roomByApplication[room.applicationKey] = roomIds[room.key]
+  }
+  const userByEmail = {}
+  for (const a of DEMO_ACCOUNTS) userByEmail[a.email] = accountIds[a.key]
+
   const applicationStatements = DEMO_APPLICATIONS.map((a) =>
     env.DB.prepare(
       `INSERT INTO applications
          (id, posting_id, applicant_name, applicant_email, applicant_phone, career_json,
-          cover_letter, consent_required, consented_at, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now', '-20 days'), ?, datetime('now', '-20 days'))`
+          cover_letter, consent_required, consented_at, status, created_at,
+          room_id, created_user_id, reviewed_by_user_id, reviewed_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now', '-20 days'), ?, datetime('now', '-20 days'),
+               ?, ?, ?, ?)`
     ).bind(
       genId(),
       postingId,
@@ -326,10 +341,22 @@ async function seedDemo(env) {
       a.phone,
       JSON.stringify(a.career),
       a.coverLetter,
-      a.status
+      a.status,
+      roomByApplication[a.key] ?? null,
+      userByEmail[a.email] ?? null,
+      a.status === 'passed' ? accountIds.company : null,
+      null // reviewed_at 은 SQL 함수라 바인딩할 수 없어 아래에서 채운다
     )
   )
   await env.DB.batch(applicationStatements)
+
+  // reviewed_at 은 바인딩으로 SQL 함수를 넣을 수 없어 따로 채운다.
+  await env.DB.prepare(
+    `UPDATE applications SET reviewed_at = datetime('now', '-18 days')
+      WHERE posting_id = ? AND status = 'passed'`
+  )
+    .bind(postingId)
+    .run()
 
   return { accountIds, postingId, roomIds }
 }

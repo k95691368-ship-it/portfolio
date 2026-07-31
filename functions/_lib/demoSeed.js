@@ -35,6 +35,16 @@ export const DEMO_ACCOUNTS = [
     companyName: null,
     isRecruiter: false,
   },
+  // 서명 전 계약의 상대방. 계약서에 적힌 이름과 실제로 그 방에 있는 사람이
+  // 다르면 화면이 앞뒤가 맞지 않는다.
+  {
+    key: 'candidate2',
+    email: `candidate2@${DEMO_DOMAIN}`,
+    role: 'candidate',
+    displayName: '최민수',
+    companyName: null,
+    isRecruiter: false,
+  },
 ]
 
 // 공고. 방 B의 계약 조건과 대조되어 채용절차법 제4조 제3항 위반을 드러낸다.
@@ -85,9 +95,9 @@ export const DEMO_APPLICATIONS = [
   {
     key: 'minsu',
     name: '최민수',
-    email: `applicant-minsu@${DEMO_DOMAIN}`,
+    email: `candidate2@${DEMO_DOMAIN}`,
     phone: '010-0000-0002',
-    status: 'submitted',
+    status: 'passed',
     coverLetter:
       '3년간 커머스 백엔드를 담당하며 주문·정산 도메인을 맡았습니다. 트래픽이 몰리는 구간의 병목을 찾아 개선한 경험이 있습니다.',
     career: [
@@ -127,6 +137,8 @@ export const DEMO_ROOM_SIGNED = {
   key: 'signed',
   title: '백엔드 개발자 최종 계약 - 이지원',
   status: 'signed',
+  candidateKey: 'candidate',
+  applicationKey: 'jiwon',
   terms: {
     employerName: '(주)한빛테크',
     employerAddress: '서울특별시 강남구 테헤란로 123, 8층',
@@ -175,6 +187,10 @@ export const DEMO_ROOM_PENDING = {
   key: 'pending',
   title: '백엔드 개발자 계약 검토 - 최민수',
   status: 'contract_pending',
+  candidateKey: 'candidate2',
+  // 공고와 계약을 대조하려면 지원서가 이 방에 연결돼 있어야 한다
+  // (contract-view 는 applications.room_id 로 공고를 찾는다).
+  applicationKey: 'minsu',
   terms: {
     employerName: '(주)한빛테크',
     employerAddress: '서울특별시 강남구 테헤란로 123, 8층',
@@ -205,6 +221,8 @@ export const DEMO_ROOM_PREVIOUS = {
   key: 'previous',
   title: '백엔드 개발자 계약(기간제) - 이지원',
   status: 'signed',
+  candidateKey: 'candidate',
+  applicationKey: null,
   terms: {
     employerName: '(주)한빛테크',
     employerAddress: '서울특별시 강남구 테헤란로 123, 8층',

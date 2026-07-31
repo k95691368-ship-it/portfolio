@@ -9,6 +9,7 @@ import {
   DEMO_ROOM_PENDING,
   DEMO_ROOM_SIGNED,
   DEMO_ROOM_PREVIOUS,
+  DEMO_ROOMS,
   DEMO_POSTING,
   DEMO_ACCOUNTS,
   DEMO_APPLICATIONS,
@@ -118,6 +119,25 @@ describe('데모 데이터의 안전 조건', () => {
     // 정리가 이 표식 하나로 이루어지므로, 벗어나면 실데이터와 섞인다.
     for (const a of DEMO_ACCOUNTS) expect(a.email.endsWith(`@${DEMO_DOMAIN}`)).toBe(true)
     for (const a of DEMO_APPLICATIONS) expect(a.email.endsWith(`@${DEMO_DOMAIN}`)).toBe(true)
+  })
+
+  // 계약서에 적힌 이름과 그 방에 실제로 있는 사람이 다르면 화면이 앞뒤가 안 맞는다.
+  it('방마다 계약서의 근로자명과 참여 계정이 일치한다', () => {
+    for (const room of DEMO_ROOMS) {
+      const account = DEMO_ACCOUNTS.find((a) => a.key === room.candidateKey)
+      expect(account, `방 ${room.key} 의 candidateKey 가 계정과 맞지 않습니다`).toBeTruthy()
+      expect(account.displayName).toBe(room.terms.employeeName)
+    }
+  })
+
+  // 공고 대조는 applications.room_id 로 이어진다. 연결이 없으면 그 기능이
+  // 데모에서 통째로 사라진다 — 실제로 한 번 그렇게 빠졌다.
+  it('결함이 있는 방에는 공고와 이어줄 지원서가 붙어 있다', () => {
+    expect(DEMO_ROOM_PENDING.applicationKey).toBeTruthy()
+    const app = DEMO_APPLICATIONS.find((a) => a.key === DEMO_ROOM_PENDING.applicationKey)
+    expect(app).toBeTruthy()
+    expect(app.status).toBe('passed')
+    expect(app.name).toBe(DEMO_ROOM_PENDING.terms.employeeName)
   })
 
   it('서명 이미지가 data URL 형식이다', () => {
