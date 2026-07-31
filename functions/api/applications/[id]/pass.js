@@ -3,6 +3,7 @@ import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { hashPassword } from '../../../_lib/auth.js'
 import { genTempPassword } from '../../../_lib/tempPassword.js'
 import { requireManageableApplication } from '../../../_lib/applications.js'
+import { seedTermsFromApplication } from '../../../_lib/seedTerms.js'
 import { logAdminAction } from '../../../_lib/auditLog.js'
 import { isEmailConfigured, sendApplicationResultEmail } from '../../../_lib/email.js'
 import { notifyUser } from '../../../_lib/notify.js'
@@ -78,6 +79,18 @@ export async function onRequestPost({ env, data, params }) {
   const roomId = genId()
   const roomTitle = `${application.applicant_name} · ${application.posting_title}`
 
+  // 지원서·공고에서 계약 조건의 출발점을 만든다.
+  const seed = seedTermsFromApplication({
+    posting: {
+      title: application.posting_title,
+      department: application.posting_department,
+      location: application.posting_location,
+      employment_type: application.posting_employment_type,
+    },
+    application,
+    companyUser: data.user,
+  })
+
   // 초대코드는 UNIQUE 제약이 막아 주므로 미리 조회하지 않는다. 겹치면 다시
   // 뽑아 넣고, 그래도 안 되면 지원서 선점을 되돌린다. 미리 조회하는 방식은
   // 왕복을 늘리면서도 동시 생성을 막지 못했다.
@@ -99,6 +112,20 @@ export async function onRequestPost({ env, data, params }) {
         env.DB.prepare(
           `UPDATE applications SET created_user_id = ?, room_id = ? WHERE id = ?`
         ).bind(candidateUserId, roomId, params.id),
+        // 계약서를 빈 종이에서 시작하지 않는다. 앱은 지원서에서 근로자 이름을,
+        // 공고와 회사 계정에서 사업체명·근무장소·업무를 이미 알고 있다. 이 넷은
+        // 근로기준법 제17조 명시사항이라 비어 있으면 서명 자체가 열리지 않는다.
+        env.DB.prepare(
+          `INSERT INTO contract_terms (room_id, employer_name, employee_name, work_location, job_description)
+           VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(room_id) DO NOTHING`
+        ).bind(
+          roomId,
+          seed.employerName,
+          seed.employeeName,
+          seed.workLocation,
+          seed.jobDescription
+        ),
       ])
       break
     } catch (err) {

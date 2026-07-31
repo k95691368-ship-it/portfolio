@@ -7,7 +7,9 @@ export async function requireManageableApplication(env, user, appId) {
   if (!user) return { error: jsonError('로그인이 필요합니다.', 401) }
 
   const row = await env.DB.prepare(
-    `SELECT a.*, p.created_by_user_id AS posting_created_by, p.title AS posting_title
+    `SELECT a.*, p.created_by_user_id AS posting_created_by, p.title AS posting_title,
+            p.department AS posting_department, p.location AS posting_location,
+            p.employment_type AS posting_employment_type
      FROM applications a
      JOIN job_postings p ON p.id = a.posting_id
      WHERE a.id = ?`
