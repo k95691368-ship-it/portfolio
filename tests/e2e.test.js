@@ -133,8 +133,14 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
   afterAll(async () => {
     // 만든 것은 반드시 지운다. 실패해도 다음 정리를 계속 시도한다.
     // 갱신 계약이 이전 계약을 참조하므로 갱신 쪽을 먼저 지운다.
+    // 체결된 계약서는 보존 의무(근로기준법 제42조)로 삭제가 한 번 막힌다.
+    // 검증용 데이터이므로 확인을 함께 보낸다 — 이 사실은 감사 로그에 남는다.
     for (const id of [state.duplicateRoomId, state.renewalRoomId, state.roomId]) {
-      if (id) await admin(`/api/admin/rooms/${id}`, { method: 'DELETE' }).catch(() => {})
+      if (id)
+        await admin(`/api/admin/rooms/${id}`, {
+          method: 'DELETE',
+          body: { acknowledgeRetention: true },
+        }).catch(() => {})
     }
     // 빌려 쓴 계정은 지우지 않는다. 이번 실행에서 만든 계정만 정리한다.
     if (!REUSE) {
@@ -619,9 +625,33 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
   it('체결된 계약은 보존 의무 기간을 알려준다', async () => {
     const view = await candidate(`/api/rooms/${state.roomId}/contract-view`)
     expect(view.json.retention.known).toBe(true)
-    // 근로관계 종료일(2027-08-31)부터 3년
+    // 계약 종료일(2027-08-31)부터 3년. 다만 그 날이 아직 오지 않았으므로
+    // 근로관계가 끝나지 않았고, 보존 기간은 시작되지 않았다.
     expect(view.json.retention.until).toBe('2030-08-31')
+    expect(view.json.retention.started).toBe(false)
     expect(view.json.retention.expired).toBe(false)
+  })
+
+  it('근로관계가 끝난 날을 기록하면 보존 기산일이 그 날로 바뀐다', async () => {
+    // 근로기준법 제42조·시행령 제22조 제2항의 기산일은 계약 종료일이 아니라
+    // 근로관계가 실제로 끝난 날이다.
+    const denied = await candidate(`/api/rooms/${state.roomId}/employment-end`, {
+      method: 'POST',
+      body: { endedOn: '2026-07-01' },
+    })
+    expect(denied.status).toBe(403)
+
+    const recorded = await company(`/api/rooms/${state.roomId}/employment-end`, {
+      method: 'POST',
+      body: { endedOn: '2026-07-01', reason: '중도 퇴사' },
+    })
+    expect(recorded.status, `종료 기록 실패: ${recorded.text}`).toBe(200)
+
+    const view = await candidate(`/api/rooms/${state.roomId}/contract-view`)
+    expect(view.json.retention.basis).toBe('2026-07-01')
+    expect(view.json.retention.until).toBe('2029-07-01')
+    expect(view.json.retention.started).toBe(true)
+    expect(view.json.auditTrail.events.map((e) => e.event)).toContain('근로관계 종료 기록')
   })
 
   it('양측이 알림을 받았다', async () => {
