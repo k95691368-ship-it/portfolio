@@ -10,34 +10,32 @@ import { DEMO_DOMAIN, DEMO_PASSWORD, DEMO_ACCOUNTS } from '../_lib/demoSeed.js'
 //
 // 심어져 있지 않으면 seeded:false 만 돌려준다. 없는 계정을 안내하는 것이
 // 안내가 없는 것보다 나쁘다.
+// 이 엔드포인트는 첫 화면이 열릴 때마다 불린다. 이 앱에서 가장 자주 불리는
+// 경로이므로 한 번의 조회로 끝낸다 — 예전에는 개수와 발급번호를 따로 물어
+// 방문자마다 왕복이 두 번이었다.
 export async function onRequestGet({ env }) {
-  const counts = await env.DB.prepare(
+  const like = `%@${DEMO_DOMAIN}`
+  const row = await env.DB.prepare(
     `SELECT (SELECT COUNT(*) FROM users WHERE email LIKE ?1) AS accounts,
             (SELECT COUNT(*) FROM job_postings p
                JOIN users u ON u.id = p.created_by_user_id
-              WHERE u.email LIKE ?1 AND p.status = 'open') AS postings`
+              WHERE u.email LIKE ?1 AND p.status = 'open') AS postings,
+            (SELECT c.serial FROM audit_certificates c
+               JOIN room_participants rp ON rp.room_id = c.room_id
+               JOIN users u ON u.id = rp.user_id
+              WHERE u.email LIKE ?1
+              ORDER BY c.issued_at DESC LIMIT 1) AS serial`
   )
-    .bind(`%@${DEMO_DOMAIN}`)
+    .bind(like)
     .first()
 
-  const seeded = (counts?.accounts ?? 0) >= DEMO_ACCOUNTS.length
-  if (!seeded) return jsonResponse({ seeded: false })
-
-  const cert = await env.DB.prepare(
-    `SELECT c.serial FROM audit_certificates c
-       JOIN room_participants rp ON rp.room_id = c.room_id
-       JOIN users u ON u.id = rp.user_id
-      WHERE u.email LIKE ?
-      ORDER BY c.issued_at DESC LIMIT 1`
-  )
-    .bind(`%@${DEMO_DOMAIN}`)
-    .first()
+  if ((row?.accounts ?? 0) < DEMO_ACCOUNTS.length) return jsonResponse({ seeded: false })
 
   return jsonResponse({
     seeded: true,
     password: DEMO_PASSWORD,
-    postings: counts?.postings ?? 0,
-    certificateSerial: cert?.serial ?? null,
+    postings: row?.postings ?? 0,
+    certificateSerial: row?.serial ?? null,
     accounts: DEMO_ACCOUNTS.map((a) => ({
       email: a.email,
       role: a.role,
