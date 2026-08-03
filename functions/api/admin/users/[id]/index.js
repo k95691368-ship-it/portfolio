@@ -124,7 +124,7 @@ export async function onRequestDelete({ env, data, params }) {
   })
 
   // D1은 외래키를 강제하므로, users 행을 지우기 전에 이 계정을 참조하는
-  // 감사 로그·지원서 심사자 참조를 먼저 정리해야 한다 (안 하면 FK 위반으로 500).
+  // 감사 로그·지원서 검토자 참조를 먼저 정리해야 한다 (안 하면 FK 위반으로 500).
   try {
     await env.DB.batch([
       env.DB.prepare('UPDATE applications SET reviewed_by_user_id = NULL WHERE reviewed_by_user_id = ?').bind(params.id),
