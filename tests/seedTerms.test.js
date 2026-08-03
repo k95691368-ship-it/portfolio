@@ -8,7 +8,7 @@ const POSTING = {
   employment_type: '정규직',
 }
 const APPLICATION = { applicant_name: '홍길동' }
-const COMPANY = { company_name: '주식회사 포오스', display_name: '김담당' }
+const COMPANY = { company_name: '주식회사 가온', display_name: '김담당' }
 
 describe('seedTermsFromApplication', () => {
   it('지원서와 공고에서 계약 출발점을 만든다', () => {
@@ -18,7 +18,7 @@ describe('seedTermsFromApplication', () => {
       companyUser: COMPANY,
     })
     expect(seed).toEqual({
-      employerName: '주식회사 포오스',
+      employerName: '주식회사 가온',
       employeeName: '홍길동',
       workLocation: '서울 본사',
       jobDescription: 'AX 프로젝트 매니저 · 전략기획팀',
@@ -60,11 +60,11 @@ describe('seedTermsFromApplication', () => {
     const seed = seedTermsFromApplication({
       posting: { title: ' 매니저 ', location: ' 서울 ' },
       application: { applicant_name: ' 홍길동 ' },
-      companyUser: { company_name: ' 포오스 ' },
+      companyUser: { company_name: ' 가온 ' },
     })
     expect(seed.employeeName).toBe('홍길동')
     expect(seed.workLocation).toBe('서울')
-    expect(seed.employerName).toBe('포오스')
+    expect(seed.employerName).toBe('가온')
     expect(seed.jobDescription).toBe('매니저')
   })
 
@@ -77,7 +77,7 @@ describe('seedTermsFromApplication', () => {
 
 describe('hasSeedValues', () => {
   it('하나라도 값이 있으면 참', () => {
-    expect(hasSeedValues({ employerName: '포오스', employeeName: null })).toBe(true)
+    expect(hasSeedValues({ employerName: '가온', employeeName: null })).toBe(true)
   })
   it('전부 비었으면 거짓', () => {
     expect(hasSeedValues({ employerName: null, employeeName: null })).toBe(false)
