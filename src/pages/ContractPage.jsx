@@ -7,6 +7,7 @@ import SignatureModal from '../components/SignatureModal.jsx'
 import ContractExplainer from '../components/ContractExplainer.jsx'
 import AuditCertificate from '../components/AuditCertificate.jsx'
 import WageComposition from '../components/WageComposition.jsx'
+import WorkerRights from '../components/WorkerRights.jsx'
 import { IDENTITY_FIELDS, TERM_FIELDS, SOCIAL_INSURANCE_FIELDS } from '../lib/contractTemplate.js'
 
 const FIELD_LABELS = {
@@ -716,6 +717,7 @@ export default function ContractPage() {
   const [employmentEnd, setEmploymentEnd] = useState({ endedAt: null, reason: null })
   const [certificates, setCertificates] = useState([])
   const [wageComposition, setWageComposition] = useState(null)
+  const [workerRights, setWorkerRights] = useState(null)
   const [linkableRooms, setLinkableRooms] = useState([])
   const [linking, setLinking] = useState(false)
   const printRef = useRef(null)
@@ -778,6 +780,7 @@ export default function ContractPage() {
     setRevokedSignatures(view.revokedSignatures ?? [])
     setCertificates(view.certificates ?? [])
     setWageComposition(view.wageComposition ?? null)
+    setWorkerRights(view.workerRights ?? null)
     setContinuity(view.continuity ?? null)
     setRetention(view.retention ?? null)
     setLinkableRooms(view.linkableRooms ?? [])
@@ -1199,6 +1202,8 @@ export default function ContractPage() {
       {/* 근로자가 자기 계약을 이해하도록 돕는다. 서명 전에 보이는 것이 중요하므로
           서명 영역보다 위에 둔다. */}
       <ContractExplainer explanation={explanation} myRole={myRole} />
+
+      <WorkerRights rights={workerRights} />
 
       {/* 공고를 보고 지원한 사람은 그 조건을 전제로 결정했다. 계약서에서 조건이
           나빠졌는지 값으로 대조해 알린다 (채용절차법 제4조 제3항). */}

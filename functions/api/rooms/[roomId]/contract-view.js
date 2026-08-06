@@ -19,6 +19,7 @@ import {
 import { checkContractDocument } from '../../../_lib/documentCheck.js'
 import { checkProbationCompliance } from '../../../_lib/probation.js'
 import { describeWageComposition } from '../../../_lib/wageItems.js'
+import { describeWorkerRights } from '../../../_lib/workerRights.js'
 
 import { contractFingerprint } from '../../../_lib/contractDocument.js'
 import { markFirstViewed, listDeliveries, describeDeliveryState } from '../../../_lib/delivery.js'
@@ -403,6 +404,8 @@ export async function onRequestGet({ env, data, params }) {
     explanation,
     // 임금이 무엇으로 이루어져 있고 그중 무엇이 최저임금에 산입되는지.
     wageComposition: terms ? describeWageComposition(terms) : null,
+    // 연차·퇴직금·가산수당을 날짜와 금액으로 (제60조·퇴직급여법 제4조·제56조)
+    workerRights: describeWorkerRights(terms),
     postingComparison,
     deliveries,
     deliveryState,
