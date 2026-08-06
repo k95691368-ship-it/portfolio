@@ -6,6 +6,7 @@ import { rowToCamelTerms } from '../../../_lib/contract.js'
 import { checkContractDocument } from '../../../_lib/documentCheck.js'
 import { findMissingFields, checkLegalCompliance } from '../../../_lib/contractCheck.js'
 import { checkPeriodCompliance } from '../../../_lib/contractPeriod.js'
+import { checkProbationCompliance } from '../../../_lib/probation.js'
 import { contractFingerprint } from '../../../_lib/contractDocument.js'
 import { recordDelivery } from '../../../_lib/delivery.js'
 
@@ -64,7 +65,11 @@ export async function onRequestPost({ env, data, params, request }) {
 
   // 최저임금 미달·주 52시간 초과 같은 높은 등급 문제는, 당사자가 화면에서 그
   // 내용을 확인했다고 밝힌 경우에만 서명을 허용한다.
-  const highIssues = [...checkLegalCompliance(terms), ...checkPeriodCompliance(terms)].filter(
+  const highIssues = [
+    ...checkLegalCompliance(terms),
+    ...checkPeriodCompliance(terms),
+    ...checkProbationCompliance(terms),
+  ].filter(
     (i) => i.severity === 'high'
   )
   if (highIssues.length > 0 && body.acknowledgedIssues !== true) {

@@ -2,6 +2,7 @@ import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { getRoomAccess } from '../../../_lib/rooms.js'
 import { rowToCamelTerms } from '../../../_lib/contract.js'
 import { checkLegalCompliance, findMissingFields, diffAgreedVsCurrent } from '../../../_lib/contractCheck.js'
+import { checkProbationCompliance } from '../../../_lib/probation.js'
 import { checkPeriodCompliance } from '../../../_lib/contractPeriod.js'
 
 // 서명 전 최종 안전 점검.
@@ -37,7 +38,11 @@ export async function onRequestGet({ env, data, params }) {
   })
 
   const diffs = diffAgreedVsCurrent(parsedHistory, terms)
-  const legalIssues = [...checkLegalCompliance(terms), ...checkPeriodCompliance(terms)]
+  const legalIssues = [
+    ...checkLegalCompliance(terms),
+    ...checkPeriodCompliance(terms),
+    ...checkProbationCompliance(terms),
+  ]
   const missingFields = findMissingFields(terms)
 
   const hasBlocking =

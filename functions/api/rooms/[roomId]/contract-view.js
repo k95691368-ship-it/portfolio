@@ -17,6 +17,7 @@ import {
   describeRetention,
 } from '../../../_lib/contractPeriod.js'
 import { checkContractDocument } from '../../../_lib/documentCheck.js'
+import { checkProbationCompliance } from '../../../_lib/probation.js'
 
 import { contractFingerprint } from '../../../_lib/contractDocument.js'
 import { markFirstViewed, listDeliveries, describeDeliveryState } from '../../../_lib/delivery.js'
@@ -302,6 +303,7 @@ export async function onRequestGet({ env, data, params }) {
     const diffs = diffAgreedVsCurrent(parsedHistory, terms)
     const legalIssues = [
       ...checkLegalCompliance(terms),
+      ...checkProbationCompliance(terms),
       ...checkPeriodCompliance(terms),
       ...checkContinuityCompliance(continuity),
     ]

@@ -24,12 +24,17 @@ import {
   computeWeeklyHours,
 } from '../functions/_lib/contractCheck.js'
 import { checkPeriodCompliance, describeRetention } from '../functions/_lib/contractPeriod.js'
+import { checkProbationCompliance } from '../functions/_lib/probation.js'
 import { comparePostingToContract } from '../functions/_lib/postingMatch.js'
 
 const NOW = new Date(Date.UTC(2026, 8, 15)) // 2026-09-15
 
 function allIssues(terms) {
-  return [...checkLegalCompliance(terms), ...checkPeriodCompliance(terms, NOW)]
+  return [
+    ...checkLegalCompliance(terms),
+    ...checkPeriodCompliance(terms, NOW),
+    ...checkProbationCompliance(terms),
+  ]
 }
 
 describe('데모 방 B (서명 전) — 심은 결함이 실제로 발동한다', () => {
