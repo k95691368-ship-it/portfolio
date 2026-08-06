@@ -6,6 +6,7 @@ import { useToast } from '../context/ToastContext.jsx'
 import SignatureModal from '../components/SignatureModal.jsx'
 import ContractExplainer from '../components/ContractExplainer.jsx'
 import AuditCertificate from '../components/AuditCertificate.jsx'
+import WageComposition from '../components/WageComposition.jsx'
 import { IDENTITY_FIELDS, TERM_FIELDS, SOCIAL_INSURANCE_FIELDS } from '../lib/contractTemplate.js'
 
 const FIELD_LABELS = {
@@ -56,6 +57,7 @@ const EMPTY_FORM = {
   uniformSize: '',
   socialInsurance: {},
   customTerms: [],
+  wageItems: [],
 }
 
 const SEVERITY_BADGE = { high: 'badge-danger', medium: 'badge-warning', info: 'badge-neutral' }
@@ -713,6 +715,7 @@ export default function ContractPage() {
   // 계약서 입력 폼과 분리해 둔다.
   const [employmentEnd, setEmploymentEnd] = useState({ endedAt: null, reason: null })
   const [certificates, setCertificates] = useState([])
+  const [wageComposition, setWageComposition] = useState(null)
   const [linkableRooms, setLinkableRooms] = useState([])
   const [linking, setLinking] = useState(false)
   const printRef = useRef(null)
@@ -761,6 +764,7 @@ export default function ContractPage() {
       uniformSize: t.uniformSize ?? '',
       socialInsurance: t.socialInsurance ?? {},
       customTerms: t.customTerms ?? [],
+      wageItems: t.wageItems ?? [],
     })
     setEmploymentEnd({ endedAt: t.employmentEndedAt ?? null, reason: t.employmentEndReason ?? null })
     setSignatures(sigData.signatures)
@@ -773,6 +777,7 @@ export default function ContractPage() {
     setDocumentSha256(view.documentSha256 ?? null)
     setRevokedSignatures(view.revokedSignatures ?? [])
     setCertificates(view.certificates ?? [])
+    setWageComposition(view.wageComposition ?? null)
     setContinuity(view.continuity ?? null)
     setRetention(view.retention ?? null)
     setLinkableRooms(view.linkableRooms ?? [])
@@ -822,10 +827,15 @@ export default function ContractPage() {
     try {
       const filteredCustomTerms = form.customTerms.filter((c) => c.label && c.value)
       const droppedCount = form.customTerms.length - filteredCustomTerms.length
+      // 이름도 금액도 비어 있는 줄은 보내지 않는다.
+      const filteredWageItems = (form.wageItems ?? []).filter(
+        (w) => String(w.name ?? '').trim() !== '' || String(w.amount ?? '').trim() !== ''
+      )
       const payload = {
         ...form,
         wageBaseAmount: form.wageBaseAmount === '' || form.wageBaseAmount === null ? null : Number(form.wageBaseAmount),
         customTerms: filteredCustomTerms,
+        wageItems: filteredWageItems.map((w) => ({ ...w, amount: Number(w.amount) })),
       }
       await api.patch(`/rooms/${roomId}/contract`, payload)
       setForm((f) => ({ ...f, customTerms: filteredCustomTerms }))
@@ -1168,6 +1178,13 @@ export default function ContractPage() {
           </button>
         )}
       </section>
+
+      <WageComposition
+        items={form.wageItems}
+        composition={wageComposition}
+        canEdit={canEdit}
+        onChange={(items) => setForm((f) => ({ ...f, wageItems: items }))}
+      />
 
       {canEdit && (user.isAdmin || user.isRecruiter) && (
         <section className="ai-draft">
