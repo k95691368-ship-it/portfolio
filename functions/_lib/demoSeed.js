@@ -163,6 +163,12 @@ export const DEMO_ROOM_SIGNED = {
     workDays: '주 5일 (월~금)',
     restDays: '토요일, 일요일 (주휴일: 일요일)',
     wageBaseAmount: 2900000,
+    // 기본급 265만 + 식대 25만. 식대는 2024년부터 전액 산입되므로 290만이
+    // 그대로 최저임금 비교 대상이 된다.
+    wageItems: [
+      { name: '기본급', type: 'base', amount: 2650000 },
+      { name: '식대', type: 'welfare', amount: 250000 },
+    ],
     wagePayMethod: '근로자 명의 예금통장에 입금',
     wagePayDate: '매월 25일 (휴일인 경우 직전 영업일)',
     annualLeave: '근로기준법 제60조에 따라 부여',
@@ -218,6 +224,13 @@ export const DEMO_ROOM_PENDING = {
     workDays: '주 6일 (월~토)',
     restDays: '일요일',
     wageBaseAmount: 1900000,
+    // 합계는 265만이지만 고정연장수당 75만은 소정근로의 대가가 아니라
+    // 최저임금에 산입되지 않는다. 산입 대상은 190만이라 미달이다.
+    // 합계만 보면 넉넉해 보이는 계약이 실제로는 위반인, 흔하고 잘 안 보이는 형태.
+    wageItems: [
+      { name: '기본급', type: 'base', amount: 1900000 },
+      { name: '고정연장수당', type: 'overtime_fixed', amount: 750000 },
+    ],
     wagePayMethod: '근로자 명의 예금통장에 입금',
     wagePayDate: '매월 25일',
     annualLeave: null,

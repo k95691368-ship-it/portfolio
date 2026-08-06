@@ -7,6 +7,8 @@
 // 법 계산은 AI가 아니라 결정론적 코드로 수행한다. 금액·시간은 매번 같은
 // 결과가 나와야 하고, 지원자에게 보여주는 경고는 재현 가능해야 하기 때문.
 
+import { effectiveWageItems, minimumWageBase, totalWage } from './wageItems.js'
+
 export const MINIMUM_HOURLY_WAGE_2026 = 10320 // 2026년 최저시급
 const WEEKS_PER_MONTH = 365 / 7 / 12 // ≈ 4.345
 const MAX_WEEKLY_HOURS = 52 // 연장 포함 법정 상한
@@ -162,7 +164,14 @@ export function checkLegalCompliance(terms) {
     })
   }
 
-  const wage = Number(terms.wageBaseAmount)
+  // 최저임금은 기본급이 아니라 '산입 대상 임금'과 비교한다.
+  //
+  // 기본급만 보면 식대·고정수당이 붙은 계약을 실제보다 낮게 읽어 없는 위반을
+  // 만들고, 반대로 합계만 보면 고정연장수당이 낀 계약의 진짜 위반을 놓친다.
+  // 항목을 입력하지 않은 계약은 기본급 하나로 취급되어 예전과 같이 계산된다.
+  const items = effectiveWageItems(terms)
+  const wage = minimumWageBase(items)
+  const paidTotal = totalWage(items)
   if (Number.isFinite(wage) && wage > 0 && weeklyHours !== null) {
     const hours = monthlyPaidHours(weeklyHours)
     if (hours > 0) {
@@ -173,7 +182,11 @@ export function checkLegalCompliance(terms) {
         issues.push({
           severity: 'high',
           title: '최저임금 미달 소지',
-          detail: `기본급 ${wage.toLocaleString('ko-KR')}원을 월 소정근로시간(약 ${Math.round(hours)}시간)으로 나누면 시급 약 ${hourly.toLocaleString('ko-KR')}원으로, 2026년 최저시급(${MINIMUM_HOURLY_WAGE_2026.toLocaleString('ko-KR')}원)에 미달합니다. 이 근로시간에서 최저임금을 지키려면 기본급이 최소 ${lawfulMinimum.toLocaleString('ko-KR')}원이어야 합니다.`,
+          detail:
+            (paidTotal > wage
+              ? `월 지급액 합계는 ${paidTotal.toLocaleString('ko-KR')}원이지만, 최저임금에 산입되는 금액은 ${wage.toLocaleString('ko-KR')}원입니다(소정근로 외의 대가는 제외 — 최저임금법 제6조 제4항). 이를 `
+              : `기본급 ${wage.toLocaleString('ko-KR')}원을 `) +
+            `월 소정근로시간(약 ${Math.round(hours)}시간)으로 나누면 시급 약 ${hourly.toLocaleString('ko-KR')}원으로, 2026년 최저시급(${MINIMUM_HOURLY_WAGE_2026.toLocaleString('ko-KR')}원)에 미달합니다. 이 근로시간에서 최저임금을 지키려면 산입 대상 임금이 최소 ${lawfulMinimum.toLocaleString('ko-KR')}원이어야 합니다.`,
           field: 'wageBaseAmount',
           suggestedValue: String(lawfulMinimum),
         })

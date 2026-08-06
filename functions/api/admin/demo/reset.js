@@ -252,14 +252,16 @@ async function seedDemo(env) {
     const columnNames = cols.map((c) => CAMEL_TO_COLUMN[c])
     await env.DB.prepare(
       `INSERT INTO contract_terms
-         (room_id, ${columnNames.join(', ')}, social_insurance_json, custom_terms_json, hire_confirmed, hire_confirmed_at)
-       VALUES (?, ${cols.map(() => '?').join(', ')}, ?, ?, 1, datetime('now', '-14 days'))`
+         (room_id, ${columnNames.join(', ')}, social_insurance_json, custom_terms_json,
+          wage_items_json, hire_confirmed, hire_confirmed_at)
+       VALUES (?, ${cols.map(() => '?').join(', ')}, ?, ?, ?, 1, datetime('now', '-14 days'))`
     )
       .bind(
         roomId,
         ...cols.map((c) => t[c] ?? null),
         JSON.stringify(t.socialInsurance ?? {}),
-        JSON.stringify(t.customTerms ?? [])
+        JSON.stringify(t.customTerms ?? []),
+        t.wageItems ? JSON.stringify(t.wageItems) : null
       )
       .run()
 

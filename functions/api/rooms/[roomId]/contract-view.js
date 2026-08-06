@@ -18,6 +18,7 @@ import {
 } from '../../../_lib/contractPeriod.js'
 import { checkContractDocument } from '../../../_lib/documentCheck.js'
 import { checkProbationCompliance } from '../../../_lib/probation.js'
+import { describeWageComposition } from '../../../_lib/wageItems.js'
 
 import { contractFingerprint } from '../../../_lib/contractDocument.js'
 import { markFirstViewed, listDeliveries, describeDeliveryState } from '../../../_lib/delivery.js'
@@ -400,6 +401,8 @@ export async function onRequestGet({ env, data, params }) {
     // 함께 내려준다. (최근 발급이 위로 오게 뒤집어서)
     certificates: [...certificates].reverse(),
     explanation,
+    // 임금이 무엇으로 이루어져 있고 그중 무엇이 최저임금에 산입되는지.
+    wageComposition: terms ? describeWageComposition(terms) : null,
     postingComparison,
     deliveries,
     deliveryState,

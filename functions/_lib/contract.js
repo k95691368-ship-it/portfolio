@@ -108,6 +108,8 @@ export function rowToCamelTerms(row) {
     socialInsurance: parseJsonColumn(row.social_insurance_json, null),
     uniformSize: row.uniform_size ?? null,
     customTerms: parseJsonColumn(row.custom_terms_json, []),
+    // 임금 구성항목 (근로기준법 제17조: 임금의 구성항목·계산방법·지급방법)
+    wageItems: parseJsonColumn(row.wage_items_json, []),
     aiDocument: parseJsonColumn(row.ai_document_json, null),
     analysisWarnings: parseJsonColumn(row.analysis_warnings_json, []),
   }

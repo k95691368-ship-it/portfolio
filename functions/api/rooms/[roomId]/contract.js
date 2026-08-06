@@ -1,5 +1,6 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { rowToCamelTerms, EDITABLE_FIELDS } from '../../../_lib/contract.js'
+import { normalizeWageItems } from '../../../_lib/wageItems.js'
 import { getRoomParticipant, getRoomAccess } from '../../../_lib/rooms.js'
 import { revokeSignaturesOnChange } from '../../../_lib/signatureLock.js'
 
@@ -71,6 +72,17 @@ export async function onRequestPatch({ env, data, params, request }) {
     const oldJson = existing?.social_insurance_json ?? null
     if ((oldJson ?? '') !== (newJson ?? '')) {
       changes.push({ field: 'socialInsurance', from: oldJson, to: newJson })
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'wageItems')) {
+    const normalized = normalizeWageItems(body.wageItems)
+    if (!normalized.ok) return jsonError(normalized.error, 400)
+    const newJson = normalized.items.length > 0 ? JSON.stringify(normalized.items) : null
+    columns.push('wage_items_json')
+    values.push(newJson)
+    const oldJson = existing?.wage_items_json ?? null
+    if ((oldJson ?? '') !== (newJson ?? '')) {
+      changes.push({ field: 'wageItems', from: oldJson, to: newJson })
     }
   }
   if (Object.prototype.hasOwnProperty.call(body, 'customTerms')) {
