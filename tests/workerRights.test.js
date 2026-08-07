@@ -111,6 +111,23 @@ describe('describeSeverance', () => {
     expect(s.eligible).toBe(false)
     expect(s.reason).toContain('15시간')
   })
+
+  // 이미 지난 날을 "…까지 근무하면"이라고 미래로 적으면, 벌써 받을 수 있게 된
+  // 사람이 아직 아니라고 읽는다.
+  it('1년 도달일이 이미 지났으면 지난 일로 말한다', () => {
+    const later = new Date(Date.UTC(2027, 8, 20)) // 2027-09-20
+    const s = describeSeverance(FULL_TIME, later)
+    expect(s.qualifyingDate).toBe('2027-09-01')
+    expect(s.reason).toContain('지났습니다')
+    expect(s.reason).not.toContain('까지 계속 근무하면')
+  })
+
+  it('도달일 당일에도 지난 것으로 본다', () => {
+    // 한국시간으로 그날이 되었으면 지난 것이다. 서버가 UTC라 아홉 시간이
+    // 어긋나는 자리다.
+    const sameDay = new Date(Date.UTC(2027, 7, 31, 16, 0, 0)) // 한국 2027-09-01 01:00
+    expect(describeSeverance(FULL_TIME, sameDay).reason).toContain('지났습니다')
+  })
 })
 
 describe('describeOvertimeRates (제56조)', () => {

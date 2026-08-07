@@ -14,6 +14,7 @@ import InterviewSummary from '../components/InterviewSummary.jsx'
 import { roomStatusInfo } from '../lib/roomStatus.js'
 
 // 전형을 왜 끝냈는지. 지원자에게는 사유마다 전혀 다른 의미다.
+// (서버의 _lib/roomLifecycle.js와 같은 목록)
 const CLOSE_REASONS = [
   { value: 'other_candidate', label: '다른 지원자를 채용했습니다' },
   { value: 'candidate_withdrew', label: '지원자가 전형을 그만두었습니다' },
@@ -21,6 +22,10 @@ const CLOSE_REASONS = [
   { value: 'terms_not_agreed', label: '근로조건에 합의하지 못했습니다' },
   { value: 'other', label: '그 밖의 사유' },
 ]
+
+// 닫을 수 있는 상태 (서버의 _lib/roomLifecycle.js와 같은 목록).
+// 여기서 잘못 판단해도 서버가 409로 거절하므로, 화면은 안내만 맡는다.
+const CLOSABLE_STATUSES = ['open', 'active', 'contract_pending']
 
 export default function RoomPage() {
   const { roomId } = useParams()
@@ -126,6 +131,47 @@ export default function RoomPage() {
             </button>
           )}
         </div>
+      )}
+
+      {/* 종료 기능은 서버에만 있고 화면에는 없었다. 부를 수 없는 기능은
+          없는 기능이다. */}
+      {room.myRole === 'company' && CLOSABLE_STATUSES.includes(room.status) && (
+        <section className="room-close">
+          <h2>전형 종료</h2>
+          <p className="period-detail">
+            다른 사람을 채용했거나 채용 자체가 취소되었다면 여기서 전형을 끝냅니다. 끝내지 않으면
+            지원자의 대시보드에는 계속 진행중으로 남아, 지원자는 기다립니다. 채용절차법 제10조는
+            구직자에게 채용 여부를 알리도록 하고 있습니다.
+          </p>
+          <div className="career-row">
+            <label>
+              종료 사유
+              <select value={closeReason} onChange={(e) => setCloseReason(e.target.value)}>
+                {CLOSE_REASONS.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              덧붙일 말 (선택)
+              <input
+                value={closeNote}
+                onChange={(e) => setCloseNote(e.target.value)}
+                maxLength={200}
+                placeholder="지원자에게 사유와 함께 전달됩니다"
+              />
+            </label>
+          </div>
+          <p className="period-detail">
+            지금까지의 대화와 계약 조건은 종료 뒤에도 그대로 볼 수 있습니다. 잘못 눌렀다면 다시
+            진행할 수 있습니다.
+          </p>
+          <button type="button" className="btn-sm" onClick={handleClose} disabled={closing}>
+            {closing ? '종료하는 중...' : '전형 종료하기'}
+          </button>
+        </section>
       )}
 
       <RoomDocuments documents={view.documents} />

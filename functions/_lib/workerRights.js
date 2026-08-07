@@ -116,13 +116,20 @@ export function describeSeverance(terms, now = new Date()) {
   const oneYear = new Date(Date.UTC(start.getUTCFullYear() + 1, start.getUTCMonth(), start.getUTCDate()))
   const reachesOneYear = !end || end.getTime() >= oneYear.getTime() - 24 * 60 * 60 * 1000
 
+  const qualifyingDate = oneYear.toISOString().slice(0, 10)
+  // 이미 지난 날을 "…까지 근무하면"이라고 미래로 적으면, 벌써 받을 수 있게 된
+  // 사람이 아직 아니라고 읽는다. 오늘을 기준으로 말을 바꾼다.
+  const passed = koreanToday(now).getTime() >= oneYear.getTime()
+
   return {
     known: true,
     eligible: reachesOneYear,
-    qualifyingDate: oneYear.toISOString().slice(0, 10),
-    reason: reachesOneYear
-      ? `${oneYear.toISOString().slice(0, 10)}까지 계속 근무하면 퇴직금이 발생합니다. 계속근로 1년에 대하여 30일분 이상의 평균임금이 지급되어야 합니다.`
-      : `계약 기간이 1년에 이르지 않아 이 계약만으로는 퇴직금이 발생하지 않습니다. 다만 계약이 갱신되어 계속근로가 1년을 넘으면 그때부터 대상이 됩니다.`,
+    qualifyingDate,
+    reason: !reachesOneYear
+      ? `계약 기간이 1년에 이르지 않아 이 계약만으로는 퇴직금이 발생하지 않습니다. 다만 계약이 갱신되어 계속근로가 1년을 넘으면 그때부터 대상이 됩니다.`
+      : passed
+        ? `${qualifyingDate}이 지났습니다. 그때까지 계속 근무했다면 계속근로 1년에 대하여 30일분 이상의 평균임금이 퇴직금으로 지급되어야 합니다.`
+        : `${qualifyingDate}까지 계속 근무하면 퇴직금이 발생합니다. 계속근로 1년에 대하여 30일분 이상의 평균임금이 지급되어야 합니다.`,
     law: '근로자퇴직급여 보장법 제4조·제8조',
   }
 }

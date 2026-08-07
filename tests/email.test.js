@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { buildFinalOfferEmailHtml, maskEmail, sendFinalOfferEmail } from '../functions/_lib/email.js'
+import { maskEmail, sendFinalOfferEmail } from '../functions/_lib/email.js'
 
 describe('final offer email helpers', () => {
   it('masks the candidate email address', () => {
