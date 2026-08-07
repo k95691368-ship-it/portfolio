@@ -30,6 +30,11 @@ export default function LandingPage() {
       </div>
 
       <DemoGuide />
+
+      {/* 코드를 보러 온 사람에게는 화면보다 무엇을 어떻게 만들었는지가 먼저다. */}
+      <Link to="/tech" className="landing-tech-link">
+        기술 구현 보러가기 →
+      </Link>
     </div>
   )
 }
