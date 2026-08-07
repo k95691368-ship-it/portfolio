@@ -482,3 +482,12 @@ input[type='checkbox'] {
   color: var(--on-accent);
   border-color: var(--text-h);
 }
+
+/* 심각도는 색으로만 알리지 않는다. 배지 안에 '심각·주의·참고'를 말로 적고,
+   색을 구분하지 못해도 눈에 들어오도록 옅은 구분선을 둔다. */
+.badge-severity {
+  font-weight: 700;
+  padding-right: 6px;
+  border-right: 1px solid currentColor;
+  border-right-color: color-mix(in srgb, currentColor 35%, transparent);
+}

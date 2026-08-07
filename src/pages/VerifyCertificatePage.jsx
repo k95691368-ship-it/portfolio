@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
+import { formatKst } from '../lib/formatTime.js'
 
 // 공개: 감사추적증명서 진위 확인. 로그인 불필요.
 //
@@ -149,8 +150,8 @@ export default function VerifyCertificatePage() {
             <dd>
               <code>{result.serial}</code>
             </dd>
-            <dt>발급 일시</dt>
-            <dd>{result.issuedAt}</dd>
+            <dt>발급 일시 (한국 시각)</dt>
+            <dd>{formatKst(result.issuedAt)}</dd>
             <dt>증명서 지문</dt>
             <dd>
               <code className="verify-hash">{result.certificateSha256}</code>

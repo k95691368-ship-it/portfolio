@@ -15,12 +15,12 @@ export default function ContractFieldsForm({ terms, hireConfirmed, confirmationE
         <tbody>
           {TERM_FIELDS.map(({ key, label }) => (
             <tr key={key}>
-              <th>{label}</th>
+              <th scope="row">{label}</th>
               <td>{terms[key] ?? '-'}</td>
             </tr>
           ))}
           <tr>
-            <th>사회보험</th>
+            <th scope="row">사회보험</th>
             <td>
               {terms.socialInsurance
                 ? Object.entries(terms.socialInsurance)
@@ -32,7 +32,7 @@ export default function ContractFieldsForm({ terms, hireConfirmed, confirmationE
           </tr>
           {terms.customTerms?.length > 0 && (
             <tr>
-              <th>기타</th>
+              <th scope="row">기타</th>
               <td>{terms.customTerms.map((c) => `${c.label}: ${c.value}`).join(', ')}</td>
             </tr>
           )}

@@ -4,6 +4,7 @@ import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import { roomStatusInfo } from '../lib/roomStatus.js'
 import Modal from '../components/Modal.jsx'
+import { formatKst, formatKstDate } from '../lib/formatTime.js'
 
 const EMPTY_NEW_ACCOUNT = { email: '', displayName: '', role: 'candidate', companyName: '', isRecruiter: false }
 
@@ -311,7 +312,7 @@ export default function AdminPage() {
                 )}
                 {u.mustChangePassword && <span className="badge badge-warning">임시비밀번호</span>}
               </td>
-              <td>{u.createdAt}</td>
+              <td>{formatKstDate(u.createdAt)}</td>
               <td>
                 {u.id === user.id ? (
                   <span className="badge badge-neutral">본인 계정</span>
@@ -408,7 +409,7 @@ export default function AdminPage() {
                 <td>
                   <span className={`badge ${status.badgeClass}`}>{status.label}</span>
                 </td>
-                <td>{r.createdAt}</td>
+                <td>{formatKstDate(r.createdAt)}</td>
                 <td>
                   <button type="button" className="btn-sm" onClick={() => handleViewMessages(r)}>
                     채팅 보기
@@ -452,7 +453,7 @@ export default function AdminPage() {
           ) : (
             auditLog.map((entry) => (
               <tr key={entry.id}>
-                <td>{entry.createdAt}</td>
+                <td>{formatKst(entry.createdAt)}</td>
                 <td>{entry.actorEmail}</td>
                 <td>{AUDIT_ACTION_LABELS[entry.action] || entry.action}</td>
                 <td>{entry.targetEmail || entry.roomTitle || '-'}</td>

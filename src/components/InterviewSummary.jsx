@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
+import { formatKst } from '../lib/formatTime.js'
 
 // 면접 대화의 회사 보관용 요약 기록.
 //
@@ -49,7 +50,7 @@ export default function InterviewSummary({ roomId, record, canWrite, messageCoun
       {summary && (
         <>
           <p className="summary-meta">
-            {record.author} · {record.createdAt} · 대화 {record.messageCount}건 기준
+            {record.author} · {formatKst(record.createdAt)} · 대화 {record.messageCount}건 기준
           </p>
           {stale && (
             <p className="period-alert">

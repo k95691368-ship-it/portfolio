@@ -8,6 +8,7 @@ import ContractExplainer from '../components/ContractExplainer.jsx'
 import AuditCertificate from '../components/AuditCertificate.jsx'
 import WageComposition from '../components/WageComposition.jsx'
 import WorkerRights from '../components/WorkerRights.jsx'
+import SeverityBadge from '../components/SeverityBadge.jsx'
 import { formatKst } from '../lib/formatTime.js'
 import { IDENTITY_FIELDS, TERM_FIELDS, SOCIAL_INSURANCE_FIELDS } from '../lib/contractTemplate.js'
 
@@ -61,8 +62,6 @@ const EMPTY_FORM = {
   customTerms: [],
   wageItems: [],
 }
-
-const SEVERITY_BADGE = { high: 'badge-danger', medium: 'badge-warning', info: 'badge-neutral' }
 
 // 지원 언어 (서버의 _lib/languages.js와 같은 목록)
 const LANGUAGES = [
@@ -551,9 +550,7 @@ function PreSignCheck({ check, onRequestFix, onRedraft, redrafting }) {
           <ul className="presign-list">
             {doc.issues.map((issue) => (
               <li key={issue.field}>
-                <span className={`badge ${SEVERITY_BADGE[issue.severity] || 'badge-neutral'}`}>
-                  {issue.label}
-                </span>{' '}
+                <SeverityBadge severity={issue.severity}>{issue.label}</SeverityBadge>{' '}
                 {issue.message}
               </li>
             ))}
@@ -591,10 +588,10 @@ function PreSignCheck({ check, onRequestFix, onRedraft, redrafting }) {
           <table className="presign-table">
             <thead>
               <tr>
-                <th>항목</th>
-                <th>대화에서 합의</th>
-                <th>현재 계약서</th>
-                {onRequestFix && <th></th>}
+                <th scope="col">항목</th>
+                <th scope="col">대화에서 합의</th>
+                <th scope="col">현재 계약서</th>
+                {onRequestFix && <th scope="col"><span className="sr-only">수정 요청</span></th>}
               </tr>
             </thead>
             <tbody>
@@ -633,9 +630,7 @@ function PreSignCheck({ check, onRequestFix, onRedraft, redrafting }) {
           <ul className="presign-list">
             {legalIssues.map((issue, i) => (
               <li key={i}>
-                <span className={`badge ${SEVERITY_BADGE[issue.severity] || 'badge-neutral'}`}>
-                  {issue.title}
-                </span>{' '}
+                <SeverityBadge severity={issue.severity}>{issue.title}</SeverityBadge>{' '}
                 {issue.detail}
                 {onRequestFix && issue.field && issue.suggestedValue && (
                   <>
@@ -1232,9 +1227,7 @@ export default function ContractPage() {
             <ul className="compare-issue-list">
               {postingComparison.issues.map((i) => (
                 <li key={i.field}>
-                  <span className={`badge ${SEVERITY_BADGE[i.severity] || 'badge-neutral'}`}>
-                    {i.label}
-                  </span>{' '}
+                  <SeverityBadge severity={i.severity}>{i.label}</SeverityBadge>{' '}
                   {i.message}
                 </li>
               ))}
@@ -1421,7 +1414,7 @@ export default function ContractPage() {
           {signedContract ? (
             <>
               <p className="save-message">
-                계약서가 저장되었습니다. ({signedContract.createdAt})
+                계약서가 저장되었습니다. ({formatKst(signedContract.createdAt)})
                 {signedContract.emailStatus === 'sent' && ' · 이메일로 사본 전송 완료'}
                 {signedContract.emailStatus === 'failed' && ' · 이메일 전송 실패'}
                 {signedContract.emailStatus === 'not_sent' &&
@@ -1491,7 +1484,7 @@ export default function ContractPage() {
             {history.map((entry) => (
               <li key={entry.id} className="history-entry">
                 <p className="history-meta">
-                  {entry.createdAt} · {entry.editorName}
+                  {formatKst(entry.createdAt)} · {entry.editorName}
                   {entry.editorRole === 'company' ? ' (회사)' : entry.editorRole === 'candidate' ? ' (지원자)' : ''}
                 </p>
                 <ul className="history-changes">
@@ -1542,18 +1535,18 @@ export default function ContractPage() {
             <tbody>
               {IDENTITY_FIELDS.map((f) => (
                 <tr key={f.key}>
-                  <th>{f.label}</th>
+                  <th scope="row">{f.label}</th>
                   <td>{form[f.key] || '-'}</td>
                 </tr>
               ))}
               {TERM_FIELDS.map((f) => (
                 <tr key={f.key}>
-                  <th>{f.label}</th>
+                  <th scope="row">{f.label}</th>
                   <td>{form[f.key] || '-'}</td>
                 </tr>
               ))}
               <tr>
-                <th>사회보험 적용</th>
+                <th scope="row">사회보험 적용</th>
                 <td>
                   {SOCIAL_INSURANCE_FIELDS.filter((f) => form.socialInsurance[f.key])
                     .map((f) => f.label)
@@ -1562,7 +1555,7 @@ export default function ContractPage() {
               </tr>
               {form.customTerms.filter((c) => c.label && c.value).length > 0 && (
                 <tr>
-                  <th>그 밖의 사항</th>
+                  <th scope="row">그 밖의 사항</th>
                   <td>{form.customTerms.map((c) => `${c.label}: ${c.value}`).join(', ')}</td>
                 </tr>
               )}
