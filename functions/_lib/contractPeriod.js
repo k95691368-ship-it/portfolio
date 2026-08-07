@@ -1,3 +1,5 @@
+import { koreanToday } from './koreanTime.js'
+
 // 근로계약 기간 계산 (순수 함수 — 단위 테스트 대상).
 //
 // 지금까지 이 서비스는 계약을 "체결"하면 끝이었다. 그런데 근로계약의 수명은
@@ -62,7 +64,9 @@ function exceedsFixedTerm(start, end) {
 export function describeContractPeriod(terms, now = new Date()) {
   const start = parseContractDate(terms?.contractStartDate)
   const end = parseContractDate(terms?.contractEndDate)
-  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  // 날짜만 비교하므로 한국 달력 기준이어야 한다. UTC로 재면 한국시간 0~9시에
+  // 하루가 밀려, 만료일 당일에도 '만료 1일 전'으로 표시된다.
+  const today = koreanToday(now)
 
   if (!start && !end) {
     return { known: false, status: 'unknown', label: '계약 기간 미기재' }
@@ -132,7 +136,7 @@ export const CONTINUITY_GAP_DAYS = 30
 //   2) 계약 종료일 — 예정. 그 날이 아직 오지 않았으면 보존 기간은 시작 전이다.
 //   3) 둘 다 없으면 근로관계가 끝나지 않은 것으로 본다 (보존 의무 계속).
 export function describeRetention(terms, signedAt, now = new Date(), employmentEndedAt = null) {
-  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  const today = koreanToday(now)
   const ended = parseContractDate(employmentEndedAt)
   const contractEnd = parseContractDate(terms?.contractEndDate)
   const signed = parseContractDate(signedAt)
@@ -235,7 +239,7 @@ export function describeContinuousEmployment(segments, now = new Date()) {
 
   if (parsed.length < 2) return { linked: false, count: parsed.length }
 
-  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  const today = koreanToday(now)
   let totalMonths = 0
   let totalDays = 0
   const gaps = []

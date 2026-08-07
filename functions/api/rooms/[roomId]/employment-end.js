@@ -2,6 +2,7 @@ import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { notifyUser } from '../../../_lib/notify.js'
 import { parseContractDate } from '../../../_lib/contractPeriod.js'
+import { koreanToday } from '../../../_lib/koreanTime.js'
 
 // 근로관계가 실제로 끝난 날을 기록한다.
 //
@@ -50,9 +51,9 @@ export async function onRequestPost({ request, env, data, params }) {
   // 미래 날짜를 기산일로 쓰면 아직 오지 않은 날부터 보존 기간이 시작된 것처럼
   // 계산된다. 종료 "예정"은 계약 종료일이 이미 담고 있으므로, 여기에는 이미
   // 일어난 사실만 적는다.
-  const today = new Date()
-  const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
-  if (ended.getTime() > todayUtc) {
+  // 한국 달력 기준으로 판단한다. UTC로 재면 한국시간 0~9시 사이에는 오늘
+  // 날짜조차 "아직 오지 않은 날짜"로 거부된다.
+  if (ended.getTime() > koreanToday().getTime()) {
     return jsonError('아직 오지 않은 날짜는 기록할 수 없습니다. 실제로 끝난 뒤에 기록해주세요.', 400)
   }
 

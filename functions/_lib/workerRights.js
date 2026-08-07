@@ -11,6 +11,7 @@
 
 import { computeWeeklyHours, monthlyPaidHours } from './contractCheck.js'
 import { parseContractDate } from './contractPeriod.js'
+import { koreanToday } from './koreanTime.js'
 import { effectiveWageItems } from './wageItems.js'
 
 // 근로기준법 제18조 제3항: 4주 평균 1주 소정근로시간이 15시간 미만인 근로자에게는
@@ -49,7 +50,7 @@ export function describeAnnualLeave(terms, now = new Date()) {
   }
   if (!start) return { known: false }
 
-  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  const today = koreanToday(now)
   const anniversary = (n) =>
     new Date(Date.UTC(start.getUTCFullYear() + n, start.getUTCMonth(), start.getUTCDate()))
 
