@@ -6,7 +6,7 @@ export async function onRequestGet({ env, params }) {
   const row = await env.DB.prepare(
     `SELECT id, title, department, employment_type, location, description, status, deadline, created_at,
             wage_type, wage_min, wage_max, work_hours_start, work_hours_end, work_days,
-            (deadline IS NOT NULL AND deadline < date('now')) AS expired
+            (deadline IS NOT NULL AND deadline < date('now', '+9 hours')) AS expired
      FROM job_postings
      WHERE id = ?`
   )

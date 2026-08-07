@@ -8,6 +8,7 @@ import ContractExplainer from '../components/ContractExplainer.jsx'
 import AuditCertificate from '../components/AuditCertificate.jsx'
 import WageComposition from '../components/WageComposition.jsx'
 import WorkerRights from '../components/WorkerRights.jsx'
+import { formatKst } from '../lib/formatTime.js'
 import { IDENTITY_FIELDS, TERM_FIELDS, SOCIAL_INSURANCE_FIELDS } from '../lib/contractTemplate.js'
 
 const FIELD_LABELS = {
@@ -1268,10 +1269,10 @@ export default function ContractPage() {
             <ul className="delivery-list">
               {deliveries.map((d) => (
                 <li key={d.channel}>
-                  <strong>{d.channelLabel}</strong> · {d.deliveredAt?.slice(0, 16)}
+                  <strong>{d.channelLabel}</strong> · {formatKst(d.deliveredAt)}
                   {d.status === 'failed' && <span className="compare-concern"> · 발송 실패</span>}
-                  {d.firstViewedAt && ` · 열람 ${d.firstViewedAt.slice(0, 16)}`}
-                  {d.downloadedAt && ` · 내려받음 ${d.downloadedAt.slice(0, 16)}`}
+                  {d.firstViewedAt && ` · 열람 ${formatKst(d.firstViewedAt)}`}
+                  {d.downloadedAt && ` · 내려받음 ${formatKst(d.downloadedAt)}`}
                 </li>
               ))}
             </ul>
@@ -1327,8 +1328,8 @@ export default function ContractPage() {
             <ul>
               {revokedSignatures.map((r, i) => (
                 <li key={i}>
-                  {r.role === 'company' ? '회사' : '지원자'} 서명 ({r.signedAt?.slice(0, 16)}) —{' '}
-                  {r.reason} · {r.revokedAt?.slice(0, 16)} 무효화
+                  {r.role === 'company' ? '회사' : '지원자'} 서명 ({formatKst(r.signedAt)}) —{' '}
+                  {r.reason} · {formatKst(r.revokedAt)} 무효화
                 </li>
               ))}
             </ul>

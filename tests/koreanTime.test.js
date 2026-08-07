@@ -74,3 +74,19 @@ describe('새벽에도 날짜 판정이 밀리지 않는다', () => {
     expect(a.upcoming?.at).not.toBe('2026-08-08')
   })
 })
+
+describe('공고 마감일도 한국 달력으로', () => {
+  it('한국 기준 오늘이 마감일이면 아직 마감이 아니다', async () => {
+    const { describeDeadline } = await import('../src/lib/deadline.js')
+    // 한국시간 2026-08-08 01:00. 마감일이 오늘이면 "오늘 마감"이어야 한다.
+    const d = describeDeadline('2026-08-08', KST_EARLY_MORNING)
+    expect(d.over).toBe(false)
+    expect(d.daysLeft).toBe(0)
+    expect(d.label).toBe('오늘 마감')
+  })
+
+  it('한국 기준 어제 마감된 공고는 마감으로 본다', async () => {
+    const { describeDeadline } = await import('../src/lib/deadline.js')
+    expect(describeDeadline('2026-08-07', KST_EARLY_MORNING).over).toBe(true)
+  })
+})

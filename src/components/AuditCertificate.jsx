@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
+import { formatKst } from '../lib/formatTime.js'
 
 // 감사추적증명서 — 계약 이력을 계약서에서 떼어낸 독립 문서.
 //
@@ -123,7 +124,7 @@ export default function AuditCertificate({ roomId, canIssue, hasSignature, initi
               <div className="certificate-row">
                 <code>{c.serial}</code>
                 <span className="certificate-meta">
-                  {c.issuedAt?.slice(0, 16)} · 이력 {c.eventCount}건
+                  {formatKst(c.issuedAt)} · 이력 {c.eventCount}건
                   {c.revokedAt && <span className="compare-concern"> · 취소됨</span>}
                 </span>
               </div>

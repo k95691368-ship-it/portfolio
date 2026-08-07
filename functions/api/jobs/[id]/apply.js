@@ -35,7 +35,9 @@ export async function onRequestPost({ request, env, params }) {
 
   const posting = await env.DB.prepare(
     `SELECT id, title, status,
-            (deadline IS NOT NULL AND deadline < date('now')) AS expired
+            -- date('now') 는 UTC다. 한국시간 새벽 아홉 시간 동안 UTC 날짜는
+            -- 아직 어제라, 한국 기준 마감일이 지난 공고에 계속 지원이 접수됐다.
+            (deadline IS NOT NULL AND deadline < date('now', '+9 hours')) AS expired
      FROM job_postings WHERE id = ?`
   )
     .bind(params.id)
