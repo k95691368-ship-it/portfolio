@@ -2861,3 +2861,16 @@
   box-shadow: var(--shadow-sm);
   cursor: pointer;
 }
+
+/* 이름으로 서명 — 마우스를 쓸 수 없는 사람에게는 이것이 유일한 경로다 */
+.signature-typed {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+.signature-typed input {
+  font-weight: 400;
+}
