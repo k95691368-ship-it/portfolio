@@ -31,7 +31,6 @@ async function call(path, options = {}) {
 // 여기서 확인하려는 건 "막혔는가"와 함께 "경로가 살아 있는가"다.
 // 라우트가 사라지면 Pages가 SPA HTML(200)을 돌려주므로 즉시 드러난다.
 const PROTECTED = [
-  ['GET', '/api/rooms/list'],
   ['GET', '/api/notifications'],
   ['POST', '/api/notifications/read'],
   ['GET', '/api/documents/mine'],
