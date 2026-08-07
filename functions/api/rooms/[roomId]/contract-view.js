@@ -1,4 +1,4 @@
-import { jsonResponse, jsonError } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, isAppFetch } from '../../../_lib/http.js'
 import { getRoomAccess } from '../../../_lib/rooms.js'
 import { rowToCamelTerms, buildArticlesFromTerms } from '../../../_lib/contract.js'
 import { buildAuditEvents, describeSigningEnvironment } from '../../../_lib/auditTrail.js'
@@ -19,6 +19,7 @@ import {
 import { checkContractDocument } from '../../../_lib/documentCheck.js'
 import { checkProbationCompliance } from '../../../_lib/probation.js'
 import { describeWageComposition } from '../../../_lib/wageItems.js'
+import { listLifecycle, lifecycleEvents } from '../../../_lib/roomLifecycleLog.js'
 import { describeWorkerRights } from '../../../_lib/workerRights.js'
 
 import { contractFingerprint } from '../../../_lib/contractDocument.js'
@@ -37,7 +38,7 @@ import { findLanguage } from '../../../_lib/languages.js'
 // 각각 따로 요청했는데, 감사추적이 나머지가 읽는 표를 대부분 다시 읽는 데다
 // 요청마다 세션 인증까지 반복돼 한 페이지에 D1 조회가 스무 번 넘게 발생했다.
 // 여기서 한 번만 읽고 나눠서 돌려준다.
-export async function onRequestGet({ env, data, params }) {
+export async function onRequestGet({ env, data, params, request }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
   const access = await getRoomAccess(env, params.roomId, data.user)
   if (!access) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
@@ -55,6 +56,7 @@ export async function onRequestGet({ env, data, params }) {
     translationRows,
     revocationRows,
     certificateRows,
+    lifecycleRows,
   ] = await Promise.all([
       env.DB.prepare('SELECT id, title, invite_code, status, created_at FROM interview_rooms WHERE id = ?')
         .bind(roomId)
@@ -124,13 +126,17 @@ export async function onRequestGet({ env, data, params }) {
       )
         .bind(roomId)
         .all(),
+      // 전형 종료·근로관계 종료 같은 사건은 상태 컬럼이 지워지면 함께 사라진다.
+      listLifecycle(env, roomId),
     ])
 
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
 
   // 근로자가 체결된 계약서를 처음 열어 본 시각을 남긴다. 전자문서법 제5조가
   // 요구하는 수신 기록이면서, 교부가 실제로 닿았다는 증거다.
-  if (room.status === 'signed' && access.role_in_room === 'candidate') {
+  // 링크를 눌러 들어온 요청으로는 기록하지 않는다. 그렇게 두면 계약서를 본
+  // 적 없는 근로자 앞으로 열람 기록이 남는다.
+  if (room.status === 'signed' && access.role_in_room === 'candidate' && isAppFetch(request)) {
     await markFirstViewed(env, roomId)
   }
 
@@ -410,6 +416,7 @@ export async function onRequestGet({ env, data, params }) {
         deliveries,
         translations: mappedTranslations,
         certificates,
+        lifecycle: lifecycleEvents(lifecycleRows),
       }),
     },
     // 서명 후 내용이 바뀌어 무효가 된 서명 (다시 서명해야 하는 이유)

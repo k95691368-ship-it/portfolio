@@ -1,6 +1,7 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { notifyUser } from '../../../_lib/notify.js'
+import { logLifecycle } from '../../../_lib/roomLifecycleLog.js'
 import { parseContractDate } from '../../../_lib/contractPeriod.js'
 import { koreanToday } from '../../../_lib/koreanTime.js'
 
@@ -88,6 +89,14 @@ export async function onRequestPost({ request, env, data, params }) {
     })
   }
 
+  // 이 날짜가 계약서 보존 기간 3년의 기산일이다. 적었다가 지우면 보존 시계가
+  // 통째로 되감기므로, 적은 것도 지운 것도 기록으로 남긴다.
+  await logLifecycle(env, params.roomId, {
+    action: 'employment_end_recorded',
+    actorName: data.user.display_name,
+    detail: [endedOn, reason || null].filter(Boolean).join(' · '),
+  })
+
   return jsonResponse({ ok: true, endedOn, reason: reason || null })
 }
 
@@ -109,6 +118,12 @@ export async function onRequestDelete({ env, data, params }) {
   )
     .bind(params.roomId)
     .run()
+
+  await logLifecycle(env, params.roomId, {
+    action: 'employment_end_cleared',
+    actorName: data.user.display_name,
+    detail: null,
+  })
 
   return jsonResponse({ ok: true })
 }

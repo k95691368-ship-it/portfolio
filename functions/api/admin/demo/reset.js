@@ -132,6 +132,9 @@ async function wipeDemo(env) {
     inRooms('final_offer_emails'),
     inRooms('chat_messages'),
     inRooms('contract_edit_history'),
+    // 방 수명 기록(0044)도 방을 외래키로 참조한다. 빠뜨리면 전형을 한 번이라도
+    // 종료해 본 데모는 두 번 다시 초기화되지 않는다.
+    inRooms('room_lifecycle_log'),
     // 갱신 연결을 먼저 끊지 않으면 방을 지울 수 없다.
     roomIds.length > 0
       ? env.DB.prepare(

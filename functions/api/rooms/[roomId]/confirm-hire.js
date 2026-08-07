@@ -40,7 +40,13 @@ export async function onRequestPost({ env, data, params }) {
        hire_confirmed = 1,
        hire_confirmed_at = COALESCE(contract_terms.hire_confirmed_at, datetime('now')),
        hire_confirmation_excerpt =
-         COALESCE(contract_terms.hire_confirmation_excerpt, excluded.hire_confirmation_excerpt)
+         COALESCE(contract_terms.hire_confirmation_excerpt, excluded.hire_confirmation_excerpt),
+       -- 이 경로만 updated_at 을 올리지 않고 있었다. 조건 행이 바뀌었는지를
+       -- updated_at 으로 판단하는 곳(AI 조건 정리의 덮어쓰기 방지, 서명의
+       -- 조건부 INSERT)이 이 변경을 보지 못한다. 채용 확정 알림이 나간 뒤
+       -- AI 조건 정리가 돌아와 hire_confirmed 를 0 으로 되돌리면, 지원자는
+       -- 확정 알림을 받고도 "아직 채용이 확정되지 않았다"는 답을 받는다.
+       updated_at = datetime('now')
      WHERE contract_terms.hire_confirmed = 0`
   )
     .bind(params.roomId, `${data.user.display_name}님이 담당자 확인으로 채용을 확정했습니다.`)

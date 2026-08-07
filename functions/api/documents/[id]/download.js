@@ -1,4 +1,4 @@
-import { jsonError } from '../../../_lib/http.js'
+import { jsonError, contentDisposition, FILE_CACHE_HEADERS } from '../../../_lib/http.js'
 
 export async function onRequestGet({ env, data, params }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
@@ -26,8 +26,8 @@ export async function onRequestGet({ env, data, params }) {
   return new Response(object.body, {
     headers: {
       'Content-Type': doc.content_type,
-      'Content-Disposition': `attachment; filename="${encodeURIComponent(doc.filename)}"`,
-      'X-Content-Type-Options': 'nosniff',
+      'Content-Disposition': contentDisposition(doc.filename),
+      ...FILE_CACHE_HEADERS,
     },
   })
 }

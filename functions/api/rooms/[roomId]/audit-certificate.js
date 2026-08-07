@@ -7,6 +7,7 @@ import { findLanguage } from '../../../_lib/languages.js'
 import { contractFingerprint } from '../../../_lib/contractDocument.js'
 import { buildAuditEvents, describeSigningEnvironment } from '../../../_lib/auditTrail.js'
 import { describeContractPeriod, describeRetention } from '../../../_lib/contractPeriod.js'
+import { listLifecycle, lifecycleEvents } from '../../../_lib/roomLifecycleLog.js'
 import { listDeliveries, describeDeliveryState } from '../../../_lib/delivery.js'
 import {
   formatSerial,
@@ -34,6 +35,7 @@ async function loadSource(env, roomId) {
     changeRequestRows,
     translationRows,
     certificateRows,
+    lifecycleRows,
   ] = await Promise.all([
       env.DB.prepare('SELECT id, title, status, created_at FROM interview_rooms WHERE id = ?')
         .bind(roomId)
@@ -56,9 +58,15 @@ async function loadSource(env, roomId) {
         .bind(roomId)
         .all(),
       env.DB.prepare(
-        `SELECT signer_role, signed_at, signer_ip, signer_user_agent, signer_country,
-                document_sha256, verified_email, session_started_at, verification_method
-           FROM signatures WHERE room_id = ?`
+        // display_name 을 읽지 않아 증명서의 서명 이벤트에 문자열 "undefined"가
+        // 동결되고 있었다. 누가 서명했는지를 증명하겠다는 문서가 아무도
+        // 가리키지 않는 이름을 해시해 굳혔다. 계약서 화면(contract-view)은
+        // 같은 자리에서 users 를 조인하고 있었으므로 두 화면이 서로 달랐다.
+        `SELECT s.signer_role, s.signed_at, s.signer_ip, s.signer_user_agent, s.signer_country,
+                s.document_sha256, s.verified_email, s.session_started_at, s.verification_method,
+                u.display_name
+           FROM signatures s JOIN users u ON u.id = s.signer_user_id
+          WHERE s.room_id = ?`
       )
         .bind(roomId)
         .all(),
@@ -94,6 +102,7 @@ async function loadSource(env, roomId) {
       )
         .bind(roomId)
         .all(),
+      listLifecycle(env, roomId),
     ])
 
   return {
@@ -115,6 +124,7 @@ async function loadSource(env, roomId) {
       }
     }),
     certificates: certificateRows.results.map((c) => ({ serial: c.serial, issuedAt: c.issued_at })),
+    lifecycle: lifecycleRows,
   }
 }
 
@@ -159,6 +169,7 @@ export async function onRequestPost({ env, data, params }) {
     deliveries,
     translations: src.translations,
     certificates: src.certificates,
+    lifecycle: lifecycleEvents(src.lifecycle),
   })
 
   // 발급 시각을 한 번만 만들어 증명서 본문과 저장 행이 같은 값을 쓰게 한다.

@@ -67,6 +67,7 @@ export function buildAuditEvents({
   deliveries,
   translations,
   certificates,
+  lifecycle,
 }) {
   const events = []
   events.push({ at: room.created_at, event: '면접방 생성', detail: room.title })
@@ -202,6 +203,10 @@ export function buildAuditEvents({
 
   // 시각 없는 사건은 이력이 아니다. 남겨두면 빈 시각으로 맨 앞에 올라와,
   // 시간순임을 전제로 읽는 사람에게 없던 순서를 만들어 낸다.
+  // 전형 종료·종료 취소·근로관계 종료 기록은 상태 컬럼이 지워지면 함께
+  // 사라지므로, 상태에서 유도하지 않고 쌓아 둔 기록에서 가져온다.
+  for (const e of lifecycle || []) events.push(e)
+
   const dated = events.filter((e) => normalizeTime(e.at) !== '')
   dated.sort((a, b) => normalizeTime(a.at).localeCompare(normalizeTime(b.at)))
   return dated.map((e) => ({ ...e, at: normalizeTime(e.at) }))

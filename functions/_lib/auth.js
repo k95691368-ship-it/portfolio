@@ -70,6 +70,15 @@ export async function createSession(db, userId) {
   const token = toBase64Url(crypto.getRandomValues(new Uint8Array(32)))
   const tokenHash = await sha256Hex(token)
   const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000).toISOString()
+
+  // 만료된 세션 행은 아무도 지우지 않아 영원히 쌓이고 있었다. 새 세션을 만들
+  // 때 이 사용자의 죽은 행을 함께 치운다 — 따로 도는 청소 작업이 없는 환경이라,
+  // 치울 기회는 여기뿐이다.
+  await db
+    .prepare("DELETE FROM sessions WHERE user_id = ? AND datetime(expires_at) <= datetime('now')")
+    .bind(userId)
+    .run()
+    .catch(() => {})
   await db
     .prepare('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)')
     .bind(tokenHash, userId, expiresAt)
@@ -109,9 +118,14 @@ export async function getSessionUser(db, request) {
       // 서명이 어느 로그인 세션에서 이루어졌는지 남기기 위해 세션 시작 시각을
       // 함께 읽는다. 서명 증거는 "누가 언제 어디서"인데, 지금까지 "언제 로그인한
       // 세션인지"가 어디에도 없었다.
+      // expires_at 은 JS 의 toISOString() 이라 "2026-08-14T06:00:00.000Z" 이고
+      // datetime('now') 는 "2026-08-14 06:00:00" 이다. 문자열로 비교하면 열한
+      // 번째 글자에서 'T'(0x54) 와 공백(0x20) 이 만나 언제나 'T' 가 크다. 그래서
+      // 만료 당일에는 몇 시간이 지났든 세션이 살아 있다. 만료를 하루 늦추는 셈이다.
+      // datetime() 으로 감싸 두 형식을 같은 값으로 읽는다.
       `SELECT users.*, sessions.created_at AS session_started_at FROM sessions
        JOIN users ON users.id = sessions.user_id
-       WHERE sessions.token_hash = ? AND sessions.expires_at > datetime('now')`
+       WHERE sessions.token_hash = ? AND datetime(sessions.expires_at) > datetime('now')`
     )
     .bind(tokenHash)
     .first()

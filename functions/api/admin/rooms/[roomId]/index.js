@@ -64,6 +64,8 @@ export async function onRequestDelete({ request, env, data, params }) {
       env.DB.prepare('DELETE FROM signature_revocations WHERE room_id = ?').bind(params.roomId),
       env.DB.prepare('DELETE FROM contract_deliveries WHERE room_id = ?').bind(params.roomId),
       env.DB.prepare('DELETE FROM audit_certificates WHERE room_id = ?').bind(params.roomId),
+      // 방 수명 기록(0044)도 방을 외래키로 참조한다.
+      env.DB.prepare('DELETE FROM room_lifecycle_log WHERE room_id = ?').bind(params.roomId),
       // 알림은 방을 외래키로 참조하지 않지만 링크로 가리킨다. 남겨두면 사용자
       // 알림함에 눌러도 404가 나는 항목이 영영 남는다.
       env.DB.prepare("DELETE FROM notifications WHERE link LIKE ?").bind(`/rooms/${params.roomId}%`),

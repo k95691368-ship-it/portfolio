@@ -1,4 +1,4 @@
-import { jsonError } from '../../../../_lib/http.js'
+import { jsonError, contentDisposition, FILE_CACHE_HEADERS } from '../../../../_lib/http.js'
 import { requireManageableApplication } from '../../../../_lib/applications.js'
 
 // 관리: 지원서 첨부파일(이력서/포트폴리오) 다운로드.
@@ -20,8 +20,8 @@ export async function onRequestGet({ env, data, params }) {
   return new Response(object.body, {
     headers: {
       'Content-Type': doc.content_type,
-      'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(doc.filename)}`,
-      'X-Content-Type-Options': 'nosniff',
+      'Content-Disposition': contentDisposition(doc.filename),
+      ...FILE_CACHE_HEADERS,
     },
   })
 }

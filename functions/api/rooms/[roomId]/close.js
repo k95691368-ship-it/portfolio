@@ -1,6 +1,7 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { notifyUser } from '../../../_lib/notify.js'
+import { logLifecycle } from '../../../_lib/roomLifecycleLog.js'
 import { canClose, normalizeCloseReason, isClosed } from '../../../_lib/roomLifecycle.js'
 
 // 전형을 종료한다.
@@ -58,6 +59,12 @@ export async function onRequestPost({ request, env, data, params }) {
     })
   }
 
+  await logLifecycle(env, params.roomId, {
+    action: 'closed',
+    actorName: data.user.display_name,
+    detail: reason.text,
+  })
+
   return jsonResponse({ ok: true, status: 'closed', reason: reason.text })
 }
 
@@ -109,6 +116,14 @@ export async function onRequestDelete({ env, data, params }) {
       link: `/rooms/${params.roomId}`,
     })
   }
+
+  // 되돌리면 closed_at 과 close_reason 이 NULL 이 되어 종료했던 사실이 사라진다.
+  // 종료를 알린 것도, 되돌린 것도 일어난 일이다.
+  await logLifecycle(env, params.roomId, {
+    action: 'reopened',
+    actorName: data.user.display_name,
+    detail: null,
+  })
 
   return jsonResponse({ ok: true, status: restored })
 }
