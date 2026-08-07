@@ -73,6 +73,8 @@ const BLOCKED_WHEN_CLOSED = {
   confirm_hire: '종료된 전형에서는 채용을 확정할 수 없습니다.',
   change_request: '종료된 전형에서는 수정을 요청할 수 없습니다.',
   draft: '종료된 전형에서는 계약서를 작성할 수 없습니다.',
+  analyze: '종료된 전형에서는 채용 조건을 다시 정리할 수 없습니다.',
+  respond_change_request: '종료된 전형에서는 수정 요청에 응답할 수 없습니다.',
   link_previous: '종료된 전형의 이전 계약 연결은 변경할 수 없습니다.',
 }
 

@@ -4,6 +4,11 @@ import { EDITABLE_FIELDS } from '../../../../_lib/contract.js'
 import { FIELD_LABELS } from '../../../../_lib/contractCheck.js'
 import { notifyUser } from '../../../../_lib/notify.js'
 import { revokeSignaturesOnChange } from '../../../../_lib/signatureLock.js'
+import { blockedWhenClosed } from '../../../../_lib/roomLifecycle.js'
+import {
+  parseWageItemsJson,
+  alignWageItemsWithBase,
+} from '../../../../_lib/wageItems.js'
 
 const NOTE_MAX = 500
 
@@ -37,6 +42,10 @@ export async function onRequestPost({ request, env, data, params }) {
   if (room?.status === 'signed') {
     return jsonError('이미 서명이 완료된 계약서는 변경할 수 없습니다.', 409)
   }
+  // 종료된 전형에서는 수정 요청을 새로 보내는 것만 막고 있었다. 이미 쌓여 있던
+  // 요청을 수락하면 조건이 바뀌고 서명이 무효화된다 — 끝난 전형에서.
+  const closedError = blockedWhenClosed(room, 'respond_change_request')
+  if (closedError) return jsonError(closedError, 409)
 
   const column = EDITABLE_FIELDS[req.field]
   if (action === 'accept' && !column) {
@@ -44,6 +53,17 @@ export async function onRequestPost({ request, env, data, params }) {
   }
 
   const label = FIELD_LABELS[req.field] || req.field
+
+  // 기본급이 두 곳에 있다 — wage_base_amount 컬럼과 wageItems 의 base 항목.
+  // 컬럼만 고치면 지원자가 요청해 회사가 수락한 인상이 최저임금·통상임금
+  // 계산에는 전혀 반영되지 않는다. 항목을 쓰는 계약이면 함께 맞춘다.
+  const existingTerms =
+    action === 'accept' && req.field === 'wageBaseAmount'
+      ? await env.DB.prepare('SELECT wage_items_json FROM contract_terms WHERE room_id = ?')
+          .bind(params.roomId)
+          .first()
+      : null
+
   const statements = [
     env.DB.prepare(
       `UPDATE contract_change_requests
@@ -86,6 +106,16 @@ export async function onRequestPost({ request, env, data, params }) {
         JSON.stringify([{ field: req.field, from: req.current_value, to: value }])
       )
     )
+
+    const items = parseWageItemsJson(existingTerms?.wage_items_json)
+    if (items.length > 0) {
+      statements.push(
+        env.DB.prepare('UPDATE contract_terms SET wage_items_json = ? WHERE room_id = ?').bind(
+          JSON.stringify(alignWageItemsWithBase(items, value)),
+          params.roomId
+        )
+      )
+    }
   }
 
   await env.DB.batch(statements)

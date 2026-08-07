@@ -23,10 +23,21 @@ function stageFromRoom(roomStatus) {
   return null
 }
 
+// 전형 종료를 이 화면이 몰랐다.
+//
+// 회사가 다른 사람을 채용해 전형을 끝내면 방은 closed 가 되고 지원자에게 알림도
+// 간다. 그런데 지원자가 자기 지원 현황을 열면 여전히 "면접이 진행 중입니다"가
+// 떠 있었다. 끝났다고 말할 자리를 만들어 놓고, 정작 지원자가 가장 자주 보는
+// 화면에서는 끝나지 않은 것처럼 보였다.
+function isClosedRoom(roomStatus) {
+  return roomStatus === 'closed'
+}
+
 // row: { status, createdAt, reviewedAt, roomId, roomStatus, signedAt }
 export function describeApplicationProgress(row) {
   const rejected = row?.status === 'rejected'
   const passed = row?.status === 'passed'
+  const closed = isClosedRoom(row?.roomStatus)
 
   // 도달한 단계 (0부터). 불합격은 서류 심사에서 멈춘다.
   let reached = 0
@@ -43,10 +54,14 @@ export function describeApplicationProgress(row) {
     contract: row?.roomStatus === 'signed' ? (row?.signedAt ?? null) : null,
   }
 
+  // 전형이 멈춘 자리. 불합격은 서류 심사에서, 전형 종료는 그 방이 와 있던
+  // 단계에서 멈춘다. 멈춘 단계는 '진행 중'이 아니라 '멈춤'으로 표시한다.
+  const stoppedAt = rejected ? 1 : closed ? reached : null
+
   const steps = STEP_KEYS.map((key, i) => {
     let state
-    if (rejected && i > 1) state = 'upcoming'
-    else if (rejected && i === 1) state = 'stopped'
+    if (stoppedAt !== null && i > stoppedAt) state = 'upcoming'
+    else if (i === stoppedAt) state = 'stopped'
     else if (i < reached) state = 'done'
     else if (i === reached) state = 'current'
     else state = 'upcoming'
@@ -55,6 +70,7 @@ export function describeApplicationProgress(row) {
 
   let headline
   if (rejected) headline = '이번 전형에서는 함께하지 못하게 되었습니다.'
+  else if (closed) headline = '이 전형은 종료되었습니다. 면접방에서 사유와 지금까지의 기록을 볼 수 있습니다.'
   else if (row?.roomStatus === 'signed') headline = '근로계약 체결이 완료되었습니다.'
   else if (row?.roomStatus === 'contract_pending') headline = '채용이 확정되었습니다. 계약서를 확인하고 서명해주세요.'
   else if (row?.roomId) headline = '면접이 진행 중입니다.'
@@ -66,17 +82,20 @@ export function describeApplicationProgress(row) {
     steps,
     headline,
     // 지원자가 지금 무엇을 할 수 있는지로 바로 이어준다.
+    // 종료돼도 기록은 볼 수 있다. 무슨 일이 있었는지 확인할 길까지 막지 않는다.
     link: row?.roomId
-      ? row?.roomStatus === 'contract_pending' || row?.roomStatus === 'signed'
+      ? !closed && (row?.roomStatus === 'contract_pending' || row?.roomStatus === 'signed')
         ? `/rooms/${row.roomId}/contract`
         : `/rooms/${row.roomId}`
       : null,
     linkLabel: row?.roomId
-      ? row?.roomStatus === 'signed'
-        ? '체결된 계약서 보기'
-        : row?.roomStatus === 'contract_pending'
-          ? '계약서 확인·서명하기'
-          : '면접방 들어가기'
+      ? closed
+        ? '종료된 전형 보기'
+        : row?.roomStatus === 'signed'
+          ? '체결된 계약서 보기'
+          : row?.roomStatus === 'contract_pending'
+            ? '계약서 확인·서명하기'
+            : '면접방 들어가기'
       : null,
   }
 }
@@ -85,6 +104,7 @@ export function describeApplicationProgress(row) {
 export function sortMyApplications(list) {
   const weight = (a) => {
     if (a.status === 'rejected') return 3
+    if (isClosedRoom(a.roomStatus)) return 3
     if (a.roomStatus === 'signed') return 2
     if (a.roomId) return 0
     return 1

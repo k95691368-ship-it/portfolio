@@ -5,6 +5,7 @@ import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { mergeValue, mergeSocialInsurance } from '../../../_lib/merge.js'
 import { notifyUser } from '../../../_lib/notify.js'
 import { buildTranscript } from '../../../_lib/transcript.js'
+import { blockedWhenClosed } from '../../../_lib/roomLifecycle.js'
 
 const COOLDOWN_SECONDS = 45
 const TRANSCRIPT_LIMIT = 300 // AI에 넘길 최근 대화 수 상한
@@ -31,6 +32,10 @@ export async function onRequestPost({ env, data, params }) {
   if (room.status === 'signed') {
     return jsonError('이미 서명이 완료된 계약은 조건을 다시 정리할 수 없습니다.', 409)
   }
+  // 종료된 전형도 막는다. 이 경로는 조건을 덮어쓸 뿐 아니라 방을
+  // contract_pending 으로 되살리므로, 끝난 전형이 다시 '서명하세요'가 된다.
+  const closed = blockedWhenClosed(room, 'analyze')
+  if (closed) return jsonError(closed, 409)
 
   // 대화 전체를 매번 읽어 AI에 넘기면 면접이 길어질수록 읽기량·토큰·응답 시간이
   // 계속 늘어난다. 이전에 확정된 조건은 previousTerms로 함께 전달되므로,
