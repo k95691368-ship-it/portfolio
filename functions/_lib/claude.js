@@ -115,6 +115,43 @@ const DRAFT_SYSTEM_PROMPT = `당신은 대한민국 고용노동부 표준근로
 4. 각 조항은 실제 표준근로계약서처럼 "제n조 (제목)" 형식의 heading과, 해당 조항 내용을 완결된 문장으로 서술한 body로 구성하세요.
 5. 사회보험 항목은 값이 true인 것만 "적용"으로 표기하고, 값이 없으면 "추후 협의"로 표기하세요.`
 
+
+// 위쪽 API 가 실패했을 때 사용자에게 무엇을 말할 것인가.
+//
+// 지금까지는 응답 본문을 그대로 붙여 던졌다. 그래서 크레딧이 떨어지자 화면에
+// 이런 것이 떴다 —
+//   Claude API 오류 (400): {"type":"error","error":{"type":"invalid_request_error",
+//   "message":"Your credit balance is too low to access the Anthropic API..."}}
+// 영어이고, JSON 이고, 사용자가 할 수 있는 일은 하나도 적혀 있지 않으며,
+// 운영자의 결제 상태를 지나가는 사람 모두에게 알린다.
+//
+// 원문은 서버 로그에만 남기고, 화면에는 무엇이 일어났고 지금 무엇을 할 수
+// 있는지만 말한다. AI 가 멈춰도 이 서비스의 법령 점검·계산·서명은 그대로
+// 동작하므로, 그 사실을 함께 알려 막다른 길로 느끼지 않게 한다.
+const UPSTREAM_MESSAGE = {
+  401: 'AI 기능의 인증 설정에 문제가 있어 지금은 사용할 수 없습니다. 이 기능 없이도 계약 조건 입력·법령 점검·서명은 그대로 이용하실 수 있습니다.',
+  403: 'AI 기능을 사용할 권한이 없어 지금은 실행할 수 없습니다. 이 기능 없이도 계약 조건 입력·법령 점검·서명은 그대로 이용하실 수 있습니다.',
+  429: 'AI 요청이 몰려 지금은 처리할 수 없습니다. 잠시 후 다시 시도해주세요.',
+}
+
+function upstreamError(status, body, label) {
+  // 서버 로그에는 원문을 남긴다. 원인을 볼 수 있어야 고칠 수 있다.
+  console.error(`Claude API ${status} (${label}):`, String(body).slice(0, 500))
+
+  if (UPSTREAM_MESSAGE[status]) return new Error(UPSTREAM_MESSAGE[status])
+  if (status === 400 && /credit balance/i.test(String(body))) {
+    return new Error(
+      'AI 기능이 일시적으로 중단되었습니다. 이 기능 없이도 계약 조건 입력·법령 점검·서명·증명서 발급은 그대로 이용하실 수 있습니다.'
+    )
+  }
+  if (status >= 500) {
+    return new Error('AI 서버가 응답하지 않습니다. 잠시 후 다시 시도해주세요.')
+  }
+  return new Error(
+    `${label}을(를) 처리하지 못했습니다. 잠시 후 다시 시도해주시고, 계속 같은 문제가 반복되면 관리자에게 알려주세요.`
+  )
+}
+
 export async function draftContractDocument(env, terms) {
   const apiKey = env.CLAUDE_API_KEY
   if (!apiKey) throw new Error('CLAUDE_API_KEY가 설정되지 않았습니다. Cloudflare 시크릿을 등록해주세요.')
@@ -140,7 +177,7 @@ export async function draftContractDocument(env, terms) {
 
   if (!res.ok) {
     const errText = await res.text()
-    throw new Error(`Claude API 오류 (${res.status}): ${errText.slice(0, 300)}`)
+    throw upstreamError(res.status, errText, '계약서 작성')
   }
 
   const data = await res.json()
@@ -232,7 +269,7 @@ export async function summarizeInterview(env, transcript) {
 
   if (!res.ok) {
     const errText = await res.text()
-    throw new Error(`Claude API 오류 (${res.status}): ${errText.slice(0, 300)}`)
+    throw upstreamError(res.status, errText, '대화 요약')
   }
 
   const data = await res.json()
@@ -307,7 +344,7 @@ export async function translateContract(env, { articles, languageLabel }) {
 
   if (!res.ok) {
     const errText = await res.text()
-    throw new Error(`Claude API 오류 (${res.status}): ${errText.slice(0, 300)}`)
+    throw upstreamError(res.status, errText, '계약서 번역')
   }
 
   const data = await res.json()
@@ -389,7 +426,7 @@ export async function screenApplication(env, { posting, application }) {
 
   if (!res.ok) {
     const errText = await res.text()
-    throw new Error(`Claude API 오류 (${res.status}): ${errText.slice(0, 300)}`)
+    throw upstreamError(res.status, errText, '조건 정리')
   }
 
   const data = await res.json()
@@ -442,7 +479,7 @@ export async function analyzeConversation(env, transcript, previousTerms) {
 
     if (!res.ok) {
       const errText = await res.text()
-      throw new Error(`Claude API 오류 (${res.status}): ${errText.slice(0, 300)}`)
+      throw upstreamError(res.status, errText, '서류 심사')
     }
 
     const data = await res.json()
