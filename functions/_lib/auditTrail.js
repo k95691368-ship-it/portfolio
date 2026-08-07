@@ -2,7 +2,7 @@
 // 단독 엔드포인트와 계약서 페이지 통합 조회가 같은 로직을 공유한다.
 
 // SQLite "YYYY-MM-DD HH:MM:SS"와 ISO "....T...Z"가 섞여 있어 정렬용으로 통일한다.
-export function normalizeTime(t) {
+function normalizeTime(t) {
   if (!t) return ''
   return String(t).replace('T', ' ').replace('Z', '').slice(0, 19)
 }

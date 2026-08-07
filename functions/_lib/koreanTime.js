@@ -26,8 +26,3 @@ export function koreanToday(now = new Date()) {
     Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate())
   )
 }
-
-// 한국 달력 날짜 문자열 (YYYY-MM-DD).
-export function koreanDateString(now = new Date()) {
-  return koreanToday(now).toISOString().slice(0, 10)
-}

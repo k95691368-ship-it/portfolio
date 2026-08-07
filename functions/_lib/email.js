@@ -16,7 +16,7 @@ function escapeHtml(value) {
 
 // 브랜디드 이메일 HTML 템플릿 (최종합격/면접초대 등 공용).
 // heading/title 기본값은 최종합격 안내 — 기존 호출부는 그대로 동작.
-export function buildBrandedEmailHtml({
+function buildBrandedEmailHtml({
   bodyText,
   companyName,
   heading = 'FINAL OFFER',
@@ -48,10 +48,6 @@ export function buildBrandedEmailHtml({
 </html>`
 }
 
-export function buildFinalOfferEmailHtml({ bodyText, companyName }) {
-  return buildBrandedEmailHtml({ bodyText, companyName, heading: 'FINAL OFFER', title: '최종 합격 안내' })
-}
-
 // True when the environment has everything needed to actually send mail.
 // Used by the route to return a clear "not configured" error instead of
 // attempting a doomed send.
@@ -71,7 +67,7 @@ export function isEmailConfigured(env) {
 
 // 공용 발송 함수 — 모든 이메일이 이 함수를 통해 Mailjet(v3.1)으로 발송된다.
 // attachments: [{ filename, contentBase64, contentType }] (선택)
-export async function sendBrandedEmail(
+async function sendBrandedEmail(
   env,
   { to, subject, bodyText, companyName, heading, title, attachments }
 ) {

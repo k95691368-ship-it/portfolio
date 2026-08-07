@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { formatKstDate } from '../lib/formatTime.js'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
@@ -90,8 +91,8 @@ export default function ApplicationStatusPage() {
           <span className={`badge ${info.badge}`}>{info.label}</span>
           <h2>{result.postingTitle}</h2>
           <p className="status-meta">
-            지원자 {result.applicantName} · 접수 {result.submittedAt?.slice(0, 10)}
-            {result.reviewedAt && ` · 심사 완료 ${result.reviewedAt.slice(0, 10)}`}
+            지원자 {result.applicantName} · 접수 {formatKstDate(result.submittedAt)}
+            {result.reviewedAt && ` · 심사 완료 ${formatKstDate(result.reviewedAt)}`}
           </p>
           <p className="status-desc">{info.desc}</p>
           {result.status === 'passed' && (

@@ -19,6 +19,3 @@ export function findLanguage(code) {
   return BY_CODE.get(String(code || '').toLowerCase()) ?? null
 }
 
-export function isSupportedLanguage(code) {
-  return BY_CODE.has(String(code || '').toLowerCase())
-}

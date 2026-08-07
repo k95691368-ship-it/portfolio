@@ -8,15 +8,35 @@ describe('final offer email helpers', () => {
     expect(maskEmail('invalid')).toBe('')
   })
 
-  it('escapes user-controlled HTML and preserves line breaks', () => {
-    const html = buildFinalOfferEmailHtml({
-      bodyText: '합격을 축하합니다.\n<script>alert("x")</script>',
-      companyName: 'A&B <채용팀>',
+  // 템플릿 함수를 직접 부르지 않고 실제 발송 경로를 통해 확인한다.
+  // 내부 함수를 테스트하려고 export 를 열어 두면, 쓰지도 않는 공개 표면이 남는다.
+  it('escapes user-controlled HTML and preserves line breaks', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ Messages: [{ Status: 'success' }] }),
     })
+    vi.stubGlobal('fetch', fetchMock)
 
+    await sendFinalOfferEmail(
+      {
+        MAILJET_API_KEY: 'k',
+        MAILJET_SECRET_KEY: 's',
+        FINAL_OFFER_FROM_EMAIL: 'recruiting@example.com',
+      },
+      {
+        to: 'candidate@example.com',
+        subject: '최종 합격 안내',
+        bodyText: '합격을 축하합니다.\n<script>alert("x")</script>',
+        companyName: 'A&B <채용팀>',
+      }
+    )
+
+    const html = JSON.parse(fetchMock.mock.calls[0][1].body).Messages[0].HTMLPart
     expect(html).toContain('합격을 축하합니다.<br>&lt;script&gt;')
     expect(html).not.toContain('<script>alert')
     expect(html).toContain('A&amp;B &lt;채용팀&gt;')
+
+    vi.unstubAllGlobals()
   })
 
   it('sends through the Mailjet API with the configured sender information', async () => {

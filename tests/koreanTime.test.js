@@ -4,7 +4,7 @@
 // "어제"다. 날짜만 비교하는 자리에서 이 어긋남이 그대로 들어가면, 그 아홉 시간
 // 동안 사용자는 오늘 날짜조차 미래로 거부당한다.
 import { describe, expect, it } from 'vitest'
-import { koreanToday, koreanDateString } from '../functions/_lib/koreanTime.js'
+import { koreanToday } from '../functions/_lib/koreanTime.js'
 import { describeContractPeriod, describeRetention } from '../functions/_lib/contractPeriod.js'
 import { describeAnnualLeave } from '../functions/_lib/workerRights.js'
 
@@ -16,11 +16,11 @@ const KST_EVENING = new Date('2026-08-07T13:00:00Z')
 describe('koreanToday', () => {
   it('한국시간 새벽에는 UTC보다 하루 앞선 날짜다', () => {
     expect(KST_EARLY_MORNING.toISOString().slice(0, 10)).toBe('2026-08-07') // 서버가 보는 날
-    expect(koreanDateString(KST_EARLY_MORNING)).toBe('2026-08-08') // 사용자가 보는 날
+    expect(koreanToday(KST_EARLY_MORNING).toISOString().slice(0, 10)).toBe('2026-08-08') // 사용자가 보는 날
   })
 
   it('한국시간 저녁에는 UTC와 같은 날짜다', () => {
-    expect(koreanDateString(KST_EVENING)).toBe('2026-08-07')
+    expect(koreanToday(KST_EVENING).toISOString().slice(0, 10)).toBe('2026-08-07')
   })
 
   it('UTC 자정 Date 로 돌려준다 (계약 날짜와 같은 형태)', () => {

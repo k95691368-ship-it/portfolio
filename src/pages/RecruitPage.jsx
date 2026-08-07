@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { formatKstDate } from '../lib/formatTime.js'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -629,7 +630,7 @@ export default function RecruitPage() {
                     </td>
                     <td>{p.deadline || '상시'}</td>
                     <td>{p.applicationCount}명</td>
-                    <td>{p.createdAt?.slice(0, 10)}</td>
+                    <td>{formatKstDate(p.createdAt)}</td>
                     <td>
                       <button
                         type="button"
@@ -729,7 +730,7 @@ export default function RecruitPage() {
                         {STATUS_LABEL[a.status]?.label || a.status}
                       </span>
                     </td>
-                    <td>{a.createdAt?.slice(0, 10)}</td>
+                    <td>{formatKstDate(a.createdAt)}</td>
                     <td>
                       <button
                         type="button"

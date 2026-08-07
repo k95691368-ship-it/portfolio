@@ -65,7 +65,7 @@ export const WAGE_ITEM_TYPES = {
 export const MAX_WAGE_ITEMS = 20
 const MAX_NAME_LENGTH = 40
 
-export function isIncludedType(type) {
+function isIncludedType(type) {
   return WAGE_ITEM_TYPES[type]?.included === true
 }
 

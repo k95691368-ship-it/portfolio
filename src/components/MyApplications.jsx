@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { formatKstDate } from '../lib/formatTime.js'
 
 const STATUS_BADGE = {
   submitted: { label: '심사 대기', badge: 'badge-warning' },
@@ -47,7 +48,7 @@ export default function MyApplications({ applications = [] }) {
                     <span className="step-dot" aria-hidden="true" />
                     <span className="step-label">{s.label}</span>
                     <span className="sr-only"> — {STEP_STATE_TEXT[s.state]}</span>
-                    {s.at && <span className="step-at">{s.at.slice(0, 10)}</span>}
+                    {s.at && <span className="step-at">{formatKstDate(s.at)}</span>}
                   </li>
                 ))}
               </ol>
@@ -61,7 +62,7 @@ export default function MyApplications({ applications = [] }) {
                   </Link>
                 )}
                 <span className="my-app-code">
-                  접수번호 {a.lookupCode || '—'} · 지원일 {a.createdAt?.slice(0, 10)}
+                  접수번호 {a.lookupCode || '—'} · 지원일 {formatKstDate(a.createdAt)}
                 </span>
               </div>
             </article>
