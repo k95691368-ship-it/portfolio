@@ -1,4 +1,10 @@
-import { verifyPassword, hashPassword } from '../_lib/auth.js'
+import {
+  verifyPassword,
+  hashPassword,
+  deleteAllUserSessions,
+  createSession,
+  sessionCookieHeader,
+} from '../_lib/auth.js'
 import { jsonResponse, jsonError } from '../_lib/http.js'
 import { checkRateLimit } from '../_lib/rateLimit.js'
 
@@ -10,6 +16,11 @@ export async function onRequestPost({ request, env, data }) {
 
   const body = await request.json().catch(() => null)
   const { currentPassword, newPassword } = body || {}
+  // 타입을 확인하지 않으면 JSON 숫자가 그대로 지나간다. 숫자에는 length 가
+  // 없어 undefined < 8 이 false 가 되고, 8자 검사가 통째로 건너뛰어진다.
+  if (typeof currentPassword !== 'string' || typeof newPassword !== 'string') {
+    return jsonError('현재 비밀번호와 새 비밀번호를 입력해주세요.', 400)
+  }
   if (!currentPassword || !newPassword) {
     return jsonError('현재 비밀번호와 새 비밀번호를 입력해주세요.', 400)
   }
@@ -27,5 +38,13 @@ export async function onRequestPost({ request, env, data }) {
     .bind(hash, salt, data.user.id)
     .run()
 
-  return jsonResponse({ ok: true })
+  // 비밀번호를 바꾸는 이유의 대부분은 "누가 알고 있을지 모른다"이다. 그런데
+  // 세션은 그대로 살아 있었다. 관리자가 발급한 임시 비밀번호로 다른 사람이
+  // 먼저 로그인해 두었다면, 본인이 비밀번호를 바꿔도 그 세션은 계속 열려 있다.
+  //
+  // 이 계정의 세션을 전부 지우고, 지금 바꾼 사람에게만 새 세션을 준다.
+  await deleteAllUserSessions(env.DB, data.user.id)
+  const { token } = await createSession(env.DB, data.user.id)
+
+  return jsonResponse({ ok: true }, 200, { 'Set-Cookie': sessionCookieHeader(token) })
 }
