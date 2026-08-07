@@ -77,13 +77,30 @@ describe('checkProbationCompliance', () => {
     expect(titles).toContain('수습 감액 기간 초과')
   })
 
-  it('90% 미만 감액을 잡고 법정 하한 금액을 함께 알린다', () => {
-    const issue = checkProbationCompliance(withProbation('3개월 (임금의 80% 지급)')).find(
-      (i) => i.title === '수습 감액 한도 초과'
-    )
+  // 법이 정한 하한은 '계약 임금의 90%'가 아니라 '최저임금의 90%'다.
+  // 지급률만 보고 판정하면 임금이 넉넉한 계약이 위반으로 잡혀 서명이 막힌다.
+  it('실제 지급액이 법정 하한 아래일 때만 잡는다', () => {
+    const issue = checkProbationCompliance(
+      withProbation('3개월 (임금의 80% 지급)', { wageBaseAmount: 2000000 })
+    ).find((i) => i.title === '수습 감액 한도 초과')
     expect(issue.severity).toBe('high')
     expect(issue.detail).toContain('시행령 제3조')
     expect(issue.detail).toMatch(/[0-9,]+원/)
+  })
+
+  it('임금이 넉넉하면 80% 지급도 적법하다', () => {
+    // 290만원의 80%는 232만원. 최저임금의 90%(약 194만원)를 한참 웃돈다.
+    const titles = checkProbationCompliance(withProbation('3개월 (임금의 80% 지급)')).map(
+      (i) => i.title
+    )
+    expect(titles).not.toContain('수습 감액 한도 초과')
+  })
+
+  it('금액을 계산할 수 없으면 단정하지 않고 확인만 요청한다', () => {
+    const issue = checkProbationCompliance(
+      withProbation('3개월 (임금의 80% 지급)', { wageBaseAmount: null })
+    ).find((i) => i.title === '수습 지급액 확인 필요')
+    expect(issue.severity).toBe('medium')
   })
 
   it('1년 미만 계약에서는 감액 자체를 막는다', () => {
@@ -123,9 +140,10 @@ describe('checkProbationCompliance', () => {
   })
 
   it('데모에 심은 6개월 80%는 두 가지가 함께 걸린다', () => {
-    const titles = checkProbationCompliance(withProbation('6개월 (수습 중 임금의 80% 지급)')).map(
-      (i) => i.title
-    )
+    // 데모 방 B의 기본급은 190만원이라 80%면 152만원 — 하한 아래다.
+    const titles = checkProbationCompliance(
+      withProbation('6개월 (수습 중 임금의 80% 지급)', { wageBaseAmount: 1900000 })
+    ).map((i) => i.title)
     expect(titles).toContain('수습 감액 기간 초과')
     expect(titles).toContain('수습 감액 한도 초과')
   })

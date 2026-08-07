@@ -1,4 +1,5 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
+import { blockedWhenClosed } from '../../../_lib/roomLifecycle.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { notifyUser } from '../../../_lib/notify.js'
 
@@ -37,6 +38,10 @@ export async function onRequestPost({ request, env, data, params }) {
   if (room.status === 'signed') {
     return jsonError('이미 체결된 계약의 연결은 변경할 수 없습니다.', 409)
   }
+  // 규칙은 적어 두고 부르지 않고 있었다. 끝난 전형이 체결된 계약의 '갱신
+  // 자리'를 계속 차지하면, 정작 이어받아야 할 새 계약이 연결하지 못한다.
+  const closedBlock = blockedWhenClosed(room, 'link_previous')
+  if (closedBlock) return jsonError(closedBlock, 409)
 
   const body = await request.json().catch(() => null)
   const previousRoomId = body?.previousRoomId
@@ -107,13 +112,27 @@ export async function onRequestPost({ request, env, data, params }) {
     }
   }
 
-  await env.DB.prepare(
-    `INSERT INTO contract_terms (room_id, previous_room_id) VALUES (?, ?)
-     ON CONFLICT(room_id) DO UPDATE SET previous_room_id = excluded.previous_room_id,
-       updated_at = datetime('now')`
-  )
-    .bind(params.roomId, previousRoomId)
-    .run()
+  // 위의 SELECT 확인과 이 INSERT 사이에는 트랜잭션이 없다. 두 요청이 같은
+  // 계약을 동시에 이전 계약으로 삼으면 둘 다 "아직 없다"를 보고 둘 다 쓴다.
+  // 0042 의 부분 유니크 인덱스가 마지막 방어선이므로, 걸렸을 때 사용자에게
+  // 무슨 일인지 알린다.
+  try {
+    await env.DB.prepare(
+      `INSERT INTO contract_terms (room_id, previous_room_id) VALUES (?, ?)
+       ON CONFLICT(room_id) DO UPDATE SET previous_room_id = excluded.previous_room_id,
+         updated_at = datetime('now')`
+    )
+      .bind(params.roomId, previousRoomId)
+      .run()
+  } catch (err) {
+    if (String(err?.message ?? '').includes('UNIQUE')) {
+      return jsonError(
+        '그 사이에 다른 계약이 이 계약을 이전 계약으로 연결했습니다. 화면을 새로 고쳐 확인해주세요.',
+        409
+      )
+    }
+    throw err
+  }
 
   await notifyUser(env, here, {
     type: 'contract_linked',

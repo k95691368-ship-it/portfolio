@@ -148,7 +148,20 @@ export async function onRequestPost({ env, data, params }) {
     : (existing?.hire_confirmation_excerpt ?? null)
   const lastMessageId = messages[messages.length - 1].id
 
-  await env.DB.prepare(
+  // AI 호출은 수 초가 걸린다. 그동안 이 방의 조건은 다른 경로로 얼마든지
+  // 바뀔 수 있다 — 회사가 다른 탭에서 수정 요청을 수락하거나, 조건을 직접
+  // 고치거나, 채용을 확정하거나.
+  //
+  // 그런데 아래 UPSERT 는 호출 전에 읽어 둔 낡은 스냅샷(existing)으로 12개
+  // 컬럼을 전부 덮어쓴다. AI 가 언급하지 않은 항목은 mergeValue 가 낡은 값으로
+  // 되쓰므로, 그 사이 수락된 인상이 조용히 되돌아간다. 수정 이력과 알림에는
+  // "반영되었습니다"가 남아 있는데 저장된 값은 옛 금액이다. hire_confirmed 도
+  // 같은 식으로 1에서 0으로 되돌아가, 채용 확정 알림을 받은 지원자가 서명하려
+  // 하면 "아직 채용이 확정되지 않았다"는 답을 받는다.
+  //
+  // 읽었을 때의 updated_at 과 같을 때만 쓴다. 그 사이 누가 썼으면 이 결과는
+  // 버린다 — 낡은 값으로 덮어쓰는 것보다 다시 누르게 하는 편이 낫다.
+  const written = await env.DB.prepare(
     `INSERT INTO contract_terms (
        room_id, work_location, job_description, contract_start_date, contract_end_date,
        work_hours_start, work_hours_end, work_days, rest_days,
@@ -171,7 +184,8 @@ export async function onRequestPost({ env, data, params }) {
        extraction_confidence=excluded.extraction_confidence,
        last_analyzed_message_id=excluded.last_analyzed_message_id,
        analysis_warnings_json=excluded.analysis_warnings_json,
-       updated_at=datetime('now')`
+       updated_at=datetime('now')
+     WHERE contract_terms.updated_at IS ?`
   )
     .bind(
       params.roomId,
@@ -195,9 +209,17 @@ export async function onRequestPost({ env, data, params }) {
       confirmationExcerpt,
       analysis.confirmation_confidence ?? null,
       lastMessageId,
-      warnings.length > 0 ? JSON.stringify(warnings) : null
+      warnings.length > 0 ? JSON.stringify(warnings) : null,
+      existing?.updated_at ?? null
     )
     .run()
+
+  if (written.meta.changes === 0) {
+    return jsonError(
+      '조건을 정리하는 사이에 계약 조건이 바뀌었습니다. 바뀐 내용을 덮어쓰지 않도록 저장하지 않았습니다. 화면을 새로 고친 뒤 다시 시도해주세요.',
+      409
+    )
+  }
 
   if (hireConfirmed && !wasConfirmed) {
     await env.DB.prepare("UPDATE interview_rooms SET status = 'contract_pending' WHERE id = ?")

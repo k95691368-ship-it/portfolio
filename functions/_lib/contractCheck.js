@@ -129,8 +129,14 @@ export function computeWeeklyHours(terms) {
   const days = parseDaysPerWeek(workDays)
   if (start === null || end === null || days === null) return null
 
+  // 시작과 종료가 같으면 근무시간을 알 수 없는 것이지, 24시간 근무가 아니다.
+  // 그런데 span 0 이 자정 보정을 타고 1440분이 되어, 09:00~09:00 이 하루 23시간
+  // (휴게 제외) 주 115시간으로 읽혔다. 없는 위반 두 건이 서명을 막고, 그
+  // 시간으로 계산한 터무니없는 금액이 '최소 적법 임금'으로 제안된다.
+  if (end === start) return null
+
   let span = end - start
-  if (span <= 0) span += 24 * 60 // 야간 교대 등 자정을 넘기는 경우
+  if (span < 0) span += 24 * 60 // 야간 교대 등 자정을 넘기는 경우
   if (span <= 0 || span > 24 * 60) return null
 
   const daily = (span - breakMinutesFor(span)) / 60
@@ -139,10 +145,24 @@ export function computeWeeklyHours(terms) {
 }
 
 // 월 소정근로시간 = (주 소정근로 + 주휴시간) × 4.345
-// 주휴시간은 주 15시간 이상 근무 시 주 소정근로에 비례해 발생.
+//
+// 주휴시간은 주 15시간 이상 근무 시 주 소정근로에 비례해 발생한다.
+//
+// 여기서 '소정근로'는 법정 기준(주 40시간) 안에서 정한 시간이다. 그 위로 더
+// 일하기로 한 시간은 연장근로이고, 최저임금법 시행령 제5조가 나누라고 하는
+// 것은 소정근로시간이지 실근로시간이 아니다.
+//
+// 그런데 이 함수는 주 60시간 계약에 60시간을 그대로 넣어 나눗수를 295시간까지
+// 키웠다. 분자에서는 고정연장수당을 빼면서 분모에는 연장근로시간을 넣은 셈이라,
+// 같은 오류가 양쪽에서 겹쳐 적법한 계약이 최저임금 미달로 잡혔다. 통상시급도
+// 같은 함수를 쓰므로 가산수당 단가까지 함께 낮아졌다.
+//
+// 실제 시간은 209시간처럼 정수로 이야기되므로 반올림해서 돌려준다. 208.57 을
+// 그대로 쓰면 경계에 걸친 계약이 나눗수가 작다는 이유만으로 통과한다.
 export function monthlyPaidHours(weeklyHours) {
-  const weeklyHoliday = weeklyHours >= 15 ? (Math.min(weeklyHours, STANDARD_WEEKLY_HOURS) / STANDARD_WEEKLY_HOURS) * 8 : 0
-  return (weeklyHours + weeklyHoliday) * WEEKS_PER_MONTH
+  const contracted = Math.min(weeklyHours, STANDARD_WEEKLY_HOURS)
+  const weeklyHoliday = weeklyHours >= 15 ? (contracted / STANDARD_WEEKLY_HOURS) * 8 : 0
+  return Math.round((contracted + weeklyHoliday) * WEEKS_PER_MONTH)
 }
 
 // 최종 계약서 값 기준 법적 검토. [{severity, title, detail}]
@@ -212,11 +232,71 @@ export function checkLegalCompliance(terms) {
 }
 
 // 계약서에서 빠진 필수 항목
+// 값이 채워져 있는지가 아니라, 그 값으로 법정 계산이 되는지까지 본다.
+//
+// 근무 시각에 "아홉시"라고 적으면 필수 항목 검사는 값이 있으니 통과시킨다.
+// 그런데 시각을 읽지 못하면 주 근로시간이 null 이 되고, 최저임금·주52시간·
+// 연차·퇴직금·수습 판정이 전부 조용히 생략된다. 화면에는 경고가 하나도 뜨지
+// 않으므로 "점검을 통과했다"로 보이고, 그대로 서명된다. 검사가 없는 것보다
+// 나쁘다 — 없으면 사람이 확인하지만, 통과했다고 하면 아무도 보지 않는다.
+const UNREADABLE_CHECKS = [
+  { field: 'workHoursStart', read: (t) => parseTimeToMinutes(t.workHoursStart) },
+  { field: 'workHoursEnd', read: (t) => parseTimeToMinutes(t.workHoursEnd) },
+  { field: 'workDays', read: (t) => parseDaysPerWeek(t.workDays) },
+]
+
+export function findUnreadableFields(terms) {
+  const t = terms || {}
+  const filled = (v) => v !== null && v !== undefined && String(v).trim() !== ''
+  const bad = UNREADABLE_CHECKS.filter((c) => filled(t[c.field]) && c.read(t) === null).map((c) => ({
+    field: c.field,
+    label: FIELD_LABELS[c.field] || c.field,
+    value: String(t[c.field]),
+  }))
+
+  // 시작과 종료를 각각은 읽었는데 같은 값이면 근무시간이 0이다. 항목별로는
+  // 문제가 없어 보이므로 따로 잡는다.
+  const start = parseTimeToMinutes(t.workHoursStart)
+  const end = parseTimeToMinutes(t.workHoursEnd)
+  if (start !== null && end !== null && start === end && bad.length === 0) {
+    bad.push({
+      field: 'workHoursEnd',
+      label: FIELD_LABELS.workHoursEnd,
+      value: String(t.workHoursEnd),
+      sameAsStart: true,
+    })
+  }
+  return bad
+}
+
 export function findMissingFields(terms) {
-  return REQUIRED_FIELDS.filter((f) => {
-    const v = terms[f]
-    return v === null || v === undefined || String(v).trim() === ''
+  const t = terms || {}
+  const missing = REQUIRED_FIELDS.filter((f) => {
+    const v = t[f]
+    if (v === null || v === undefined || String(v).trim() === '') return true
+    // 0원·음수는 "적혀 있다"로 통과하는데 최저임금 계산은 wage > 0 에서
+    // 멈춘다. 채워졌으니 서명은 열리고 검사는 꺼지는 자리다.
+    if (f === 'wageBaseAmount') {
+      const amount = Number(v)
+      return !Number.isFinite(amount) || amount <= 0
+    }
+    return false
   }).map((f) => ({ field: f, label: FIELD_LABELS[f] || f }))
+
+  // 읽을 수 없는 값은 채워지지 않은 것과 같이 다룬다. 서명을 막는 목록이
+  // 이것 하나이므로, 여기에 넣지 않으면 막히지 않는다.
+  for (const bad of findUnreadableFields(t)) {
+    if (missing.some((m) => m.field === bad.field)) continue
+    missing.push({
+      field: bad.field,
+      label: bad.label,
+      unreadable: true,
+      note: bad.sameAsStart
+        ? `시작 시각과 같아 근무시간이 0이 됩니다. 실제 종료 시각을 적어주세요.`
+        : `"${bad.value}"은(는) 근로시간 계산에 쓸 수 없는 표기입니다. 09:00 처럼 적어주세요.`,
+    })
+  }
+  return missing
 }
 
 // 값 표시용 문자열 정규화 (숫자/JSON 대비)

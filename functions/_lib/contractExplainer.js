@@ -22,6 +22,7 @@ import {
   breakMinutesFor,
 } from './contractCheck.js'
 import { describeContractPeriod } from './contractPeriod.js'
+import { effectiveWageItems, minimumWageBase, totalWage } from './wageItems.js'
 
 const won = (n) => `${Math.round(n).toLocaleString('ko-KR')}원`
 const hours = (n) => `${Math.round(n * 10) / 10}시간`
@@ -35,11 +36,26 @@ const UNKNOWN = '적혀 있지 않음'
 // 임금이 최저임금을 지키는지, 시급으로 얼마인지.
 function wageSection(terms) {
   const lines = []
-  const wage = Number(terms?.wageBaseAmount)
+  // 이 해설은 기본급 하나만 보고 최저임금을 판정하고 있었다. 같은 응답 안의
+  // 서명 전 점검은 산입범위를 반영한 금액을 쓰므로, 근로자용 해설과 회사용
+  // 점검이 같은 계약을 놓고 정반대 결론을 냈다. 근로자가 보는 쪽이 틀렸다.
+  const items = effectiveWageItems(terms)
+  const total = totalWage(items)
+  const wage = minimumWageBase(items)
   const hasWage = Number.isFinite(wage) && wage > 0
+  const excluded = total - wage
 
   lines.push(
-    line('기본급', hasWage ? `월 ${won(wage)}` : UNKNOWN, hasWage ? null : '반드시 적혀 있어야 합니다.', hasWage ? 'info' : 'caution')
+    line(
+      '월 지급액',
+      total > 0 ? `월 ${won(total)}` : UNKNOWN,
+      total > 0
+        ? excluded > 0
+          ? `이 가운데 ${won(excluded)}은 소정근로의 대가가 아니어서 최저임금과 비교할 때는 빠집니다.`
+          : null
+        : '반드시 적혀 있어야 합니다.',
+      total > 0 ? 'info' : 'caution'
+    )
   )
   lines.push(line('지급일', terms?.wagePayDate || UNKNOWN, null, terms?.wagePayDate ? 'info' : 'caution'))
   lines.push(
@@ -52,7 +68,7 @@ function wageSection(terms) {
       line(
         '시급 환산',
         '계산할 수 없음',
-        '기본급과 근무시간(시작·종료 시각, 근무일)이 모두 적혀 있어야 시급을 환산할 수 있습니다.',
+        '임금과 근무시간(시작·종료 시각, 근무일)이 모두 적혀 있어야 시급을 환산할 수 있습니다.',
         'caution'
       )
     )
@@ -67,7 +83,7 @@ function wageSection(terms) {
     line(
       '시급 환산',
       won(hourly),
-      `월 기본급 ${won(wage)} ÷ 월 소정근로시간 약 ${hours(monthly)} (주휴시간 포함)`,
+      `최저임금에 산입되는 ${won(wage)} ÷ 월 소정근로시간 약 ${hours(monthly)} (주휴시간 포함)`,
       'info'
     )
   )
@@ -87,7 +103,7 @@ function wageSection(terms) {
       line(
         '최저임금 비교',
         `${won(-diff)} 미달`,
-        `2026년 최저시급은 ${won(MINIMUM_HOURLY_WAGE_2026)}입니다. 이 근무시간에서 최저임금을 지키려면 기본급이 최소 ${won(lawful)}이어야 합니다. 회사에 수정을 요청할 수 있습니다.`,
+        `2026년 최저시급은 ${won(MINIMUM_HOURLY_WAGE_2026)}입니다. 이 근무시간에서 최저임금을 지키려면 산입되는 임금이 최소 ${won(lawful)}이어야 합니다. 회사에 수정을 요청할 수 있습니다.`,
         'caution'
       )
     )

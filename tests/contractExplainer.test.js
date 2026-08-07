@@ -59,10 +59,29 @@ describe('explainContract — 임금', () => {
     expect(hourly.tone).toBe('caution')
   })
 
-  it('기본급이 없으면 비어 있다고 표시한다', () => {
-    const wage = find(explainContract({ ...LAWFUL, wageBaseAmount: null }, NOW), '임금', '기본급')
+  it('임금이 없으면 비어 있다고 표시한다', () => {
+    const wage = find(explainContract({ ...LAWFUL, wageBaseAmount: null }, NOW), '임금', '월 지급액')
     expect(wage.value).toBe('적혀 있지 않음')
     expect(wage.tone).toBe('caution')
+  })
+
+  // 근로자용 해설이 기본급만 보고 판정하면, 같은 응답 안의 서명 전 점검과
+  // 정반대 결론이 나온다. 근로자가 보는 쪽이 틀렸던 자리다.
+  it('구성항목이 있으면 산입 대상만으로 최저임금을 따진다', () => {
+    const terms = {
+      ...LAWFUL,
+      wageBaseAmount: 1900000,
+      wageItems: [
+        { name: '기본급', type: 'base', amount: 1900000 },
+        { name: '고정연장수당', type: 'overtime_fixed', amount: 750000 },
+      ],
+    }
+    const total = find(explainContract(terms, NOW), '임금', '월 지급액')
+    expect(total.value).toContain('2,650,000')
+    expect(total.note).toContain('750,000')
+    const cmp = find(explainContract(terms, NOW), '임금', '최저임금 비교')
+    expect(cmp.tone).toBe('caution')
+    expect(cmp.value).toContain('미달')
   })
 })
 

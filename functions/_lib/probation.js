@@ -16,6 +16,7 @@
 // 나온다는 보장이 없다. 법정 한도는 값이 정해져 있으므로 코드로 옮긴다.
 
 import { parseContractDate, monthsBetween } from './contractPeriod.js'
+import { effectiveWageItems, minimumWageBase } from './wageItems.js'
 import {
   MINIMUM_HOURLY_WAGE_2026,
   computeWeeklyHours,
@@ -98,7 +99,8 @@ function contractMonths(terms) {
 // 수습 중에 지급하기로 한 금액과, 법이 허용하는 하한을 나란히 계산한다.
 // 금액이 없으면 비율만으로 판정한다.
 function probationAmounts(terms, payRatio) {
-  const wage = Number(terms?.wageBaseAmount)
+  // 수습 감액도 최저임금과의 비교이므로 산입 대상 임금으로 따진다.
+  const wage = minimumWageBase(effectiveWageItems(terms))
   const weekly = computeWeeklyHours(terms)
   if (!Number.isFinite(wage) || wage <= 0 || weekly === null) return null
   const hours = monthlyPaidHours(weekly)
@@ -136,19 +138,31 @@ export function checkProbationCompliance(terms) {
     }
   }
 
-  if (p.payRatio !== null && p.payRatio < PROBATION_MIN_PAY_RATIO) {
+  // 감액의 하한은 '계약 임금의 90%'가 아니라 '최저임금의 90%'다
+  // (최저임금법 시행령 제3조).
+  //
+  // 지급률만 보고 90% 미만이면 위반이라고 하고 있었다. 그러면 기본급 400만원인
+  // 계약이 수습 중 80%인 320만원을 주어도 — 최저임금 하한의 한참 위인데도 —
+  // 위반으로 잡혀 서명이 막힌다. 법이 정한 것은 비율이 아니라 금액이므로,
+  // 실제 지급액과 하한을 비교해 판정한다.
+  if (reduced) {
     const amounts = probationAmounts(terms, p.payRatio)
-    const detail =
-      `수습 중이라도 최저임금의 90% 미만은 지급할 수 없습니다(최저임금법 시행령 제3조). 계약서에는 ${p.payRatio}% 지급으로 적혀 있습니다.` +
-      (amounts
-        ? ` 이 근로시간에서 수습 중 지급액은 약 ${amounts.paid.toLocaleString('ko-KR')}원인데, 법이 허용하는 하한은 ${amounts.floor.toLocaleString('ko-KR')}원입니다.`
-        : '')
-    issues.push({ severity: 'high', title: '수습 감액 한도 초과', detail })
+    if (amounts?.below) {
+      issues.push({
+        severity: 'high',
+        title: '수습 감액 한도 초과',
+        detail: `수습 중이라도 최저임금의 90% 미만은 지급할 수 없습니다(최저임금법 시행령 제3조). 계약서에는 ${p.payRatio}% 지급으로 적혀 있어 이 근로시간에서 수습 중 지급액이 약 ${amounts.paid.toLocaleString('ko-KR')}원인데, 법이 허용하는 하한은 ${amounts.floor.toLocaleString('ko-KR')}원입니다.`,
+      })
+    } else if (!amounts && p.payRatio < PROBATION_MIN_PAY_RATIO) {
+      // 임금이나 근무시간이 비어 있어 금액을 계산할 수 없다. 모르는 것을
+      // 위반이라고 단정하지 않되, 확인해야 할 자리라는 것은 남긴다.
+      issues.push({
+        severity: 'medium',
+        title: '수습 지급액 확인 필요',
+        detail: `계약서에 수습 중 ${p.payRatio}% 지급으로 적혀 있습니다. 수습 중이라도 최저임금의 90% 이상을 지급해야 하는데(최저임금법 시행령 제3조), 임금 또는 근무시간이 비어 있어 실제 지급액을 계산할 수 없습니다. 두 값을 채우면 자동으로 판정합니다.`,
+      })
+    }
   }
 
-  // "감액 폭은 적법한데 수습 중 금액만 하한 아래"인 경우는 따로 보지 않는다.
-  // 감액률이 90% 이상이면 수습 임금이 하한 아래로 내려가려면 기본급 자체가
-  // 이미 최저임금 미달이어야 하고, 그것은 checkLegalCompliance 가 잡는다.
-  // 같은 사실을 두 번 경고하면 경고 하나하나의 무게가 가벼워진다.
   return issues
 }

@@ -89,12 +89,16 @@ export async function onRequestPost({ request, env, data, params }) {
   // 비교하면 이후 변경되지 않았음을 증명할 수 있다.
   const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
   const sha256 = [...new Uint8Array(hashBuffer)].map((b) => b.toString(16).padStart(2, '0')).join('')
-  // 방마다 고정 키 — 재저장 시 같은 객체를 덮어써서 고아 객체가 생기지 않는다.
-  const r2Key = `contracts/${params.roomId}/signed.pdf`
+  // 방마다 고정 키를 써서 재저장 때 같은 객체를 덮어쓰고 있었다. 고아 객체는
+  // 생기지 않지만, 덮어쓴 직후 DB 쓰기가 실패하면 파일은 새것인데 기록된
+  // 지문(sha256)은 옛것이 된다. 그 계약서는 내려받아 해시를 대조할 때마다
+  // 영원히 "변조됨"으로 나온다 — 아무도 손대지 않았는데.
+  //
+  // 저장할 때마다 새 키를 쓴다. 기록이 새 파일을 가리킨 뒤에 옛 파일을 지운다.
+  const r2Key = `contracts/${params.roomId}/signed-${Date.now()}.pdf`
   const filename = `근로계약서_${params.roomId.slice(0, 8)}.pdf`
 
-  // 기존 저장 행이 있는지 (DB 실패 시 방금 올린 객체 정리 판단용)
-  const existing = await env.DB.prepare('SELECT 1 FROM signed_contracts WHERE room_id = ?')
+  const existing = await env.DB.prepare('SELECT r2_key FROM signed_contracts WHERE room_id = ?')
     .bind(params.roomId)
     .first()
 
@@ -120,9 +124,15 @@ export async function onRequestPost({ request, env, data, params }) {
       .run()
   } catch (err) {
     console.error(`Signed contract DB write failed for room ${params.roomId}:`, err)
-    // 기존 저장본이 없던 신규 저장인데 DB가 실패했다면 방금 올린 객체를 정리한다.
-    if (!existing) await env.DOCUMENTS.delete(r2Key).catch(() => {})
+    // 기록이 가리키는 것은 여전히 옛 파일이다. 방금 올린 것만 치운다.
+    await env.DOCUMENTS.delete(r2Key).catch(() => {})
     return jsonError('계약서 저장에 실패했습니다. 잠시 후 다시 시도해주세요.', 500)
+  }
+
+  // 기록이 새 파일을 가리킨 뒤에 옛 파일을 지운다. 여기서 실패해도 남는 것은
+  // 아무도 가리키지 않는 객체뿐이라, 계약서가 사라지는 일은 없다.
+  if (existing?.r2_key && existing.r2_key !== r2Key) {
+    await env.DOCUMENTS.delete(existing.r2_key).catch(() => {})
   }
 
   // 지원자에게 이메일 발송 (설정된 경우에만 시도)

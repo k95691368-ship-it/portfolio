@@ -12,6 +12,7 @@
 // 그 판단은 매번 같아야 한다.
 
 import { computeWeeklyHours, monthlyPaidHours, parseDaysPerWeek } from './contractCheck.js'
+import { effectiveWageItems, totalWage } from './wageItems.js'
 
 const won = (n) => `${Math.round(n).toLocaleString('ko-KR')}원`
 
@@ -64,8 +65,15 @@ export function comparePostingToContract(posting, terms) {
   let comparedAnything = false
 
   // 임금 — 공고가 약속한 하한보다 낮으면 불리한 변경이다.
+  //
+  // 기본급만 비교하고 있었다. 공고가 약속한 것은 "받는 돈"이지 "기본급"이
+  // 아니므로, 기본급 190만 + 고정연장수당 75만으로 실제 265만을 주는 계약이
+  // 공고 하한 250만에 미달한다며 채용절차법 위반 경고를 받았다. 없는 위법을
+  // 만들어 내면, 같은 화면의 진짜 경고까지 함께 무시된다.
   const promised = postingWageToMonthly(posting, terms)
-  const actual = Number(terms.wageBaseAmount)
+  const items = effectiveWageItems(terms)
+  const actual = totalWage(items)
+  const base = Number(terms.wageBaseAmount)
   if (promised && Number.isFinite(actual) && actual > 0) {
     comparedAnything = true
     if (actual < promised.monthly) {
@@ -74,12 +82,22 @@ export function comparePostingToContract(posting, terms) {
           'wageBaseAmount',
           '임금',
           'high',
-          `공고에는 ${wageTypeLabel(posting.wageType)} 최소 ${won(posting.wageMin)}으로 제시됐는데(${promised.basis} = 월 ${won(promised.monthly)}), 계약서의 기본급은 월 ${won(actual)}입니다. 월 ${won(promised.monthly - actual)} 적습니다.`
+          `공고에는 ${wageTypeLabel(posting.wageType)} 최소 ${won(posting.wageMin)}으로 제시됐는데(${promised.basis} = 월 ${won(promised.monthly)}), 계약서의 월 지급액은 ${won(actual)}입니다. 월 ${won(promised.monthly - actual)} 적습니다.`
         )
       )
     } else {
+      // 총액은 넘지만 기본급은 크게 낮은 구성이 있다. 위법은 아니되,
+      // 연장수당·퇴직금 같은 뒤따르는 금액이 기본급을 따라 줄어든다.
+      const composed = items.length > 1 && Number.isFinite(base) && base > 0 && base < promised.monthly
       matched.push(
-        issue('wageBaseAmount', '임금', 'ok', `공고에 제시된 최소 금액(월 ${won(promised.monthly)}) 이상입니다.`)
+        issue(
+          'wageBaseAmount',
+          '임금',
+          'ok',
+          composed
+            ? `월 지급액 ${won(actual)}은 공고에 제시된 최소 금액(월 ${won(promised.monthly)}) 이상입니다. 다만 그중 기본급은 ${won(base)}이며, 연장근로수당·퇴직금은 기본급을 기준으로 계산됩니다.`
+            : `공고에 제시된 최소 금액(월 ${won(promised.monthly)}) 이상입니다.`
+        )
       )
     }
   }

@@ -27,17 +27,26 @@ export async function onRequestPost({ env, data, params, request }) {
   const signBlock = blockedWhenClosed(room, 'sign')
   if (signBlock) return jsonError(signBlock, 409)
 
-  const contract = await env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?')
-    .bind(params.roomId)
-    .first()
-  if (!contract?.hire_confirmed) return jsonError('아직 채용이 확정되지 않아 서명할 수 없습니다.', 400)
-
+  // 조건을 읽기 전에 본문부터 받는다.
+  //
+  // 서명 이미지는 최대 2MB 라 본문을 받는 데 실제로 시간이 걸린다. 조건을 먼저
+  // 읽어 두고 그동안 본문을 기다리면, 그 사이 회사가 조건을 고쳐도 이 요청은
+  // 낡은 조건으로 모든 검사를 통과한 뒤 서명을 남긴다. 조건 변경 경로는 그
+  // 시점에 있던 서명만 지우므로 뒤늦게 도착한 이 서명은 살아남는다.
+  //
+  // 읽는 순서를 바꿔 그 창을 없앤다. 남는 것은 아래 검사에 드는 짧은 시간뿐이고,
+  // 그것은 INSERT 에 건 조건이 막는다.
   let body
   try {
     body = await request.json()
   } catch {
     return jsonError('잘못된 요청입니다.', 400)
   }
+
+  const contract = await env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?')
+    .bind(params.roomId)
+    .first()
+  if (!contract?.hire_confirmed) return jsonError('아직 채용이 확정되지 않아 서명할 수 없습니다.', 400)
 
   // 서명하는 문서는 계약 조건이 아니라 계약서 본문이다. 조건을 고친 뒤 본문을
   // 다시 작성하지 않으면 본문에 옛 금액이 남는데, 여기서 서로 다른 금액이
@@ -110,12 +119,21 @@ export async function onRequestPost({ env, data, params, request }) {
     )
   }
 
-  await env.DB.prepare(
+  // 여기까지의 모든 검사는 위에서 한 번 읽은 조건 스냅샷으로 했다. 그 사이
+  // 회사가 조건을 고치면, 조건 변경 경로는 그 시점에 존재하는 서명만 지우므로
+  // 지금 들어가는 이 서명은 지울 대상이 아니어서 살아남는다. 근로자는 자기가
+  // 본 적 없는 계약에 서명한 것이 되고, 최저임금·제17조 검사도 옛 값으로만
+  // 돌아 새 값은 서버에서 한 번도 확인되지 않는다.
+  //
+  // D1 에는 트랜잭션이 없으므로 문장 하나로 조건을 건다. 읽었을 때의
+  // updated_at 과 지금이 같을 때만 INSERT 가 성립한다. IS 는 NULL 도 비교한다.
+  const inserted = await env.DB.prepare(
     `INSERT INTO signatures
        (id, room_id, signer_user_id, signer_role, image_data_url, signed_at,
         signer_ip, signer_user_agent, signer_country, document_sha256,
         verified_email, session_started_at, verification_method)
-     VALUES (?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, ?, ?)
+     SELECT ?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, ?, ?
+      WHERE (SELECT updated_at FROM contract_terms WHERE room_id = ?) IS ?
      ON CONFLICT(room_id, signer_role) DO UPDATE SET
        signer_user_id = excluded.signer_user_id,
        image_data_url = excluded.image_data_url,
@@ -142,9 +160,18 @@ export async function onRequestPost({ env, data, params, request }) {
       // "내가 서명하지 않았다"는 주장에 답할 수 없다.
       data.user.email ?? null,
       data.user.session_started_at ?? null,
-      data.user.must_change_password ? 'temp_password' : 'account_password'
+      data.user.must_change_password ? 'temp_password' : 'account_password',
+      params.roomId,
+      contract.updated_at ?? null
     )
     .run()
+
+  if (inserted.meta.changes === 0) {
+    return jsonError(
+      '서명하는 사이에 계약 조건이 바뀌었습니다. 화면을 새로 고쳐 바뀐 내용을 확인한 뒤 다시 서명해주세요.',
+      409
+    )
+  }
 
   const { results: sigs } = await env.DB.prepare('SELECT signer_role FROM signatures WHERE room_id = ?')
     .bind(params.roomId)
@@ -154,7 +181,13 @@ export async function onRequestPost({ env, data, params, request }) {
   const bothSigned = roles.has('company') && roles.has('candidate')
 
   if (bothSigned) {
-    await env.DB.prepare("UPDATE interview_rooms SET status = 'signed' WHERE id = ?")
+    // 상태를 무조건 덮어쓰면, 그 사이에 성립한 전형 종료를 되돌릴 수 없는
+    // 형태로 지운다(close_reason·closed_at 은 남고 상태만 signed 가 된다).
+    // 서명 가능한 상태였을 때만 체결로 넘긴다.
+    await env.DB.prepare(
+      `UPDATE interview_rooms SET status = 'signed'
+        WHERE id = ? AND status IN ('open', 'active', 'contract_pending')`
+    )
       .bind(params.roomId)
       .run()
 

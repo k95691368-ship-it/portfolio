@@ -159,3 +159,44 @@ export function describeWageComposition(terms) {
     included: included.length,
   }
 }
+
+// 기본급이 두 곳에 있다.
+//
+// wage_base_amount 컬럼과 wageItems 안의 base 항목이다. 구성항목을 뒤늦게
+// 도입하면서 옛 계약과의 호환을 위해 컬럼을 남겼는데, 두 값이 갈라질 수 있는
+// 길도 함께 남겨 버렸다. 화면은 컬럼을 기본급으로 보여 주고 최저임금·통상임금
+// 계산은 항목을 쓰므로, 갈라지면 "계약서에는 250만인데 위반 판정은 190만
+// 기준"이 된다. 지원자가 기본급 인상을 요청해 회사가 수락해도, 항목이 있는
+// 계약에서는 그 인상이 법령 계산에 아예 반영되지 않았다.
+//
+// 두 값을 쓰는 모든 경로가 이 함수를 지나가게 해서 한쪽만 바뀌는 일을 없앤다.
+
+export function parseWageItemsJson(json) {
+  if (!json) return []
+  try {
+    const parsed = JSON.parse(json)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+// 항목의 기본급을 주어진 금액에 맞춘다. 항목이 없으면 만들지 않는다 —
+// 구성항목을 쓰지 않는 계약을 마음대로 구성항목 계약으로 바꾸지 않는다.
+export function alignWageItemsWithBase(items, baseAmount) {
+  const list = Array.isArray(items) ? items : []
+  if (list.length === 0) return list
+  const amount = Number(baseAmount)
+  if (!Number.isFinite(amount) || amount < 0) return list
+  const rounded = Math.round(amount)
+  return list.map((i) => (i.type === 'base' ? { ...i, amount: rounded } : i))
+}
+
+// 항목에서 기본급을 뽑는다. 항목이 없으면 null.
+export function baseAmountFromItems(items) {
+  const list = Array.isArray(items) ? items : []
+  const base = list.find((i) => i.type === 'base')
+  if (!base) return null
+  const amount = Number(base.amount)
+  return Number.isFinite(amount) ? Math.round(amount) : null
+}
