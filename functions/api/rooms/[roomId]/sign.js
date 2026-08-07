@@ -1,4 +1,5 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
+import { blockedWhenClosed } from '../../../_lib/roomLifecycle.js'
 import { genId } from '../../../_lib/db.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { notifyUser } from '../../../_lib/notify.js'
@@ -23,6 +24,8 @@ export async function onRequestPost({ env, data, params, request }) {
     .first()
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
   if (room.status === 'signed') return jsonError('이미 서명이 완료된 계약서입니다.', 409)
+  const signBlock = blockedWhenClosed(room, 'sign')
+  if (signBlock) return jsonError(signBlock, 409)
 
   const contract = await env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?')
     .bind(params.roomId)

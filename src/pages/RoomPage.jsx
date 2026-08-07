@@ -11,6 +11,16 @@ import ContractFieldsForm from '../components/ContractFieldsForm.jsx'
 import FinalOfferEmailForm from '../components/FinalOfferEmailForm.jsx'
 import RoomInviteEmailForm from '../components/RoomInviteEmailForm.jsx'
 import InterviewSummary from '../components/InterviewSummary.jsx'
+import { roomStatusInfo } from '../lib/roomStatus.js'
+
+// 전형을 왜 끝냈는지. 지원자에게는 사유마다 전혀 다른 의미다.
+const CLOSE_REASONS = [
+  { value: 'other_candidate', label: '다른 지원자를 채용했습니다' },
+  { value: 'candidate_withdrew', label: '지원자가 전형을 그만두었습니다' },
+  { value: 'position_cancelled', label: '채용 자체가 취소되었습니다' },
+  { value: 'terms_not_agreed', label: '근로조건에 합의하지 못했습니다' },
+  { value: 'other', label: '그 밖의 사유' },
+]
 
 export default function RoomPage() {
   const { roomId } = useParams()
@@ -19,6 +29,9 @@ export default function RoomPage() {
   const [view, setView] = useState(null)
   const [error, setError] = useState('')
   const [analyzing, setAnalyzing] = useState(false)
+  const [closing, setClosing] = useState(false)
+  const [closeReason, setCloseReason] = useState('other_candidate')
+  const [closeNote, setCloseNote] = useState('')
 
   // 이 화면에 필요한 모든 정보를 한 번의 요청으로 받는다.
   const loadView = useCallback(async () => {
@@ -26,6 +39,33 @@ export default function RoomPage() {
     setView(data)
     return data
   }, [roomId])
+
+  const handleClose = async () => {
+    if (!window.confirm('이 전형을 종료하시겠습니까? 지원자에게 종료 사실과 사유가 안내됩니다.')) return
+    setClosing(true)
+    try {
+      await api.post(`/rooms/${roomId}/close`, { reason: closeReason, note: closeNote })
+      await loadView()
+      toast.success('전형을 종료했습니다. 지원자에게 안내되었습니다.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setClosing(false)
+    }
+  }
+
+  const handleReopen = async () => {
+    setClosing(true)
+    try {
+      await api.delete(`/rooms/${roomId}/close`)
+      await loadView()
+      toast.success('전형을 다시 진행합니다.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setClosing(false)
+    }
+  }
 
   useEffect(() => {
     setView(null)
@@ -66,7 +106,27 @@ export default function RoomPage() {
         <h1>{room.title}</h1>
         <p>참가자: {room.participants.map((p) => p.displayName).join(', ')}</p>
         {room.myRole === 'company' && <p>초대코드: {room.inviteCode}</p>}
+        <span className={`badge ${roomStatusInfo(room.status).badgeClass}`}>
+          {roomStatusInfo(room.status).label}
+        </span>
       </header>
+
+      {/* 끝난 전형이 "진행중"으로 남아 있으면 지원자는 계속 기다린다. */}
+      {room.status === 'closed' && (
+        <div className="room-closed" role="status">
+          <p className="period-alert">
+            이 전형은 종료되었습니다.{room.closeReason && ` 사유: ${room.closeReason}`}
+          </p>
+          <p className="period-detail">
+            지금까지의 대화와 계약 조건은 그대로 볼 수 있습니다. 계약을 진행하는 작업만 막혀 있습니다.
+          </p>
+          {room.myRole === 'company' && (
+            <button type="button" className="btn-sm" onClick={handleReopen} disabled={closing}>
+              전형 다시 진행하기
+            </button>
+          )}
+        </div>
+      )}
 
       <RoomDocuments documents={view.documents} />
 

@@ -1,4 +1,5 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
+import { blockedWhenClosed } from '../../../_lib/roomLifecycle.js'
 import { rowToCamelTerms, EDITABLE_FIELDS } from '../../../_lib/contract.js'
 import { normalizeWageItems } from '../../../_lib/wageItems.js'
 import { getRoomParticipant, getRoomAccess } from '../../../_lib/rooms.js'
@@ -39,6 +40,8 @@ export async function onRequestPatch({ env, data, params, request }) {
     .first()
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
   if (room.status === 'signed') return jsonError('이미 서명이 완료된 계약서는 수정할 수 없습니다.', 409)
+  const editBlock = blockedWhenClosed(room, 'edit_terms')
+  if (editBlock) return jsonError(editBlock, 409)
 
   let body
   try {

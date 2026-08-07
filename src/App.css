@@ -2640,3 +2640,29 @@
   line-height: 1.6;
   color: var(--warning-text);
 }
+
+/* 전형 종료 */
+.room-closed {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 16px 20px;
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius);
+  background: var(--warning-bg);
+}
+.room-close {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.room-close h2 {
+  margin: 0;
+  font-size: 18px;
+}

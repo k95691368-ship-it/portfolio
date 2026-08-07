@@ -1,4 +1,5 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
+import { blockedWhenClosed } from '../../../_lib/roomLifecycle.js'
 import { draftContractDocument } from '../../../_lib/claude.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
@@ -22,6 +23,8 @@ export async function onRequestPost({ env, data, params, request }) {
     .first()
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
   if (room.status === 'signed') return jsonError('이미 서명이 완료된 계약서는 다시 작성할 수 없습니다.', 409)
+  const draftBlock = blockedWhenClosed(room, 'draft')
+  if (draftBlock) return jsonError(draftBlock, 409)
 
   const bucket = `contract-draft:${params.roomId}`
   const ticket = await checkRateLimit(env, bucket, 5, 60)

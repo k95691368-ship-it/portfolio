@@ -1,4 +1,5 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
+import { blockedWhenClosed } from '../../../_lib/roomLifecycle.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { notifyUser } from '../../../_lib/notify.js'
 
@@ -21,6 +22,8 @@ export async function onRequestPost({ env, data, params }) {
     .bind(params.roomId)
     .first()
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
+  const closedBlock = blockedWhenClosed(room, 'confirm_hire')
+  if (closedBlock) return jsonError(closedBlock, 409)
 
   const candidate = await env.DB.prepare(
     "SELECT user_id FROM room_participants WHERE room_id = ? AND role_in_room = 'candidate'"

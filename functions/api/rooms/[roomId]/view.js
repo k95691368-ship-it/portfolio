@@ -105,6 +105,7 @@ export async function onRequestGet({ env, data, params }) {
       title: room.title,
       inviteCode: room.invite_code,
       status: room.status,
+      closeReason: room.close_reason ?? null,
       myRole: access.role_in_room,
       participants: participants.map((p) => ({
         id: p.id,

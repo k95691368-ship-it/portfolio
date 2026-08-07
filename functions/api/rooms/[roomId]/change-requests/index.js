@@ -1,5 +1,6 @@
 import { genId } from '../../../../_lib/db.js'
 import { jsonResponse, jsonError } from '../../../../_lib/http.js'
+import { blockedWhenClosed } from '../../../../_lib/roomLifecycle.js'
 import { getRoomParticipant, getRoomAccess } from '../../../../_lib/rooms.js'
 import { EDITABLE_FIELDS } from '../../../../_lib/contract.js'
 import { FIELD_LABELS } from '../../../../_lib/contractCheck.js'
@@ -44,6 +45,9 @@ export async function onRequestPost({ request, env, data, params }) {
   if (room.status === 'signed') {
     return jsonError('이미 서명이 완료된 계약서는 수정을 요청할 수 없습니다.', 409)
   }
+  const closedBlock = blockedWhenClosed(room, 'change_request')
+  if (closedBlock) return jsonError(closedBlock, 409)
+
 
   const allowed = await checkRateLimit(env, `change-req:${data.user.id}`, 10, 600)
   if (!allowed) return jsonError('요청이 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)
