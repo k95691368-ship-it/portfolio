@@ -9,7 +9,16 @@ import { describeApplicationProgress, sortMyApplications } from './applicationPr
 
 const APPLICATION_LIMIT = 50
 
+// 면접방 목록에는 상한이 없었다. 채용을 오래 한 회사 계정은 방이 수백 개가
+// 되고, 그 전부를 방마다 여섯 번의 딸린 조회와 함께 읽어 첫 화면에 한꺼번에
+// 그렸다. 로그인 직후 가장 먼저 열리는 화면이 가장 무거웠던 셈이다.
+//
+// 최신부터 자른다. 그리고 잘랐다는 사실을 반드시 함께 돌려준다 — 조용히
+// 자르면 화면은 "이게 전부"라고 말하는 것이 되고, 그것은 거짓말이다.
+const ROOM_LIMIT = 100
+
 export async function loadMyRooms(env, user) {
+  // 한 건 더 읽어 잘렸는지 판단한다. 세어 보는 조회를 한 번 더 하지 않는다.
   const { results } = await env.DB.prepare(
     `SELECT
        r.id, r.title, r.invite_code, r.status, r.created_at,
@@ -21,17 +30,20 @@ export async function loadMyRooms(env, user) {
           WHERE rp2.room_id = r.id AND rp2.role_in_room = 'candidate') AS candidate_name,
        (SELECT COUNT(*) FROM signatures s WHERE s.room_id = r.id) AS signature_count,
        EXISTS(SELECT 1 FROM signatures s WHERE s.room_id = r.id AND s.signer_user_id = ?) AS i_signed,
-       (SELECT ct.contract_start_date FROM contract_terms ct WHERE ct.room_id = r.id) AS start_date,
-       (SELECT ct.contract_end_date FROM contract_terms ct WHERE ct.room_id = r.id) AS end_date
+       ct.contract_start_date AS start_date,
+       ct.contract_end_date AS end_date
      FROM interview_rooms r
      JOIN room_participants rp ON rp.room_id = r.id
+     LEFT JOIN contract_terms ct ON ct.room_id = r.id
      WHERE rp.user_id = ?
-     ORDER BY r.created_at DESC`
+     ORDER BY r.created_at DESC
+     LIMIT ?`
   )
-    .bind(user.id, user.id)
+    .bind(user.id, user.id, ROOM_LIMIT + 1)
     .all()
 
-  return results.map((r) => {
+  const truncated = results.length > ROOM_LIMIT
+  const rooms = (truncated ? results.slice(0, ROOM_LIMIT) : results).map((r) => {
     // 서명 단계에서 사용자가 지금 해야 할 일을 한 줄로 안내
     let nextAction = null
     if (r.status === 'contract_pending') {
@@ -66,6 +78,8 @@ export async function loadMyRooms(env, user) {
       periodAlert,
     }
   })
+
+  return { rooms, truncated, limit: ROOM_LIMIT }
 }
 
 // 지원은 로그인 없이도 할 수 있고 합격하면 그 이메일로 계정이 만들어진다.
@@ -92,10 +106,11 @@ export async function loadMyApplications(env, user) {
       ORDER BY a.created_at DESC
       LIMIT ?`
   )
-    .bind(user.id, APPLICATION_LIMIT)
+    .bind(user.id, APPLICATION_LIMIT + 1)
     .all()
 
-  const applications = results.map((r) => {
+  const truncated = results.length > APPLICATION_LIMIT
+  const applications = (truncated ? results.slice(0, APPLICATION_LIMIT) : results).map((r) => {
     const base = {
       id: r.id,
       postingTitle: r.posting_title,
@@ -114,5 +129,5 @@ export async function loadMyApplications(env, user) {
     return { ...base, progress: describeApplicationProgress(base) }
   })
 
-  return sortMyApplications(applications)
+  return { applications: sortMyApplications(applications), truncated, limit: APPLICATION_LIMIT }
 }

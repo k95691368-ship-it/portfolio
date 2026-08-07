@@ -13,6 +13,9 @@ export default function DashboardPage() {
   const toast = useToast()
   const [rooms, setRooms] = useState([])
   const [applications, setApplications] = useState([])
+  // 목록에 상한이 있다. 잘렸으면 잘렸다고 말한다 — 말하지 않으면 화면이
+  // "이게 전부"라고 주장하는 것이 된다.
+  const [truncated, setTruncated] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
 
@@ -33,11 +36,20 @@ export default function DashboardPage() {
       ])
       setRooms(roomData.rooms)
       setApplications(mine.applications)
+      setTruncated(mine.truncated ? { applications: mine.limit } : null)
       return
     }
     const data = await api.get('/dashboard')
     setRooms(data.rooms)
     setApplications(data.applications)
+    setTruncated(
+      data.roomsTruncated || data.applicationsTruncated
+        ? {
+            rooms: data.roomsTruncated ? data.roomLimit : null,
+            applications: data.applicationsTruncated ? data.applicationLimit : null,
+          }
+        : null
+    )
   }, [user.isAdmin])
 
   // 실패를 삼키면 "참여 중인 면접방이 없습니다"가 떠서, 불러오지 못한 것과
@@ -126,6 +138,11 @@ export default function DashboardPage() {
       )}
 
       <MyApplications applications={applications} />
+      {truncated?.applications && (
+        <p className="notice">
+          지원한 곳이 많아 최근 {truncated.applications}건만 표시했습니다.
+        </p>
+      )}
 
       {user.role === 'candidate' && <DocumentManager />}
 
@@ -145,6 +162,12 @@ export default function DashboardPage() {
       ) : rooms.length === 0 ? (
         <p>{user.isAdmin ? '등록된 면접방이 없습니다.' : '참여 중인 면접방이 없습니다.'}</p>
       ) : (
+        <>
+        {truncated?.rooms && (
+          <p className="notice">
+            면접방이 많아 최근 {truncated.rooms}개만 표시했습니다.
+          </p>
+        )}
         <ul className="room-list">
           {rooms.map((room) => {
             const status = roomStatusInfo(room.status)
@@ -174,6 +197,7 @@ export default function DashboardPage() {
             )
           })}
         </ul>
+        </>
       )}
     </div>
   )

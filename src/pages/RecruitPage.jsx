@@ -686,10 +686,15 @@ export default function RecruitPage() {
               <input
                 type="search"
                 placeholder="이름·이메일·공고 검색"
+                aria-label="지원자 검색 (이름·이메일·공고)"
                 value={appSearch}
                 onChange={(e) => setAppSearch(e.target.value)}
               />
-              <select value={appStatus} onChange={(e) => setAppStatus(e.target.value)}>
+              <select
+                value={appStatus}
+                aria-label="지원 상태로 거르기"
+                onChange={(e) => setAppStatus(e.target.value)}
+              >
                 <option value="all">전체 상태</option>
                 <option value="submitted">심사 대기</option>
                 <option value="passed">서류합격</option>

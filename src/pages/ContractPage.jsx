@@ -1155,11 +1155,13 @@ export default function ContractPage() {
             <div key={idx} className="custom-term-row">
               <input
                 placeholder="항목명"
+                aria-label={`${idx + 1}번 그 밖의 사항 항목명`}
                 value={c.label}
                 onChange={(e) => updateCustomTerm(idx, 'label', e.target.value)}
               />
               <input
                 placeholder="내용"
+                aria-label={`${idx + 1}번 그 밖의 사항 내용`}
                 value={c.value}
                 onChange={(e) => updateCustomTerm(idx, 'value', e.target.value)}
               />

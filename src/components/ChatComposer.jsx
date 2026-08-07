@@ -26,6 +26,7 @@ export default function ChatComposer({ onSend }) {
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="메시지를 입력하세요"
+        aria-label="보낼 메시지"
       />
       <button type="submit" className="btn-primary btn-sm" disabled={sending}>
         전송

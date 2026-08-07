@@ -9,11 +9,19 @@ import { loadMyRooms, loadMyApplications } from '../_lib/dashboard.js'
 export async function onRequestGet({ env, data }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
 
-  const [rooms, applications] = await Promise.all([
+  const [roomResult, applicationResult] = await Promise.all([
     // 관리자는 모든 면접방을 보는 별도 화면을 쓰므로 여기서는 본인 것만 읽는다.
     loadMyRooms(env, data.user),
     loadMyApplications(env, data.user),
   ])
 
-  return jsonResponse({ rooms, applications })
+  // 둘 다 상한이 있다. 잘렸다는 사실을 화면이 알 수 있도록 함께 돌려준다.
+  return jsonResponse({
+    rooms: roomResult.rooms,
+    roomsTruncated: roomResult.truncated,
+    roomLimit: roomResult.limit,
+    applications: applicationResult.applications,
+    applicationsTruncated: applicationResult.truncated,
+    applicationLimit: applicationResult.limit,
+  })
 }

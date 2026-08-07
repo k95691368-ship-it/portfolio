@@ -54,11 +54,16 @@ export default function WageComposition({ items, composition, canEdit, onChange 
                   <input
                     className="wage-name"
                     placeholder="항목명 (예: 식대)"
+                    aria-label={`${idx + 1}번 임금 항목의 이름`}
                     value={row.name ?? ''}
                     maxLength={40}
                     onChange={(e) => update(idx, 'name', e.target.value)}
                   />
-                  <select value={row.type ?? ''} onChange={(e) => update(idx, 'type', e.target.value)}>
+                  <select
+                    value={row.type ?? ''}
+                    aria-label={`${idx + 1}번 임금 항목의 종류`}
+                    onChange={(e) => update(idx, 'type', e.target.value)}
+                  >
                     {TYPES.map((t) => (
                       <option key={t.value} value={t.value}>
                         {t.label}
@@ -70,6 +75,7 @@ export default function WageComposition({ items, composition, canEdit, onChange 
                     type="number"
                     min="0"
                     placeholder="금액"
+                    aria-label={`${idx + 1}번 임금 항목의 금액 (원)`}
                     value={row.amount ?? ''}
                     onChange={(e) => update(idx, 'amount', e.target.value)}
                   />
