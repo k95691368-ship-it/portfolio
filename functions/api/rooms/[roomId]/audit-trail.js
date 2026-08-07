@@ -46,7 +46,7 @@ export async function onRequestGet({ env, data, params }) {
       env.DB.prepare(
         `SELECT h.created_at, u.display_name, h.changes
          FROM contract_edit_history h JOIN users u ON u.id = h.editor_user_id
-         WHERE h.room_id = ? ORDER BY h.id ASC LIMIT 100`
+         WHERE h.room_id = ? ORDER BY h.id ASC`
       )
         .bind(params.roomId)
         .all(),
@@ -74,7 +74,7 @@ export async function onRequestGet({ env, data, params }) {
         .all(),
       env.DB.prepare(
         `SELECT field, status, created_at, resolved_at FROM contract_change_requests
-          WHERE room_id = ? ORDER BY id ASC LIMIT 100`
+          WHERE room_id = ? ORDER BY id ASC`
       )
         .bind(params.roomId)
         .all(),

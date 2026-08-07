@@ -72,7 +72,11 @@ export async function onRequestGet({ env, data, params }) {
          FROM contract_edit_history h
          JOIN users u ON u.id = h.editor_user_id
          LEFT JOIN room_participants rp ON rp.room_id = h.room_id AND rp.user_id = h.editor_user_id
-         WHERE h.room_id = ? ORDER BY h.id ASC LIMIT 100`
+         -- 상한을 두면 그 뒤에 승인된 수정 요청이 읽히지 않아, 폐기된 최초
+         -- 금액이 "대화에서 합의한 값"으로 남고 서명이 잠긴다. 같은 계산을
+         -- 하는 pre-sign-check 는 상한이 없어 두 경로 판정이 갈리기까지 했다.
+         -- 계산은 전량으로 하고, 화면 표시만 아래에서 최근 것으로 자른다.
+         WHERE h.room_id = ? ORDER BY h.id ASC`
       )
         .bind(roomId)
         .all(),
@@ -132,6 +136,9 @@ export async function onRequestGet({ env, data, params }) {
 
   const participantRows = participants.results
   const history = historyRows.results
+  // 화면에는 최근 것부터 100건만 보여 준다. 계산(parsedHistory)은 전량을 쓴다.
+  const HISTORY_DISPLAY = 100
+  const historyForDisplay = history.slice(-HISTORY_DISPLAY)
   const signatures = signatureRows.results
   const terms = rowToCamelTerms(termsRow)
   const isSigned = room.status === 'signed'
@@ -361,7 +368,8 @@ export async function onRequestGet({ env, data, params }) {
     // 지금 화면에 보이는 내용의 지문. 서명할 때 함께 보내, 화면과 저장된 내용이
     // 어긋난 상태로 서명되는 것을 막는다.
     documentSha256: terms ? await contractFingerprint(terms) : null,
-    history: history
+    historyTotal: history.length,
+    history: historyForDisplay
       .slice()
       .reverse()
       .map((h) => ({

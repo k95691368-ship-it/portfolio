@@ -48,7 +48,10 @@ async function loadSource(env, roomId) {
       env.DB.prepare(
         `SELECT h.id, h.created_at, h.changes, u.display_name
            FROM contract_edit_history h JOIN users u ON u.id = h.editor_user_id
-          WHERE h.room_id = ? ORDER BY h.id ASC LIMIT 200`
+          -- 상한을 두면 그 뒤의 수정이 증명서에서 사라진 채로 해시된다.
+          -- 이력을 증명한다면서 이력을 빠뜨리는 문서가 된다. 방 하나의 수정
+          -- 이력은 room_id 인덱스로 읽히므로 전량을 읽어도 문제되지 않는다.
+          WHERE h.room_id = ? ORDER BY h.id ASC`
       )
         .bind(roomId)
         .all(),
@@ -77,7 +80,7 @@ async function loadSource(env, roomId) {
       // 증명서의 이력이 실제보다 성겼다.
       env.DB.prepare(
         `SELECT field, status, created_at, resolved_at
-           FROM contract_change_requests WHERE room_id = ? ORDER BY id ASC LIMIT 100`
+           FROM contract_change_requests WHERE room_id = ? ORDER BY id ASC`
       )
         .bind(roomId)
         .all(),

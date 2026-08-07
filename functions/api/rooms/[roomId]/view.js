@@ -38,12 +38,17 @@ export async function onRequestGet({ env, data, params }) {
       .all(),
     env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?').bind(roomId).first(),
     env.DB.prepare(
-      `SELECT m.id, m.sender_user_id, m.body, m.created_at, u.display_name AS sender_name
-         FROM chat_messages m
-         JOIN users u ON u.id = m.sender_user_id
-        WHERE m.room_id = ?
-        ORDER BY m.id ASC
-        LIMIT ?`
+      // 오래된 것부터 자르면 방을 열었을 때 대화 맨 앞이 뜬다. 메시지가 쌓인
+      // 방에서는 최근 대화가 폴링을 여러 번 돈 뒤에야 나타나고, 그 사이 양측은
+      // 서로의 최근 발언을 못 본 채 협상한다. 최근 것부터 잘라 다시 뒤집는다.
+      `SELECT * FROM (
+         SELECT m.id, m.sender_user_id, m.body, m.created_at, u.display_name AS sender_name
+           FROM chat_messages m
+           JOIN users u ON u.id = m.sender_user_id
+          WHERE m.room_id = ?
+          ORDER BY m.id DESC
+          LIMIT ?
+       ) ORDER BY id ASC`
     )
       .bind(roomId, MESSAGE_LIMIT)
       .all(),

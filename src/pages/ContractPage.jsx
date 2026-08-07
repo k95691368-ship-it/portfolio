@@ -718,6 +718,7 @@ export default function ContractPage() {
   const [employmentEnd, setEmploymentEnd] = useState({ endedAt: null, reason: null })
   const [certificates, setCertificates] = useState([])
   const [wageComposition, setWageComposition] = useState(null)
+  const [historyTotal, setHistoryTotal] = useState(0)
   const [workerRights, setWorkerRights] = useState(null)
   const [linkableRooms, setLinkableRooms] = useState([])
   const [linking, setLinking] = useState(false)
@@ -781,6 +782,7 @@ export default function ContractPage() {
     setRevokedSignatures(view.revokedSignatures ?? [])
     setCertificates(view.certificates ?? [])
     setWageComposition(view.wageComposition ?? null)
+    setHistoryTotal(view.historyTotal ?? 0)
     setWorkerRights(view.workerRights ?? null)
     setContinuity(view.continuity ?? null)
     setRetention(view.retention ?? null)
@@ -1478,7 +1480,13 @@ export default function ContractPage() {
 
       {history.length > 0 && (
         <section className="contract-history">
-          <h2>수정 이력 ({history.length})</h2>
+          <h2>수정 이력 ({historyTotal || history.length})</h2>
+          {historyTotal > history.length && (
+            <p className="notice">
+              최근 {history.length}건만 표시합니다. 법령 점검과 증명서는 전체 {historyTotal}건을 모두
+              반영합니다.
+            </p>
+          )}
           <ul className="history-list">
             {history.map((entry) => (
               <li key={entry.id} className="history-entry">
