@@ -2894,3 +2894,22 @@
   color: var(--warning-text);
   font-size: 14px;
 }
+
+/* 저장하지 않은 입력이 있는데 서버 쪽도 바뀐 상태. 어느 쪽을 버릴지는
+   사용자가 정한다 — 화면이 조용히 덮어쓰면 무엇이 사라졌는지 알 수 없다. */
+.form-conflict {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 12px 0;
+  padding: 12px 16px;
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 14px;
+}
+.form-conflict p {
+  margin: 0;
+}

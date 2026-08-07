@@ -36,7 +36,16 @@ export default function DashboardPage() {
       ])
       setRooms(roomData.rooms)
       setApplications(mine.applications)
-      setTruncated(mine.truncated ? { applications: mine.limit } : null)
+      // 관리자 화면은 '모든 면접방'이라고 적어 놓고 서버가 준 잘림 표시를
+      // 버리고 있었다. 잘린 목록에 '모든'이라고 쓰면 그것은 거짓말이다.
+      setTruncated(
+        roomData.truncated || mine.truncated
+          ? {
+              rooms: roomData.truncated ? roomData.limit : null,
+              applications: mine.truncated ? mine.limit : null,
+            }
+          : null
+      )
       return
     }
     const data = await api.get('/dashboard')
@@ -152,7 +161,7 @@ export default function DashboardPage() {
         </p>
       )}
 
-      <h2>{user.isAdmin ? '모든 면접방' : '내 면접방'}</h2>
+      <h2>{user.isAdmin && !truncated?.rooms ? '모든 면접방' : user.isAdmin ? '면접방' : '내 면접방'}</h2>
       {loading ? (
         <p>불러오는 중...</p>
       ) : loadError ? (

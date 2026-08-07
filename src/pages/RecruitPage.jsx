@@ -78,7 +78,14 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
     try {
       const result = await api.post(`/applications/${appId}/pass`, {})
       setPassResult(result)
-      toast.success('서류합격 처리되었습니다. 지원자 계정과 면접방이 생성되었습니다.')
+      // 결과 통보 이메일이 실패해도 '처리되었습니다'만 뜨고 있었다. 채용절차법
+      // 제10조는 구직자에게 채용 여부를 알리도록 한다. 알림이 실패한 것을
+      // 알리지 않으면 담당자는 통보가 끝났다고 믿고 넘어간다.
+      toast.success(
+        result?.emailStatus === 'failed'
+          ? '서류합격 처리되었습니다. 다만 결과 안내 이메일 발송에 실패했습니다 — 지원자에게 따로 연락해주세요.'
+          : '서류합격 처리되었습니다. 지원자 계정과 면접방이 생성되었습니다.'
+      )
       load()
       onChanged()
     } catch (err) {
@@ -92,8 +99,12 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
     if (!window.confirm('불합격 처리하시겠습니까?')) return
     setWorking(true)
     try {
-      await api.post(`/applications/${appId}/reject`, {})
-      toast.success('불합격 처리되었습니다.')
+      const result = await api.post(`/applications/${appId}/reject`, {})
+      toast.success(
+        result?.emailStatus === 'failed'
+          ? '불합격 처리되었습니다. 다만 결과 안내 이메일 발송에 실패했습니다 — 지원자에게 따로 연락해주세요.'
+          : '불합격 처리되었습니다.'
+      )
       load()
       onChanged()
     } catch (err) {
@@ -308,7 +319,7 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
   )
 }
 
-function RecruitStats({ postings, applications }) {
+function RecruitStats({ postings, applications, truncatedAt }) {
   const stats = useMemo(() => {
     const openPostings = postings.filter((p) => p.status === 'open').length
     const submitted = applications.filter((a) => a.status === 'submitted').length
@@ -325,6 +336,15 @@ function RecruitStats({ postings, applications }) {
   return (
     <section className="recruit-section">
       <h2>채용 현황</h2>
+      {/* 지원서를 최근 N건만 불러온 상태에서 그 목록으로 통계를 냈다.
+          아래 공고 표는 전수 COUNT 를 보여 주므로 두 숫자가 어긋난다.
+          무엇을 센 숫자인지 밝히지 않으면 둘 다 틀린 것이 된다. */}
+      {truncatedAt && (
+        <p className="notice">
+          지원서가 많아 최근 {truncatedAt}건만 불러왔습니다. 아래 숫자는 그 범위 안에서만 센
+          것이라, 공고별 지원자 수와 다를 수 있습니다.
+        </p>
+      )}
       <div className="stat-row">
         <div className="stat-tile">
           <span className="stat-value">{stats.count}</span>
@@ -473,7 +493,9 @@ export default function RecruitPage() {
         </div>
       </header>
 
-      {!loading && <RecruitStats postings={postings} applications={applications} />}
+      {!loading && (
+        <RecruitStats postings={postings} applications={applications} truncatedAt={appsTruncated} />
+      )}
 
       <section className="recruit-section">
         <h2>채용 공고 등록</h2>

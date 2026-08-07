@@ -1,4 +1,4 @@
-import { jsonResponse } from '../../../_lib/http.js'
+import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { genId } from '../../../_lib/db.js'
 import { hashPassword } from '../../../_lib/auth.js'
 import { logAdminAction } from '../../../_lib/auditLog.js'
@@ -68,6 +68,33 @@ async function wipeDemo(env) {
     .bind(...userIds)
     .all()
   const roomIds = rooms.map((r) => r.id)
+
+  // 삭제 범위가 '데모가 만든 것'이 아니라 '데모가 참여한 것'이다.
+  //
+  // 외래키 때문에 그래야 한다 — 데모 계정이 남의 방에 참여해 있으면 그 행부터
+  // 끊지 않고는 계정을 지울 수 없다. 그런데 그 방을 통째로 지우면, 남의 회사가
+  // 만든 방과 그 안의 체결된 계약서까지 함께 사라진다. 계약서는 근로관계
+  // 종료일부터 3년 보존해야 하는 문서다(근로기준법 제42조).
+  //
+  // 그런 방이 하나라도 있으면 지우지 않고 멈춘다. 사람이 확인해야 할 일이지,
+  // 초기화 버튼이 조용히 결정할 일이 아니다.
+  if (roomIds.length > 0) {
+    const { results: foreign } = await env.DB.prepare(
+      `SELECT r.id, r.title
+         FROM interview_rooms r
+         JOIN room_participants rp ON rp.room_id = r.id AND rp.role_in_room = 'company'
+        WHERE r.id IN (${roomIds.map(() => '?').join(',')})
+          AND rp.user_id NOT IN (${userIds.map(() => '?').join(',') || "''"})`
+    )
+      .bind(...roomIds, ...userIds)
+      .all()
+    if (foreign.length > 0) {
+      const titles = foreign.map((f) => f.title).join(', ')
+      return {
+        blocked: `데모가 아닌 회사의 면접방에 데모 계정이 참여해 있어 초기화를 멈췄습니다: ${titles}. 그 방에서 데모 계정을 내보낸 뒤 다시 시도해주세요.`,
+      }
+    }
+  }
 
   const { results: postings } = await env.DB.prepare(
     `SELECT id FROM job_postings WHERE created_by_user_id IN (${userIds.map(() => '?').join(',') || "''"})`
@@ -147,6 +174,19 @@ async function wipeDemo(env) {
     ),
     inPostings('DELETE FROM applications WHERE posting_id IN (__IN__)'),
     inRooms('room_participants'),
+    // 지원서는 공고 기준으로 지운다. 그런데 applications.room_id 는 방을
+    // 외래키로 참조하므로, 데모 공고가 아닌 지원서가 이 방을 가리키고 있으면
+    // 방 삭제가 FK 위반으로 실패하고 batch 전체가 롤백된다. R2 객체는 batch
+    // 밖에서 이미 지운 뒤라, 파일만 사라지고 기록은 그대로 남는다.
+    roomIds.length > 0
+      ? env.DB.prepare(
+          `UPDATE applications SET room_id = NULL WHERE room_id IN (${roomIds.map(() => '?').join(',')})`
+        ).bind(...roomIds)
+      : null,
+    // 같은 이유로 계정 참조도 끊는다. 데모 계정이 남긴 지원서가 데모 공고가
+    // 아닌 곳에 있으면 계정 삭제가 실패한다.
+    inUsers('UPDATE applications SET created_user_id = NULL WHERE created_user_id IN (__IN__)'),
+    inUsers('UPDATE applications SET reviewed_by_user_id = NULL WHERE reviewed_by_user_id IN (__IN__)'),
     // 감사 로그는 방을 외래키로 참조한다(admin_audit_log.target_room_id).
     // 끊지 않으면 방 삭제가 FK 위반으로 실패하고 batch 전체가 롤백되어,
     // 데모를 두 번 다시 초기화할 수 없게 된다.
@@ -492,6 +532,9 @@ async function issueDemoCertificate(env, roomId, issuerName) {
 
 export async function onRequestPost({ env, data }) {
   const removed = await wipeDemo(env)
+  // 지울 수 없는 것이 섞여 있으면 아무것도 지우지 않은 상태로 멈춘다.
+  if (removed.blocked) return jsonError(removed.blocked, 409)
+
   const seeded = await seedDemo(env)
   const certificate = await issueDemoCertificate(env, seeded.roomIds.signed, DEMO_ACCOUNTS[0].displayName)
 

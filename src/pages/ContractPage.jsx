@@ -412,7 +412,10 @@ function ChangeRequests({ requests, myRole, canRequest, onCreate, onRespond, bus
 
   const submit = async (e) => {
     e.preventDefault()
-    await onCreate({ field, requestedValue: value, reason })
+    // 실패해도 입력을 지우고 있었다. 오류 토스트는 몇 초 뒤 사라지고 폼은
+    // 비어 있으므로, 보낸 것으로 착각하고 회사의 답을 기다리게 된다.
+    const sent = await onCreate({ field, requestedValue: value, reason })
+    if (!sent) return
     setField('')
     setValue('')
     setReason('')
@@ -688,6 +691,12 @@ export default function ContractPage() {
   const [room, setRoom] = useState(null)
   const [contractMeta, setContractMeta] = useState({ hireConfirmed: false })
   const [form, setForm] = useState(EMPTY_FORM)
+  // 지금 화면의 값과 서버에서 마지막으로 받은 값. 둘이 다르면 저장하지 않은
+  // 입력이 있다는 뜻이다.
+  const formRef = useRef(form)
+  formRef.current = form
+  const savedFormRef = useRef(EMPTY_FORM)
+  const [serverChangedWhileEditing, setServerChangedWhileEditing] = useState(false)
   const [signatures, setSignatures] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -754,7 +763,7 @@ export default function ContractPage() {
     const company = roomData.participants.find((p) => p.role === 'company')
     const candidate = roomData.participants.find((p) => p.role === 'candidate')
 
-    setForm({
+    const nextForm = {
       employerName: t.employerName ?? company?.companyName ?? company?.displayName ?? '',
       employerAddress: t.employerAddress ?? '',
       employeeName: t.employeeName ?? candidate?.displayName ?? '',
@@ -775,7 +784,25 @@ export default function ContractPage() {
       socialInsurance: t.socialInsurance ?? {},
       customTerms: t.customTerms ?? [],
       wageItems: t.wageItems ?? [],
-    })
+    }
+
+    // 저장하지 않은 입력을 서버 값으로 덮어쓰지 않는다.
+    //
+    // loadAll 은 채용 확정·수정 요청 응답·이전 계약 연결 등 거의 모든 동작
+    // 뒤에 불린다. 그때마다 폼을 서버 값으로 되돌리고 있었으므로, 회사가
+    // 임금을 고치던 중에 다른 버튼을 한 번 누르면 입력한 내용이 사라지고
+    // "처리되었습니다" 토스트만 뜬다. 무엇이 사라졌는지 알 방법이 없다.
+    const dirty = JSON.stringify(formRef.current) !== JSON.stringify(savedFormRef.current)
+    const serverChanged = JSON.stringify(nextForm) !== JSON.stringify(savedFormRef.current)
+    savedFormRef.current = nextForm
+    if (!dirty) {
+      setForm(nextForm)
+      setServerChangedWhileEditing(false)
+    } else if (serverChanged) {
+      // 내 입력은 지키되, 서버 쪽도 바뀌었다는 사실은 알린다.
+      setServerChangedWhileEditing(true)
+    }
+
     setEmploymentEnd({ endedAt: t.employmentEndedAt ?? null, reason: t.employmentEndReason ?? null })
     setSignatures(sigData.signatures)
     setChangeRequests(view.changeRequests ?? [])
@@ -798,6 +825,12 @@ export default function ContractPage() {
 
     // 서명 전 최종 안전 점검은 아직 체결되지 않은 계약서에만 보여준다.
     setPreSign(roomData.status === 'signed' ? null : preSignData)
+    // 점검 결과를 다시 읽었으면 "모두 검토했다"는 확인도 다시 받는다.
+    //
+    // 체크는 한 번 누르면 그대로 남아 있었다. 그런데 그 사이 조건이 바뀌어
+    // 새 위반이 생겨도 체크는 켜진 채이므로, 본 적 없는 문제까지 동의한
+    // 것이 된다. 이 체크는 서명을 여는 유일한 문이다.
+    setAcknowledged(false)
 
     if (roomData.status === 'signed' && storedData) {
       setSignedContract(storedData.stored)
@@ -851,6 +884,10 @@ export default function ContractPage() {
       }
       await api.patch(`/rooms/${roomId}/contract`, payload)
       setForm((f) => ({ ...f, customTerms: filteredCustomTerms }))
+      // 저장했으므로 아래 loadAll 은 폼을 덮어써도 된다.
+      savedFormRef.current = { ...formRef.current, customTerms: filteredCustomTerms }
+      formRef.current = savedFormRef.current
+      setServerChangedWhileEditing(false)
       // 저장 후 다시 읽지 않으면 서명 전 점검이 저장 이전 상태로 남는다.
       // 이미 해결한 경고가 계속 보이는 것보다 위험한 방향이 있다 — 저장으로
       // 임금을 최저임금 미달로 낮춰도 낡은 점검이 "문제 없음"을 유지하고
@@ -974,8 +1011,10 @@ export default function ContractPage() {
       await api.post(`/rooms/${roomId}/change-requests`, { field, requestedValue, reason })
       await loadAll()
       toast.success('수정 요청을 보냈습니다. 회사 측 검토를 기다려주세요.')
+      return true
     } catch (err) {
       toast.error(err.message)
+      return false
     } finally {
       setRequestBusy(false)
     }
@@ -1127,6 +1166,25 @@ export default function ContractPage() {
         {myRole !== 'company' && !isSigned && (
           <p className="notice">계약 조건은 회사(고용) 측만 작성·수정할 수 있습니다. 내용을 확인한 뒤 서명해주세요.</p>
         )}
+        {serverChangedWhileEditing && (
+          <div className="form-conflict" role="status">
+            <p>
+              저장하지 않은 입력이 있어 화면을 그대로 두었습니다. 그 사이 계약 조건이 서버에서
+              바뀌었습니다.
+            </p>
+            <button
+              type="button"
+              className="btn-sm"
+              onClick={() => {
+                setForm(savedFormRef.current)
+                setServerChangedWhileEditing(false)
+              }}
+            >
+              내 입력을 버리고 서버 값 불러오기
+            </button>
+          </div>
+        )}
+
         <fieldset disabled={!canEdit}>
           <h3>당사자 정보</h3>
           {IDENTITY_FIELDS.map((f) => (

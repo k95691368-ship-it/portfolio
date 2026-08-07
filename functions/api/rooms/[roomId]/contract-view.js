@@ -108,7 +108,7 @@ export async function onRequestGet({ env, data, params, request }) {
         .bind(roomId)
         .all(),
       env.DB.prepare(
-        'SELECT language, articles_json, created_at, source_sha256 FROM contract_translations WHERE room_id = ?'
+        'SELECT language, articles_json, created_at, updated_at, source_sha256 FROM contract_translations WHERE room_id = ?'
       )
         .bind(roomId)
         .all(),
@@ -299,6 +299,7 @@ export async function onRequestGet({ env, data, params, request }) {
       nativeLabel: lang?.nativeLabel ?? t.language,
       articles,
       createdAt: t.created_at,
+      updatedAt: t.updated_at ?? null,
       sourceSha256: t.source_sha256 ?? null,
       // true = 옛 내용의 번역, false = 지금 내용의 번역, null = 확인할 수 없음
       stale,

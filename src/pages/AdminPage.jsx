@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
@@ -41,6 +41,8 @@ export default function AdminPage() {
   const [roomMessages, setRoomMessages] = useState([])
   const [messagesCap, setMessagesCap] = useState(null)
   const [messagesLoading, setMessagesLoading] = useState(false)
+  // 지금 열려 있는 방. 늦게 도착한 응답을 버리는 기준이다.
+  const openedRoomRef = useRef(null)
   const [messagesError, setMessagesError] = useState('')
 
   const [auditLog, setAuditLog] = useState([])
@@ -211,14 +213,21 @@ export default function AdminPage() {
     setMessagesCap(null)
     setMessagesError('')
     setMessagesLoading(true)
+    // 방 A 를 열고 곧바로 방 B 를 열면, 늦게 도착한 A 의 응답이 B 의 대화를
+    // 덮어쓴다. 관리자 화면에서 남의 면접 대화가 다른 방 제목 아래 보이는
+    // 것이므로, 화면만 어긋나는 문제가 아니다.
+    const requested = room.id
+    openedRoomRef.current = requested
     try {
-      const data = await api.get(`/admin/rooms/${room.id}/messages`)
+      const data = await api.get(`/admin/rooms/${requested}/messages`)
+      if (openedRoomRef.current !== requested) return
       setRoomMessages(data.messages)
       setMessagesCap(data.truncated ? data.limit : null)
     } catch (err) {
+      if (openedRoomRef.current !== requested) return
       setMessagesError(err.message)
     } finally {
-      setMessagesLoading(false)
+      if (openedRoomRef.current === requested) setMessagesLoading(false)
     }
   }
 

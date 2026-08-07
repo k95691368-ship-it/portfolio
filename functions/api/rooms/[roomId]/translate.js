@@ -72,13 +72,15 @@ export async function onRequestPost({ request, env, data, params }) {
   const sourceSha256 = await contractFingerprint(terms)
 
   await env.DB.prepare(
+    // created_at 은 건드리지 않는다. 처음 번역한 시각이 사라지면, 근로자가
+    // 서명 시점에 자기 언어로 읽을 수 있었는지를 확인할 길이 없어진다.
     `INSERT INTO contract_translations (room_id, language, articles_json, translated_by_user_id, source_sha256)
      VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(room_id, language) DO UPDATE SET
        articles_json = excluded.articles_json,
        translated_by_user_id = excluded.translated_by_user_id,
        source_sha256 = excluded.source_sha256,
-       created_at = datetime('now')`
+       updated_at = datetime('now')`
   )
     .bind(params.roomId, language.code, JSON.stringify(clean), data.user.id, sourceSha256)
     .run()

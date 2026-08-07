@@ -54,6 +54,39 @@ function roleLabel(role) {
 // 다만 값은 담지 않는다. 증명서는 계약 당사자가 아닌 사람에게 제시되므로,
 // "임금을 얼마에서 얼마로 바꿔달라고 했다"가 들어가면 발급번호를 아는 것만으로
 // 남의 근로조건이 보인다. 무엇에 대한 사건인지(항목 이름)까지만 남긴다.
+
+// 같은 초에 일어난 사건들 사이의 인과 순서. 작을수록 먼저다.
+// 여기 없는 사건은 중간값을 준다 — 순서를 모르면 억지로 앞뒤로 밀지 않는다.
+const CAUSAL_RANK = {
+  '면접방 생성': 0,
+  'AI 조건 분석 (최근)': 10,
+  '외국어 계약서 생성': 12,
+  '외국어 계약서 재작성': 13,
+  '계약 조건 수정 요청': 20,
+  '수정 요청 수락': 21,
+  '수정 요청 반려': 21,
+  '계약 조건 수정': 22,
+  '회사 서명 무효화': 23,
+  '지원자 서명 무효화': 23,
+  '채용 확정': 30,
+  '최종합격 이메일 발송': 35,
+  '회사 서명': 40,
+  '지원자 서명': 40,
+  '서명 계약서 보관': 50,
+  '계약서 사본 이메일 발송': 55,
+  '근로자 계약서 열람': 60,
+  '근로자 계약서 내려받음': 61,
+  '감사추적증명서 발급': 70,
+  '근로관계 종료 기록': 80,
+  '전형 종료': 85,
+  '전형 종료 취소': 86,
+}
+
+function causalRank(event) {
+  const rank = CAUSAL_RANK[event]
+  return rank === undefined ? 45 : rank
+}
+
 export function buildAuditEvents({
   room,
   participants,
@@ -157,11 +190,18 @@ export function buildAuditEvents({
 
   // 외국인 근로자가 무엇을 읽고 서명했는지는 이력의 일부다.
   for (const t of translations || []) {
+    const label = t.nativeLabel ?? t.label ?? t.language ?? null
     events.push({
       at: t.createdAt ?? t.created_at,
       event: '외국어 계약서 생성',
-      detail: t.nativeLabel ?? t.label ?? t.language ?? null,
+      detail: label,
     })
+    // 같은 언어를 다시 번역한 것도 사건이다. 예전에는 재번역이 최초 생성
+    // 시각을 덮어써서, 서명 전에 있던 번역본이 서명 뒤에 생긴 것으로 보였다.
+    const updatedAt = t.updatedAt ?? t.updated_at
+    if (updatedAt) {
+      events.push({ at: updatedAt, event: '외국어 계약서 재작성', detail: label })
+    }
   }
 
   // 이미 발급된 증명서. 같은 계약에 대해 몇 장이 나가 있는지 드러난다.
@@ -208,6 +248,19 @@ export function buildAuditEvents({
   for (const e of lifecycle || []) events.push(e)
 
   const dated = events.filter((e) => normalizeTime(e.at) !== '')
-  dated.sort((a, b) => normalizeTime(a.at).localeCompare(normalizeTime(b.at)))
+  // 같은 초에 일어난 사건은 시각만으로 순서를 정할 수 없다. 배열 정렬은
+  // 안정적이라 넣은 순서가 그대로 남는데, 그 순서가 원인과 결과를 뒤집는다.
+  //
+  //   수정 요청을 수락하면 한 batch 안에서 요청 상태·조건 수정·서명 무효화가
+  //   같은 초에 일어난다. 넣은 순서대로면 '계약 조건 수정' → '서명 무효화' →
+  //   '수정 요청 수락' 이 되어, 시간순으로 읽는 제3자에게는 회사가 임의로
+  //   조건을 고쳐 서명을 무효화한 다음 사후에 요청을 수락한 것으로 보인다.
+  //
+  // 같은 초 안에서는 인과 순서를 정해 둔다.
+  dated.sort(
+    (a, b) =>
+      normalizeTime(a.at).localeCompare(normalizeTime(b.at)) ||
+      causalRank(a.event) - causalRank(b.event)
+  )
   return dated.map((e) => ({ ...e, at: normalizeTime(e.at) }))
 }

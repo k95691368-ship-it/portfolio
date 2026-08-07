@@ -93,7 +93,7 @@ async function loadSource(env, roomId) {
         .bind(roomId)
         .all(),
       env.DB.prepare(
-        'SELECT language, created_at FROM contract_translations WHERE room_id = ?'
+        'SELECT language, created_at, updated_at FROM contract_translations WHERE room_id = ?'
       )
         .bind(roomId)
         .all(),

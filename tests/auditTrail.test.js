@@ -257,3 +257,60 @@ describe('buildAuditEvents', () => {
     expect(times).toEqual([...times].sort())
   })
 })
+
+// 같은 초에 일어난 사건은 시각만으로 순서를 정할 수 없다. 넣은 순서가 그대로
+// 남으면 원인이 결과 뒤에 찍혀, 시간순으로 읽는 제3자에게 정반대로 보인다.
+describe('같은 초 사건의 인과 순서', () => {
+  const base = {
+    room: { id: 'r1', title: '계약', created_at: '2026-08-01 09:00:00' },
+    participants: [],
+    terms: null,
+    history: [],
+    signatures: [],
+    signedContract: null,
+    finalOffer: null,
+    revocations: [],
+    changeRequests: [],
+    deliveries: [],
+    translations: [],
+    certificates: [],
+  }
+
+  it('수정 요청 수락이 그 결과보다 먼저 찍힌다', () => {
+    const at = '2026-08-05 10:00:00'
+    const events = buildAuditEvents({
+      ...base,
+      history: [{ created_at: at, changes: '[{"field":"wageBaseAmount"}]', display_name: '김담당' }],
+      revocations: [{ revoked_at: at, signer_role: 'company', reason: '수정 요청 수락' }],
+      changeRequests: [
+        { created_at: '2026-08-04 09:00:00', resolved_at: at, status: 'accepted', label: '기본급' },
+      ],
+    })
+    const order = events.map((e) => e.event)
+    expect(order.indexOf('수정 요청 수락')).toBeLessThan(order.indexOf('계약 조건 수정'))
+    expect(order.indexOf('계약 조건 수정')).toBeLessThan(order.indexOf('회사 서명 무효화'))
+  })
+
+  it('다른 초는 시각이 먼저다 — 인과 순서가 시각을 이기지 않는다', () => {
+    const events = buildAuditEvents({
+      ...base,
+      // 서명(늦은 순위)이 수정 요청(빠른 순위)보다 하루 먼저 일어났다.
+      signatures: [{ signed_at: '2026-08-01 10:00:00', signer_role: 'company', display_name: '김담당' }],
+      changeRequests: [{ created_at: '2026-08-02 10:00:00', status: 'pending', label: '기본급' }],
+    })
+    const order = events.map((e) => e.event)
+    expect(order.indexOf('회사 서명')).toBeLessThan(order.indexOf('계약 조건 수정 요청'))
+  })
+
+  it('재번역이 최초 번역과 따로 남는다', () => {
+    const events = buildAuditEvents({
+      ...base,
+      translations: [
+        { language: 'vi', created_at: '2026-08-02 10:00:00', updated_at: '2026-08-09 10:00:00', nativeLabel: 'Tiếng Việt' },
+      ],
+    })
+    const names = events.map((e) => e.event)
+    expect(names).toContain('외국어 계약서 생성')
+    expect(names).toContain('외국어 계약서 재작성')
+  })
+})
