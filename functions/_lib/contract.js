@@ -20,6 +20,41 @@ export const EDITABLE_FIELDS = {
   uniformSize: 'uniform_size',
 }
 
+// 아래 둘은 번역본에만 쓴다.
+//
+// buildArticlesFromTerms 의 출력은 정본 직렬화의 [본문] 구간에 그대로 들어가
+// 문서 지문이 된다. 거기에 조항을 더하면 이미 서명된 계약서의 지문이 소급해서
+// 바뀌어, 아무도 손대지 않은 계약이 "서명한 내용과 다름"으로 뒤집힌다.
+// 그래서 정본 본문은 건드리지 않고 번역용 조항만 따로 만든다. 내용이 빠지는
+// 것은 아니다 — 그 밖의 사항과 유니폼 사이즈는 정본의 [계약조건]·[그밖의사항]
+// 구간에 이미 들어가 있고, 계약서 인쇄 화면에도 표에 그대로 나온다.
+function wageDescription(terms) {
+  const items = Array.isArray(terms?.wageItems) ? terms.wageItems : []
+  if (items.length > 0) {
+    const parts = items
+      .filter((i) => Number(i?.amount) > 0)
+      .map((i) => `${i.name} ${Number(i.amount).toLocaleString('ko-KR')}원`)
+    if (parts.length > 0) return parts.join(' + ')
+  }
+  return terms?.wageBaseAmount
+    ? `기본급 ${Number(terms.wageBaseAmount).toLocaleString('ko-KR')}원`
+    : ''
+}
+
+function describeCustomTerms(customTerms) {
+  if (!Array.isArray(customTerms)) return ''
+  // 이 조항은 문서 지문에 그대로 들어간다. 입력 순서대로 이으면 같은 내용의
+  // 계약이 순서만 다르다는 이유로 다른 지문이 되고, 서명해 둔 계약서가
+  // "변조됨"으로 뒤집힌다. 정본 직렬화(contractDocument.js)와 같은 규칙으로
+  // 라벨 기준 정렬한다.
+  return [...customTerms]
+    .filter((c) => c && (c.label || c.value))
+    .map((c) => ({ label: String(c.label ?? '').trim(), value: String(c.value ?? '').trim() }))
+    .sort((a, b) => a.label.localeCompare(b.label) || a.value.localeCompare(b.value))
+    .map((c) => [c.label, c.value].filter(Boolean).join(': '))
+    .join(' / ')
+}
+
 // AI 초안이 아직 없는 계약서도 번역할 수 있도록, 입력된 조건을 조항 형태로 만든다.
 export function buildArticlesFromTerms(terms) {
   if (!terms) return []
@@ -113,4 +148,39 @@ export function rowToCamelTerms(row) {
     aiDocument: parseJsonColumn(row.ai_document_json, null),
     analysisWarnings: parseJsonColumn(row.analysis_warnings_json, []),
   }
+}
+
+// 번역할 조항.
+//
+// '그 밖의 사항'에는 수습기간처럼 법적으로 무거운 약정이 들어가고, 임금은
+// 기본급 하나가 아니라 구성항목으로 담긴다. 그런데 번역 원본은 정본 본문
+// 생성기를 그대로 쓰고 있어서 둘 다 빠져 있었다. 한국어 계약서에는 있고
+// 외국어 계약서에만 없는 조항이 생기는 셈이라, 정작 그 조항의 적용을 받는
+// 사람이 그것을 읽지 못한다.
+export function buildArticlesForTranslation(terms) {
+  const base = buildArticlesFromTerms(terms)
+  if (base.length === 0) return base
+
+  // 임금 조항은 구성항목이 있으면 항목별로 다시 쓴다.
+  const wage = wageDescription(terms)
+  const articles = base.map((a) =>
+    a.heading.includes('임금') && wage
+      ? {
+          ...a,
+          body: [wage, terms?.wagePayMethod, terms?.wagePayDate].filter(Boolean).join(' · '),
+        }
+      : a
+  )
+
+  const extra = [
+    ['유니폼 사이즈', terms?.uniformSize],
+    ['그 밖의 사항', describeCustomTerms(terms?.customTerms)],
+  ].filter(([, value]) => value && String(value).trim() !== '')
+
+  return articles.concat(
+    extra.map(([heading, body], i) => ({
+      heading: `제${articles.length + i + 1}조 (${heading})`,
+      body: String(body),
+    }))
+  )
 }

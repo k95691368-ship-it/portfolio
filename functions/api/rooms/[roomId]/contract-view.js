@@ -106,7 +106,7 @@ export async function onRequestGet({ env, data, params }) {
         .bind(roomId)
         .all(),
       env.DB.prepare(
-        'SELECT language, articles_json, created_at FROM contract_translations WHERE room_id = ?'
+        'SELECT language, articles_json, created_at, source_sha256 FROM contract_translations WHERE room_id = ?'
       )
         .bind(roomId)
         .all(),
@@ -273,6 +273,8 @@ export async function onRequestGet({ env, data, params }) {
   // 감사추적과 응답이 같은 목록을 쓰도록 먼저 만들어 둔다. 예전에는 응답을
   // 조립하는 자리에서만 변환해서, 이력에는 이 사건들이 들어가지 못했다.
   const mappedRequests = changeRequestRows.results.map(mapRequestRow)
+  // 지금 계약 내용의 지문. 번역본이 이것과 다른 내용을 옮긴 것인지 가린다.
+  const currentSha256 = terms ? await contractFingerprint(terms) : null
   const mappedTranslations = translationRows.results.map((t) => {
     const lang = findLanguage(t.language)
     let articles = []
@@ -281,12 +283,19 @@ export async function onRequestGet({ env, data, params }) {
     } catch {
       articles = []
     }
+    // 번역한 시점의 내용과 지금 내용이 다르면, 이 번역본은 지금 계약서의
+    // 번역이 아니다. 한국어를 읽지 못하는 사람에게는 그 사실을 말해 주지
+    // 않으면 확인할 방법이 없다.
+    const stale = t.source_sha256 ? t.source_sha256 !== currentSha256 : null
     return {
       language: t.language,
       label: lang?.label ?? t.language,
       nativeLabel: lang?.nativeLabel ?? t.language,
       articles,
       createdAt: t.created_at,
+      sourceSha256: t.source_sha256 ?? null,
+      // true = 옛 내용의 번역, false = 지금 내용의 번역, null = 확인할 수 없음
+      stale,
     }
   })
   const revokedSignatures = revocationRows.results.map((r) => ({
@@ -367,7 +376,7 @@ export async function onRequestGet({ env, data, params }) {
     })),
     // 지금 화면에 보이는 내용의 지문. 서명할 때 함께 보내, 화면과 저장된 내용이
     // 어긋난 상태로 서명되는 것을 막는다.
-    documentSha256: terms ? await contractFingerprint(terms) : null,
+    documentSha256: currentSha256,
     historyTotal: history.length,
     history: historyForDisplay
       .slice()

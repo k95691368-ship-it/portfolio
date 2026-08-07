@@ -28,10 +28,23 @@ const SignaturePad = forwardRef(function SignaturePad(_props, ref) {
     const h = canvas.offsetHeight
     ctx.save()
     ctx.fillStyle = '#14263f'
-    ctx.font = `italic ${Math.min(h * 0.42, 44)}px 'Gungsuh', 'Batang', serif`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(name, w / 2, h / 2)
+
+    // 칸을 넘으면 잘린 채로 저장된다. 이름이 긴 사람 — 대개 한국 이름이 아닌
+    // 사람 — 만 자기 서명이 잘려 나가는 것을 보게 된다. 들어갈 때까지 줄인다.
+    const maxWidth = w * 0.9
+    let size = Math.min(h * 0.42, 44)
+    const setFont = () => {
+      ctx.font = `italic ${size}px 'Gungsuh', 'Batang', serif`
+    }
+    setFont()
+    while (size > 10 && ctx.measureText(name).width > maxWidth) {
+      size -= 1
+      setFont()
+    }
+
+    ctx.fillText(name, w / 2, h / 2, maxWidth)
     ctx.restore()
   }, [])
 

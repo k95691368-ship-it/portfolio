@@ -1,10 +1,11 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
-import { rowToCamelTerms, buildArticlesFromTerms } from '../../../_lib/contract.js'
+import { rowToCamelTerms, buildArticlesForTranslation } from '../../../_lib/contract.js'
 import { findLanguage } from '../../../_lib/languages.js'
 import { translateContract } from '../../../_lib/claude.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
 import { notifyUser } from '../../../_lib/notify.js'
+import { contractFingerprint } from '../../../_lib/contractDocument.js'
 
 // 계약서를 근로자의 언어로 번역한다.
 //
@@ -36,7 +37,7 @@ export async function onRequestPost({ request, env, data, params }) {
   const articles =
     terms?.aiDocument && terms.aiDocument.length > 0
       ? terms.aiDocument
-      : buildArticlesFromTerms(terms)
+      : buildArticlesForTranslation(terms)
 
   if (articles.length === 0) {
     await releaseRateLimit(env, bucket, ticket)
@@ -66,15 +67,20 @@ export async function onRequestPost({ request, env, data, params }) {
     body: String(a.body || '').slice(0, 4000),
   }))
 
+  // 무엇을 옮긴 번역인지 함께 남긴다. 이 값이 있어야 나중에 조건이 바뀌었을 때
+  // "이 번역본은 지금 계약서의 번역이 아니다"라고 말할 수 있다.
+  const sourceSha256 = await contractFingerprint(terms)
+
   await env.DB.prepare(
-    `INSERT INTO contract_translations (room_id, language, articles_json, translated_by_user_id)
-     VALUES (?, ?, ?, ?)
+    `INSERT INTO contract_translations (room_id, language, articles_json, translated_by_user_id, source_sha256)
+     VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(room_id, language) DO UPDATE SET
        articles_json = excluded.articles_json,
        translated_by_user_id = excluded.translated_by_user_id,
+       source_sha256 = excluded.source_sha256,
        created_at = datetime('now')`
   )
-    .bind(params.roomId, language.code, JSON.stringify(clean), data.user.id)
+    .bind(params.roomId, language.code, JSON.stringify(clean), data.user.id, sourceSha256)
     .run()
 
   const candidate = await env.DB.prepare(

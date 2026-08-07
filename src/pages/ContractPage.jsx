@@ -132,9 +132,20 @@ function ContractTranslations({ translations, sourceArticles, canTranslate, onTr
               onClick={() => setShown(effectiveShown === t.language ? null : t.language)}
             >
               {t.nativeLabel}
+              {t.stale !== false && <span className="translation-stale-mark"> ⚠</span>}
             </button>
           ))}
         </div>
+      )}
+
+      {/* 번역한 뒤에 조건이 바뀌었으면, 지금 보이는 번역본은 지금 계약서의
+          번역이 아니다. 한국어를 읽지 못하는 사람은 스스로 확인할 방법이 없다. */}
+      {current && current.stale !== false && (
+        <p className="translation-alert" role="alert">
+          {current.stale
+            ? '이 번역본을 만든 뒤 계약 조건이 바뀌었습니다. 지금 계약서와 다른 내용이므로, 다시 번역한 뒤 확인해주세요.'
+            : '이 번역본이 어느 시점의 내용을 옮긴 것인지 확인할 수 없습니다. 정확한 대조가 필요하면 다시 번역해주세요.'}
+        </p>
       )}
 
       {current && (

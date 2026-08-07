@@ -506,6 +506,11 @@
   color: #000;
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  /* 전역 자간(0.18px)이 걸려 있으면 html2canvas 는 글자를 하나씩 따로 그린다.
+     한글·라틴은 조금 어긋나는 정도지만, 태국어·크메르어·미얀마어처럼 글자가
+     서로 붙어 모양이 결정되는 문자는 낱자로 흩어져 읽을 수 없게 된다.
+     외국어 계약서를 PDF 로 내보내는 사람에게는 문서가 없는 것과 같다. */
+  letter-spacing: normal;
 }
 
 .contract-print h1,
@@ -2873,4 +2878,19 @@
 }
 .signature-typed input {
   font-weight: 400;
+}
+
+/* 번역본이 지금 계약서의 번역이 아닐 때. 한국어를 읽지 못하는 사람에게는
+   이 표시가 유일한 단서다. */
+.translation-stale-mark {
+  color: var(--warning-text);
+}
+.translation-alert {
+  margin: 8px 0 0;
+  padding: 12px 16px;
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 14px;
 }
