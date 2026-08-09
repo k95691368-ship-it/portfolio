@@ -17,7 +17,6 @@ export const EDITABLE_FIELDS = {
   wagePayMethod: 'wage_pay_method',
   wagePayDate: 'wage_pay_date',
   annualLeave: 'annual_leave',
-  uniformSize: 'uniform_size',
   // 상시 근로자 수. 어느 조항이 적용되는지가 이 값에서 갈린다(제11조).
   //
   // 정본 직렬화의 TERM_ORDER 에는 넣지 않는다. 표준근로계약서가 명시를 요구하는
@@ -180,7 +179,6 @@ export function buildArticlesForTranslation(terms) {
   )
 
   const extra = [
-    ['유니폼 사이즈', terms?.uniformSize],
     ['그 밖의 사항', describeCustomTerms(terms?.customTerms)],
   ].filter(([, value]) => value && String(value).trim() !== '')
 

@@ -60,14 +60,12 @@ describe('buildArticlesForTranslation — 빠짐없이 옮기는가', () => {
     wagePayMethod: '계좌이체',
     wagePayDate: '매월 25일',
     annualLeave: '근로기준법에 따름',
-    uniformSize: 'L',
     customTerms: [{ label: '수습기간', value: '3개월 (임금의 95% 지급)' }],
   }
 
-  it('그 밖의 사항과 유니폼 사이즈가 조항에 들어간다', () => {
+  it('그 밖의 사항이 조항에 들어간다', () => {
     const bodies = buildArticlesForTranslation(TERMS).map((a) => a.body).join(' | ')
     expect(bodies).toContain('수습기간: 3개월')
-    expect(bodies).toContain('L')
   })
 
   it('임금은 구성항목이 있으면 항목별로 적는다', () => {
@@ -107,12 +105,11 @@ describe('buildArticlesFromTerms — 지문이 흔들리지 않는가', () => {
     annualLeave: '근로기준법에 따름',
   }
 
-  it('그 밖의 사항과 유니폼 사이즈는 정본 본문을 바꾸지 않는다', () => {
+  it('그 밖의 사항은 정본 본문을 바꾸지 않는다', () => {
     const before = JSON.stringify(buildArticlesFromTerms(T))
     const after = JSON.stringify(
       buildArticlesFromTerms({
         ...T,
-        uniformSize: 'L',
         customTerms: [{ label: '수습기간', value: '3개월' }],
       })
     )

@@ -32,7 +32,6 @@ const ANALYSIS_TOOL = {
               industrial_accident_insurance: { type: ['boolean', 'null'] },
             },
           },
-          uniform_size: { type: ['string', 'null'], description: '유니폼 사이즈 등 언급된 값' },
           custom_terms: {
             type: 'array',
             description: '위 항목에 해당하지 않지만 대화에서 언급된 기타 조건',

@@ -31,6 +31,9 @@ const TERM_ORDER = [
   'wagePayMethod',
   'wagePayDate',
   'annualLeave',
+  // 계약서 입력에서는 내렸지만 정본 목록에서는 빼지 않는다. 빼면 줄이 하나
+  // 사라져 이미 서명된 계약서의 지문이 소급해서 바뀐다. 값이 없는 계약에서는
+  // 어차피 빈 문자열이라 출력이 달라지지 않는다.
   'uniformSize',
 ]
 

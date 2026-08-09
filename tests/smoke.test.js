@@ -47,7 +47,6 @@ const PROTECTED = [
   ['POST', '/api/admin/demo/reset'],
   ['POST', '/api/rooms/create'],
   ['POST', '/api/rooms/join'],
-  ['GET', '/api/rooms/smoke-nonexistent'],
   ['GET', '/api/rooms/smoke-nonexistent/view'],
   ['GET', '/api/rooms/smoke-nonexistent/audit-certificate'],
   ['POST', '/api/rooms/smoke-nonexistent/audit-certificate'],

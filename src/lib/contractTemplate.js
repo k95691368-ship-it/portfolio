@@ -18,7 +18,6 @@ export const TERM_FIELDS = [
   { key: 'wagePayMethod', label: '임금 지급 방법', placeholder: '예: 계좌이체' },
   { key: 'wagePayDate', label: '임금 지급일', placeholder: '예: 매월 25일' },
   { key: 'annualLeave', label: '연차유급휴가' },
-  { key: 'uniformSize', label: '유니폼 사이즈' },
   // 상시 근로자 수. 근로기준법 제11조에 따라 어느 조항이 적용되는지가 여기서
   // 갈린다 — 4명 이하 사업장에는 주 52시간 상한(제53조)·가산수당(제56조)·
   // 연차(제60조)가 적용되지 않는다. 비워 두면 5명 이상으로 보고 판정한다.
