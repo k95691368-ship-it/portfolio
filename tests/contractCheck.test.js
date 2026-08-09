@@ -157,10 +157,25 @@ describe('findMissingFields', () => {
     const complete = {
       employerName: 'A', employeeName: 'B', contractStartDate: '2026-09-01',
       workLocation: '서울', jobDescription: '운영', workHoursStart: '09:00',
-      workHoursEnd: '18:00', restDays: '토, 일', wageBaseAmount: 2800000,
+      workHoursEnd: '18:00', workDays: '주 5일 (월~금)', restDays: '토, 일',
+      wageBaseAmount: 2800000,
       wagePayMethod: '계좌이체', wagePayDate: '매월 10일', annualLeave: '근로기준법에 따름',
     }
     expect(findMissingFields(complete)).toEqual([])
+  })
+
+  // 근무일이 비면 주 소정근로시간이 정해지지 않는다. 제17조 제1항 제2호가
+  // 명시하라는 것은 시각이 아니라 '소정근로시간'이다. 게다가 이 값이 없으면
+  // 최저임금·주52시간·연차·퇴직금 판정이 전부 조용히 생략되어, 경고 0건으로
+  // 최저임금 미달 계약이 서명될 수 있었다.
+  it('근무일이 비면 누락으로 잡는다', () => {
+    const withoutDays = {
+      employerName: 'A', employeeName: 'B', contractStartDate: '2026-09-01',
+      workLocation: '서울', jobDescription: '운영', workHoursStart: '09:00',
+      workHoursEnd: '18:00', restDays: '토, 일', wageBaseAmount: 1000000,
+      wagePayMethod: '계좌이체', wagePayDate: '매월 10일', annualLeave: '근로기준법에 따름',
+    }
+    expect(findMissingFields(withoutDays).map((m) => m.field)).toContain('workDays')
   })
 
   // 근로기준법 제17조 제1항이 직접 열거하는 항목인데 목록에서 빠져 있었다.

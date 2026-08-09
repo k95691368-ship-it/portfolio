@@ -8,6 +8,7 @@
 // 결과가 나와야 하고, 지원자에게 보여주는 경고는 재현 가능해야 하기 때문.
 
 import { effectiveWageItems, minimumWageBase, totalWage } from './wageItems.js'
+import { workplaceScope, UNKNOWN_SIZE_CAVEAT } from './workplaceScope.js'
 
 export const MINIMUM_HOURLY_WAGE_2026 = 10320 // 2026년 최저시급
 const WEEKS_PER_MONTH = 365 / 7 / 12 // ≈ 4.345
@@ -32,6 +33,7 @@ export const FIELD_LABELS = {
   wagePayDate: '임금 지급일',
   annualLeave: '연차유급휴가',
   uniformSize: '유니폼 사이즈',
+  employeeCount: '상시 근로자 수',
   socialInsurance: '사회보험',
   customTerms: '그 밖의 사항',
 }
@@ -50,6 +52,12 @@ const REQUIRED_FIELDS = [
   'jobDescription',
   'workHoursStart',
   'workHoursEnd',
+  // 근무일이 빠져 있었다. 제17조 제1항 제2호가 명시하라는 것은 '소정근로시간'
+  // 인데, 시작·종료 시각만으로는 주 몇 시간인지 정해지지 않는다. 게다가 근무일이
+  // 비면 computeWeeklyHours 가 null 이 되어 최저임금·주52시간·연차·퇴직금·수습
+  // 판정이 전부 조용히 생략된다. 필수 항목 검사가 통과시키므로 서명도 열린다 —
+  // 경고 0건으로 최저임금 미달 계약이 체결될 수 있었다.
+  'workDays',
   'restDays',
   'wageBaseAmount',
   'wagePayMethod',
@@ -170,17 +178,31 @@ export function checkLegalCompliance(terms) {
   const issues = []
   const weeklyHours = computeWeeklyHours(terms)
 
-  if (weeklyHours !== null && weeklyHours > MAX_WEEKLY_HOURS) {
+  // 제53조(연장근로 제한)와 제56조(가산수당)는 상시 5명 이상 사업장에만
+  // 적용된다(제11조·시행령 제7조 별표1). 4명 이하인데도 '주 52시간 초과'를
+  // high 로 띄우면, 위반이 아닌 계약의 서명을 서버가 거부한다.
+  const scope = workplaceScope(terms)
+  const sizeNote = scope.known ? '' : ` ${UNKNOWN_SIZE_CAVEAT}`
+
+  if (!scope.small && weeklyHours !== null && weeklyHours > MAX_WEEKLY_HOURS) {
     issues.push({
       severity: 'high',
       title: '주 52시간 초과',
-      detail: `계약서상 주 근로시간이 약 ${weeklyHours}시간으로, 연장근로를 포함한 법정 상한(주 52시간)을 초과합니다.`,
+      detail: `계약서상 주 근로시간이 약 ${weeklyHours}시간으로, 연장근로를 포함한 법정 상한(주 52시간)을 초과합니다.${sizeNote}`,
     })
-  } else if (weeklyHours !== null && weeklyHours > STANDARD_WEEKLY_HOURS) {
+  } else if (!scope.small && weeklyHours !== null && weeklyHours > STANDARD_WEEKLY_HOURS) {
     issues.push({
       severity: 'info',
       title: '연장근로 포함',
-      detail: `주 근로시간이 약 ${weeklyHours}시간으로 법정 소정근로(주 40시간)를 초과합니다. 초과분에는 가산수당(1.5배)이 지급되어야 합니다.`,
+      detail: `주 근로시간이 약 ${weeklyHours}시간으로 법정 소정근로(주 40시간)를 초과합니다. 초과분에는 가산수당(1.5배)이 지급되어야 합니다.${sizeNote}`,
+    })
+  } else if (scope.small && weeklyHours !== null && weeklyHours > STANDARD_WEEKLY_HOURS) {
+    // 적용되지 않는다는 사실 자체는 알려야 한다. 조용히 넘어가면 근로자는
+    // 가산수당을 받을 수 있다고 오해한 채 서명한다.
+    issues.push({
+      severity: 'info',
+      title: '연장근로 제한·가산수당 미적용 사업장',
+      detail: `주 근로시간이 약 ${weeklyHours}시간이지만, 상시 근로자 ${scope.count}명(4명 이하) 사업장이라 주 52시간 상한(제53조)과 연장·야간·휴일 가산수당(제56조)이 적용되지 않습니다(제11조 제1항·시행령 제7조 별표1). 최저임금·휴게·주휴일·퇴직급여는 그대로 적용됩니다.`,
     })
   }
 

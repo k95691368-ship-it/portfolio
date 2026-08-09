@@ -58,6 +58,7 @@ const EMPTY_FORM = {
   wagePayDate: '',
   annualLeave: '',
   uniformSize: '',
+  employeeCount: '',
   socialInsurance: {},
   customTerms: [],
   wageItems: [],

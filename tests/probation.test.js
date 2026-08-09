@@ -68,8 +68,10 @@ describe('checkProbationCompliance', () => {
     expect(checkProbationCompliance(withProbation('6개월 (임금 감액 없음)'))).toHaveLength(0)
   })
 
-  it('3개월 이내 10% 이내 감액은 적법하다', () => {
-    expect(checkProbationCompliance(withProbation('3개월 (임금의 90% 지급)'))).toHaveLength(0)
+  it('3개월 이내 10% 이내 감액은 위반으로 잡지 않는다', () => {
+    // 단순노무업무 단서 안내(info)는 별개다 — 위반 판정은 없어야 한다.
+    const issues = checkProbationCompliance(withProbation('3개월 (임금의 90% 지급)'))
+    expect(issues.filter((i) => i.severity !== 'info')).toHaveLength(0)
   })
 
   it('3개월을 넘겨 감액하면 잡는다', () => {
@@ -146,5 +148,26 @@ describe('checkProbationCompliance', () => {
     ).map((i) => i.title)
     expect(titles).toContain('수습 감액 기간 초과')
     expect(titles).toContain('수습 감액 한도 초과')
+  })
+})
+
+// 최저임금법 제5조 제2항 단서 (2018.3.20 신설)
+// "다만, 단순노무업무로 고용노동부장관이 정하여 고시한 직종에 종사하는
+//  근로자는 제외한다."
+//
+// 업무의 내용은 자유 입력이라 코드가 직종을 분류할 수 없다. 분류할 수 없는
+// 것을 분류한 척하지 않되, 그런 단서가 있다는 사실은 반드시 알려야 한다.
+describe('단순노무업무 단서', () => {
+  it('감액이 있으면 단서를 함께 알린다', () => {
+    const issues = checkProbationCompliance(withProbation('3개월 (임금의 95% 지급)'))
+    const note = issues.find((i) => i.title.includes('단순노무'))
+    expect(note).toBeTruthy()
+    expect(note.severity).toBe('info')
+    expect(note.detail).toContain('제5조 제2항')
+  })
+
+  it('감액이 없으면 알리지 않는다 — 상관없는 경고를 늘리지 않는다', () => {
+    const issues = checkProbationCompliance(withProbation('3개월 (임금 감액 없음)'))
+    expect(issues.some((i) => i.title.includes('단순노무'))).toBe(false)
   })
 })

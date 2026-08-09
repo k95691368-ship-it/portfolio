@@ -186,3 +186,49 @@ describe('describeWorkerRights', () => {
     expect(describeWorkerRights(null, NOW)).toBeNull()
   })
 })
+
+// 대법원 2021. 10. 14. 선고 2021다227100
+//
+// 제60조 제1항의 15일은 "최초 1년간 80% 이상 출근한 근로자가 그 다음 해에도
+// 근로관계를 유지하는 것"을 전제로 한다. 1년 기간제 계약이 만료와 동시에
+// 끝나면 그 전제가 없으므로 제60조 제2항의 최대 11일만 남는다.
+describe('1년으로 끝나는 계약의 연차', () => {
+  const ONE_YEAR = {
+    ...FULL_TIME,
+    contractStartDate: '2026-09-01',
+    contractEndDate: '2027-08-31',
+  }
+
+  it('1주년의 15일을 약속하지 않는다', () => {
+    const a = describeAnnualLeave(ONE_YEAR, NOW)
+    expect(a.applies).toBe(true)
+    expect(a.endsBeforeFirstAnniversary).toBe(true)
+    expect(a.byYear).toEqual([])
+    expect(a.summary).toContain('최대 11일')
+    expect(a.summary).toContain('2021다227100')
+  })
+
+  it('1개월 개근마다 1일씩 최대 11일은 그대로 알려준다', () => {
+    const a = describeAnnualLeave(ONE_YEAR, NOW)
+    expect(a.firstYear).toHaveLength(11)
+    expect(a.upcoming).not.toBeNull()
+  })
+
+  it('무기계약은 예전대로 15일이 생긴다', () => {
+    const a = describeAnnualLeave(FULL_TIME, NOW)
+    expect(a.endsBeforeFirstAnniversary).toBe(false)
+    expect(a.byYear[0]).toMatchObject({ serviceYears: 1, days: 15 })
+  })
+
+  it('계약이 끝난 뒤의 연차까지 미리 약속하지 않는다', () => {
+    // 2026-09-01 ~ 2028-08-31. 1주년(2027-09-01)에는 15일이 생기지만
+    // 2주년(2028-09-01)은 계약이 끝난 다음 날이라 생기지 않는다.
+    const a = describeAnnualLeave({ ...FULL_TIME, contractEndDate: '2028-08-31' }, NOW)
+    expect(a.byYear.map((b) => b.serviceYears)).toEqual([1])
+  })
+
+  it('2주년까지 이어지는 계약은 두 번 다 알려준다', () => {
+    const a = describeAnnualLeave({ ...FULL_TIME, contractEndDate: '2028-12-31' }, NOW)
+    expect(a.byYear.map((b) => b.serviceYears)).toEqual([1, 2])
+  })
+})

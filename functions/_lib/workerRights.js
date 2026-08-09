@@ -13,6 +13,7 @@ import { computeWeeklyHours, monthlyPaidHours } from './contractCheck.js'
 import { parseContractDate } from './contractPeriod.js'
 import { koreanToday } from './koreanTime.js'
 import { effectiveWageItems } from './wageItems.js'
+import { workplaceScope, notApplicableReason } from './workplaceScope.js'
 
 // 근로기준법 제18조 제3항: 4주 평균 1주 소정근로시간이 15시간 미만인 근로자에게는
 // 제55조(주휴)와 제60조(연차)를 적용하지 않는다.
@@ -39,6 +40,7 @@ export function annualLeaveDaysForYear(serviceYears) {
 // 연차가 언제 몇 개 생기는지.
 export function describeAnnualLeave(terms, now = new Date()) {
   const start = parseContractDate(terms?.contractStartDate)
+  const end = parseContractDate(terms?.contractEndDate)
   const weekly = computeWeeklyHours(terms)
 
   if (weekly !== null && weekly < SHORT_TIME_WEEKLY_HOURS) {
@@ -46,6 +48,17 @@ export function describeAnnualLeave(terms, now = new Date()) {
       known: true,
       applies: false,
       reason: `1주 소정근로시간이 ${weekly}시간으로 15시간 미만입니다. 근로기준법 제18조 제3항에 따라 연차 유급휴가와 주휴일이 적용되지 않습니다.`,
+    }
+  }
+  // 제60조는 상시 5명 이상 사업장에만 적용된다(제11조·시행령 제7조 별표1).
+  // 생기지 않는 연차를 날짜와 일수까지 적어 주면, 근로자는 없는 권리를 근거로
+  // 미사용수당을 청구하게 된다.
+  const scope = workplaceScope(terms)
+  if (scope.small) {
+    return {
+      known: true,
+      applies: false,
+      reason: notApplicableReason('연차 유급휴가(제60조)', scope.count),
     }
   }
   if (!start) return { known: false }
@@ -66,14 +79,31 @@ export function describeAnnualLeave(terms, now = new Date()) {
     })
   }
 
-  // 만 1년부터는 근속 연수에 따라 한 번에 발생한다.
+  // 1년으로 끝나는 계약에는 15일이 발생하지 않는다.
+  //
+  // 제60조 제1항의 15일은 "최초 1년간 80% 이상 출근한 근로자가 그 다음 해에도
+  // 근로관계를 유지하는 것"을 전제로 한 것이다. 1년 기간제 계약이 만료와 동시에
+  // 끝나면 그 전제가 없으므로 제60조 제2항의 최대 11일만 남는다
+  // (대법원 2021. 10. 14. 선고 2021다227100).
+  //
+  // 이 앱에서 가장 흔한 계약 형태가 정확히 그것이다. 15일이 생긴다고 적으면
+  // 근로자는 없는 청구권을 근거로 미사용수당을 요구하게 되고, 이 앱은 그
+  // 숫자를 '법정 계산'이라며 내놓은 셈이 된다.
+  const firstAnniversary = anniversary(1)
+  const endsBeforeFirstAnniversary = !!end && end.getTime() < firstAnniversary.getTime()
+
   const byYear = []
-  for (let y = 1; y <= 5; y += 1) {
-    byYear.push({
-      at: anniversary(y).toISOString().slice(0, 10),
-      serviceYears: y,
-      days: annualLeaveDaysForYear(y),
-    })
+  if (!endsBeforeFirstAnniversary) {
+    for (let y = 1; y <= 5; y += 1) {
+      const at = anniversary(y)
+      // 계약이 끝난 뒤의 연차까지 미리 약속하지 않는다.
+      if (end && at.getTime() > end.getTime()) break
+      byYear.push({
+        at: at.toISOString().slice(0, 10),
+        serviceYears: y,
+        days: annualLeaveDaysForYear(y),
+      })
+    }
   }
 
   // 오늘 기준으로 다음에 생길 연차.
@@ -87,9 +117,12 @@ export function describeAnnualLeave(terms, now = new Date()) {
     firstYear,
     byYear,
     upcoming,
-    summary:
-      '입사 후 1년이 되기 전에는 1개월을 개근할 때마다 1일씩(최대 11일), 1년이 되는 날부터는 15일이 한 번에 생깁니다. 3년째부터 2년마다 1일씩 늘어 최대 25일까지입니다.',
-    law: '근로기준법 제60조',
+    // 계약이 1년으로 끝나는지에 따라 사실이 달라진다.
+    endsBeforeFirstAnniversary,
+    summary: endsBeforeFirstAnniversary
+      ? '1개월을 개근할 때마다 1일씩 생겨 최대 11일입니다. 계약이 1년이 되기 전에 끝나 그 다음 해로 이어지지 않으므로, 1년이 되는 날의 15일은 발생하지 않습니다(대법원 2021다227100). 계약이 갱신되어 근로가 이어지면 그때부터 15일이 생깁니다.'
+      : '입사 후 1년이 되기 전에는 1개월을 개근할 때마다 1일씩(최대 11일), 1년이 되는 날부터는 15일이 한 번에 생깁니다. 3년째부터 2년마다 1일씩 늘어 최대 25일까지입니다.',
+    law: endsBeforeFirstAnniversary ? '근로기준법 제60조 · 대법원 2021다227100' : '근로기준법 제60조',
   }
 }
 
@@ -151,6 +184,13 @@ export function ordinaryWageBase(terms) {
 
 // 연장·야간·휴일근로 가산 (근로기준법 제56조).
 export function describeOvertimeRates(terms) {
+  // 제56조도 상시 5명 이상 사업장에만 적용된다. 받을 수 없는 가산수당 단가를
+  // 확정 금액으로 제시하면, 근로자는 그것을 근거로 사업주에게 요구하게 된다.
+  const scope = workplaceScope(terms)
+  if (scope.small) {
+    return { known: false, notApplicable: true, reason: notApplicableReason('가산수당(제56조)', scope.count) }
+  }
+
   const weekly = computeWeeklyHours(terms)
   const ordinary = ordinaryWageBase(terms)
   if (weekly === null || !(ordinary > 0)) return { known: false }

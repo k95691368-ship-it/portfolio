@@ -18,6 +18,12 @@ export const EDITABLE_FIELDS = {
   wagePayDate: 'wage_pay_date',
   annualLeave: 'annual_leave',
   uniformSize: 'uniform_size',
+  // 상시 근로자 수. 어느 조항이 적용되는지가 이 값에서 갈린다(제11조).
+  //
+  // 정본 직렬화의 TERM_ORDER 에는 넣지 않는다. 표준근로계약서가 명시를 요구하는
+  // 항목이 아니고, 넣으면 이미 서명된 계약서의 지문이 소급해서 바뀌어 손대지
+  // 않은 계약이 '변조됨'으로 뒤집힌다.
+  employeeCount: 'employee_count',
 }
 
 // 아래 둘은 번역본에만 쓴다.
@@ -142,6 +148,7 @@ export function rowToCamelTerms(row) {
     employmentEndReason: row.employment_end_reason ?? null,
     socialInsurance: parseJsonColumn(row.social_insurance_json, null),
     uniformSize: row.uniform_size ?? null,
+    employeeCount: row.employee_count ?? null,
     customTerms: parseJsonColumn(row.custom_terms_json, []),
     // 임금 구성항목 (근로기준법 제17조: 임금의 구성항목·계산방법·지급방법)
     wageItems: parseJsonColumn(row.wage_items_json, []),

@@ -110,6 +110,18 @@ export async function onRequestPatch({ env, data, params, request }) {
     if (bad) return jsonError(bad, 400)
   }
 
+  // 상시 근로자 수는 어느 조항이 적용되는지를 가르는 값이라, 아무 숫자나
+  // 받으면 판정이 통째로 흔들린다. 비워 두는 것은 '모름'으로 허용한다.
+  if (Object.prototype.hasOwnProperty.call(body, 'employeeCount')) {
+    const raw = body.employeeCount
+    if (raw !== '' && raw !== null && raw !== undefined) {
+      const n = Number(raw)
+      if (!Number.isInteger(n) || n < 1 || n > 100000) {
+        return jsonError('상시 근로자 수는 1명 이상의 정수여야 합니다.', 400)
+      }
+    }
+  }
+
   const columns = []
   const values = []
   const changes = []
