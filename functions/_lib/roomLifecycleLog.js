@@ -5,6 +5,8 @@
 
 export const LIFECYCLE_ACTIONS = {
   closed: '전형 종료',
+  // 채용이 확정된 뒤의 종료는 전형 종료가 아니라 해고다. 이력에도 그렇게 남는다.
+  offer_withdrawn: '채용내정 취소 (해고에 해당)',
   reopened: '전형 종료 취소',
   employment_end_recorded: '근로관계 종료일 기록',
   employment_end_cleared: '근로관계 종료 기록 취소',

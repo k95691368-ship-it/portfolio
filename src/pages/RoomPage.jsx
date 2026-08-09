@@ -37,6 +37,7 @@ export default function RoomPage() {
   const [closing, setClosing] = useState(false)
   const [closeReason, setCloseReason] = useState('other_candidate')
   const [closeNote, setCloseNote] = useState('')
+  const [dismissalAcknowledged, setDismissalAcknowledged] = useState(false)
 
   // 이 화면에 필요한 모든 정보를 한 번의 요청으로 받는다.
   const loadView = useCallback(async () => {
@@ -45,13 +46,25 @@ export default function RoomPage() {
     return data
   }, [roomId])
 
+  // 채용이 확정된 뒤의 종료는 전형 종료가 아니라 해고다. 서버가 확인 없이는
+  // 받지 않으므로, 확인 표시를 함께 보낸다. 확인란은 경고를 읽어야 나타난다.
   const handleClose = async () => {
-    if (!window.confirm('이 전형을 종료하시겠습니까? 지원자에게 종료 사실과 사유가 안내됩니다.')) return
+    const established = view?.offer?.established
+    const question = established
+      ? '채용이 확정된 전형입니다. 지금 끝내면 해고로 다뤄질 수 있습니다. 그래도 진행하시겠습니까?'
+      : '이 전형을 종료하시겠습니까? 지원자에게 종료 사실과 사유가 안내됩니다.'
+    if (!window.confirm(question)) return
     setClosing(true)
     try {
-      await api.post(`/rooms/${roomId}/close`, { reason: closeReason, note: closeNote })
+      await api.post(`/rooms/${roomId}/close`, {
+        reason: closeReason,
+        note: closeNote,
+        acknowledgedDismissal: established ? dismissalAcknowledged : undefined,
+      })
       await loadView()
-      toast.success('전형을 종료했습니다. 지원자에게 안내되었습니다.')
+      toast.success(
+        established ? '채용내정 취소로 기록했습니다.' : '전형을 종료했습니다. 지원자에게 안내되었습니다.'
+      )
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -98,6 +111,7 @@ export default function RoomPage() {
   if (!view) return <p>불러오는 중...</p>
 
   const room = view.room
+  const offer = view.offer
   const contract = view.contract
   const candidate = room.participants.find((participant) => participant.role === 'candidate')
   const company = room.participants.find((participant) => participant.role === 'company')
@@ -136,8 +150,47 @@ export default function RoomPage() {
       {/* 종료 기능은 서버에만 있고 화면에는 없었다. 부를 수 없는 기능은
           없는 기능이다. */}
       {room.myRole === 'company' && CLOSABLE_STATUSES.includes(room.status) && (
-        <section className="room-close">
-          <h2>전형 종료</h2>
+        <section className={`room-close${offer?.established ? ' room-close-dismissal' : ''}`}>
+          <h2>{offer?.established ? '채용내정 취소' : '전형 종료'}</h2>
+
+          {/* 이 서비스가 존재하는 이유가 이 경고다. 담당자는 자기가 이미 선을
+              넘었다는 것을 모른 채 누른다. 누르고 나서 알려 주면 늦는다. */}
+          {offer?.established && (
+            <div className="dismissal-warning" role="alert">
+              <p className="dismissal-headline">{offer.risk.headline}</p>
+              <p className="period-detail">{offer.risk.reason}</p>
+              {offer.excerpt && (
+                <blockquote className="dismissal-excerpt">
+                  <span className="dismissal-excerpt-label">확정으로 본 근거</span>
+                  {offer.excerpt}
+                </blockquote>
+              )}
+              <p className="period-detail">
+                지원자가 취할 수 있는 조치: {offer.risk.remedies.join(' · ')}
+              </p>
+              {offer.risk.scopeNote && <p className="period-detail">{offer.risk.scopeNote}</p>}
+              <details className="dismissal-grounds">
+                <summary>취소가 인정될 수 있는 사유</summary>
+                <ul>
+                  {offer.risk.lawfulGrounds.map((g) => (
+                    <li key={g}>{g}</li>
+                  ))}
+                </ul>
+                <p className="period-detail">
+                  여기에 해당하지 않는다면 다른 정당한 이유를 갖춰야 합니다({offer.risk.law}).
+                </p>
+              </details>
+            </div>
+          )}
+
+          {/* 아직 성립하지 않았어도 가까워졌으면 미리 말한다. 넘고 나서 아는
+              것보다 넘기 전에 아는 편이 낫다. */}
+          {!offer?.established && offer?.note && (
+            <p className="period-alert" role="status">
+              {offer.note}
+            </p>
+          )}
+
           <p className="period-detail">
             다른 사람을 채용했거나 채용 자체가 취소되었다면 여기서 전형을 끝냅니다. 끝내지 않으면
             지원자의 대시보드에는 계속 진행중으로 남아, 지원자는 기다립니다. 채용절차법 제10조는
@@ -168,8 +221,27 @@ export default function RoomPage() {
             지금까지의 대화와 계약 조건은 종료 뒤에도 그대로 볼 수 있습니다. 잘못 눌렀다면 다시
             진행할 수 있습니다.
           </p>
-          <button type="button" className="btn-sm" onClick={handleClose} disabled={closing}>
-            {closing ? '종료하는 중...' : '전형 종료하기'}
+          {offer?.established && (
+            <label className="checkbox-label dismissal-ack">
+              <input
+                type="checkbox"
+                checked={dismissalAcknowledged}
+                onChange={(e) => setDismissalAcknowledged(e.target.checked)}
+              />
+              위 내용을 확인했으며, 이것이 해고로 다뤄질 수 있음을 알고 진행합니다.
+            </label>
+          )}
+          <button
+            type="button"
+            className={offer?.established ? 'btn-danger btn-sm' : 'btn-sm'}
+            onClick={handleClose}
+            disabled={closing || (offer?.established && !dismissalAcknowledged)}
+          >
+            {closing
+              ? '처리하는 중...'
+              : offer?.established
+                ? '해고로 기록하고 전형 종료'
+                : '전형 종료하기'}
           </button>
         </section>
       )}

@@ -2913,3 +2913,59 @@
 .form-conflict p {
   margin: 0;
 }
+
+/* 채용내정이 성립한 뒤의 종료는 전형 종료가 아니라 해고다.
+   이 경고가 이 서비스가 존재하는 이유이므로, 눈에 띄지 않으면 아무 소용이 없다. */
+.room-close-dismissal {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+}
+.dismissal-warning {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+}
+.dismissal-headline {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--danger-text);
+}
+/* 확정으로 본 근거는 회사 자신이 쓴 문장이다. "AI가 그렇다는데요"로는 아무도
+   승복하지 않으므로, 그 문장을 그대로 눈앞에 다시 놓는다. */
+.dismissal-excerpt {
+  margin: 4px 0;
+  padding: 12px 16px;
+  border-left: 3px solid var(--danger-border);
+  background: var(--bg);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.dismissal-excerpt-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.dismissal-grounds {
+  font-size: 14px;
+}
+.dismissal-grounds summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-h);
+}
+.dismissal-grounds ul {
+  margin: 8px 0;
+  padding-left: 20px;
+  line-height: 1.7;
+}
+.dismissal-ack {
+  align-self: flex-start;
+  text-align: left;
+  font-weight: 600;
+}

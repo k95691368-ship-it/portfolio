@@ -10,13 +10,23 @@ import { buildAuditEvents } from '../functions/_lib/auditTrail.js'
 const ROOM = { id: 'r1', title: '백엔드 개발자 계약', created_at: '2026-08-01 09:00:00', status: 'closed' }
 
 describe('lifecycleEvents', () => {
-  it('네 가지 사건을 모두 사람이 읽는 말로 옮긴다', () => {
+  it('기록하는 사건을 모두 사람이 읽는 말로 옮긴다', () => {
     expect(Object.keys(LIFECYCLE_ACTIONS).sort()).toEqual([
       'closed',
       'employment_end_cleared',
       'employment_end_recorded',
+      'offer_withdrawn',
       'reopened',
     ])
+  })
+
+  // 이름이 행동의 무게를 말해야 한다. 확정 뒤의 종료는 전형 종료가 아니다.
+  it('채용 확정 뒤의 종료는 전형 종료와 다른 이름으로 남는다', () => {
+    const [e] = lifecycleEvents([
+      { action: 'offer_withdrawn', actor_name: '김담당', detail: '채용 취소', created_at: '2026-09-05 10:00:00' },
+    ])
+    expect(e.event).toContain('채용내정 취소')
+    expect(e.event).toContain('해고')
   })
 
   it('행위자와 사유를 함께 담는다', () => {

@@ -1,4 +1,5 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
+import { describeOfferStatus } from '../../../_lib/jobOffer.js'
 import { getRoomAccess } from '../../../_lib/rooms.js'
 import { rowToCamelTerms } from '../../../_lib/contract.js'
 import { mapDocumentRow } from '../../../_lib/documents.js'
@@ -136,6 +137,19 @@ export async function onRequestGet({ env, data, params }) {
       createdAt: m.created_at,
     })),
     documents: documentRows.results.map(mapDocumentRow),
+    // 채용내정이 성립했는가, 그리고 지금 끝내면 무슨 일이 벌어지는가.
+    //
+    // 메시지 조회에는 역할이 없으므로 참여자 목록으로 발신자를 회사/지원자로
+    // 가른다. 확정은 회사만 할 수 있어서, 지원자가 "언제 출근하면 되나요"라고
+    // 묻는 것을 확정으로 읽으면 안 된다.
+    offer: describeOfferStatus({
+      terms: termsRow ? rowToCamelTerms(termsRow) : null,
+      messages: messageRows.results.map((m) => ({
+        body: m.body,
+        created_at: m.created_at,
+        role_in_room: participants.find((p) => p.id === m.sender_user_id)?.role_in_room ?? null,
+      })),
+    }),
     // 아래 셋은 회사 측 화면에만 쓰인다.
     interviewSummary: isCompany ? interviewSummary : null,
     inviteEmail: isCompany ? { candidate: candidateBrief, emailConfigured: isEmailConfigured(env) } : null,

@@ -3,6 +3,8 @@ import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { notifyUser } from '../../../_lib/notify.js'
 import { logLifecycle } from '../../../_lib/roomLifecycleLog.js'
 import { canClose, normalizeCloseReason, isClosed } from '../../../_lib/roomLifecycle.js'
+import { describeOfferStatus } from '../../../_lib/jobOffer.js'
+import { rowToCamelTerms } from '../../../_lib/contract.js'
 
 // 전형을 종료한다.
 //
@@ -30,6 +32,46 @@ export async function onRequestPost({ request, env, data, params }) {
 
   const body = await request.json().catch(() => null)
   const reason = normalizeCloseReason(body?.reason, body?.note)
+
+  // 이 서비스가 존재하는 이유가 여기다.
+  //
+  // 채용내정이 성립한 뒤의 종료는 전형 종료가 아니라 해고다. 담당자는 그것을
+  // 모른 채 누른다 — "아직 최종 결재 전"이라고 생각하기 때문이다. 누르고 나서
+  // 알려 주는 것은 사고 보고서이지 예방이 아니므로, 누르는 이 자리에서 막는다.
+  //
+  // 단정해서 막지는 않는다. 확정으로 본 근거가 된 회사 자신의 문장을 돌려주고,
+  // 그것을 확인했다는 표시가 함께 와야 통과시킨다. AI 판정이 없어도 대화에
+  // 확정으로 읽힐 표현이 있으면 같은 절차를 밟는다.
+  const [termsRow, messageRows] = await Promise.all([
+    env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?').bind(params.roomId).first(),
+    env.DB.prepare(
+      `SELECT m.body, m.created_at, rp.role_in_room
+         FROM chat_messages m
+         JOIN room_participants rp ON rp.room_id = m.room_id AND rp.user_id = m.sender_user_id
+        WHERE m.room_id = ?
+        ORDER BY m.id DESC
+        LIMIT 200`
+    )
+      .bind(params.roomId)
+      .all(),
+  ])
+
+  const offer = describeOfferStatus({
+    terms: rowToCamelTerms(termsRow),
+    messages: (messageRows.results || []).slice().reverse(),
+  })
+
+  if (offer.established && body?.acknowledgedDismissal !== true) {
+    return jsonResponse(
+      {
+        error:
+          '채용이 확정된 전형입니다. 지금 끝내면 채용 취소가 아니라 해고로 다뤄질 수 있습니다. 아래 내용을 확인한 뒤 다시 진행해주세요.',
+        requiresAcknowledgement: true,
+        offer,
+      },
+      409
+    )
+  }
 
   // 그 사이에 서명이 끝났으면 닫지 않는다.
   const claimed = await env.DB.prepare(
@@ -59,8 +101,9 @@ export async function onRequestPost({ request, env, data, params }) {
     })
   }
 
+  // 이름이 행동의 무게를 말해야 한다. 확정 뒤의 종료는 전형 종료가 아니다.
   await logLifecycle(env, params.roomId, {
-    action: 'closed',
+    action: offer.established ? 'offer_withdrawn' : 'closed',
     actorName: data.user.display_name,
     detail: reason.text,
   })
