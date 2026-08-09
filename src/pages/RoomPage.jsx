@@ -159,11 +159,18 @@ export default function RoomPage() {
             <div className="dismissal-warning" role="alert">
               <p className="dismissal-headline">{offer.risk.headline}</p>
               <p className="period-detail">{offer.risk.reason}</p>
-              {offer.excerpt && (
+              {offer.excerpt ? (
                 <blockquote className="dismissal-excerpt">
                   <span className="dismissal-excerpt-label">확정으로 본 근거</span>
                   {offer.excerpt}
                 </blockquote>
+              ) : (
+                // 근거를 못 대면 담당자는 승복하지 않는다. 없으면 없다고 말한다 —
+                // 있는 척하는 것보다 낫다.
+                <p className="period-detail">
+                  확정으로 기록되어 있으나 그렇게 본 근거 문장이 남아 있지 않습니다. 대화를 직접
+                  확인한 뒤 판단해주세요.
+                </p>
               )}
               <p className="period-detail">
                 지원자가 취할 수 있는 조치: {offer.risk.remedies.join(' · ')}
