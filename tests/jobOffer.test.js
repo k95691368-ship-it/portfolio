@@ -102,3 +102,31 @@ describe('취소하면 무슨 일이 벌어지는가', () => {
     expect(r.lawfulGrounds.join(' ')).toContain('졸업')
   })
 })
+
+// 호출부에 따라 DB 행이 그대로 오기도 하고 카멜로 바뀌어 오기도 한다.
+// 한쪽 이름만 읽으면 확정 여부가 판정에 도달하지 않고, 그러면 이 시스템이
+// 하려는 일 전체가 조용히 꺼진다. 실제로 그렇게 한 번 꺼졌다.
+describe('행 모양이 달라도 같은 판정', () => {
+  const expectSame = (terms) => {
+    const o = describeOfferStatus({ terms, messages: [] })
+    expect(o.established).toBe(true)
+    expect(o.basis).toBe('ai')
+    expect(o.excerpt).toContain('9월 1일')
+  }
+
+  it('스네이크 행을 그대로 넘겨도 읽는다', () => {
+    expectSame({
+      hire_confirmed: 1,
+      hire_confirmed_at: '2026-09-01',
+      hire_confirmation_excerpt: '9월 1일부터 출근하시죠',
+    })
+  })
+
+  it('카멜로 바꿔 넘겨도 읽는다', () => {
+    expectSame({
+      hireConfirmed: true,
+      hireConfirmedAt: '2026-09-01',
+      confirmationExcerpt: '9월 1일부터 출근하시죠',
+    })
+  })
+})

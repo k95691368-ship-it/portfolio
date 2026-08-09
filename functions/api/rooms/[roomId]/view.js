@@ -143,7 +143,9 @@ export async function onRequestGet({ env, data, params }) {
     // 가른다. 확정은 회사만 할 수 있어서, 지원자가 "언제 출근하면 되나요"라고
     // 묻는 것을 확정으로 읽으면 안 된다.
     offer: describeOfferStatus({
-      terms: termsRow ? rowToCamelTerms(termsRow) : null,
+      // 원본 행을 그대로 넘긴다. rowToCamelTerms 는 hire_confirmed 를 담지
+      // 않아서, 카멜만 넘기면 확정 여부가 판정에 도달하지 않는다.
+      terms: termsRow,
       messages: messageRows.results.map((m) => ({
         body: m.body,
         created_at: m.created_at,

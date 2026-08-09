@@ -123,7 +123,13 @@ export function describeOfferStatus({ terms, messages } = {}) {
   const signals = scanForOfferSignals(messages)
 
   // AI 판정이 있으면 그것이 우선한다. 없으면 표현으로 정황을 잡는다.
-  const confirmed = !!terms?.hireConfirmed
+  //
+  // DB 행을 그대로 넘기는 호출부와 카멜로 바꿔 넘기는 호출부가 섞여 있다.
+  // 한쪽 이름만 읽으면 확정 여부가 판정에 도달하지 않고, 그러면 이 시스템이
+  // 하려는 일 전체가 조용히 꺼진다. 실제로 그렇게 한 번 꺼졌다.
+  const confirmed = !!(terms?.hireConfirmed ?? terms?.hire_confirmed)
+  const confirmedAt = terms?.hireConfirmedAt ?? terms?.hire_confirmed_at ?? null
+  const aiExcerpt = terms?.confirmationExcerpt ?? terms?.hire_confirmation_excerpt ?? null
   const strongPhrase = signals.strong.length > 0
 
   if (!confirmed && !strongPhrase) {
@@ -144,10 +150,10 @@ export function describeOfferStatus({ terms, messages } = {}) {
     established: true,
     likely: true,
     basis: confirmed ? 'ai' : 'phrase',
-    at: terms?.hireConfirmedAt ?? signals.strong[0]?.at ?? null,
+    at: confirmedAt ?? signals.strong[0]?.at ?? null,
     // 단정하지 않고 근거를 보여 준다. "AI가 그렇다는데요"로는 아무도 승복하지
     // 않고, 승복하지 않으면 그냥 취소 버튼을 누른다.
-    excerpt: terms?.confirmationExcerpt ?? signals.strong[signals.strong.length - 1]?.text ?? null,
+    excerpt: aiExcerpt ?? signals.strong[signals.strong.length - 1]?.text ?? null,
     signals,
     risk: describeCancellationRisk(terms),
     note: confirmed

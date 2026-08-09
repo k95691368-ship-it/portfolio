@@ -4,7 +4,6 @@ import { notifyUser } from '../../../_lib/notify.js'
 import { logLifecycle } from '../../../_lib/roomLifecycleLog.js'
 import { canClose, normalizeCloseReason, isClosed } from '../../../_lib/roomLifecycle.js'
 import { describeOfferStatus } from '../../../_lib/jobOffer.js'
-import { rowToCamelTerms } from '../../../_lib/contract.js'
 
 // 전형을 종료한다.
 //
@@ -57,7 +56,7 @@ export async function onRequestPost({ request, env, data, params }) {
   ])
 
   const offer = describeOfferStatus({
-    terms: rowToCamelTerms(termsRow),
+    terms: termsRow,
     messages: (messageRows.results || []).slice().reverse(),
   })
 
