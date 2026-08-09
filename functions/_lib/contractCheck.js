@@ -245,7 +245,7 @@ const UNREADABLE_CHECKS = [
   { field: 'workDays', read: (t) => parseDaysPerWeek(t.workDays) },
 ]
 
-export function findUnreadableFields(terms) {
+function findUnreadableFields(terms) {
   const t = terms || {}
   const filled = (v) => v !== null && v !== undefined && String(v).trim() !== ''
   const bad = UNREADABLE_CHECKS.filter((c) => filled(t[c.field]) && c.read(t) === null).map((c) => ({

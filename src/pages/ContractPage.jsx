@@ -63,23 +63,17 @@ const EMPTY_FORM = {
   wageItems: [],
 }
 
-// 지원 언어 (서버의 _lib/languages.js와 같은 목록)
-const LANGUAGES = [
-  { code: 'en', label: 'English', nativeLabel: 'English' },
-  { code: 'zh', label: '중국어', nativeLabel: '中文' },
-  { code: 'vi', label: '베트남어', nativeLabel: 'Tiếng Việt' },
-  { code: 'th', label: '태국어', nativeLabel: 'ไทย' },
-  { code: 'id', label: '인도네시아어', nativeLabel: 'Bahasa Indonesia' },
-  { code: 'uz', label: '우즈베크어', nativeLabel: "O'zbekcha" },
-  { code: 'ne', label: '네팔어', nativeLabel: 'नेपाली' },
-  { code: 'km', label: '크메르어', nativeLabel: 'ភាសាខ្មែរ' },
-  { code: 'my', label: '미얀마어', nativeLabel: 'မြန်မာဘာသာ' },
-  { code: 'mn', label: '몽골어', nativeLabel: 'Монгол' },
-]
 
 // 외국인 근로자용 번역본 — 원본과 나란히 보여준다(공식 표준근로계약서 외국어본 방식).
-function ContractTranslations({ translations, sourceArticles, canTranslate, onTranslate, busy }) {
-  const [language, setLanguage] = useState('en')
+function ContractTranslations({
+  translations,
+  sourceArticles,
+  languages,
+  canTranslate,
+  onTranslate,
+  busy,
+}) {
+  const [language, setLanguage] = useState(languages[0]?.code ?? 'en')
   // useState 초기값은 첫 렌더에만 쓰인다. 계약서 화면은 한 번만 마운트되므로,
   // 번역이 없던 상태에서 잡힌 null 이 그대로 남아 번역을 마쳐도 아무것도
   // 펼쳐지지 않았다. "아직 고르지 않음"과 "사용자가 접음"을 구분해, 고르지
@@ -102,7 +96,7 @@ function ContractTranslations({ translations, sourceArticles, canTranslate, onTr
       {canTranslate && (
         <div className="translation-controls">
           <select value={language} onChange={(e) => setLanguage(e.target.value)}>
-            {LANGUAGES.map((l) => (
+            {languages.map((l) => (
               <option key={l.code} value={l.code}>
                 {l.label} ({l.nativeLabel})
               </option>
@@ -718,6 +712,8 @@ export default function ContractPage() {
   const [confirmingHire, setConfirmingHire] = useState(false)
   const [period, setPeriod] = useState(null)
   const [translations, setTranslations] = useState([])
+  // 번역 가능한 언어는 서버가 정한다. 화면이 따로 적어 두면 목록이 갈라진다.
+  const [languages, setLanguages] = useState([])
   const [sourceArticles, setSourceArticles] = useState([])
   const [translating, setTranslating] = useState(false)
   const [explanation, setExplanation] = useState(null)
@@ -821,6 +817,7 @@ export default function ContractPage() {
     setRetention(view.retention ?? null)
     setLinkableRooms(view.linkableRooms ?? [])
     setTranslations(view.translations ?? [])
+    setLanguages(view.languages ?? [])
     setSourceArticles(view.sourceArticles ?? [])
 
     // 서명 전 최종 안전 점검은 아직 체결되지 않은 계약서에만 보여준다.
@@ -1365,6 +1362,7 @@ export default function ContractPage() {
       <ContractTranslations
         translations={translations}
         sourceArticles={sourceArticles}
+        languages={languages}
         canTranslate={myRole === 'company'}
         onTranslate={handleTranslate}
         busy={translating}

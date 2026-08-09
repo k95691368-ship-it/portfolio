@@ -11,12 +11,12 @@ import { koreanToday } from './koreanTime.js'
 // 2년을 초과해 사용하면 기간의 정함이 없는 근로계약을 체결한 것으로 본다.
 
 const DAY_MS = 24 * 60 * 60 * 1000
-export const FIXED_TERM_LIMIT_MONTHS = 24 // 기간제 상한 (2년) — 화면 표시용
+const FIXED_TERM_LIMIT_MONTHS = 24 // 기간제 상한 (2년) — 화면 표시용
 // 여러 계약을 합산할 때 쓰는 일 단위 상한. 윤년을 포함하지 않는 2년(730일)을
 // 기준으로 삼아, 애매한 경우 조금 이르게 알린다 — 법정 상한 경고는 늦게 뜨는
 // 쪽이 위험하다.
-export const FIXED_TERM_LIMIT_DAYS = 730
-export const EXPIRY_SOON_DAYS = 30 // 만료 임박으로 볼 기간
+const FIXED_TERM_LIMIT_DAYS = 730
+const EXPIRY_SOON_DAYS = 30 // 만료 임박으로 볼 기간
 
 // "2026-09-01", "2026년 9월 1일", "2026.9.1", "2026/09/01" → Date (UTC 자정)
 export function parseContractDate(value) {
@@ -118,9 +118,9 @@ export function describeContractPeriod(terms, now = new Date()) {
 }
 
 // 근로기준법 제42조: 근로계약서 등 근로관계 서류는 3년간 보존해야 한다.
-export const RETENTION_YEARS = 3
+const RETENTION_YEARS = 3
 // 갱신 사이 공백이 이보다 길면 계속근로가 끊겼을 수 있다고 본다.
-export const CONTINUITY_GAP_DAYS = 30
+const CONTINUITY_GAP_DAYS = 30
 
 // 계약서 보존 의무 기간.
 //

@@ -1,5 +1,10 @@
 import { jsonResponse } from '../_lib/http.js'
-import { DEMO_DOMAIN, DEMO_PASSWORD, DEMO_ACCOUNTS } from '../_lib/demoSeed.js'
+import {
+  DEMO_DOMAIN,
+  DEMO_PASSWORD,
+  DEMO_ACCOUNTS,
+  DEMO_WALKTHROUGH,
+} from '../_lib/demoSeed.js'
 
 // 공개: 체험용 데모가 살아 있는지와 그 접속 정보.
 //
@@ -41,5 +46,8 @@ export async function onRequestGet({ env }) {
       role: a.role,
       displayName: a.displayName,
     })),
+    // 안내 문구는 방 제목과 같은 곳에서 나온다. 화면이 따로 적어 두면
+    // 제목을 고쳤을 때 안내만 옛 이름을 가리킨다.
+    walkthrough: DEMO_WALKTHROUGH,
   })
 }

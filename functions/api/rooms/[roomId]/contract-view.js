@@ -30,7 +30,7 @@ import { postingConditionsFromRow } from '../../../_lib/postingConditions.js'
 
 // 갱신 사슬을 거슬러 올라가는 최대 깊이 (link-previous의 제한과 같아야 한다)
 const MAX_CHAIN_DEPTH = 10
-import { findLanguage } from '../../../_lib/languages.js'
+import { findLanguage, SUPPORTED_LANGUAGES } from '../../../_lib/languages.js'
 
 // 계약서 화면이 필요한 모든 정보를 한 번에 돌려준다.
 //
@@ -445,6 +445,9 @@ export async function onRequestGet({ env, data, params, request }) {
         ? terms.aiDocument
         : buildArticlesFromTerms(terms),
     translations: mappedTranslations,
+    // 번역 가능한 언어 목록. 화면이 같은 목록을 따로 적어 두면, 언어를 늘려도
+    // 드롭다운에 나오지 않고 줄이면 서버가 거절하는 언어를 고르게 된다.
+    languages: SUPPORTED_LANGUAGES,
     changeRequests: mappedRequests,
     signedContract: storedRow
       ? {

@@ -6,6 +6,7 @@
 // 깨져, 데모가 조용히 무력해지는 것을 막는다.
 import { describe, expect, it } from 'vitest'
 import {
+  DEMO_WALKTHROUGH,
   DEMO_ROOM_PENDING,
   DEMO_ROOM_SIGNED,
   DEMO_ROOM_PREVIOUS,
@@ -154,5 +155,36 @@ describe('데모 데이터의 안전 조건', () => {
   it('공고 임금 하한이 방 B 계약 임금보다 높다', () => {
     // 이 관계가 뒤집히면 "공고보다 불리" 장면이 사라진다.
     expect(DEMO_POSTING.wageMin).toBeGreaterThan(DEMO_ROOM_PENDING.terms.wageBaseAmount)
+  })
+})
+
+// 안내가 가리키는 방이 실제로 있는가.
+//
+// 안내 문구와 방 제목이 서로 다른 곳에 적혀 있으면, 제목을 고쳐도 안내만 옛
+// 이름을 가리킨다. 평가자는 안내가 말하는 방을 찾지 못한다.
+describe('데모 안내와 실제 데모가 같은 것을 가리키는가', () => {
+  const ROOM_TITLES = [DEMO_ROOM_PREVIOUS, DEMO_ROOM_SIGNED, DEMO_ROOM_PENDING].map((r) => r.title)
+
+  it('안내가 세 단계로 되어 있다', () => {
+    expect(DEMO_WALKTHROUGH).toHaveLength(3)
+    for (const s of DEMO_WALKTHROUGH) {
+      expect(typeof s.title).toBe('string')
+      expect(s.title.length).toBeGreaterThan(0)
+      expect(typeof s.body).toBe('string')
+    }
+  })
+
+  it('안내가 인용하는 방 이름이 실제로 심는 방 이름이다', () => {
+    const quoted = DEMO_WALKTHROUGH.flatMap((s) => [...s.body.matchAll(/"([^"]+)"/g)].map((m) => m[1]))
+    expect(quoted.length).toBeGreaterThan(0)
+    for (const name of quoted) {
+      expect(ROOM_TITLES).toContain(name)
+    }
+  })
+
+  it('서명 전 방과 체결된 방을 모두 안내한다', () => {
+    const body = DEMO_WALKTHROUGH.map((s) => s.body).join(' ')
+    expect(body).toContain(DEMO_ROOM_PENDING.title)
+    expect(body).toContain(DEMO_ROOM_SIGNED.title)
   })
 })

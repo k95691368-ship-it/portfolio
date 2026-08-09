@@ -189,7 +189,7 @@ export function checkDocumentConsistency(articles, terms) {
 }
 
 // 근로기준법 제17조 명시사항 — 본문에 조항으로 담겨 있어야 한다.
-export const REQUIRED_TOPICS = [
+const REQUIRED_TOPICS = [
   { key: 'period', label: '근로계약기간', keywords: ['근로계약기간', '계약기간', '근로개시일'] },
   { key: 'workplace', label: '취업의 장소', keywords: ['근무장소', '취업장소', '근무지', '취업의장소'] },
   { key: 'job', label: '종사할 업무', keywords: ['업무의내용', '담당업무', '종사할업무', '직무'] },

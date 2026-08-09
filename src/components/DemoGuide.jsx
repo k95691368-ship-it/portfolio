@@ -11,23 +11,6 @@ import { useToast } from '../context/ToastContext.jsx'
 //
 // 데모가 심어져 있지 않으면 아무것도 그리지 않는다 — 없는 계정을 안내하는 것이
 // 안내가 없는 것보다 나쁘다.
-const STEPS = [
-  {
-    n: 1,
-    title: '법령 점검이 실제로 막는 것을 본다',
-    body: '"백엔드 개발자 계약 검토 - 최민수" 방 → 계약서. 최저임금 미달·주 52시간 초과·연차 미기재·기간제 2년 초과·공고보다 불리한 조건이 한 화면에 잡힙니다. 서명 버튼을 눌러도 서버가 막습니다.',
-  },
-  {
-    n: 2,
-    title: '체결된 계약에서 증명서를 발급한다',
-    body: '"백엔드 개발자 최종 계약 - 이지원" 방 → 계약서 아래 감사추적증명서. 서명·문서 지문·교부·열람 이력이 담긴 증명서가 발급번호와 함께 나옵니다.',
-  },
-  {
-    n: 3,
-    title: '로그인 없이 진위를 확인한다',
-    body: '로그아웃하고 발급번호를 확인 화면에 넣으면 검증됩니다. 정본 문자열을 내려받아 직접 SHA-256을 계산해 대조할 수도 있습니다.',
-  },
-]
 
 export default function DemoGuide() {
   const [demo, setDemo] = useState(null)
@@ -92,8 +75,8 @@ export default function DemoGuide() {
 
       {open && (
         <ol className="demo-steps">
-          {STEPS.map((s) => (
-            <li key={s.n}>
+          {(demo.walkthrough ?? []).map((s) => (
+            <li key={s.step}>
               <strong>{s.title}</strong>
               <p>{s.body}</p>
             </li>
