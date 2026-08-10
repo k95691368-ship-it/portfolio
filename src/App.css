@@ -2969,3 +2969,82 @@
   text-align: left;
   font-weight: 600;
 }
+
+/* 대화 감시 — 채용내정이 성립하는 순간을 그 자리에서 알린다.
+   취소 화면에서 처음 알게 되면 이미 마음을 정한 뒤라 늦다. */
+.offer-watch {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  border-radius: var(--radius);
+  text-align: left;
+}
+.offer-watch h3 {
+  margin: 0;
+  font-size: 17px;
+}
+.offer-watch p {
+  font-size: 15px;
+  line-height: 1.6;
+}
+.offer-watch-established {
+  border: 1px solid var(--danger-border);
+  background: var(--danger-bg);
+}
+.offer-watch-established h3 {
+  color: var(--danger-text);
+}
+.offer-watch-near {
+  border: 1px solid var(--warning-border);
+  background: var(--warning-bg);
+}
+.offer-watch-near h3 {
+  color: var(--warning-text);
+}
+/* 근거는 회사 자신이 쓴 문장이다. 그것을 그대로 눈앞에 다시 놓는다. */
+.offer-excerpt {
+  margin: 0;
+  padding: 12px 16px;
+  border-left: 3px solid var(--danger-border);
+  background: var(--bg);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.offer-excerpt-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.offer-consequence {
+  font-weight: 600;
+}
+.offer-signal-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.offer-signal-label {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 700;
+}
+.offer-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.offer-hint {
+  font-size: 14px;
+  color: var(--text-muted);
+}

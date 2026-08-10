@@ -1,4 +1,5 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
+import { describeOfferStatus, describeUnfavourableChanges } from '../../../_lib/jobOffer.js'
 import { blockedWhenClosed } from '../../../_lib/roomLifecycle.js'
 import { rowToCamelTerms, EDITABLE_FIELDS } from '../../../_lib/contract.js'
 import {
@@ -231,6 +232,15 @@ export async function onRequestPatch({ env, data, params, request }) {
     .bind(params.roomId)
     .first()
 
+  // 확정 뒤의 불리한 조건 변경은 실질적으로 취소일 수 있다.
+  //
+  // 막지는 않는다 — 양측이 합의해 바꾸는 것은 정당하다. 다만 회사가 그것이
+  // 무엇인지 모르고 하는 일이 없도록, 무엇이 어떻게 불리해졌는지 짚어 준다.
+  // 임금을 깎거나 출근일을 미뤄 지원자가 스스로 포기하게 만드는 쪽이 노골적인
+  // 통보보다 흔하고, 회사는 그것을 취소라고 자각하지 못한다.
+  const offer = describeOfferStatus({ terms: row, messages: [] })
+  const unfavourable = offer.established ? describeUnfavourableChanges(changes) : []
+
   return jsonResponse({
     terms: rowToCamelTerms(row),
     hireConfirmed: !!row.hire_confirmed,
@@ -238,5 +248,14 @@ export async function onRequestPatch({ env, data, params, request }) {
     confirmationExcerpt: row.hire_confirmation_excerpt,
     updatedAt: row.updated_at,
     revokedSignatures: revocation.revoked,
+    offerWarning:
+      unfavourable.length > 0
+        ? {
+            headline: '채용이 확정된 뒤 근로조건이 불리하게 바뀌었습니다.',
+            changes: unfavourable,
+            detail:
+              '근로계약이 이미 성립한 상태에서 조건을 일방적으로 불리하게 바꾸는 것은 근로조건의 불이익 변경입니다. 지원자가 이를 거부해 관계가 끝나면 실질적인 채용내정 취소로 다뤄질 수 있습니다. 지원자의 동의를 받아 두세요.',
+          }
+        : null,
   })
 }

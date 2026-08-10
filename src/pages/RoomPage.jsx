@@ -11,6 +11,7 @@ import ContractFieldsForm from '../components/ContractFieldsForm.jsx'
 import FinalOfferEmailForm from '../components/FinalOfferEmailForm.jsx'
 import RoomInviteEmailForm from '../components/RoomInviteEmailForm.jsx'
 import InterviewSummary from '../components/InterviewSummary.jsx'
+import OfferWatch from '../components/OfferWatch.jsx'
 import { roomStatusInfo } from '../lib/roomStatus.js'
 
 // 전형을 왜 끝냈는지. 지원자에게는 사유마다 전혀 다른 의미다.
@@ -254,6 +255,11 @@ export default function RoomPage() {
       )}
 
       <RoomDocuments documents={view.documents} />
+
+      {/* 막아야 할 순간은 취소할 때가 아니라 말할 때다. 대화 바로 위에 둔다. */}
+      {room.myRole === 'company' && (
+        <OfferWatch offer={offer} roomId={roomId} onChanged={loadView} />
+      )}
 
       <div className="chat-panel">
         <ChatMessageList messages={messages} />

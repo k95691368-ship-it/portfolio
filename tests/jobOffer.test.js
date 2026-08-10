@@ -7,6 +7,7 @@ import {
   scanForOfferSignals,
   describeOfferStatus,
   describeCancellationRisk,
+  describeUnfavourableChanges,
 } from '../functions/_lib/jobOffer.js'
 
 const msg = (role, body) => ({ role_in_room: role, body, created_at: '2026-09-01 10:00:00' })
@@ -128,5 +129,59 @@ describe('행 모양이 달라도 같은 판정', () => {
       hireConfirmedAt: '2026-09-01',
       confirmationExcerpt: '9월 1일부터 출근하시죠',
     })
+  })
+})
+
+// 내정 취소는 "없던 일로 합시다"로만 일어나지 않는다. 임금을 깎거나 출근일을
+// 미뤄 지원자가 스스로 포기하게 만드는 쪽이 실무에서 더 흔하고, 회사는 그것을
+// 취소라고 자각하지 못한다.
+describe('확정 뒤의 불리한 조건 변경', () => {
+  it('임금이 낮아지면 얼마나 낮아졌는지까지 짚는다', () => {
+    const [c] = describeUnfavourableChanges([
+      { field: 'wageBaseAmount', from: 3000000, to: 2500000 },
+    ])
+    expect(c.label).toBe('임금')
+    expect(c.detail).toContain('500,000원')
+  })
+
+  it('임금이 오르는 것은 잡지 않는다', () => {
+    expect(
+      describeUnfavourableChanges([{ field: 'wageBaseAmount', from: 2500000, to: 3000000 }])
+    ).toHaveLength(0)
+  })
+
+  it('출근일이 뒤로 밀리면 잡는다', () => {
+    const found = describeUnfavourableChanges([
+      { field: 'contractStartDate', from: '2026-09-01', to: '2026-11-01' },
+    ])
+    expect(found).toHaveLength(1)
+    // 앞당기는 것은 불리하지 않다.
+    expect(
+      describeUnfavourableChanges([
+        { field: 'contractStartDate', from: '2026-11-01', to: '2026-09-01' },
+      ])
+    ).toHaveLength(0)
+  })
+
+  it('계약 종료일이 앞당겨지면 잡는다', () => {
+    expect(
+      describeUnfavourableChanges([
+        { field: 'contractEndDate', from: '2027-08-31', to: '2027-02-28' },
+      ])
+    ).toHaveLength(1)
+  })
+
+  it('상관없는 항목은 잡지 않는다', () => {
+    expect(
+      describeUnfavourableChanges([{ field: 'workLocation', from: '서울', to: '부산' }])
+    ).toHaveLength(0)
+  })
+
+  it('금액에 콤마나 원이 붙어 있어도 읽는다', () => {
+    expect(
+      describeUnfavourableChanges([
+        { field: 'wageBaseAmount', from: '3,000,000원', to: '2,500,000' },
+      ])
+    ).toHaveLength(1)
   })
 })

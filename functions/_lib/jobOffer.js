@@ -161,3 +161,58 @@ export function describeOfferStatus({ terms, messages } = {}) {
       : '아직 채용 확정 처리는 되지 않았지만, 대화에 확정으로 읽힐 수 있는 표현이 있습니다. 실제로 확정했다면 지금 취소는 해고에 해당합니다.',
   }
 }
+
+// 확정 뒤의 조건 변경도 실질적으로는 취소일 수 있다.
+//
+// 내정 취소는 "없던 일로 합시다"라는 통보로만 일어나지 않는다. 임금을 깎거나
+// 출근일을 미뤄서 지원자가 스스로 포기하게 만드는 쪽이 실무에서 더 흔하고,
+// 회사 입장에서는 그것이 취소라는 자각조차 없다. 근로계약이 이미 성립한 이상
+// 그 내용을 일방적으로 불리하게 바꾸는 것은 근로조건의 불이익 변경이고,
+// 지원자가 이를 거부해 관계가 끝나면 그 책임은 회사에 돌아온다.
+//
+// 막지는 않는다 — 양측이 합의해 바꾸는 것은 정당하다. 다만 그것이 무엇인지
+// 모르고 하는 일이 없게, 무엇이 어떻게 불리해졌는지 짚어 준다.
+const UNFAVOURABLE_FIELDS = {
+  wageBaseAmount: { label: '임금', direction: 'down' },
+  contractStartDate: { label: '근로개시일', direction: 'later' },
+  contractEndDate: { label: '계약 종료일', direction: 'earlier' },
+}
+
+function toNumber(v) {
+  const n = Number(String(v ?? '').replace(/[,\s원]/g, ''))
+  return Number.isFinite(n) ? n : null
+}
+
+export function describeUnfavourableChanges(changes) {
+  const found = []
+  for (const c of changes || []) {
+    const spec = UNFAVOURABLE_FIELDS[c.field]
+    if (!spec) continue
+
+    if (spec.direction === 'down') {
+      const from = toNumber(c.from)
+      const to = toNumber(c.to)
+      if (from !== null && to !== null && to < from) {
+        found.push({
+          field: c.field,
+          label: spec.label,
+          detail: `${from.toLocaleString('ko-KR')}원에서 ${to.toLocaleString('ko-KR')}원으로 ${(from - to).toLocaleString('ko-KR')}원 낮아집니다.`,
+        })
+      }
+      continue
+    }
+
+    const from = String(c.from ?? '')
+    const to = String(c.to ?? '')
+    if (!from || !to || from === to) continue
+    const worse = spec.direction === 'later' ? to > from : to < from
+    if (worse) {
+      found.push({
+        field: c.field,
+        label: spec.label,
+        detail: `${from}에서 ${to}로 바뀝니다.`,
+      })
+    }
+  }
+  return found
+}

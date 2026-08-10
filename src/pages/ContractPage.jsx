@@ -695,6 +695,7 @@ export default function ContractPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [offerWarning, setOfferWarning] = useState(null)
   const [signingRole, setSigningRole] = useState(null)
   const [exporting, setExporting] = useState(false)
   const [aiDocument, setAiDocument] = useState(null)
@@ -878,7 +879,10 @@ export default function ContractPage() {
         customTerms: filteredCustomTerms,
         wageItems: filteredWageItems.map((w) => ({ ...w, amount: Number(w.amount) })),
       }
-      await api.patch(`/rooms/${roomId}/contract`, payload)
+      const saved = await api.patch(`/rooms/${roomId}/contract`, payload)
+      // 확정 뒤의 불리한 변경은 실질적으로 취소일 수 있다. 토스트는 5초 뒤
+      // 사라지므로, 이 경고는 화면에 남겨 둔다.
+      setOfferWarning(saved?.offerWarning ?? null)
       setForm((f) => ({ ...f, customTerms: filteredCustomTerms }))
       // 저장했으므로 아래 loadAll 은 폼을 덮어써도 된다.
       savedFormRef.current = { ...formRef.current, customTerms: filteredCustomTerms }
@@ -1239,6 +1243,23 @@ export default function ContractPage() {
             + 항목 추가
           </button>
         </fieldset>
+
+        {/* 확정 뒤의 불리한 변경은 실질적으로 취소일 수 있다. 토스트는 사라지므로
+            이 경고는 화면에 남긴다. */}
+        {offerWarning && (
+          <div className="offer-watch offer-watch-established" role="alert">
+            <h3>{offerWarning.headline}</h3>
+            <ul className="offer-signal-list">
+              {offerWarning.changes.map((c) => (
+                <li key={c.field}>
+                  <span className="offer-signal-label">{c.label}</span>
+                  {c.detail}
+                </li>
+              ))}
+            </ul>
+            <p>{offerWarning.detail}</p>
+          </div>
+        )}
 
         {canEdit && (
           <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
