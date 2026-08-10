@@ -43,12 +43,6 @@ export async function onRequestPost({ request, env, data, params }) {
   if (!text) return jsonError('메시지 내용을 입력해주세요.', 400)
   if (text.length > 2000) return jsonError('메시지가 너무 깁니다.', 400)
 
-  const result = await env.DB.prepare(
-    'INSERT INTO chat_messages (room_id, sender_user_id, body) VALUES (?, ?, ?) RETURNING id, created_at'
-  )
-    .bind(params.roomId, data.user.id, text)
-    .first()
-
   // 처우 조건이 오갈 때마다 그 자리에서 기록한다.
   //
   // 협의는 계약서를 쓰기 전에 대화에서 먼저 일어난다. 나중에 회사가 "그렇게
@@ -58,15 +52,36 @@ export async function onRequestPost({ request, env, data, params }) {
   // AI 가 아니라 코드가 읽는다. AI 조건 정리는 회사가 버튼을 눌러야 돌고
   // 크레딧이 없으면 아예 돌지 않는데, 협의는 그동안에도 계속 진행된다.
   //
+  // 조건을 읽는 것은 공짜다(정규식). 조건이 들어 있는 메시지에서는 직전 값을
+  // 읽어야 하는데, 그 조회는 메시지 저장과 서로를 기다릴 이유가 없다. 함께
+  // 보내 왕복을 한 번 줄인다 — 대화는 사람이 기다리는 화면이다.
+  const extracted = extractTermsFromMessage({ body: text })
+
+  const [result, previousRows] = await Promise.all([
+    env.DB.prepare(
+      'INSERT INTO chat_messages (room_id, sender_user_id, body) VALUES (?, ?, ?) RETURNING id, created_at'
+    )
+      .bind(params.roomId, data.user.id, text)
+      .first(),
+    extracted.length === 0
+      ? null
+      : env.DB.prepare(
+          `SELECT field, value FROM negotiation_log
+            WHERE room_id = ? AND id IN (
+              SELECT MAX(id) FROM negotiation_log WHERE room_id = ? GROUP BY field
+            )`
+        )
+          .bind(params.roomId, params.roomId)
+          .all()
+          .catch(() => null),
+  ])
+
   // 기록이 실패해도 메시지 전송까지 되돌리지는 않는다. 대화가 막히는 것이
   // 이력이 한 줄 비는 것보다 나쁘다. 다만 조용히 넘기지 않고 로그에 남긴다.
-  const recorded = await recordNegotiation(
-    env,
-    params.roomId,
-    participant.role_in_room,
-    result,
-    text
-  ).catch((err) => {
+  const recorded = await recordNegotiation(env, params.roomId, participant.role_in_room, result, {
+    extracted,
+    previousRows,
+  }).catch((err) => {
     console.error(`negotiation_log write failed (${params.roomId}):`, err)
     return []
   })
@@ -99,21 +114,16 @@ export async function onRequestPost({ request, env, data, params }) {
 }
 
 // 이 메시지에서 읽어 낸 처우 조건을 이력에 남긴다.
-async function recordNegotiation(env, roomId, role, message, text) {
-  const extracted = extractTermsFromMessage({ body: text })
+//
+// 읽어 낸 값과 직전 값 조회는 호출부에서 메시지 저장과 함께 보낸다. 서로를
+// 기다릴 이유가 없는 두 요청이라 왕복이 하나 준다.
+async function recordNegotiation(env, roomId, role, message, { extracted, previousRows }) {
   if (extracted.length === 0) return []
 
   // 같은 값을 여러 번 말하는 것은 협의의 진전이 아니다. 항목별 마지막 값과
   // 다를 때만 남긴다 — 그대로 쌓으면 정작 바뀐 지점이 같은 줄에 묻힌다.
-  const { results: previous } = await env.DB.prepare(
-    `SELECT field, value FROM negotiation_log
-      WHERE room_id = ? AND id IN (
-        SELECT MAX(id) FROM negotiation_log WHERE room_id = ? GROUP BY field
-      )`
-  )
-    .bind(roomId, roomId)
-    .all()
-  const latestByField = Object.fromEntries((previous || []).map((r) => [r.field, r.value]))
+  const previous = previousRows?.results ?? []
+  const latestByField = Object.fromEntries(previous.map((r) => [r.field, r.value]))
 
   const fresh = selectNewEntries(extracted, latestByField)
   if (fresh.length === 0) return []
