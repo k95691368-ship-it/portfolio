@@ -72,6 +72,8 @@ export async function onRequestDelete({ request, env, data, params }) {
       // 이 방을 이전 계약으로 삼은 갱신 계약이 있으면 연결부터 끊어야 한다.
       env.DB.prepare('UPDATE contract_terms SET previous_room_id = NULL WHERE previous_room_id = ?').bind(params.roomId),
       env.DB.prepare('DELETE FROM contract_edit_history WHERE room_id = ?').bind(params.roomId),
+      // 처우 협의 이력(0047)도 방을 외래키로 참조한다.
+      env.DB.prepare('DELETE FROM negotiation_log WHERE room_id = ?').bind(params.roomId),
       env.DB.prepare('DELETE FROM final_offer_emails WHERE room_id = ?').bind(params.roomId),
       env.DB.prepare('DELETE FROM chat_messages WHERE room_id = ?').bind(params.roomId),
       env.DB.prepare('DELETE FROM signatures WHERE room_id = ?').bind(params.roomId),

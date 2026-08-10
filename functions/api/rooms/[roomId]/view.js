@@ -1,5 +1,6 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { describeOfferStatus } from '../../../_lib/jobOffer.js'
+import { describeNegotiation } from '../../../_lib/termsNegotiation.js'
 import { getRoomAccess } from '../../../_lib/rooms.js'
 import { rowToCamelTerms } from '../../../_lib/contract.js'
 import { mapDocumentRow } from '../../../_lib/documents.js'
@@ -28,7 +29,7 @@ export async function onRequestGet({ env, data, params }) {
 
   const isCompany = access.role_in_room === 'company'
 
-  const [participantRows, termsRow, messageRows, finalOffer] = await Promise.all([
+  const [participantRows, termsRow, negotiationRows, messageRows, finalOffer] = await Promise.all([
     env.DB.prepare(
       `SELECT u.id, u.display_name, u.company_name, u.email, rp.role_in_room
          FROM room_participants rp
@@ -38,6 +39,14 @@ export async function onRequestGet({ env, data, params }) {
       .bind(roomId)
       .all(),
     env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?').bind(roomId).first(),
+    // 처우 협의 이력. 계약서에 적히기 전에 대화에서 정해진 것들이다.
+    env.DB.prepare(
+      `SELECT id, message_id, speaker_role, field, label, value, value_display,
+              previous_value, excerpt, created_at
+         FROM negotiation_log WHERE room_id = ? ORDER BY id ASC LIMIT 200`
+    )
+      .bind(roomId)
+      .all(),
     env.DB.prepare(
       // 오래된 것부터 자르면 방을 열었을 때 대화 맨 앞이 뜬다. 메시지가 쌓인
       // 방에서는 최근 대화가 폴링을 여러 번 돈 뒤에야 나타나고, 그 사이 양측은
@@ -137,6 +146,10 @@ export async function onRequestGet({ env, data, params }) {
       createdAt: m.created_at,
     })),
     documents: documentRows.results.map(mapDocumentRow),
+    // 처우 협의 이력 — 계약서에 적히기 전에 대화에서 정해진 것들.
+    // 회사 쪽에만 내려준다. 지원자 화면에 "당신이 이 값을 제시했다"를 나열하는
+    // 것은 이 도구의 목적이 아니다.
+    negotiation: isCompany ? describeNegotiation(negotiationRows.results) : null,
     // 채용내정이 성립했는가, 그리고 지금 끝내면 무슨 일이 벌어지는가.
     //
     // 메시지 조회에는 역할이 없으므로 참여자 목록으로 발신자를 회사/지원자로

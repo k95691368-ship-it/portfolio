@@ -12,6 +12,8 @@ import FinalOfferEmailForm from '../components/FinalOfferEmailForm.jsx'
 import RoomInviteEmailForm from '../components/RoomInviteEmailForm.jsx'
 import InterviewSummary from '../components/InterviewSummary.jsx'
 import OfferWatch from '../components/OfferWatch.jsx'
+import NegotiationLog from '../components/NegotiationLog.jsx'
+import OfferWithdrawalModal from '../components/OfferWithdrawalModal.jsx'
 import { roomStatusInfo } from '../lib/roomStatus.js'
 
 // 전형을 왜 끝냈는지. 지원자에게는 사유마다 전혀 다른 의미다.
@@ -38,7 +40,7 @@ export default function RoomPage() {
   const [closing, setClosing] = useState(false)
   const [closeReason, setCloseReason] = useState('other_candidate')
   const [closeNote, setCloseNote] = useState('')
-  const [dismissalAcknowledged, setDismissalAcknowledged] = useState(false)
+  const [withdrawalOpen, setWithdrawalOpen] = useState(false)
 
   // 이 화면에 필요한 모든 정보를 한 번의 요청으로 받는다.
   const loadView = useCallback(async () => {
@@ -47,24 +49,34 @@ export default function RoomPage() {
     return data
   }, [roomId])
 
-  // 채용이 확정된 뒤의 종료는 전형 종료가 아니라 해고다. 서버가 확인 없이는
-  // 받지 않으므로, 확인 표시를 함께 보낸다. 확인란은 경고를 읽어야 나타난다.
-  const handleClose = async () => {
-    const established = view?.offer?.established
-    const question = established
-      ? '채용이 확정된 전형입니다. 지금 끝내면 해고로 다뤄질 수 있습니다. 그래도 진행하시겠습니까?'
-      : '이 전형을 종료하시겠습니까? 지원자에게 종료 사실과 사유가 안내됩니다.'
-    if (!window.confirm(question)) return
+  // 채용이 확정된 뒤의 종료는 전형 종료가 아니라 해고다.
+  //
+  // 확정된 방에서는 window.confirm 한 줄로 묻지 않는다. 그 창에는 근거 문장도,
+  // 무슨 법이 걸리는지도, 지원자가 무엇을 할 수 있는지도 담기지 않아서
+  // 담당자는 "예"를 누르고 지나간다. 사실을 앞에 놓는 창을 따로 띄운다.
+  const requestClose = () => {
+    if (view?.offer?.established) {
+      setWithdrawalOpen(true)
+      return
+    }
+    if (!window.confirm('이 전형을 종료하시겠습니까? 지원자에게 종료 사실과 사유가 안내됩니다.')) return
+    void submitClose(false)
+  }
+
+  const submitClose = async (acknowledgedDismissal) => {
     setClosing(true)
     try {
       await api.post(`/rooms/${roomId}/close`, {
         reason: closeReason,
         note: closeNote,
-        acknowledgedDismissal: established ? dismissalAcknowledged : undefined,
+        acknowledgedDismissal: acknowledgedDismissal ? true : undefined,
       })
+      setWithdrawalOpen(false)
       await loadView()
       toast.success(
-        established ? '채용내정 취소로 기록했습니다.' : '전형을 종료했습니다. 지원자에게 안내되었습니다.'
+        acknowledgedDismissal
+          ? '채용내정 취소로 기록했습니다.'
+          : '전형을 종료했습니다. 지원자에게 안내되었습니다.'
       )
     } catch (err) {
       toast.error(err.message)
@@ -229,29 +241,30 @@ export default function RoomPage() {
             지금까지의 대화와 계약 조건은 종료 뒤에도 그대로 볼 수 있습니다. 잘못 눌렀다면 다시
             진행할 수 있습니다.
           </p>
-          {offer?.established && (
-            <label className="checkbox-label dismissal-ack">
-              <input
-                type="checkbox"
-                checked={dismissalAcknowledged}
-                onChange={(e) => setDismissalAcknowledged(e.target.checked)}
-              />
-              위 내용을 확인했으며, 이것이 해고로 다뤄질 수 있음을 알고 진행합니다.
-            </label>
-          )}
           <button
             type="button"
             className={offer?.established ? 'btn-danger btn-sm' : 'btn-sm'}
-            onClick={handleClose}
-            disabled={closing || (offer?.established && !dismissalAcknowledged)}
+            onClick={requestClose}
+            disabled={closing}
           >
             {closing
               ? '처리하는 중...'
               : offer?.established
-                ? '해고로 기록하고 전형 종료'
+                ? '채용내정 취소 진행'
                 : '전형 종료하기'}
           </button>
         </section>
+      )}
+
+      {withdrawalOpen && (
+        <OfferWithdrawalModal
+          offer={offer}
+          reasonLabel={CLOSE_REASONS.find((r) => r.value === closeReason)?.label}
+          note={closeNote}
+          busy={closing}
+          onConfirm={() => submitClose(true)}
+          onClose={() => setWithdrawalOpen(false)}
+        />
       )}
 
       <RoomDocuments documents={view.documents} />
@@ -260,6 +273,8 @@ export default function RoomPage() {
       {room.myRole === 'company' && (
         <OfferWatch offer={offer} roomId={roomId} onChanged={loadView} />
       )}
+
+      {room.myRole === 'company' && <NegotiationLog negotiation={view.negotiation} />}
 
       <div className="chat-panel">
         <ChatMessageList messages={messages} />

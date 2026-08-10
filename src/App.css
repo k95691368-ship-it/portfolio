@@ -3048,3 +3048,98 @@
   font-size: 14px;
   color: var(--text-muted);
 }
+
+/* 처우 협의 기록 — 계약서에 적히기 전에 대화에서 정해진 것들.
+   채팅 로그를 다시 읽으면 다 있지만, 수백 줄에서 찾는 것과 뽑아 늘어놓은 것은
+   다르다. 다툼이 생겼을 때 필요한 것은 후자다. */
+.negotiation-log {
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  text-align: left;
+}
+.negotiation-log h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+.negotiation-entries {
+  list-style: none;
+  margin: 16px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.negotiation-entries > li {
+  padding-left: 14px;
+  border-left: 3px solid var(--accent-border);
+}
+.negotiation-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+.negotiation-field {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+.negotiation-value {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+/* 무엇에서 무엇으로 바뀌었는지가 협의의 내용이다. */
+.negotiation-prev {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+.negotiation-meta {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.negotiation-excerpt {
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* 채용내정 취소 경고문. 겁을 주는 것이 아니라 사실을 앞에 놓는 창이다. */
+.withdrawal-title {
+  margin: 0 0 8px;
+  color: var(--danger-text);
+}
+.withdrawal-reason {
+  margin-bottom: 12px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.withdrawal-facts {
+  margin: 16px 0;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.withdrawal-facts dt {
+  margin-top: 12px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+.withdrawal-facts dd {
+  margin: 2px 0 0;
+}
+.withdrawal-grounds {
+  margin: 4px 0 8px;
+  padding-left: 20px;
+}

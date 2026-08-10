@@ -159,6 +159,9 @@ async function wipeDemo(env) {
     inRooms('final_offer_emails'),
     inRooms('chat_messages'),
     inRooms('contract_edit_history'),
+    // 처우 협의 이력(0047)도 방을 외래키로 참조한다. 빠뜨리면 대화를 한 번이라도
+    // 나눈 데모는 두 번 다시 초기화되지 않는다.
+    inRooms('negotiation_log'),
     // 방 수명 기록(0044)도 방을 외래키로 참조한다. 빠뜨리면 전형을 한 번이라도
     // 종료해 본 데모는 두 번 다시 초기화되지 않는다.
     inRooms('room_lifecycle_log'),
