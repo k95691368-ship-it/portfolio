@@ -39,7 +39,10 @@ function excerpt(body) {
 const SCALE = { 억: 100000000, 천만: 10000000, 만: 10000, 천: 1000 }
 
 function parseWon(text) {
-  const t = String(text ?? '').replace(/(\d),(?=\d{3}(?!\d))/g, '$1')
+  const raw = String(text ?? '')
+  // 음수 금액은 임금이 아니다. 부호를 무시하면 "-100만원"이 100만원이 된다.
+  if (/[-−]\s*\d/.test(raw)) return null
+  const t = raw.replace(/(\d),(?=\d{3}(?!\d))/g, '$1')
 
   // 한 금액의 자릿수를 합치는 것과, 문장 안의 서로 다른 금액을 더하는 것은
   // 다르다. 처음에는 문장 전체의 단위 표기를 모두 더해서
@@ -77,6 +80,24 @@ function parseWon(text) {
 // 값이라, 연도가 통째로 틀린 값이 근거로 남는다.
 //
 // 기준일은 한국 날짜로 잡는다. 서버는 UTC 라 한국시간 새벽에는 해가 다르다.
+// 달력에 없는 날은 날짜가 아니다. 연도를 추론하다 보면 윤년이 아닌 해의
+// 2월 29일 같은 것이 만들어진다 — 그대로 기록하면 근로개시일이 존재하지 않는
+// 날이 되고, 그것을 기준으로 도는 모든 계산이 함께 어긋난다.
+function isRealDate(year, month, day) {
+  const d = new Date(Date.UTC(year, month - 1, day))
+  return (
+    d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day
+  )
+}
+
+function isoOrNull(year, month, day) {
+  const y = Number(year)
+  const m = Number(month)
+  const d = Number(day)
+  if (!isRealDate(y, m, d)) return null
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+}
+
 function parseDate(text, options = {}) {
   const base = options.today ?? koreanToday(options.now ?? new Date())
   const baseYear = options.year ?? base.getUTCFullYear()
@@ -84,14 +105,14 @@ function parseDate(text, options = {}) {
   const iso = text.match(/(20\d{2})[.\-/년]\s*(\d{1,2})[.\-/월]\s*(\d{1,2})/)
   if (iso) {
     const [, y, m, d] = iso
-    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+    return isoOrNull(y, m, d)
   }
 
   // "27년 3월 2일" 처럼 두 자리로 적은 연도.
   const short = text.match(/(?<!\d)(\d{2})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/)
   if (short) {
     const [, y, m, d] = short
-    return `20${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+    return isoOrNull(`20${y}`, m, d)
   }
 
   const md = text.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/)
@@ -106,7 +127,7 @@ function parseDate(text, options = {}) {
       const asThisYear = Date.UTC(year, Number(m) - 1, Number(d))
       if (asThisYear < base.getTime()) year += 1
     }
-    return `${year}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+    return isoOrNull(year, m, d)
   }
   return null
 }
@@ -136,13 +157,22 @@ function parseHours(text) {
     return h
   }
 
-  let s = toHour(sh, sMeri)
+  const s = toHour(sh, sMeri)
   let e = toHour(eh, eMeri)
   if (s === null || e === null) return null
 
-  // 오후 표기를 생략한 "9시부터 6시까지".
-  if (e <= s && !eMeri && e < 12) e += 12
-  if (e <= s) return null
+  // 시작과 끝이 같으면 근무시간을 알 수 없는 것이지 0시간도 24시간도 아니다.
+  // 보정보다 먼저 걸러야 한다 — "09:00부터 09:00까지"가 9시간으로 읽혔다.
+  if (s === e && !sMeri && !eMeri) return null
+
+  if (e <= s) {
+    // "9시부터 6시까지"는 오후를 생략한 것이고, "22시부터 6시까지"는 자정을
+    // 넘기는 교대다. 시작이 오후면 뒤로 미룰 자리가 없으므로 교대로 본다.
+    if (!eMeri && e < 12 && s < 12) e += 12
+    // 그래도 뒤집혀 있으면 자정을 넘긴 근무다. 그대로 두면
+    // computeWeeklyHours 가 24시간을 더해 제대로 센다.
+  }
+  if (e === s) return null
 
   const pad = (n) => String(n).padStart(2, '0')
   return { start: `${pad(s)}:${sm ?? '00'}`, end: `${pad(e)}:${em ?? '00'}` }

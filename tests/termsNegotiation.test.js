@@ -209,3 +209,36 @@ describe('쉬는 날', () => {
     expect(fieldsOf('근무일은 주말은 쉽니다. 토~일은 휴무입니다.')).not.toContain('workDays')
   })
 })
+
+// 경계값. 근로개시일과 근무시간은 그 위에서 모든 법정 계산이 돈다.
+describe('시각의 경계', () => {
+  it('자정을 넘기는 교대를 버리지 않는다', () => {
+    // 예전에는 종료가 시작보다 작으면 무조건 오후로 밀었다가, 그래도 작으면
+    // 통째로 버렸다. 야간 교대가 아예 기록되지 않았다.
+    expect(read('근무시간은 22시부터 6시까지입니다.')[0].value).toBe('22:00~06:00')
+    expect(read('근무시간은 오후 10시부터 오전 6시까지')[0].value).toBe('22:00~06:00')
+  })
+
+  it('시작과 끝이 같으면 모르는 것으로 둔다', () => {
+    // "09:00부터 09:00까지"가 9시간으로 읽혔다.
+    expect(fieldsOf('근무시간은 09:00부터 09:00까지')).not.toContain('workHours')
+  })
+})
+
+describe('금액과 날짜의 경계', () => {
+  it('음수 금액은 임금이 아니다', () => {
+    expect(fieldsOf('급여는 -100만원')).not.toContain('wageBaseAmount')
+  })
+
+  // 연도를 추론하다 보면 윤년이 아닌 해의 2월 29일이 만들어진다.
+  it('달력에 없는 날은 기록하지 않는다', () => {
+    const NOW = new Date(Date.UTC(2026, 7, 10))
+    expect(
+      extractTermsFromMessage({ body: '입사일은 2월 29일입니다' }, { now: NOW }).map((e) => e.field)
+    ).not.toContain('contractStartDate')
+    // 진짜 윤년은 그대로 읽는다.
+    expect(
+      extractTermsFromMessage({ body: '입사일은 2028-02-29 입니다' }, { now: NOW })[0].value
+    ).toBe('2028-02-29')
+  })
+})

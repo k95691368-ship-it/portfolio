@@ -33,9 +33,16 @@ export function termsFromNegotiation(rows, savedTerms = null) {
     if (field === 'workHours') {
       // 협의 이력은 "09:00~18:00" 한 덩어리로 남지만, 계산은 시작·종료를
       // 따로 본다.
-      const [start, end] = String(value).split('~')
-      if (start) terms.workHoursStart = start
-      if (end) terms.workHoursEnd = end
+      //
+      // 한쪽만 세우면 안 된다. 시작만 있고 종료가 없으면 주 근로시간이
+      // 계산되지 않는데, 계약서에는 시각이 적혀 있는 것처럼 보여 필수 항목
+      // 검사를 통과한다 — 값은 있는데 계산은 꺼지는, 이 저장소에서 반복되는
+      // 모양이다.
+      const [start, end, ...rest] = String(value).split('~')
+      if (rest.length > 0) continue
+      if (!start?.trim() || !end?.trim()) continue
+      terms.workHoursStart = start.trim()
+      terms.workHoursEnd = end.trim()
       continue
     }
     if (field === 'wageBaseAmount') {

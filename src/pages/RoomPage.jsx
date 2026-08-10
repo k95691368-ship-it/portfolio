@@ -119,14 +119,18 @@ export default function RoomPage() {
   const sendMessage = useCallback(
     async (body) => {
       const sent = await postMessage(body)
-      const signalled =
-        (sent?.offerSignal?.strong?.length ?? 0) > 0 ||
-        (sent?.offerSignal?.weak?.length ?? 0) > 0 ||
-        (sent?.negotiationAdded?.length ?? 0) > 0
-      if (signalled) await loadView().catch(() => {})
+      // 이미 확정으로 잡혀 있으면 같은 표현이 또 나와도 배너는 달라지지 않는다.
+      // 조건이 오가는 대화에서 매 메시지마다 화면 전체를 다시 부르지 않도록,
+      // 바뀔 수 있는 때만 다시 읽는다.
+      const offerCouldChange =
+        !view?.offer?.established &&
+        ((sent?.offerSignal?.strong?.length ?? 0) > 0 ||
+          (sent?.offerSignal?.weak?.length ?? 0) > 0)
+      const termsRecorded = (sent?.negotiationAdded?.length ?? 0) > 0
+      if (offerCouldChange || termsRecorded) await loadView().catch(() => {})
       return sent
     },
-    [postMessage, loadView]
+    [postMessage, loadView, view?.offer?.established]
   )
 
   const handleAnalyze = async () => {

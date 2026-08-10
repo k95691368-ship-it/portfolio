@@ -114,3 +114,24 @@ describe('지금 합의된 값으로 계약하면', () => {
     expect(Array.isArray(r.issues)).toBe(true)
   })
 })
+
+describe('근무시간 이력이 온전하지 않을 때', () => {
+  // 한쪽만 세우면 시각이 적혀 있는 것처럼 보여 필수 항목 검사를 통과하는데
+  // 주 근로시간은 계산되지 않는다 — 값은 있는데 계산은 꺼진다.
+  it('시작이나 종료 한쪽만 있으면 세우지 않는다', () => {
+    expect(termsFromNegotiation([row('workHours', '09:00')]).workHoursStart).toBeUndefined()
+    expect(termsFromNegotiation([row('workHours', '~18:00')]).workHoursEnd).toBeUndefined()
+  })
+
+  it('구분자가 여럿이면 세우지 않는다', () => {
+    const t = termsFromNegotiation([row('workHours', '09:00~18:00~20:00')])
+    expect(t.workHoursStart).toBeUndefined()
+    expect(t.workHoursEnd).toBeUndefined()
+  })
+
+  it('온전한 값은 시작과 종료로 나눈다', () => {
+    const t = termsFromNegotiation([row('workHours', '09:00~18:00')])
+    expect(t.workHoursStart).toBe('09:00')
+    expect(t.workHoursEnd).toBe('18:00')
+  })
+})
