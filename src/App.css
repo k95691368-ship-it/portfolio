@@ -540,7 +540,7 @@
    이 영역은 그대로 PDF로 내보내 보관·교부되는 문서이고, 서명 이미지는 배경이
    비어 있는 검은 획이라 어두운 면 위에서는 보이지 않는다. 종이는 흰색이다. */
 .contract-print {
-  text-align: left;
+  text-align: center;
   padding: 32px;
   background: #fff;
   color: #000;
@@ -589,17 +589,113 @@
   line-height: 165%;
 }
 
-.print-signatures {
-  display: flex;
-  gap: 40px;
-  margin-top: 24px;
+/* 표준근로계약서 본문.
+   이것은 화면에 보여 주는 요약이 아니라 그대로 서명되고 교부되어 보관되는
+   문서다. 표로 그리면 받는 사람이 근로계약서로 알아보지 못한다. */
+.print-title {
+  display: inline-block;
+  margin: 0 auto 20px;
+  padding: 6px 28px;
+  border: 1px solid #000;
+  font-size: 20px;
+  letter-spacing: 2px;
+}
+/* 제목만 가운데, 본문은 왼쪽. 원본 양식이 그렇다. */
+.print-parties,
+.print-clauses,
+.print-signatures,
+.contract-articles,
+.audit-trail-print {
+  text-align: left;
+}
+.print-parties {
+  margin-bottom: 16px;
+  line-height: 2;
+}
+.print-parties u {
+  display: inline-block;
+  min-width: 130px;
+  text-decoration: none;
+  border-bottom: 1px solid #000;
+  text-align: center;
+}
+.print-clauses {
+  margin: 0;
+  padding-left: 22px;
+  line-height: 1.9;
+}
+.print-clauses > li {
+  margin-bottom: 6px;
+}
+/* 항목 이름은 폭을 맞춰 세로로 줄이 서게 한다. 원본 양식이 그렇다. */
+.clause-name {
+  display: inline-block;
+  min-width: 108px;
+}
+.clause-name::after {
+  content: ' :';
+}
+.clause-value {
+  overflow-wrap: anywhere;
+}
+.clause-note {
+  display: block;
+  padding-left: 116px;
+  font-size: 13px;
+  color: #444;
+}
+.clause-sub {
+  list-style: none;
+  margin: 2px 0 0;
+  padding-left: 116px;
+}
+.clause-sub > li::before {
+  content: '- ';
+}
+.print-date {
+  margin: 28px 0 20px;
+  text-align: center;
+  letter-spacing: 6px;
 }
 
+/* 마지막은 좌우로 나눈 상자가 아니라 당사자별 항목이다. */
+.print-signatures {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 8px;
+}
+.print-party {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  row-gap: 6px;
+  align-items: center;
+}
+.print-party > div {
+  display: contents;
+}
+.print-party dt {
+  font-weight: 400;
+}
+.print-party dt::after {
+  content: ' :';
+}
+.print-party dd {
+  margin: 0;
+  min-height: 24px;
+  border-bottom: 1px solid #bbb;
+  overflow-wrap: anywhere;
+}
+.print-sign-cell {
+  border-bottom: none;
+}
+.print-sign-blank {
+  color: #666;
+}
 .print-signatures img {
-  max-width: 200px;
-  max-height: 100px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
+  max-width: 180px;
+  max-height: 70px;
 }
 
 /* Modal */

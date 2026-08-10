@@ -28,12 +28,32 @@ import { workplaceScope } from './workplaceScope.js'
 //
 // 여기서 잡는 것은 "확정"이 아니라 "확정으로 읽힐 수 있는 표현"이다. 단정하지
 // 않고 그 문장을 그대로 보여 주어 사람이 판단하게 한다.
+// 문장이 확정을 **부정**하고 있으면 확정으로 읽지 않는다.
+//
+// 표현이 있는지만 보고 극성을 보지 않아서, "합격이 아닙니다"와 "아직 채용을
+// 확정하지 않았습니다"가 확정 근거가 됐다. 가장 나빴던 것은 "내정 취소를
+// 검토 중입니다" — 취소를 검토한다는 말 자체가 내정 성립 판정을 만들고, 그
+// 문장이 "확정으로 본 근거"로 인용됐다.
+const NEGATION_RE =
+  /불합격|탈락|아닙니다|아닙니다만|아니에요|아직\s*(?:아니|정해지지|확정하지|결정하지)|않았|않습니다|못했|어렵겠|어렵습니다|취소|철회|없던\s*일|보류|다음\s*기회|안\s*됩니다|안됩니다|마세요|말아\s*주세요/
+
+// 확정 여부를 아직 알리지 않는다는 예고. 확정이 아니다.
+const PENDING_RE = /합격\s*(?:자|여부)?\s*(?:발표|안내|통보)?\s*(?:는|은)?\s*(?:다음|추후|나중|아직|이후|내주|곧)/
+
 const STRONG_PATTERNS = [
-  { re: /합격(?!\s*자\s*발표\s*는)/, label: '합격 통보' },
-  { re: /채용하기로|채용을?\s*확정|모시기로|함께하기로|함께하게\s*되/, label: '채용 확정 표현' },
-  { re: /출근\s*해\s*주세요|출근하시면|출근하세요|첫\s*출근/, label: '출근 지시' },
-  { re: /입사일(은|이)|입사\s*날짜(는|가)/, label: '입사일 지정' },
-  { re: /최종\s*합격|최종\s*확정|내정/, label: '최종 확정 표현' },
+  // '불합격'의 뒤 두 글자에 그대로 걸리지 않도록 앞을 막는다.
+  { re: /(?<![불부])합격(?!\s*자\s*발표)/, label: '합격 통보' },
+  {
+    re: /채용하기로|채용을?\s*(?:확정|결정)|뽑기로|모시기로|함께\s*(?:하기로|일하게|근무하게)|오퍼\s*(?:드립|드릴|를\s*드)/,
+    label: '채용 확정 표현',
+  },
+  {
+    re: /출근\s*해\s*주세요|출근하시면|출근하세요|첫\s*출근|나오시죠|나와\s*주세요|출근일(?:은|이)|출근\s*부탁/,
+    label: '출근 지시',
+  },
+  // 조사를 붙이지 않고 "입사일 9월 1일로 하시죠"라고 쓰는 쪽이 더 흔하다.
+  { re: /입사일\s*(?:은|이|을)?\s*\d|입사\s*날짜\s*(?:는|가)?\s*\d|자로\s*발령/, label: '입사일 지정' },
+  { re: /최종\s*합격|최종\s*확정|채용내정|내정\s*통지/, label: '최종 확정 표현' },
 ]
 
 const WEAK_PATTERNS = [
@@ -63,6 +83,11 @@ export function scanForOfferSignals(messages) {
     const body = String(m.body ?? '')
     if (!body.trim()) continue
 
+    // 확정을 부정하거나 아직 알리지 않겠다는 문장은 확정 근거로 삼지 않는다.
+    // 없는 확정을 만들면 회사가 방을 닫지 못하고, 감사 증명서에는 있지도
+    // 않았던 채용내정의 취소가 기록된다.
+    if (NEGATION_RE.test(body) || PENDING_RE.test(body)) continue
+
     for (const p of STRONG_PATTERNS) {
       if (p.re.test(body)) {
         strong.push({ label: p.label, text: excerpt(body), at: m.created_at ?? m.createdAt ?? null })
@@ -77,7 +102,9 @@ export function scanForOfferSignals(messages) {
     }
   }
 
-  return { strong: strong.slice(-MAX_SIGNALS), weak: weak.slice(-MAX_SIGNALS) }
+  // 앞에서부터 남긴다. 확정을 성립시킨 것은 처음 그렇게 말한 문장이므로,
+  // 뒤에서 자르면 정작 근거가 될 문장이 잘려 나간다.
+  return { strong: strong.slice(0, MAX_SIGNALS), weak: weak.slice(0, MAX_SIGNALS) }
 }
 
 // 취소하면 무슨 일이 벌어지는가.
@@ -150,10 +177,12 @@ export function describeOfferStatus({ terms, messages } = {}) {
     established: true,
     likely: true,
     basis: confirmed ? 'ai' : 'phrase',
+    // 확정을 성립시킨 것은 처음 그렇게 말한 문장이다. 시각과 인용문이 서로
+    // 다른 메시지를 가리키면 "언제 무슨 말로 확정됐는가"가 어긋난다.
     at: confirmedAt ?? signals.strong[0]?.at ?? null,
     // 단정하지 않고 근거를 보여 준다. "AI가 그렇다는데요"로는 아무도 승복하지
     // 않고, 승복하지 않으면 그냥 취소 버튼을 누른다.
-    excerpt: aiExcerpt ?? signals.strong[signals.strong.length - 1]?.text ?? null,
+    excerpt: aiExcerpt ?? signals.strong[0]?.text ?? null,
     signals,
     risk: describeCancellationRisk(terms),
     note: confirmed

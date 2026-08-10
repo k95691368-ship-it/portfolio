@@ -1122,6 +1122,25 @@ export default function ContractPage() {
     }
   }
 
+  // 인쇄되는 계약서에 쓰는 값들.
+  //
+  // 표준근로계약서는 빈칸이 있는 양식이다. 값이 없으면 "-"를 넣는 대신 빈칸을
+  // 그대로 두는 편이 원본에 가깝고, 무엇이 아직 안 정해졌는지도 눈에 띈다.
+  const wageItemsForPrint = (form.wageItems ?? []).filter(
+    (w) => w?.name && Number(w.amount) > 0
+  )
+  // 계약 체결일. 양측이 서명한 뒤에는 마지막 서명 시각이 곧 체결일이다.
+  const signedDateText = (() => {
+    const last = signatures
+      .map((s) => s.signedAt)
+      .filter(Boolean)
+      .sort()
+      .pop()
+    if (!last) return '____년 __월 __일'
+    const [y, m, d] = formatKst(last).slice(0, 10).split('-')
+    return `${y}년 ${Number(m)}월 ${Number(d)}일`
+  })()
+
   if (loading) return <p>불러오는 중...</p>
   if (error && !room) return <p className="error">{error}</p>
 
@@ -1605,9 +1624,15 @@ export default function ContractPage() {
 
       <div className="contract-print" ref={printRef}>
         <h2 className="print-title">표준근로계약서</h2>
-        <p>
-          {form.employerName || '사업체명 미기재'} (이하 "사업주")과(와) {form.employeeName || '근로자 미기재'}
-          (이하 "근로자")은 다음과 같이 근로계약을 체결한다.
+
+        {/* 고용노동부 표준근로계약서는 표가 아니라 번호가 붙은 조문이다.
+            이것은 화면에 보여 주는 요약이 아니라 그대로 서명되고 교부되어
+            보관되는 문서이므로, 실제 양식과 다른 모양이면 받는 사람이
+            근로계약서로 알아보지 못한다. */}
+        <p className="print-parties">
+          <u>{form.employerName || ' '.repeat(14)}</u> (이하 "사업주"라 함)과(와){' '}
+          <u>{form.employeeName || ' '.repeat(14)}</u> (이하 "근로자"라 함)은 다음과 같이
+          근로계약을 체결한다.
         </p>
 
         {aiDocument ? (
@@ -1620,51 +1645,160 @@ export default function ContractPage() {
             ))}
           </div>
         ) : (
-          <table>
-            <tbody>
-              {IDENTITY_FIELDS.map((f) => (
-                <tr key={f.key}>
-                  <th scope="row">{f.label}</th>
-                  <td>{form[f.key] || '-'}</td>
-                </tr>
-              ))}
-              {TERM_FIELDS.map((f) => (
-                <tr key={f.key}>
-                  <th scope="row">{f.label}</th>
-                  <td>{form[f.key] || '-'}</td>
-                </tr>
-              ))}
-              <tr>
-                <th scope="row">사회보험 적용</th>
-                <td>
-                  {SOCIAL_INSURANCE_FIELDS.filter((f) => form.socialInsurance[f.key])
-                    .map((f) => f.label)
-                    .join(', ') || '-'}
-                </td>
-              </tr>
-              {form.customTerms.filter((c) => c.label && c.value).length > 0 && (
-                <tr>
-                  <th scope="row">그 밖의 사항</th>
-                  <td>{form.customTerms.map((c) => `${c.label}: ${c.value}`).join(', ')}</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <ol className="print-clauses">
+            <li>
+              <span className="clause-name">근로계약기간</span>
+              <span className="clause-value">
+                {form.contractStartDate || '____년 __월 __일'}부터{' '}
+                {form.contractEndDate || '____년 __월 __일'}까지
+              </span>
+              <span className="clause-note">
+                ※ 근로계약기간을 정하지 않는 경우에는 "근로개시일"만 기재
+              </span>
+            </li>
+            <li>
+              <span className="clause-name">근 무 장 소</span>
+              <span className="clause-value">{form.workLocation || ' '}</span>
+            </li>
+            <li>
+              <span className="clause-name">업무의 내용</span>
+              <span className="clause-value">{form.jobDescription || ' '}</span>
+            </li>
+            <li>
+              <span className="clause-name">소정근로시간</span>
+              <span className="clause-value">
+                {form.workHoursStart || '__시 __분'}부터 {form.workHoursEnd || '__시 __분'}까지
+                {' '}(휴게시간 : __시 __분 ~ __시 __분)
+              </span>
+            </li>
+            <li>
+              <span className="clause-name">근무일/휴일</span>
+              <span className="clause-value">
+                매주 {form.workDays || '__일'} 근무, 주휴일 {form.restDays || '매주 __요일'}
+              </span>
+            </li>
+            <li>
+              <span className="clause-name">임 금</span>
+              <ul className="clause-sub">
+                {wageItemsForPrint.length > 0 ? (
+                  wageItemsForPrint.map((w, i) => (
+                    <li key={i}>
+                      {w.name} : {Number(w.amount).toLocaleString('ko-KR')}원
+                    </li>
+                  ))
+                ) : (
+                  <li>
+                    월(일, 시간)급 :{' '}
+                    {form.wageBaseAmount
+                      ? `${Number(form.wageBaseAmount).toLocaleString('ko-KR')}원`
+                      : '__________원'}
+                  </li>
+                )}
+                <li>
+                  임금지급일 : {form.wagePayDate || '매월(매주 또는 매일) ____일'}
+                  (휴일의 경우는 전일 지급)
+                </li>
+                <li>지급방법 : {form.wagePayMethod || '근로자에게 직접지급( ), 근로자 명의 예금통장에 입금( )'}</li>
+              </ul>
+            </li>
+            <li>
+              <span className="clause-name">연차유급휴가</span>
+              <ul className="clause-sub">
+                <li>{form.annualLeave || '연차유급휴가는 근로기준법에서 정하는 바에 따라 부여함'}</li>
+              </ul>
+            </li>
+            <li>
+              <span className="clause-name">사회보험 적용여부</span>
+              <span className="clause-value">
+                {SOCIAL_INSURANCE_FIELDS.map(
+                  (f) => `${f.label} ( ${form.socialInsurance[f.key] ? '○' : '  '} )`
+                ).join('  ')}
+              </span>
+            </li>
+            <li>
+              <span className="clause-name">근로계약서 교부</span>
+              <ul className="clause-sub">
+                <li>
+                  사업주는 근로계약을 체결함과 동시에 본 계약서를 사본하여 근로자의 교부요구와
+                  관계없이 근로자에게 교부함(근로기준법 제17조 이행)
+                </li>
+              </ul>
+            </li>
+            {form.customTerms.filter((c) => c.label && c.value).length > 0 && (
+              <li>
+                <span className="clause-name">그 밖의 사항</span>
+                <ul className="clause-sub">
+                  {form.customTerms
+                    .filter((c) => c.label && c.value)
+                    .map((c, i) => (
+                      <li key={i}>
+                        {c.label} : {c.value}
+                      </li>
+                    ))}
+                </ul>
+              </li>
+            )}
+            <li>
+              <span className="clause-name">기 타</span>
+              <ul className="clause-sub">
+                <li>이 계약에 정함이 없는 사항은 근로기준법령에 의함</li>
+              </ul>
+            </li>
+          </ol>
         )}
 
+        <p className="print-date">{signedDateText}</p>
+
+        {/* 표준근로계약서의 마지막은 좌우로 나눈 상자가 아니라, 사업주와
+            근로자의 항목을 세로로 적고 그 옆에 서명하는 자리다. */}
         <div className="print-signatures">
-          <div>
-            <p>사업주 (회사)</p>
-            {signatures.find((s) => s.role === 'company') && (
-              <img src={signatures.find((s) => s.role === 'company').imageDataUrl} alt="회사 서명" />
-            )}
-          </div>
-          <div>
-            <p>근로자 (지원자)</p>
-            {signatures.find((s) => s.role === 'candidate') && (
-              <img src={signatures.find((s) => s.role === 'candidate').imageDataUrl} alt="지원자 서명" />
-            )}
-          </div>
+          <dl className="print-party">
+            <div>
+              <dt>(사업주) 사업체명</dt>
+              <dd>{form.employerName || ' '}</dd>
+            </div>
+            <div>
+              <dt>주 소</dt>
+              <dd>{form.employerAddress || ' '}</dd>
+            </div>
+            <div>
+              <dt>대 표 자</dt>
+              <dd className="print-sign-cell">
+                {signatures.find((s) => s.role === 'company') ? (
+                  <img
+                    src={signatures.find((s) => s.role === 'company').imageDataUrl}
+                    alt="사업주 서명"
+                  />
+                ) : (
+                  <span className="print-sign-blank">(서명)</span>
+                )}
+              </dd>
+            </div>
+          </dl>
+
+          <dl className="print-party">
+            <div>
+              <dt>(근로자) 주 소</dt>
+              <dd>{form.employeeAddress || ' '}</dd>
+            </div>
+            <div>
+              <dt>성 명</dt>
+              <dd>{form.employeeName || ' '}</dd>
+            </div>
+            <div>
+              <dt>서 명</dt>
+              <dd className="print-sign-cell">
+                {signatures.find((s) => s.role === 'candidate') ? (
+                  <img
+                    src={signatures.find((s) => s.role === 'candidate').imageDataUrl}
+                    alt="근로자 서명"
+                  />
+                ) : (
+                  <span className="print-sign-blank">(서명)</span>
+                )}
+              </dd>
+            </div>
+          </dl>
         </div>
 
         {auditTrail && auditTrail.events.length > 0 && (

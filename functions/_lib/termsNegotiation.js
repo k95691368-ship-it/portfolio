@@ -19,6 +19,8 @@
 // 그리고 이 기록은 나중에 근거로 쓰이므로 재현되어야 한다 — 같은 문장에서
 // 오늘과 내일 다른 값이 나오면 근거가 될 수 없다.
 
+import { koreanToday } from './koreanTime.js'
+
 const MAX_EXCERPT = 200
 
 function excerpt(body) {
@@ -39,17 +41,23 @@ const SCALE = { 억: 100000000, 천만: 10000000, 만: 10000, 천: 1000 }
 function parseWon(text) {
   const t = String(text ?? '').replace(/(\d),(?=\d{3}(?!\d))/g, '$1')
 
-  // 천만은 천×만이므로 따로 잡지 않으면 "3천"과 "만"으로 쪼개진다.
-  const units = [...t.matchAll(/(\d+)\s*(억|천만|만|천)/g)]
-  if (units.length > 0) {
+  // 한 금액의 자릿수를 합치는 것과, 문장 안의 서로 다른 금액을 더하는 것은
+  // 다르다. 처음에는 문장 전체의 단위 표기를 모두 더해서
+  // "기본급 290만원에 식대 10만원 별도"가 300만원으로 기록됐다.
+  //
+  // 붙어 있는 단위 표기만 한 덩어리로 본다. "1억 2천만원"은 이어져 있으므로
+  // 한 금액이고, "290만원 ... 10만원"은 사이에 다른 말이 끼므로 두 금액이다.
+  const groups = [...t.matchAll(/(?:\d+\s*(?:억|천만|만|천)\s*)+/g)]
+  for (const g of groups) {
     let total = 0
-    for (const m of units) {
+    for (const m of g[0].matchAll(/(\d+)\s*(억|천만|만|천)/g)) {
       const n = Number(m[1])
       const scale = SCALE[m[2]]
       if (Number.isFinite(n) && scale) total += n * scale
     }
     // 만 단위에 못 미치는 값은 임금으로 보지 않는다. "3천 원"은 금액이지
-    // 급여가 아니다.
+    // 급여가 아니다. 첫 번째로 나오는 금액을 쓴다 — 문장에서 먼저 말한 것이
+    // 그 문장이 정하려는 값이다.
     if (total >= 10000) return total
   }
 
@@ -61,40 +69,96 @@ function parseWon(text) {
   return null
 }
 
-// "9월 1일", "2026-09-01", "2026년 9월 1일"
-function parseDate(text, { year = new Date().getUTCFullYear() } = {}) {
+// "9월 1일", "2026-09-01", "2026년 9월 1일", "27년 3월 2일", "내년 3월 2일"
+//
+// 연도를 안 적은 날짜를 무조건 올해로 붙이고 있었다. 그래서 "내년 3월 2일"이
+// 이미 지나간 올해 3월로 기록되고, 12월에 "1월 5일 입사"로 합의하면 11개월
+// 과거가 된다. 근로개시일은 채용내정 성립과 불이익 변경(개시일 연기)을 따지는
+// 값이라, 연도가 통째로 틀린 값이 근거로 남는다.
+//
+// 기준일은 한국 날짜로 잡는다. 서버는 UTC 라 한국시간 새벽에는 해가 다르다.
+function parseDate(text, options = {}) {
+  const base = options.today ?? koreanToday(options.now ?? new Date())
+  const baseYear = options.year ?? base.getUTCFullYear()
+
   const iso = text.match(/(20\d{2})[.\-/년]\s*(\d{1,2})[.\-/월]\s*(\d{1,2})/)
   if (iso) {
     const [, y, m, d] = iso
     return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
   }
+
+  // "27년 3월 2일" 처럼 두 자리로 적은 연도.
+  const short = text.match(/(?<!\d)(\d{2})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/)
+  if (short) {
+    const [, y, m, d] = short
+    return `20${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+  }
+
   const md = text.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/)
   if (md) {
     const [, m, d] = md
+    let year = baseYear
+    if (/내년|다음\s*해|익년/.test(text)) year += 1
+    else if (/작년|지난\s*해/.test(text)) year -= 1
+    else if (options.year === undefined) {
+      // 연도를 말하지 않았다면 앞으로 올 날을 뜻한다. 근로개시일은 과거로
+      // 정하지 않는다 — 이미 지난 달을 말했으면 내년으로 읽는다.
+      const asThisYear = Date.UTC(year, Number(m) - 1, Number(d))
+      if (asThisYear < base.getTime()) year += 1
+    }
     return `${year}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
   }
   return null
 }
 
-// "09시부터 18시까지", "9시~18시", "09:00 ~ 18:00"
+// "09시부터 18시까지", "9시~18시", "09:00 ~ 18:00", "오전 9시부터 오후 6시까지"
+//
+// 오전·오후를 몰라서 "9시부터 6시까지"가 09:00~06:00 으로 기록됐다. 9시간
+// 근무가 이력상 하루 -3시간이 되고, 이 값은 제53조 연장근로 판단의 기준이다.
+// 반대로 "오전 9시부터 오후 6시까지"는 구분자 뒤에 곧바로 숫자를 요구해
+// 아예 매치되지 않았다.
+//
+// 오전·오후가 없으면 종료가 시작보다 앞설 때 오후로 읽는다. 근로계약에서
+// 자정을 넘겨 되돌아오는 근무보다 오후 표기를 생략한 경우가 압도적으로 흔하다.
+// 전화번호(010-1234-5678)가 시각으로 읽히지 않도록 '-'는 구분자에서 뺐다.
 function parseHours(text) {
   const m = text.match(
-    /(\d{1,2})\s*(?::(\d{2}))?\s*시?\s*(?:부터|~|-|에서)\s*(\d{1,2})\s*(?::(\d{2}))?\s*시?\s*(?:까지)?/
+    /(오전|오후|아침|저녁|밤)?\s*(\d{1,2})\s*(?::(\d{2}))?\s*시?\s*(?:부터|~|에서)\s*(오전|오후|아침|저녁|밤)?\s*(\d{1,2})\s*(?::(\d{2}))?\s*시?\s*(?:까지)?/
   )
   if (!m) return null
-  const [, sh, sm, eh, em] = m
-  const s = Number(sh)
-  const e = Number(eh)
-  if (!Number.isFinite(s) || !Number.isFinite(e) || s > 24 || e > 24) return null
+  const [, sMeri, sh, sm, eMeri, eh, em] = m
+
+  const toHour = (raw, meri) => {
+    let h = Number(raw)
+    if (!Number.isFinite(h) || h < 0 || h > 24) return null
+    if ((meri === '오후' || meri === '저녁' || meri === '밤') && h < 12) h += 12
+    if ((meri === '오전' || meri === '아침') && h === 12) h = 0
+    return h
+  }
+
+  let s = toHour(sh, sMeri)
+  let e = toHour(eh, eMeri)
+  if (s === null || e === null) return null
+
+  // 오후 표기를 생략한 "9시부터 6시까지".
+  if (e <= s && !eMeri && e < 12) e += 12
+  if (e <= s) return null
+
   const pad = (n) => String(n).padStart(2, '0')
   return { start: `${pad(s)}:${sm ?? '00'}`, end: `${pad(e)}:${em ?? '00'}` }
 }
 
 // "주 5일", "주5일 근무", "월~금"
+//
+// 쉬는 날을 안내한 문장이 근무일로 기록됐다. "토~일은 휴무입니다"가 토·일
+// 근무로 남으면, 제56조 휴일근로 가산의 전제가 실제 합의와 정반대가 된다.
+const DAY_OFF_RE = /휴무|쉽니다|쉬는|제외|off/i
+
 function parseWorkDays(text) {
   const week = text.match(/주\s*([1-7])\s*일/)
   if (week) return `주 ${week[1]}일`
-  const range = text.replace(/요일/g, '').match(/([월화수목금토일])\s*[~-]\s*([월화수목금토일])/)
+  if (DAY_OFF_RE.test(text)) return null
+  const range = text.replace(/요일/g, '').match(/([월화수목금토일])\s*~\s*([월화수목금토일])/)
   if (range) return `${range[1]}~${range[2]}`
   return null
 }
@@ -123,7 +187,11 @@ const FIELD_RULES = [
   {
     field: 'workHours',
     label: '근무시간',
-    topic: /근무\s*시간|근로\s*시간|출퇴근|시\s*부터|출근\s*시간/,
+    // '시 부터'만으로 주제를 잡으면 "점심 휴게시간은 12시부터 13시까지"가
+    // 근무시간으로 기록되어, 합의된 09:00~18:00 을 12:00~13:00 으로 갈아치운다.
+    // 근무를 말하는 문장인지 먼저 가리고, 휴게·점심 이야기는 뺀다.
+    topic: /근무\s*시간|근로\s*시간|소정근로|출퇴근|출근\s*시간|근무는/,
+    exclude: /휴게|점심|식사|브레이크|연락처|전화/,
     read: (t) => {
       const h = parseHours(t)
       return h === null ? null : { value: `${h.start}~${h.end}`, display: `${h.start} ~ ${h.end}` }
@@ -151,6 +219,7 @@ export function extractTermsFromMessage(message, options = {}) {
   const found = []
   for (const rule of FIELD_RULES) {
     if (!rule.topic.test(body)) continue
+    if (rule.exclude && rule.exclude.test(body)) continue
     const read = rule.read(body, options)
     if (!read) continue
     found.push({

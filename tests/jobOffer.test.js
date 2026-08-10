@@ -185,3 +185,75 @@ describe('확정 뒤의 불리한 조건 변경', () => {
     ).toHaveLength(1)
   })
 })
+
+// 워크플로우가 찾은 것들. 없는 확정을 만들면 회사가 방을 닫지 못하고,
+// 감사 증명서에는 있지도 않았던 채용내정의 취소가 기록된다.
+describe('확정이 아닌 문장을 확정으로 읽지 않는다', () => {
+  const co = (body) => ({ role_in_room: 'company', body })
+  const established = (body) =>
+    describeOfferStatus({ terms: {}, messages: [co(body)] }).established
+
+  // '불합격'의 뒤 두 글자가 '합격'에 그대로 걸렸다. 채용절차법 제10조에 따라
+  // 불합격을 통지한 회사가 그 방을 닫지 못하게 된다.
+  it('불합격 통보', () => {
+    expect(established('아쉽지만 이번 채용에서는 불합격입니다.')).toBe(false)
+    expect(established('불합격입니다. 좋은 결과 있으시길 바랍니다.')).toBe(false)
+  })
+
+  it('아직 알리지 않겠다는 예고', () => {
+    expect(established('합격 여부는 다음 주에 알려드립니다.')).toBe(false)
+    expect(established('합격자 발표는 다음 주입니다.')).toBe(false)
+    expect(established('최종 합격자 발표는 아직입니다.')).toBe(false)
+  })
+
+  it('확정을 부정하는 문장', () => {
+    expect(established('합격이 아닙니다.')).toBe(false)
+    expect(established('아직 채용을 확정하지 않았습니다.')).toBe(false)
+    expect(established('입사일은 아직 정해지지 않았습니다.')).toBe(false)
+    expect(established('출근하시면 안 됩니다.')).toBe(false)
+  })
+
+  // 취소를 검토한다는 말 자체가 내정 성립 판정을 만들고, 그 문장이
+  // "확정으로 본 근거"로 인용됐다.
+  it('취소를 검토한다는 말', () => {
+    expect(established('내정 취소를 검토 중입니다.')).toBe(false)
+  })
+})
+
+describe('흔한 확정 표현을 놓치지 않는다', () => {
+  const co = (body) => ({ role_in_room: 'company', body })
+  const established = (body) =>
+    describeOfferStatus({ terms: {}, messages: [co(body)] }).established
+
+  it.each([
+    '채용을 결정했습니다.',
+    '다음 주 월요일부터 나오시죠.',
+    '오퍼 드립니다. 검토해주세요.',
+    '뽑기로 했습니다.',
+    '9월 1일자로 발령 예정입니다.',
+    '입사일 9월 1일로 하시죠.',
+    '출근일은 9월 1일입니다.',
+    '함께 일하게 되어 기쁩니다.',
+    '최종 합격하셨습니다.',
+  ])('%s', (body) => {
+    expect(established(body)).toBe(true)
+  })
+})
+
+describe('근거로 인용하는 문장', () => {
+  const co = (body, at) => ({ role_in_room: 'company', body, created_at: at })
+
+  // 확정을 성립시킨 것은 처음 그렇게 말한 문장이다. 시각과 인용문이 서로 다른
+  // 메시지를 가리키면 "언제 무슨 말로 확정됐는가"가 어긋난다.
+  it('처음 확정을 말한 문장을 인용한다', () => {
+    const o = describeOfferStatus({
+      terms: {},
+      messages: [
+        co('최종 합격하셨습니다.', '2026-09-01 10:00:00'),
+        co('9월 1일부터 출근해 주세요.', '2026-09-02 10:00:00'),
+      ],
+    })
+    expect(o.excerpt).toContain('최종 합격')
+    expect(o.at).toBe('2026-09-01 10:00:00')
+  })
+})
