@@ -13,6 +13,7 @@ import RoomInviteEmailForm from '../components/RoomInviteEmailForm.jsx'
 import InterviewSummary from '../components/InterviewSummary.jsx'
 import OfferWatch from '../components/OfferWatch.jsx'
 import NegotiationLog from '../components/NegotiationLog.jsx'
+import PreContractReview from '../components/PreContractReview.jsx'
 import OfferWithdrawalModal from '../components/OfferWithdrawalModal.jsx'
 import { roomStatusInfo } from '../lib/roomStatus.js'
 
@@ -296,6 +297,11 @@ export default function RoomPage() {
       )}
 
       {room.myRole === 'company' && <NegotiationLog negotiation={view.negotiation} />}
+
+      {/* 확정 뒤에 조건을 고치는 것이 실질적 취소다. 그 전에 본다. */}
+      {room.myRole === 'company' && room.status !== 'signed' && (
+        <PreContractReview roomId={roomId} />
+      )}
 
       <div className="chat-panel">
         <ChatMessageList messages={messages} />

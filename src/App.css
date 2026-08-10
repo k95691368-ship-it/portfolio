@@ -3143,3 +3143,67 @@
   margin: 4px 0 8px;
   padding-left: 20px;
 }
+
+/* 계약서 쓰기 전 검토 — 값으로 계산한 것과 맥락으로 읽은 것을 나란히 둔다. */
+.pre-contract-review {
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  text-align: left;
+}
+.pre-contract-review h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+.pre-contract-review > button {
+  margin-top: 12px;
+}
+.review-result {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 900px) {
+  .review-result {
+    grid-template-columns: 1fr;
+  }
+}
+.review-block {
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.review-block h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+.review-block h4 {
+  margin: 14px 0 4px;
+  font-size: 14px;
+  color: var(--text-h);
+}
+.review-summary {
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+.review-quote {
+  margin: 4px 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--warning-border);
+  background: var(--bg);
+  font-size: 14px;
+}
+.review-law,
+.review-basis {
+  color: var(--text-muted);
+  font-size: 13px;
+}

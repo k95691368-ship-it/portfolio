@@ -498,3 +498,164 @@ export async function analyzeConversation(env, transcript, previousTerms) {
   }
   return analysis
 }
+
+// 계약서를 쓰기 전에 대화를 통째로 검토한다.
+//
+// 지금까지 법적 판정은 순수 함수만 했다. 계약서에 값이 다 채워진 뒤라야 돌 수
+// 있었기 때문이다. 그런데 조건은 계약서에 적히기 훨씬 전에 대화에서 정해지고,
+// 한 번 확정되면 되돌리기 어려워진다 — 확정 뒤에 조건을 고치는 것은 이 앱이
+// 막으려는 실질적 취소에 해당한다. 그러니 확정 전에 봐야 한다.
+//
+// 그 자리는 계산으로는 닿지 않는다. "무엇이 합의되지 않은 채 넘어갔는가",
+// "회사와 지원자가 서로 다르게 이해하고 있는 지점은 어디인가", "나중에 다툼이
+// 될 모호한 표현은 무엇인가" 는 값이 아니라 맥락이다.
+//
+// 이 판정은 재현되지 않는다. 같은 대화에 대해 오늘과 내일의 답이 다를 수 있다.
+// 그래서 이 결과로 무엇을 막지 않는다 — 사람이 읽고 판단할 재료로만 쓴다.
+// 서명을 실제로 막는 것은 여전히 순수 함수의 법정 계산이다.
+const NEGOTIATION_REVIEW_TOOL = {
+  name: 'record_negotiation_review',
+  description:
+    '근로계약서를 작성하기 전에, 지금까지의 면접 대화에서 근로조건이 충분히 합의되었는지 검토한다.',
+  input_schema: {
+    type: 'object',
+    required: ['verdict', 'summary', 'agreed', 'missing', 'ambiguous', 'mismatches', 'legal_issues'],
+    properties: {
+      verdict: {
+        type: 'string',
+        enum: ['ready', 'needs_work'],
+        description: '지금 계약서를 써도 되는 상태인지. 빠진 합의나 법적 문제가 있으면 needs_work.',
+      },
+      summary: { type: 'string', description: '지금 상태를 두세 문장으로' },
+      agreed: {
+        type: 'array',
+        description: '대화에서 양측이 합의한 것으로 보이는 근로조건',
+        items: {
+          type: 'object',
+          required: ['item', 'value'],
+          properties: {
+            item: { type: 'string', description: '항목 이름 (예: 임금, 근무시간)' },
+            value: { type: 'string', description: '합의된 값' },
+            basis: { type: ['string', 'null'], description: '그렇게 본 근거가 된 발언' },
+          },
+        },
+      },
+      missing: {
+        type: 'array',
+        description: '근로계약서에 반드시 있어야 하는데 대화에서 한 번도 정해지지 않은 항목',
+        items: {
+          type: 'object',
+          required: ['item', 'why'],
+          properties: {
+            item: { type: 'string' },
+            why: { type: 'string', description: '왜 필요한지 (근거 조문이 있으면 함께)' },
+          },
+        },
+      },
+      ambiguous: {
+        type: 'array',
+        description: '말은 오갔지만 해석이 갈릴 수 있어 나중에 다툼이 될 표현',
+        items: {
+          type: 'object',
+          required: ['quote', 'why'],
+          properties: {
+            quote: { type: 'string', description: '대화에서 그대로 인용' },
+            why: { type: 'string', description: '어떻게 갈릴 수 있는지' },
+          },
+        },
+      },
+      mismatches: {
+        type: 'array',
+        description: '회사와 지원자가 서로 다르게 이해하고 있는 것으로 보이는 지점',
+        items: {
+          type: 'object',
+          required: ['item', 'company', 'candidate'],
+          properties: {
+            item: { type: 'string' },
+            company: { type: 'string', description: '회사 쪽 이해' },
+            candidate: { type: 'string', description: '지원자 쪽 이해' },
+          },
+        },
+      },
+      legal_issues: {
+        type: 'array',
+        description: '지금 합의된 조건대로 계약하면 생길 법적 문제',
+        items: {
+          type: 'object',
+          required: ['severity', 'title', 'detail'],
+          properties: {
+            severity: { type: 'string', enum: ['high', 'medium', 'info'] },
+            title: { type: 'string' },
+            detail: { type: 'string' },
+            law: { type: ['string', 'null'], description: '근거 조문' },
+          },
+        },
+      },
+    },
+  },
+}
+
+const NEGOTIATION_REVIEW_PROMPT = `당신은 한국 근로기준법에 밝은 노무 담당자입니다. 회사가 근로계약서를 작성하기 직전에, 지금까지의 면접 대화를 검토합니다.
+
+이 검토의 목적은 회사가 실수로 손해를 입는 것을 막는 것입니다. 채용내정이 성립한 뒤에 조건을 바꾸면 그것은 근로조건의 불이익 변경이고, 취소하면 해고로 다뤄집니다. 그러니 확정되기 전에 빠진 것과 어긋난 것을 찾아야 합니다.
+
+검토 기준:
+1. 근로기준법 제17조 제1항이 명시를 요구하는 것 — 임금(구성항목·계산방법·지급방법), 소정근로시간, 제55조에 따른 휴일, 제60조에 따른 연차 유급휴가. 그 밖에 근무장소와 업무의 내용.
+2. 최저임금: 2026년 최저시급 10,320원. 월 소정근로시간은 주 40시간 기준 약 209시간. 산입되지 않는 것(연장·야간·휴일 가산수당, 연차수당, 부정기 상여)을 빼고 비교합니다.
+3. 근로시간: 1일 8시간·주 40시간, 연장 포함 주 52시간. 휴게는 4시간 초과 30분, 8시간 초과 1시간(제54조).
+4. 기간제: 2년을 초과하면 무기계약으로 전환됩니다(기간제법 제4조).
+5. 수습: 1년 이상 계약이고 3개월 이내일 때만 감액할 수 있고, 하한은 최저임금의 90%입니다(최저임금법 제5조 제2항·시행령 제3조). 단순노무업무 종사자는 감액 자체가 금지됩니다.
+6. 상시 4명 이하 사업장에는 제53조(주 52시간)·제56조(가산수당)·제60조(연차)가 적용되지 않습니다(제11조). 사업장 규모를 알 수 없으면 5명 이상을 전제로 하되 그 사실을 밝히세요.
+
+지켜야 할 것:
+- 대화에 없는 것을 지어내지 마세요. 근거가 된 발언을 인용할 수 없으면 agreed 에 넣지 마세요.
+- 정보가 부족해 판단할 수 없으면 legal_issues 에 넣지 말고 missing 에 넣으세요. 없는 위반을 만들면 진짜 경고까지 무시됩니다.
+- 회사 편도 지원자 편도 들지 마세요. 사실과 조문만 적으세요.
+- 모든 답은 한국어로 쓰세요.`
+
+export async function reviewNegotiation(env, transcript, context = {}) {
+  const apiKey = env.CLAUDE_API_KEY
+  if (!apiKey) throw new Error('CLAUDE_API_KEY가 설정되지 않았습니다. Cloudflare 시크릿을 등록해주세요.')
+
+  const userContent = [
+    context.posting ? `[지원한 공고]\n${JSON.stringify(context.posting)}` : null,
+    context.employeeCount ? `[상시 근로자 수]\n${context.employeeCount}명` : null,
+    `[대화 내용]\n${transcript}`,
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 4096,
+      system: NEGOTIATION_REVIEW_PROMPT,
+      messages: [{ role: 'user', content: userContent }],
+      tools: [NEGOTIATION_REVIEW_TOOL],
+      tool_choice: { type: 'tool', name: 'record_negotiation_review' },
+    }),
+  })
+
+  if (!res.ok) {
+    const errText = await res.text()
+    throw upstreamError(res.status, errText, '계약 전 검토')
+  }
+
+  const data = await res.json()
+  if (data.stop_reason === 'max_tokens') {
+    throw new Error('대화가 길어 검토가 중간에 끊겼습니다. 잠시 후 다시 시도해주세요.')
+  }
+  const toolUse = Array.isArray(data.content)
+    ? data.content.find((block) => block.type === 'tool_use')
+    : null
+  if (!toolUse || typeof toolUse.input !== 'object' || toolUse.input === null) {
+    throw new Error('검토 결과를 받지 못했습니다. 잠시 후 다시 시도해주세요.')
+  }
+  return toolUse.input
+}
