@@ -40,7 +40,7 @@ export default function DemoGuide() {
     <section className="demo-guide">
       <div className="demo-guide-head">
         <span className="badge badge-accent">채용 담당자용</span>
-        <h2>3분 체험</h2>
+        <h2>1시간 체험</h2>
       </div>
       <p className="demo-guide-lead">
         아래 계정으로 로그인하면 계약 체결까지 진행된 상태에서 시작합니다. 실제 서비스와 같은 화면이며,

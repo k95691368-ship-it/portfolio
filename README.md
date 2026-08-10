@@ -2,7 +2,7 @@
 
 채용 공고를 올리는 순간부터 근로계약서를 보관하고 증명하는 순간까지를 하나로 이은 서비스입니다.
 
-**[portfolio-epa.pages.dev](https://portfolio-epa.pages.dev)** · 첫 화면에 3분 체험 안내가 있습니다.
+**[portfolio-epa.pages.dev](https://portfolio-epa.pages.dev)** · 첫 화면에 1시간 체험 안내가 있습니다.
 
 ---
 

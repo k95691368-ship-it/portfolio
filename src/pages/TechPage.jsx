@@ -291,7 +291,7 @@ export default function TechPage() {
       )}
 
       <p className="tech-foot">
-        직접 눌러 보시려면 <Link to="/">첫 화면의 3분 체험</Link>을, 코드를 보시려면{' '}
+        직접 눌러 보시려면 <Link to="/">첫 화면의 1시간 체험</Link>을, 코드를 보시려면{' '}
         <a href="https://github.com/k95691368-ship-it/portfolio" target="_blank" rel="noreferrer">
           GitHub 저장소
         </a>
