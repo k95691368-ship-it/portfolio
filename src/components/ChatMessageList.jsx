@@ -1,5 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
+import { formatKst } from '../lib/formatTime.js'
+
+// 말풍선 옆에는 시:분만 둔다. 날짜까지 붙이면 줄이 길어져 대화가 밀린다.
+function formatKstTime(value) {
+  const full = formatKst(value)
+  return full ? full.slice(11) : ''
+}
 
 // 대화 목록.
 //
@@ -11,7 +18,18 @@ import { useAuth } from '../context/AuthContext.jsx'
 // 간격으로 도는데 그때마다 화면이 아래로 튕기면 과거 대화를 읽을 수 없다.
 const NEAR_BOTTOM_PX = 40
 
-export default function ChatMessageList({ messages }) {
+// 누가 어느 쪽에 서는가.
+//
+// 흔한 메신저는 "나"를 오른쪽에 두지만, 여기서는 역할로 고정한다. 회사가 왼쪽,
+// 지원자가 오른쪽으로 보는 화면과 그 반대로 보는 화면이 있으면, 나중에 이
+// 대화를 증거로 함께 들여다볼 때 서로 다른 것을 보게 된다. 관리자 열람 모드에서
+// 그 사람은 어느 쪽도 아니라서 기준 자체가 없기도 하다.
+//
+// 지원자는 왼쪽, 회사는 오른쪽. 이름 옆에 역할을 적어 누가 한 말인지 대화 밖에
+// 있는 사람도 알 수 있게 한다.
+const ROLE_LABEL = { company: '회사', candidate: '구직자' }
+
+export default function ChatMessageList({ messages, participants }) {
   const { user } = useAuth()
   const boxRef = useRef(null)
   const pinnedRef = useRef(true)
@@ -50,15 +68,33 @@ export default function ChatMessageList({ messages }) {
     setHasNew(false)
   }
 
+  const roleOf = (senderId) =>
+    (participants ?? []).find((p) => p.id === senderId)?.role ?? null
+
   return (
     <div className="chat-message-wrap">
       <div className="chat-message-list" ref={boxRef}>
-        {messages.map((m) => (
-          <div key={m.id} className={m.senderId === user.id ? 'chat-message mine' : 'chat-message'}>
-            <span className="chat-sender">{m.senderName}</span>
-            <p>{m.body}</p>
-          </div>
-        ))}
+        {messages.map((m) => {
+          const role = roleOf(m.senderId)
+          const side = role === 'company' ? 'right' : 'left'
+          return (
+            <div
+              key={m.id}
+              className={`chat-row chat-row-${side}${m.senderId === user.id ? ' mine' : ''}`}
+            >
+              <div className="chat-message">
+                <span className="chat-sender">
+                  {m.senderName}
+                  {role && <span className="chat-role">{ROLE_LABEL[role] ?? role}</span>}
+                </span>
+                <p>{m.body}</p>
+              </div>
+              <time className="chat-time" dateTime={m.createdAt}>
+                {formatKstTime(m.createdAt)}
+              </time>
+            </div>
+          )
+        })}
       </div>
       {hasNew && (
         <button type="button" className="chat-jump" onClick={jumpToLatest}>

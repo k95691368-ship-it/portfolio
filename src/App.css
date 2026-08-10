@@ -22,6 +22,14 @@
   gap: 4px;
   padding-bottom: 20px;
   border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+/* 세로 flex 의 기본값(stretch)이 배지를 화면 폭까지 늘여, 상태 표시가 제목만
+   한 알약이 되어 있었다. 내용만큼만 차지하게 한다. */
+.page-header > .badge,
+.page-header > button,
+.page-header > .header-actions {
+  align-self: flex-start;
 }
 .page-header h1 {
   margin: 4px 0 0;
@@ -262,18 +270,50 @@
   max-height: 420px;
   overflow-y: auto;
 }
-.chat-message {
+/* 좌우를 역할로 고정한다 — 지원자 왼쪽, 회사 오른쪽.
+   "나"를 기준으로 나누면 같은 대화를 두 사람이 좌우 반대로 보게 되고,
+   나중에 이 기록을 함께 들여다볼 때 서로 다른 것을 본다. 관리자 열람 모드에서는
+   그 사람이 어느 쪽도 아니라 기준 자체가 없기도 하다. */
+.chat-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: 78%;
+}
+.chat-row-left {
   align-self: flex-start;
-  max-width: 70%;
+}
+.chat-row-right {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+.chat-message {
+  min-width: 0;
   background: var(--surface);
   border-radius: 16px 16px 16px 4px;
   padding: 10px 14px;
 }
-.chat-message.mine {
-  align-self: flex-end;
+.chat-row-right .chat-message {
   background: var(--accent);
   color: var(--on-accent);
   border-radius: 16px 16px 4px 16px;
+}
+/* 시각은 말풍선 바깥 아래쪽에 붙인다. 안에 넣으면 문장과 섞여 읽기 나쁘다. */
+.chat-time {
+  flex: none;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  padding-bottom: 2px;
+}
+/* 이름 옆의 역할. 대화 밖에 있는 사람도 누가 한 말인지 알아야 한다. */
+.chat-role {
+  margin-left: 6px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.chat-row-right .chat-role {
+  color: color-mix(in srgb, var(--on-accent) 66%, transparent);
 }
 .chat-message p {
   margin: 0;
@@ -288,7 +328,7 @@
   margin-bottom: 2px;
   color: var(--text-muted);
 }
-.chat-message.mine .chat-sender {
+.chat-row-right .chat-sender {
   color: color-mix(in srgb, var(--on-accent) 78%, transparent);
 }
 .chat-composer {
@@ -987,10 +1027,26 @@
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  width: 100%;
 }
+/* 라벨이 쌓이지 않아 글자와 입력칸이 한 줄에 섞여 있었다.
+   내용이 짧은 칸은 글자 옆에 붙고 긴 칸은 아래로 밀려, 같은 줄의 두 입력이
+   서로 다른 높이에서 시작했다. 이 앱의 다른 폼과 같은 규칙으로 맞춘다. */
 .career-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   flex: 1;
-  min-width: 160px;
+  min-width: 200px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+  text-align: left;
+}
+.career-row label input,
+.career-row label select {
+  width: 100%;
+  font-weight: 400;
 }
 .career-entry > button {
   align-self: flex-start;
@@ -2660,19 +2716,26 @@
   border-radius: var(--radius);
   background: var(--warning-bg);
 }
+/* align-items: flex-start 는 세로 배치에서 자식의 가로 폭을 내용 크기로 줄인다.
+   그래서 문단은 제 폭을 못 가져 이상한 자리에서 줄바꿈되고, 입력 줄은 칸마다
+   폭이 달라졌다. 폭은 늘리고, 버튼만 왼쪽에 붙인다. */
 .room-close {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  align-items: flex-start;
+  align-items: stretch;
   padding: 20px 24px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
+  text-align: left;
 }
 .room-close h2 {
   margin: 0;
   font-size: 18px;
+}
+.room-close > button {
+  align-self: flex-start;
 }
 
 /* 첫 화면에서 기술 설명으로 가는 문 */
@@ -2977,7 +3040,6 @@
   flex-direction: column;
   gap: 10px;
   padding: 20px 24px;
-  margin-bottom: 16px;
   border-radius: var(--radius);
   text-align: left;
 }
@@ -3054,11 +3116,14 @@
    다르다. 다툼이 생겼을 때 필요한 것은 후자다. */
 .negotiation-log {
   padding: 20px 24px;
-  margin-bottom: 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
   text-align: left;
+}
+.negotiation-log > button,
+.pre-contract-review > button {
+  align-self: flex-start;
 }
 .negotiation-log h2 {
   margin: 0 0 4px;
@@ -3147,7 +3212,6 @@
 /* 계약서 쓰기 전 검토 — 값으로 계산한 것과 맥락으로 읽은 것을 나란히 둔다. */
 .pre-contract-review {
   padding: 20px 24px;
-  margin-bottom: 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
@@ -3206,4 +3270,101 @@
 .review-basis {
   color: var(--text-muted);
   font-size: 13px;
+}
+
+/* 세로로 쌓는 패널 안에서 버튼과 배지는 내용만큼만 차지한다.
+   세로 flex 의 기본값(stretch)이 그것들을 화면 폭까지 늘여, 화면마다 버튼이
+   제각각인 자리에 서 있고 상태 배지가 제목만 한 알약이 됐다.
+   직계 자식에만 건다 — 부모가 가로 flex 인 버튼까지 위로 밀면 더 어색해진다. */
+.certificate-issued > button,
+.demo-credentials > button,
+.interview-summary > button,
+.apply-done > button,
+.lookup-code-box > button,
+.presign-group > button,
+.request-item > button,
+.application-block > button,
+.contract-lifecycle > button,
+.contract-delivery > button,
+.signed-contract-section > button,
+.summary-block > button,
+.room-documents > button,
+.status-card > .badge,
+.my-app-card > .badge,
+.job-card > .badge,
+.notif-item > .badge,
+.certificate-row > .badge,
+.request-item > .badge,
+.verify-result > .badge,
+.presign-group > .badge,
+.application-block > .badge,
+.room-info > .badge {
+  align-self: flex-start;
+}
+
+/* 이름만 붙어 있고 규칙이 없던 클래스들.
+   클래스가 있으니 정돈된 줄 알았는데 실제로는 아무 배치도 걸려 있지 않아,
+   라벨과 입력칸이 한 줄에 섞이고 칸마다 폭이 달랐다. */
+
+/* 공고 등록의 임금·시간 입력. 그리드라는 이름만 있고 그리드가 없었다. */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+.form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+  text-align: left;
+}
+.form-grid label input,
+.form-grid label select {
+  width: 100%;
+  font-weight: 400;
+}
+
+/* 근로관계 종료 기록 — 안쪽 career-row 만 정돈돼 있고 바깥은 비어 있었다. */
+.employment-end {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+}
+.employment-end > button {
+  align-self: flex-start;
+}
+
+.applicant-compare,
+.ai-screening {
+  width: 100%;
+  text-align: left;
+}
+
+/* 화면이 통째로 죽었을 때 보이는 마지막 화면. 가운데로 모은다. */
+.error-boundary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 64px 24px;
+  text-align: center;
+}
+
+.print-title {
+  margin: 0 0 16px;
+  text-align: center;
+}
+
+/* 임금 항목 이름은 길어질 수 있다. 고유 폭이 그리드 칸을 밀어내 좁은 화면에서
+   행 전체가 컨테이너를 넘쳤다. */
+.wage-name,
+.wage-readonly-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
