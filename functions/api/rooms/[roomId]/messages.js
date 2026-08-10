@@ -1,6 +1,7 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { getRoomParticipant, getRoomAccess } from '../../../_lib/rooms.js'
 import { extractTermsFromMessage, selectNewEntries } from '../../../_lib/termsNegotiation.js'
+import { scanForOfferSignals } from '../../../_lib/jobOffer.js'
 
 export async function onRequestGet({ request, env, data, params }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
@@ -59,9 +60,27 @@ export async function onRequestPost({ request, env, data, params }) {
   //
   // 기록이 실패해도 메시지 전송까지 되돌리지는 않는다. 대화가 막히는 것이
   // 이력이 한 줄 비는 것보다 나쁘다. 다만 조용히 넘기지 않고 로그에 남긴다.
-  await recordNegotiation(env, params.roomId, participant.role_in_room, result, text).catch((err) => {
+  const recorded = await recordNegotiation(
+    env,
+    params.roomId,
+    participant.role_in_room,
+    result,
+    text
+  ).catch((err) => {
     console.error(`negotiation_log write failed (${params.roomId}):`, err)
+    return []
   })
+
+  // 방금 보낸 이 말이 채용 확정으로 읽히는가.
+  //
+  // 이 앱의 핵심은 "확정 발화를 보내는 그 순간" 알리는 것이다. 그런데 화면은
+  // 방에 들어올 때 한 번 받은 offer 를 들고 있을 뿐이고, 폴링은 메시지만
+  // 가져온다. 그래서 "다음 주부터 나오시죠"를 보내도 새로 고치기 전까지는
+  // 아무 경고도 뜨지 않았다 — 막아야 할 순간에 아무 말도 하지 않은 셈이다.
+  //
+  // 방금 보낸 한 건만 훑어 돌려준다. 이력 전체를 다시 읽을 필요가 없고,
+  // 화면은 이 신호를 보고 그때만 상태를 다시 불러오면 된다.
+  const signal = scanForOfferSignals([{ role_in_room: participant.role_in_room, body: text }])
 
   return jsonResponse(
     {
@@ -70,6 +89,10 @@ export async function onRequestPost({ request, env, data, params }) {
       senderName: data.user.display_name,
       body: text,
       createdAt: result.created_at,
+      // 화면이 상태를 다시 불러와야 하는지 판단할 근거. 아무 일도 없었으면
+      // 둘 다 비어 있고, 화면은 아무것도 더 하지 않는다.
+      offerSignal: { strong: signal.strong, weak: signal.weak },
+      negotiationAdded: recorded,
     },
     201
   )
@@ -78,7 +101,7 @@ export async function onRequestPost({ request, env, data, params }) {
 // 이 메시지에서 읽어 낸 처우 조건을 이력에 남긴다.
 async function recordNegotiation(env, roomId, role, message, text) {
   const extracted = extractTermsFromMessage({ body: text })
-  if (extracted.length === 0) return
+  if (extracted.length === 0) return []
 
   // 같은 값을 여러 번 말하는 것은 협의의 진전이 아니다. 항목별 마지막 값과
   // 다를 때만 남긴다 — 그대로 쌓으면 정작 바뀐 지점이 같은 줄에 묻힌다.
@@ -93,7 +116,7 @@ async function recordNegotiation(env, roomId, role, message, text) {
   const latestByField = Object.fromEntries((previous || []).map((r) => [r.field, r.value]))
 
   const fresh = selectNewEntries(extracted, latestByField)
-  if (fresh.length === 0) return
+  if (fresh.length === 0) return []
 
   await env.DB.batch(
     fresh.map((e) =>
@@ -114,4 +137,6 @@ async function recordNegotiation(env, roomId, role, message, text) {
       )
     )
   )
+
+  return fresh.map((e) => ({ field: e.field, label: e.label, display: e.display }))
 }

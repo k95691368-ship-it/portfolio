@@ -26,17 +26,36 @@ function excerpt(body) {
   return text.length > MAX_EXCERPT ? `${text.slice(0, MAX_EXCERPT)}…` : text
 }
 
-// "290만원", "2,900,000원", "월 290만", "290만 원"
+// "290만원", "2,900,000원", "1,234만원", "3천만원", "1억 2천만원", "290만 5천원"
+//
+// 처음에는 콤마가 찍힌 만 단위를 앞뒤로 쪼개 각각 만을 곱해 더했다. 그래서
+// "1,234만원"이 1×10000 + 234×10000 = 235만원으로 기록됐다. 실제의 5분의 1이다.
+// 이 값은 나중에 "그때 얼마를 제시했는가"의 근거로 쓰인다. 틀린 숫자가 남는
+// 것은 아무것도 남지 않는 것보다 나쁘다.
+//
+// 세 자리마다 찍은 콤마를 먼저 지우고, 단위가 붙은 표기는 단위끼리 곱해 더한다.
+const SCALE = { 억: 100000000, 천만: 10000000, 만: 10000, 천: 1000 }
+
 function parseWon(text) {
-  const man = text.match(/(\d{1,5})(?:\s*,\s*(\d{3}))?\s*만\s*원?/)
-  if (man) {
-    const head = Number(man[1])
-    const tail = man[2] ? Number(man[2]) : 0
-    if (Number.isFinite(head)) return (head * 10000 + tail * 10000) / (man[2] ? 1 : 1) || head * 10000
+  const t = String(text ?? '').replace(/(\d),(?=\d{3}(?!\d))/g, '$1')
+
+  // 천만은 천×만이므로 따로 잡지 않으면 "3천"과 "만"으로 쪼개진다.
+  const units = [...t.matchAll(/(\d+)\s*(억|천만|만|천)/g)]
+  if (units.length > 0) {
+    let total = 0
+    for (const m of units) {
+      const n = Number(m[1])
+      const scale = SCALE[m[2]]
+      if (Number.isFinite(n) && scale) total += n * scale
+    }
+    // 만 단위에 못 미치는 값은 임금으로 보지 않는다. "3천 원"은 금액이지
+    // 급여가 아니다.
+    if (total >= 10000) return total
   }
-  const plain = text.match(/([\d,]{6,12})\s*원/)
+
+  const plain = t.match(/(\d{6,12})\s*원/)
   if (plain) {
-    const n = Number(plain[1].replace(/,/g, ''))
+    const n = Number(plain[1])
     if (Number.isFinite(n) && n >= 100000) return n
   }
   return null

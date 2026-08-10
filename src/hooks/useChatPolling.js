@@ -123,6 +123,9 @@ export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null
       // 면접 대화는 계약 조건의 근거가 되는 기록이라 한 줄이 사라지면 안 된다.
       emptyRunsRef.current = 0
       setMessages((prev) => mergeById(prev, [message]))
+      // 보낸 결과를 그대로 돌려준다. 화면이 이 응답에 실린 신호(채용 확정으로
+      // 읽히는 표현, 새로 기록된 처우 조건)를 보고 상태를 다시 불러온다.
+      return message
     },
     [roomId]
   )

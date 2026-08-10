@@ -105,7 +105,28 @@ export default function RoomPage() {
   }, [loadView])
 
   // 대화의 첫 묶음은 위 요청에 이미 들어 있다. 그다음부터만 증분으로 확인한다.
-  const { messages, sendMessage } = useChatPolling(roomId, 2500, view?.messages ?? null)
+  const { messages, sendMessage: postMessage } = useChatPolling(roomId, 2500, view?.messages ?? null)
+
+  // 말하는 그 순간에 알려야 예방이다.
+  //
+  // 폴링은 메시지만 가져오고, 감시 배너와 협의 기록은 방에 들어올 때 한 번 받은
+  // view 를 들고 있었다. 그래서 "다음 주부터 나오시죠"를 보내도 새로 고치기
+  // 전까지 아무 경고도 뜨지 않았다 — 막아야 할 순간에 침묵한 셈이다.
+  //
+  // 서버가 방금 보낸 한 건을 훑어 신호를 함께 돌려주므로, 무언가 잡혔을 때만
+  // 상태를 다시 불러온다. 아무 일도 없는 대화에서는 요청이 늘지 않는다.
+  const sendMessage = useCallback(
+    async (body) => {
+      const sent = await postMessage(body)
+      const signalled =
+        (sent?.offerSignal?.strong?.length ?? 0) > 0 ||
+        (sent?.offerSignal?.weak?.length ?? 0) > 0 ||
+        (sent?.negotiationAdded?.length ?? 0) > 0
+      if (signalled) await loadView().catch(() => {})
+      return sent
+    },
+    [postMessage, loadView]
+  )
 
   const handleAnalyze = async () => {
     setAnalyzing(true)
