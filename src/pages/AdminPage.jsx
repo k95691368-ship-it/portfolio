@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
@@ -236,7 +237,22 @@ export default function AdminPage() {
 
   return (
     <div className="admin-page">
-      <h1>관리자 패널</h1>
+      {/* 들어올 길만 있고 나갈 길이 없었다. 대시보드와 채용 관리에는 서로
+          오가는 버튼이 있는데 관리자 패널에만 없어서, 여기 들어오면 주소를
+          직접 고치거나 뒤로 가기를 눌러야 했다. 같은 자리에 같은 모양으로 둔다. */}
+      <header className="dashboard-header">
+        <h1>관리자 패널</h1>
+        <div className="header-actions">
+          <Link to="/dashboard" className="btn-nav">
+            대시보드
+          </Link>
+          {(user?.isAdmin || user?.isRecruiter) && (
+            <Link to="/recruit" className="btn-nav">
+              채용 관리
+            </Link>
+          )}
+        </div>
+      </header>
 
       <section className="admin-create-account">
         <h2>새 계정 만들기</h2>
