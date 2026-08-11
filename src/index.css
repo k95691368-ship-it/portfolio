@@ -396,17 +396,20 @@ textarea:focus-visible {
 .btn-nav {
   display: inline-flex;
   align-items: center;
-  padding: 10px 20px;
+  padding: 9px 19px;
+  border: 1px solid var(--btn-border);
   border-radius: var(--radius-full);
-  background: var(--surface);
+  background: var(--btn-face);
   color: var(--accent);
   font-size: 15px;
   font-weight: 600;
   white-space: nowrap;
-  transition: background 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 .btn-nav:hover {
-  background: var(--border);
+  background: var(--btn-face-hover);
   text-decoration: none;
 }
 .btn-block {
