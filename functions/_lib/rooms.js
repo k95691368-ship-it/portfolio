@@ -30,6 +30,24 @@ export async function loadCompanyMessages(env, roomId) {
   return results || []
 }
 
+// 참여 여부와 방 상태를 한 번에 읽는다.
+//
+// 보관 잠금을 넣으면서 대화 전송에 조회가 하나 늘었다 — 참여자 확인 한 번,
+// 방 상태 한 번. 며칠 전 왕복 셋을 둘로 줄여 놓은 바로 그 자리다. 두 값은
+// 같은 방에 대한 것이라 한 번에 읽을 수 있다.
+//
+// 참여하지 않았으면 role_in_room 이 NULL 로 온다. 방이 아예 없으면 행이 없다.
+export async function getRoomParticipation(env, roomId, userId) {
+  return env.DB.prepare(
+    `SELECT r.id, r.title, r.status, r.archived_at, rp.role_in_room
+       FROM interview_rooms r
+       LEFT JOIN room_participants rp ON rp.room_id = r.id AND rp.user_id = ?
+      WHERE r.id = ?`
+  )
+    .bind(userId, roomId)
+    .first()
+}
+
 // 열람 권한: 참여자면 그 역할, 참여자가 아니어도 관리자면 'admin'(읽기 전용 열람).
 // 쓰기(메시지 전송, 분석, 서명 등)에는 사용하지 말 것 — 그건 getRoomParticipant로 참여자만 허용.
 export async function getRoomAccess(env, roomId, user) {

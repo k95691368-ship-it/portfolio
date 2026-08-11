@@ -1,6 +1,6 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { blockedWhenArchived } from '../../../_lib/roomLifecycle.js'
-import { getRoomParticipant, getRoomAccess } from '../../../_lib/rooms.js'
+import { getRoomAccess, getRoomParticipation } from '../../../_lib/rooms.js'
 import { extractTermsFromMessage, selectNewEntries } from '../../../_lib/termsNegotiation.js'
 import { scanForOfferSignals } from '../../../_lib/jobOffer.js'
 
@@ -36,18 +36,16 @@ export async function onRequestGet({ request, env, data, params }) {
 
 export async function onRequestPost({ request, env, data, params }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
-  const participant = await getRoomParticipant(env, params.roomId, data.user.id)
-  if (!participant) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
+  // 참여 여부와 방 상태를 한 번에 읽는다. 둘 다 같은 방에 대한 것이고,
+  // 대화는 사람이 기다리는 화면이라 왕복 한 번이 그대로 체감된다.
+  const room = await getRoomParticipation(env, params.roomId, data.user.id)
+  if (!room?.role_in_room) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
+  const participant = { role_in_room: room.role_in_room }
 
   // 보관된 방에서는 대화도 멈춘다.
   //
   // 종료(closed)와 다른 점이 여기다. 종료된 방에서는 "끝났습니다"를 주고받을
   // 자리가 있어야 해서 대화를 막지 않는다. 보관은 그 자리까지 닫는 것이다.
-  const room = await env.DB.prepare(
-    'SELECT status, archived_at FROM interview_rooms WHERE id = ?'
-  )
-    .bind(params.roomId)
-    .first()
   const archived = blockedWhenArchived(room, 'message')
   if (archived) return jsonError(archived, 409)
 

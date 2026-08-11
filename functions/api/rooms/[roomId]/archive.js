@@ -1,7 +1,7 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
-import { getRoomParticipant, loadCompanyMessages } from '../../../_lib/rooms.js'
+import { getRoomParticipation, loadCompanyMessages } from '../../../_lib/rooms.js'
 import { logLifecycle } from '../../../_lib/roomLifecycleLog.js'
-import { canArchive, canUnarchive, ROOM_SIGNED } from '../../../_lib/roomLifecycle.js'
+import { canArchive, canUnarchive, CLOSABLE_STATUSES } from '../../../_lib/roomLifecycle.js'
 import { describeOfferStatus } from '../../../_lib/jobOffer.js'
 import { notifyUser } from '../../../_lib/notify.js'
 
@@ -13,17 +13,13 @@ import { notifyUser } from '../../../_lib/notify.js'
 export async function onRequestPost({ request, env, data, params }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
 
-  const participant = await getRoomParticipant(env, params.roomId, data.user.id)
-  if (!participant) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
-  if (participant.role_in_room !== 'company') {
+  // 참여 여부와 방 상태를 한 번에 읽는다 — 같은 방에 대한 두 값이다.
+  const room = await getRoomParticipation(env, params.roomId, data.user.id)
+  if (!room?.role_in_room) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
+  if (room.role_in_room !== 'company') {
     return jsonError('보관은 회사(고용) 측만 할 수 있습니다.', 403)
   }
 
-  const room = await env.DB.prepare(
-    'SELECT id, title, status, archived_at FROM interview_rooms WHERE id = ?'
-  )
-    .bind(params.roomId)
-    .first()
   const allowed = canArchive(room)
   if (!allowed.ok) return jsonError(allowed.error, room ? 409 : 404)
 
@@ -36,7 +32,12 @@ export async function onRequestPost({ request, env, data, params }) {
   // 마무리하지 못하게 막는 것은 실질적으로 내정 취소와 같은 자리에 선다.
   // 막지는 않되, 종료할 때와 같은 절차를 밟게 한다 — 무엇을 하는 것인지
   // 모른 채 누르는 일이 없도록.
-  if (room.status !== ROOM_SIGNED) {
+  //
+  // 이미 종료됐거나 체결된 방에서는 묻지 않는다. 종료된 방은 서명이 이미
+  // 막혀 있고 체결된 방은 서명이 끝났으므로, 거기서 "보관하면 서명할 수 없게
+  // 됩니다"라고 말하는 것은 사실이 아니다. 사실이 아닌 경고를 한 번 보여
+  // 주면 그다음의 진짜 경고도 같은 무게로 읽힌다.
+  if (CLOSABLE_STATUSES.includes(room.status)) {
     const [termsRow, companyMessages] = await Promise.all([
       env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?').bind(params.roomId).first(),
       loadCompanyMessages(env, params.roomId),
@@ -67,19 +68,22 @@ export async function onRequestPost({ request, env, data, params }) {
     return jsonError('그 사이 상태가 바뀌었습니다. 화면을 새로 고쳐 확인해주세요.', 409)
   }
 
-  await logLifecycle(env, params.roomId, {
-    action: 'archived',
-    actorName: data.user.display_name,
-    detail: null,
-  })
-
+  // 이력 남기기와 상대 찾기는 서로를 기다릴 이유가 없다.
+  //
   // 대화가 막히는 것은 상대에게도 일어나는 일이다. 알리지 않으면 지원자는
   // 메시지를 보내려다 거절당하고 나서야 안다.
-  const candidate = await env.DB.prepare(
-    "SELECT user_id FROM room_participants WHERE room_id = ? AND role_in_room = 'candidate'"
-  )
-    .bind(params.roomId)
-    .first()
+  const [, candidate] = await Promise.all([
+    logLifecycle(env, params.roomId, {
+      action: 'archived',
+      actorName: data.user.display_name,
+      detail: null,
+    }),
+    env.DB.prepare(
+      "SELECT user_id FROM room_participants WHERE room_id = ? AND role_in_room = 'candidate'"
+    )
+      .bind(params.roomId)
+      .first(),
+  ])
   if (candidate) {
     await notifyUser(env, candidate.user_id, {
       type: 'room_archived',
@@ -99,17 +103,12 @@ export async function onRequestPost({ request, env, data, params }) {
 export async function onRequestDelete({ env, data, params }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
 
-  const participant = await getRoomParticipant(env, params.roomId, data.user.id)
-  if (!participant) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
-  if (participant.role_in_room !== 'company') {
+  const room = await getRoomParticipation(env, params.roomId, data.user.id)
+  if (!room?.role_in_room) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
+  if (room.role_in_room !== 'company') {
     return jsonError('보관 해제는 회사(고용) 측만 할 수 있습니다.', 403)
   }
 
-  const room = await env.DB.prepare(
-    'SELECT id, title, status, archived_at FROM interview_rooms WHERE id = ?'
-  )
-    .bind(params.roomId)
-    .first()
   const allowed = canUnarchive(room)
   if (!allowed.ok) return jsonError(allowed.error, room ? 409 : 404)
 
@@ -124,17 +123,18 @@ export async function onRequestDelete({ env, data, params }) {
     return jsonError('그 사이 상태가 바뀌었습니다. 화면을 새로 고쳐 확인해주세요.', 409)
   }
 
-  await logLifecycle(env, params.roomId, {
-    action: 'unarchived',
-    actorName: data.user.display_name,
-    detail: null,
-  })
-
-  const candidate = await env.DB.prepare(
-    "SELECT user_id FROM room_participants WHERE room_id = ? AND role_in_room = 'candidate'"
-  )
-    .bind(params.roomId)
-    .first()
+  const [, candidate] = await Promise.all([
+    logLifecycle(env, params.roomId, {
+      action: 'unarchived',
+      actorName: data.user.display_name,
+      detail: null,
+    }),
+    env.DB.prepare(
+      "SELECT user_id FROM room_participants WHERE room_id = ? AND role_in_room = 'candidate'"
+    )
+      .bind(params.roomId)
+      .first(),
+  ])
   if (candidate) {
     await notifyUser(env, candidate.user_id, {
       type: 'room_unarchived',

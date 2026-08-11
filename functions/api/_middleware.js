@@ -1,4 +1,4 @@
-import { getSessionUser, renewSessionIfStale } from '../_lib/auth.js'
+import { getSessionUser, renewSessionIfStale, needsRenewal } from '../_lib/auth.js'
 import { jsonError } from '../_lib/http.js'
 
 // 다른 사이트가 이 API 를 대신 부르는 것을 막는다.
@@ -34,9 +34,14 @@ export async function onRequest(context) {
 
   context.data.user = await getSessionUser(context.env.DB, request)
 
-  // 쓰고 있는 동안에는 로그인이 끝나지 않게 만료를 미룬다. 응답을 붙잡아 두지
-  // 않도록 뒤로 넘긴다 — 실패해도 이번 요청과는 상관없는 일이다.
-  if (context.data.user) {
+  // 쓰고 있는 동안에는 로그인이 끝나지 않게 만료를 미룬다.
+  //
+  // 조건을 SQL 에만 걸어 두어, 미룰 필요가 없는 요청에서도 UPDATE 가 한 번씩
+  // 나갔다. 로그인한 사람의 모든 요청마다 쓰기가 한 번인 셈이다. 만료 시각은
+  // 이미 세션을 읽을 때 함께 가져왔으므로, 미뤄야 할 때만 부른다.
+  //
+  // 응답을 붙잡아 두지 않도록 뒤로 넘긴다 — 실패해도 이번 요청과는 상관없다.
+  if (context.data.user && needsRenewal(context.data.user)) {
     const renewal = renewSessionIfStale(context.env.DB, request)
     if (context.waitUntil) context.waitUntil(renewal)
     else await renewal.catch(() => {})

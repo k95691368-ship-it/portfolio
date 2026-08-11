@@ -195,6 +195,9 @@ export default function DashboardPage() {
                           : room.companyName}
                       {!user.isAdmin && user.role === 'company' && ` · 초대코드 ${room.inviteCode}`}
                     </span>
+                    {room.archivedAt && (
+                      <span className="room-next-action">보관됨 — 대화·계약서 잠김</span>
+                    )}
                     {room.nextAction && <span className="room-next-action">→ {room.nextAction}</span>}
                     {room.periodAlert && (
                       <span className="room-period-alert">⏱ {room.periodAlert}</span>

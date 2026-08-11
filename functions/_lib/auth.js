@@ -139,7 +139,10 @@ export async function getSessionUser(db, request) {
       // 번째 글자에서 'T'(0x54) 와 공백(0x20) 이 만나 언제나 'T' 가 크다. 그래서
       // 만료 당일에는 몇 시간이 지났든 세션이 살아 있다. 만료를 하루 늦추는 셈이다.
       // datetime() 으로 감싸 두 형식을 같은 값으로 읽는다.
-      `SELECT users.*, sessions.created_at AS session_started_at FROM sessions
+      // 만료 시각도 함께 읽는다. 이 값이 없으면 "미뤄야 하는가"를 알 수 없어
+      // 매 요청마다 UPDATE 를 한 번씩 쏘게 된다 — 실제로 그러고 있었다.
+      `SELECT users.*, sessions.created_at AS session_started_at,
+              sessions.expires_at AS session_expires_at FROM sessions
        JOIN users ON users.id = sessions.user_id
        WHERE sessions.token_hash = ? AND datetime(sessions.expires_at) > datetime('now')`
     )
@@ -162,6 +165,23 @@ export async function getSessionUser(db, request) {
 // 않는다. 그 구분은 따로 저장하지 않고 처음 잡았던 기간으로 안다 — 하루보다
 // 길게 잡혔으면 유지를 고른 로그인이다.
 const RENEW_WHEN_REMAINING_SECONDS = SESSION_TTL_SECONDS / 2
+
+// 지금 미뤄야 하는가. 조회해 온 행만 보고 판단한다 — DB 를 다시 부르지 않는다.
+export function needsRenewal(user) {
+  const expires = user?.session_expires_at
+  const started = user?.session_started_at
+  if (!expires || !started) return false
+
+  const expiresAt = Date.parse(String(expires).replace(' ', 'T').replace(/Z?$/, 'Z'))
+  const startedAt = Date.parse(String(started).replace(' ', 'T').replace(/Z?$/, 'Z'))
+  if (!Number.isFinite(expiresAt) || !Number.isFinite(startedAt)) return false
+
+  // 브라우저를 닫으면 끝나기로 한 세션은 미루지 않는다. 처음 잡았던 기간이
+  // 하루보다 길었으면 유지를 고른 로그인이다.
+  if (expiresAt - startedAt <= 24 * 60 * 60 * 1000) return false
+
+  return expiresAt - Date.now() < RENEW_WHEN_REMAINING_SECONDS * 1000
+}
 
 export async function renewSessionIfStale(db, request) {
   const token = parseCookie(request, 'session')

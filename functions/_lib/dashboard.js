@@ -21,7 +21,7 @@ export async function loadMyRooms(env, user) {
   // 한 건 더 읽어 잘렸는지 판단한다. 세어 보는 조회를 한 번 더 하지 않는다.
   const { results } = await env.DB.prepare(
     `SELECT
-       r.id, r.title, r.invite_code, r.status, r.created_at,
+       r.id, r.title, r.invite_code, r.status, r.created_at, r.archived_at,
        (SELECT u.display_name FROM room_participants rp2
           JOIN users u ON u.id = rp2.user_id
           WHERE rp2.room_id = r.id AND rp2.role_in_room = 'company') AS company_name,
@@ -44,9 +44,16 @@ export async function loadMyRooms(env, user) {
 
   const truncated = results.length > ROOM_LIMIT
   const rooms = (truncated ? results.slice(0, ROOM_LIMIT) : results).map((r) => {
+    // 보관된 방은 손댈 수 없다. 그런데 목록은 그것을 모른 채 "내 서명 필요"라고
+    // 재촉했다 — 눌러 봐도 잠겨 있는 일을 하라고 하는 셈이다. 할 일 안내와
+    // 만료 경고는 무언가 할 수 있을 때만 뜻이 있다.
+    const archived = !!r.archived_at
+
     // 서명 단계에서 사용자가 지금 해야 할 일을 한 줄로 안내
     let nextAction = null
-    if (r.status === 'contract_pending') {
+    if (archived) {
+      nextAction = null
+    } else if (r.status === 'contract_pending') {
       nextAction = r.i_signed
         ? `상대방 서명 대기 중 (${r.signature_count}/2)`
         : `내 서명 필요 (${r.signature_count}/2)`
@@ -56,7 +63,7 @@ export async function loadMyRooms(env, user) {
 
     // 체결된 계약은 만료가 다가오면 목록에서 바로 보이게 한다.
     let periodAlert = null
-    if (r.status === 'signed') {
+    if (!archived && r.status === 'signed') {
       const period = describeContractPeriod({
         contractStartDate: r.start_date,
         contractEndDate: r.end_date,
@@ -71,6 +78,8 @@ export async function loadMyRooms(env, user) {
       title: r.title,
       inviteCode: r.invite_code,
       status: r.status,
+      // 보관은 status 를 덮지 않는다. 목록에서도 원래 상태와 나란히 보여 준다.
+      archivedAt: r.archived_at ?? null,
       createdAt: r.created_at,
       companyName: r.company_name,
       candidateName: r.candidate_name,
