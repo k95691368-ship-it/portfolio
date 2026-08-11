@@ -166,18 +166,34 @@ export async function getSessionUser(db, request) {
 // 길게 잡혔으면 유지를 고른 로그인이다.
 const RENEW_WHEN_REMAINING_SECONDS = SESSION_TTL_SECONDS / 2
 
+// 이 세션은 '로그인 유지'를 고르고 만든 것인가.
+//
+// 그 선택을 따로 저장하지 않는다. 처음 잡았던 기간이 곧 답이다 — 하루보다
+// 길게 잡혔으면 유지를 고른 로그인이다.
+export function wasPersistentSession(user) {
+  const started = Date.parse(normalizeStamp(user?.session_started_at))
+  const expires = Date.parse(normalizeStamp(user?.session_expires_at))
+  if (!Number.isFinite(started) || !Number.isFinite(expires)) return true
+  return expires - started > 24 * 60 * 60 * 1000
+}
+
+// SQLite 의 "2026-08-12 09:00:00" 과 JS 의 toISOString() 을 같은 값으로 읽는다.
+function normalizeStamp(value) {
+  if (!value) return ''
+  return String(value).replace(' ', 'T').replace(/Z?$/, 'Z')
+}
+
 // 지금 미뤄야 하는가. 조회해 온 행만 보고 판단한다 — DB 를 다시 부르지 않는다.
 export function needsRenewal(user) {
   const expires = user?.session_expires_at
   const started = user?.session_started_at
   if (!expires || !started) return false
 
-  const expiresAt = Date.parse(String(expires).replace(' ', 'T').replace(/Z?$/, 'Z'))
-  const startedAt = Date.parse(String(started).replace(' ', 'T').replace(/Z?$/, 'Z'))
+  const expiresAt = Date.parse(normalizeStamp(expires))
+  const startedAt = Date.parse(normalizeStamp(started))
   if (!Number.isFinite(expiresAt) || !Number.isFinite(startedAt)) return false
 
-  // 브라우저를 닫으면 끝나기로 한 세션은 미루지 않는다. 처음 잡았던 기간이
-  // 하루보다 길었으면 유지를 고른 로그인이다.
+  // 브라우저를 닫으면 끝나기로 한 세션은 미루지 않는다.
   if (expiresAt - startedAt <= 24 * 60 * 60 * 1000) return false
 
   return expiresAt - Date.now() < RENEW_WHEN_REMAINING_SECONDS * 1000

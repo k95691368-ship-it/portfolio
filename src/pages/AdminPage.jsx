@@ -434,6 +434,9 @@ export default function AdminPage() {
                 <td>{r.candidateName || '-'}</td>
                 <td>
                   <span className={`badge ${status.badgeClass}`}>{status.label}</span>
+                  {/* 보관은 status 를 덮지 않는다. 나란히 보여 주어야 잠긴
+                      방이 '진행중'으로만 읽히지 않는다. */}
+                  {r.archivedAt && <span className="badge badge-neutral">보관됨</span>}
                 </td>
                 <td>{formatKstDate(r.createdAt)}</td>
                 <td>

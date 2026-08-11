@@ -1,4 +1,5 @@
 import { jsonResponse, jsonError } from '../../_lib/http.js'
+import { blockedWhenArchived } from '../../_lib/roomLifecycle.js'
 import { checkRateLimit } from '../../_lib/rateLimit.js'
 import { notifyUser } from '../../_lib/notify.js'
 
@@ -17,6 +18,15 @@ export async function onRequestPost({ request, env, data }) {
     .bind(inviteCode)
     .first()
   if (!room) return jsonError('유효하지 않은 초대코드입니다.', 404)
+
+  // 대화할 수 없는 방에 사람을 앉히지 않는다.
+  //
+  // 초대 이메일은 막아 놓고 정작 그 이메일이 안내하는 문은 열려 있었다.
+  // 들어가 봐야 "보관된 면접방입니다. 대화는 잠겨 있습니다"만 보이고, 그
+  // 참여로 방의 status 가 open→active 로 바뀐다 — 지금 상태 그대로 잠근다는
+  // 보관의 약속이 깨진다. 지원자 자리(UNIQUE)까지 소모된다.
+  const archived = blockedWhenArchived(room, 'join')
+  if (archived) return jsonError(archived, 409)
 
   const alreadyJoined = await env.DB.prepare(
     'SELECT 1 FROM room_participants WHERE room_id = ? AND user_id = ?'

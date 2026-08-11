@@ -158,6 +158,15 @@ export async function onRequestDelete({ env, data, params }) {
   if (room?.status === 'signed') {
     return jsonError('이미 체결된 계약의 연결은 변경할 수 없습니다.', 409)
   }
+  // 연결(POST)은 막으면서 해제(DELETE)는 열려 있었다. archived_at 을 읽어 놓고
+  // 판정을 부르지 않은, 값은 있는데 계산만 꺼진 모양이다.
+  //
+  // 이쪽이 더 무겁다. previous_room_id 는 계속근로기간 합산의 유일한 근거라,
+  // 지우는 순간 "계약 하나하나는 2년 이내지만 이어서 보면 2년을 넘습니다"
+  // (기간제법 제4조) 경고가 계약서 화면과 서명 전 점검에서 함께 사라진다.
+  // 연결은 막혀 있으므로 되돌릴 수도 없다.
+  const frozen = blockedWhenFrozen(room, 'link_previous')
+  if (frozen) return jsonError(frozen, 409)
 
   await env.DB.prepare('UPDATE contract_terms SET previous_room_id = NULL WHERE room_id = ?')
     .bind(params.roomId)

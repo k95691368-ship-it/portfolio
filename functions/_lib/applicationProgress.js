@@ -71,6 +71,11 @@ export function describeApplicationProgress(row) {
   let headline
   if (rejected) headline = '이번 전형에서는 함께하지 못하게 되었습니다.'
   else if (closed) headline = '이 전형은 종료되었습니다. 면접방에서 사유와 지금까지의 기록을 볼 수 있습니다.'
+  // 보관된 방은 대화도 서명도 잠겨 있다. 그것을 모른 채 "서명해주세요"라고
+  // 재촉하면, 지원자는 하라는 대로 눌러 보고 아무 일도 일어나지 않는 것을
+  // 자기 잘못으로 여긴다. 할 일 안내는 무언가 할 수 있을 때만 뜻이 있다.
+  else if (row?.roomArchived)
+    headline = '면접방이 보관되어 대화와 계약서 작업이 잠겨 있습니다. 지금까지의 기록은 그대로 볼 수 있습니다.'
   else if (row?.roomStatus === 'signed') headline = '근로계약 체결이 완료되었습니다.'
   else if (row?.roomStatus === 'contract_pending') headline = '채용이 확정되었습니다. 계약서를 확인하고 서명해주세요.'
   else if (row?.roomId) headline = '면접이 진행 중입니다.'

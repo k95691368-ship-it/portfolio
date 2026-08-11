@@ -65,15 +65,28 @@ export default function RoomPage() {
     setArchiving(true)
     try {
       await api.post(`/rooms/${roomId}/archive`, acknowledged ? { acknowledgedDismissal: true } : {})
-      await loadView()
+      // 보관은 이미 끝났다. 뒤이은 재조회가 실패했다고 보관이 실패한 것처럼
+      // 말하면, 사용자는 다시 누르고 그때는 "이미 보관됨" 오류를 받는다.
+      await loadView().catch(() => {})
       toast.success('면접방을 보관했습니다.')
       setWithdrawalOpen(false)
     } catch (err) {
-      if (err.status === 409 && !acknowledged) {
+      // 409 를 전부 "채용 확정이라 확인이 필요하다"로 읽고 있었다. 그래서
+      // 이미 보관된 방을 한 번 더 보관하려 해도, 그 사이 상태가 바뀌었어도
+      // "채용이 확정된 전형입니다"라는 가장 무거운 경고창이 떴다. 확정된 적
+      // 없는 방에서도 똑같이 떴다. 사실이 아닌 자리에서 한 번 뜨면 진짜
+      // 경고도 같은 무게로 읽히지 않는다.
+      //
+      // 서버는 확인이 필요할 때만 requiresAcknowledgement 를 함께 보낸다.
+      if (err.data?.requiresAcknowledgement && !acknowledged) {
+        // 창이 그리는 근거는 서버가 방금 준 것이어야 한다. 화면이 들고 있던
+        // 옛 값으로 그리면 내용이 빈 경고가 된다.
+        if (err.data.offer) setView((v) => (v ? { ...v, offer: err.data.offer } : v))
         setWithdrawalMode('archive')
         setWithdrawalOpen(true)
+      } else {
+        toast.error(err.message)
       }
-      else toast.error(err.message)
     } finally {
       setArchiving(false)
     }
@@ -83,7 +96,7 @@ export default function RoomPage() {
     setArchiving(true)
     try {
       await api.delete(`/rooms/${roomId}/archive`)
-      await loadView()
+      await loadView().catch(() => {})
       toast.success('보관을 해제했습니다.')
     } catch (err) {
       toast.error(err.message)
@@ -267,7 +280,10 @@ export default function RoomPage() {
 
       {/* 종료 기능은 서버에만 있고 화면에는 없었다. 부를 수 없는 기능은
           없는 기능이다. */}
-      {room.myRole === 'company' && CLOSABLE_STATUSES.includes(room.status) && (
+      {/* 보관된 방에서도 이 칸이 통째로 살아 있었다. 해고 확인 창을 띄우고
+          체크박스를 켜고 마지막 버튼까지 누른 뒤에야 409 로 거절됐다 — 이
+          앱에서 가장 무거운 절차를 끝까지 밟게 해 놓고 마지막에 막는 셈이다. */}
+      {room.myRole === 'company' && !room.archivedAt && CLOSABLE_STATUSES.includes(room.status) && (
         <section className={`room-close${offer?.established ? ' room-close-dismissal' : ''}`}>
           <h2>{offer?.established ? '채용내정 취소' : '전형 종료'}</h2>
 
@@ -396,13 +412,13 @@ export default function RoomPage() {
 
       {/* 막아야 할 순간은 취소할 때가 아니라 말할 때다. 대화 바로 위에 둔다. */}
       {room.myRole === 'company' && (
-        <OfferWatch offer={offer} roomId={roomId} onChanged={loadView} />
+        <OfferWatch offer={offer} roomId={roomId} archived={!!room.archivedAt} onChanged={loadView} />
       )}
 
       {room.myRole === 'company' && <NegotiationLog negotiation={view.negotiation} />}
 
       {/* 확정 뒤에 조건을 고치는 것이 실질적 취소다. 그 전에 본다. */}
-      {room.myRole === 'company' && room.status !== 'signed' && (
+      {room.myRole === 'company' && !room.archivedAt && room.status !== 'signed' && (
         <PreContractReview roomId={roomId} />
       )}
 
@@ -427,8 +443,8 @@ export default function RoomPage() {
       <section className="ai-analysis">
         <h2>채용 조건 분석</h2>
         {/* 체결이 끝난 계약의 조건을 다시 정리하면 근로자가 보는 근로조건이
-            바뀐다. 서버에서도 막지만 버튼부터 내린다. */}
-        {room.myRole === 'company' && room.status !== 'signed' && (
+            바뀐다. 서버에서도 막지만 버튼부터 내린다. 보관도 같다. */}
+        {room.myRole === 'company' && !room.archivedAt && room.status !== 'signed' && (
           <button type="button" className="btn-primary" onClick={handleAnalyze} disabled={analyzing}>
             {analyzing ? '분석 중...' : 'AI로 조건 정리하기'}
           </button>

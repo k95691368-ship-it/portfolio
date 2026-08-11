@@ -105,7 +105,7 @@ export async function loadMyApplications(env, user) {
   const { results } = await env.DB.prepare(
     `SELECT a.id, a.status, a.created_at, a.reviewed_at, a.room_id, a.lookup_code,
             p.title AS posting_title, p.department, p.employment_type, p.location,
-            r.status AS room_status, r.title AS room_title,
+            r.status AS room_status, r.title AS room_title, r.archived_at AS room_archived_at,
             sc.created_at AS signed_at
        FROM applications a
        JOIN job_postings p ON p.id = a.posting_id
@@ -131,6 +131,9 @@ export async function loadMyApplications(env, user) {
       reviewedAt: r.reviewed_at,
       roomId: r.room_id,
       roomStatus: r.room_status,
+      // 보관된 방은 서명할 수 없다. 이것을 넘기지 않으면 잠긴 계약서를 두고
+      // "확인하고 서명해주세요"라고 재촉하게 된다.
+      roomArchived: !!r.room_archived_at,
       roomTitle: r.room_title,
       signedAt: r.signed_at,
       lookupCode: r.lookup_code,

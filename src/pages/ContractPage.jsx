@@ -370,7 +370,7 @@ const REQUEST_STATUS = {
 }
 
 // 계약 조건 수정 요청 — 지원자가 보내고 회사가 수락·거절한다.
-function ChangeRequests({ requests, myRole, canRequest, onCreate, onRespond, busy, prefill }) {
+function ChangeRequests({ requests, myRole, canRequest, canRespond, onCreate, onRespond, busy, prefill }) {
   const [field, setField] = useState('')
   const [value, setValue] = useState('')
   const [reason, setReason] = useState('')
@@ -423,7 +423,9 @@ function ChangeRequests({ requests, myRole, canRequest, onCreate, onRespond, bus
                 <span className="request-to">{r.requestedValue}</span>
               </p>
               {r.reason && <p className="request-reason">사유: {r.reason}</p>}
-              {myRole === 'company' && (
+              {/* 잠긴 방에서는 응답도 막힌다(서버가 409). 버튼만 남겨 두면
+                  눌러 봐야 안 되는 화면이 된다. */}
+              {myRole === 'company' && canRespond && (
                 <div className="request-actions">
                   <button
                     type="button"
@@ -820,11 +822,18 @@ export default function ContractPage() {
   const isSigned = room?.status === 'signed'
   // 보관된 방은 계약서가 잠긴다 — 수정도 서명도 파일 저장도.
   const archived = !!room?.archivedAt
+  // 종료된 전형도 계약을 앞으로 진행하는 행동은 전부 막힌다(서버가 409).
+  // 그런데 화면은 그것을 보지 않아, 끝난 전형에서 아무 표시 없이 조건을
+  // 고치고 서명할 수 있는 것처럼 보였다.
+  const roomClosed = room?.status === 'closed'
+  // 계약을 앞으로 진행할 수 없는 상태를 한 이름으로 묶는다. 여기저기서
+  // 따로 확인하게 두면 한 곳을 빠뜨린다 — 실제로 그렇게 빠뜨렸다.
+  const frozen = archived || roomClosed
   const myRole = room?.myRole
   const otherRole = myRole === 'company' ? 'candidate' : 'company'
   const mySignature = signatures.find((s) => s.role === myRole)
   const otherSignature = signatures.find((s) => s.role === otherRole)
-  const canEdit = !isSigned && !archived && myRole === 'company'
+  const canEdit = !isSigned && !frozen && myRole === 'company'
 
   const handleSave = async () => {
     setSaving(true)
@@ -1145,8 +1154,9 @@ export default function ContractPage() {
             눌러도 아무 일이 없는 화면에서 사람은 자기 잘못을 찾는다. */}
         {archived && (
           <p className="room-archived-note" role="status">
-            보관된 면접방입니다. 계약 조건 수정·서명·계약서 파일 저장이 잠겨 있습니다. 내용을 보고
-            내려받는 것은 그대로 됩니다.
+            보관된 면접방입니다. 계약 조건 수정, 채용 확정, 서명, 계약서 파일 저장, 번역, 수정 요청과
+            그 응답, 이전 계약 연결, 근로관계 종료 기록이 모두 잠겨 있습니다. 내용을 보고 내려받는
+            것은 그대로 됩니다.
           </p>
         )}
       </header>
@@ -1157,7 +1167,9 @@ export default function ContractPage() {
             아직 채용이 확정되지 않았습니다. 계약 조건은 지금 미리 작성할 수 있지만, 서명은 채용이 확정된
             후에 가능합니다.
           </p>
-          {myRole === 'company' && (
+          {/* 잠긴 방에서 채용 확정을 권하고 있었다. 확정은 채용내정을
+              성립시키는 행위인데, 그 방에서는 대화도 서명도 할 수 없다. */}
+          {myRole === 'company' && !frozen && (
             <>
               <p className="hire-confirm-hint">
                 면접방 대화에서 AI가 채용 확정을 인식하면 자동으로 확정됩니다. 면접을 별도로 진행했거나
@@ -1385,12 +1397,12 @@ export default function ContractPage() {
         continuity={continuity}
         retention={retention}
         linkableRooms={linkableRooms}
-        canLink={myRole === 'company' && !isSigned}
+        canLink={myRole === 'company' && !isSigned && !frozen}
         onLink={handleLinkPrevious}
         onUnlink={handleUnlinkPrevious}
         busy={linking}
         employmentEnd={employmentEnd}
-        canRecordEnd={myRole === 'company' && isSigned}
+        canRecordEnd={myRole === 'company' && isSigned && !frozen}
         onRecordEnd={handleRecordEmploymentEnd}
         onClearEnd={handleClearEmploymentEnd}
       />
@@ -1399,7 +1411,7 @@ export default function ContractPage() {
         translations={translations}
         sourceArticles={sourceArticles}
         languages={languages}
-        canTranslate={myRole === 'company'}
+        canTranslate={myRole === 'company' && !frozen}
         onTranslate={handleTranslate}
         busy={translating}
       />
@@ -1408,7 +1420,8 @@ export default function ContractPage() {
         <ChangeRequests
           requests={changeRequests}
           myRole={myRole}
-          canRequest={myRole === 'candidate' && !isSigned}
+          canRequest={myRole === 'candidate' && !isSigned && !frozen}
+          canRespond={!frozen}
           onCreate={handleCreateRequest}
           onRespond={handleRespondRequest}
           busy={requestBusy}
@@ -1503,13 +1516,15 @@ export default function ContractPage() {
               className="btn-primary"
               onClick={() => setSigningRole(myRole)}
               disabled={
-                archived || !contractMeta.hireConfirmed || (preSign?.hasBlocking && !acknowledged)
+                frozen || !contractMeta.hireConfirmed || (preSign?.hasBlocking && !acknowledged)
               }
             >
               서명하기
             </button>
-            {archived && (
-              <p className="notice">보관된 면접방입니다. 서명은 잠겨 있습니다.</p>
+            {frozen && (
+              <p className="notice">
+                {archived ? '보관된 면접방입니다.' : '종료된 전형입니다.'} 서명은 잠겨 있습니다.
+              </p>
             )}
             {!contractMeta.hireConfirmed && <p className="notice">채용이 확정된 후에 서명할 수 있습니다.</p>}
           </>
@@ -1565,7 +1580,7 @@ export default function ContractPage() {
               type="button"
               className="btn-primary"
               onClick={handleStoreAndSend}
-              disabled={storing || archived}
+              disabled={storing || frozen}
             >
               {storing
                 ? '처리 중...'

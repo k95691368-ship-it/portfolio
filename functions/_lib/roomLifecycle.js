@@ -159,6 +159,7 @@ const BLOCKED_WHEN_ARCHIVED = {
   final_offer_email: '보관된 면접방에서는 최종합격 이메일을 보낼 수 없습니다. 보관을 해제한 뒤 진행해주세요.',
   invite_email: '보관된 면접방에서는 초대 이메일을 보낼 수 없습니다.',
   interview_summary: '보관된 면접방에서는 면접 요약을 새로 쓸 수 없습니다.',
+  join: '보관된 면접방에는 참여할 수 없습니다. 회사에 문의해주세요.',
 }
 
 export function blockedWhenArchived(room, action) {

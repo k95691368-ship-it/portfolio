@@ -2,7 +2,7 @@
 // SQL 에만 걸어 두면, 미룰 필요가 없는 요청에서도 쓰기가 한 번씩 나간다.
 // 로그인한 사람의 모든 요청마다 UPDATE 를 쏘는 셈이었다.
 import { describe, expect, it } from 'vitest'
-import { needsRenewal } from '../functions/_lib/auth.js'
+import { needsRenewal, wasPersistentSession } from '../functions/_lib/auth.js'
 
 const DAY = 24 * 60 * 60 * 1000
 const iso = (ms) => new Date(ms).toISOString()
@@ -49,5 +49,35 @@ describe('만료를 미뤄야 하는가', () => {
     expect(needsRenewal(null)).toBe(false)
     expect(needsRenewal({})).toBe(false)
     expect(needsRenewal({ session_started_at: '어제', session_expires_at: '내일' })).toBe(false)
+  })
+})
+
+// '로그인 유지'를 고르지 않은 세션이 다른 경로로 30일이 되면, 고르지 않은
+// 것을 켜 주는 셈이 된다. 공용 컴퓨터를 쓰는 사람에게는 정확히 반대다.
+describe('이 세션은 유지를 고른 것인가', () => {
+  const at = (ms) => new Date(ms).toISOString()
+  const DAY2 = 24 * 60 * 60 * 1000
+
+  it('30일로 잡힌 세션은 유지를 고른 것이다', () => {
+    expect(
+      wasPersistentSession({
+        session_started_at: at(Date.now() - 5 * DAY2),
+        session_expires_at: at(Date.now() + 25 * DAY2),
+      })
+    ).toBe(true)
+  })
+
+  it('12시간으로 잡힌 세션은 아니다', () => {
+    expect(
+      wasPersistentSession({
+        session_started_at: at(Date.now() - 60 * 60 * 1000),
+        session_expires_at: at(Date.now() + 11 * 60 * 60 * 1000),
+      })
+    ).toBe(false)
+  })
+
+  it('알 수 없으면 유지로 본다 — 쓰던 사람을 갑자기 내보내지 않는다', () => {
+    expect(wasPersistentSession(null)).toBe(true)
+    expect(wasPersistentSession({})).toBe(true)
   })
 })

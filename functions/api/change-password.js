@@ -4,6 +4,7 @@ import {
   deleteAllUserSessions,
   createSession,
   sessionCookieHeader,
+  wasPersistentSession,
 } from '../_lib/auth.js'
 import { jsonResponse, jsonError } from '../_lib/http.js'
 import { checkRateLimit } from '../_lib/rateLimit.js'
@@ -44,7 +45,18 @@ export async function onRequestPost({ request, env, data }) {
   //
   // 이 계정의 세션을 전부 지우고, 지금 바꾼 사람에게만 새 세션을 준다.
   await deleteAllUserSessions(env.DB, data.user.id)
-  const { token } = await createSession(env.DB, data.user.id)
+  // 새 세션의 수명은 원래 세션을 따른다.
+  //
+  // 무조건 30일로 만들고 있었다. '로그인 유지'를 끄고 들어온 사람이 비밀번호를
+  // 바꾸면, 창을 닫아도 사라지던 세션이 디스크에 30일 남는 쿠키로 바뀐다.
+  // 고르지 않은 것을 비밀번호를 바꿨다는 이유로 켜 주는 셈이다. 공용 컴퓨터를
+  // 쓰는 사람에게는 정확히 반대 방향이다.
+  //
+  // 원래 세션이 하루보다 길게 잡혔으면 유지를 고른 로그인이다.
+  const persistent = wasPersistentSession(data.user)
+  const { token } = await createSession(env.DB, data.user.id, { persistent })
 
-  return jsonResponse({ ok: true }, 200, { 'Set-Cookie': sessionCookieHeader(token) })
+  return jsonResponse({ ok: true }, 200, {
+    'Set-Cookie': sessionCookieHeader(token, { persistent }),
+  })
 }

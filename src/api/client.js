@@ -10,6 +10,10 @@ function toUserError(res, data) {
   }
   const error = new Error(message)
   error.status = res.status
+  // 서버가 함께 보낸 내용을 버리고 있었다. 그래서 화면은 같은 409 를 모두
+  // 같은 뜻으로 읽을 수밖에 없었고, "확인이 필요하다"와 "이미 처리되었다"가
+  // 구별되지 않아 사실이 아닌 경고창이 떴다.
+  error.data = data ?? null
   return error
 }
 

@@ -1,4 +1,10 @@
-import { getSessionUser, renewSessionIfStale, needsRenewal } from '../_lib/auth.js'
+import {
+  getSessionUser,
+  renewSessionIfStale,
+  needsRenewal,
+  parseCookie,
+  sessionCookieHeader,
+} from '../_lib/auth.js'
 import { jsonError } from '../_lib/http.js'
 
 // 다른 사이트가 이 API 를 대신 부르는 것을 막는다.
@@ -39,13 +45,27 @@ export async function onRequest(context) {
   // 조건을 SQL 에만 걸어 두어, 미룰 필요가 없는 요청에서도 UPDATE 가 한 번씩
   // 나갔다. 로그인한 사람의 모든 요청마다 쓰기가 한 번인 셈이다. 만료 시각은
   // 이미 세션을 읽을 때 함께 가져왔으므로, 미뤄야 할 때만 부른다.
-  //
-  // 응답을 붙잡아 두지 않도록 뒤로 넘긴다 — 실패해도 이번 요청과는 상관없다.
-  if (context.data.user && needsRenewal(context.data.user)) {
+  const renew = context.data.user ? needsRenewal(context.data.user) : false
+  if (renew) {
+    // 응답을 붙잡아 두지 않도록 뒤로 넘긴다 — 실패해도 이번 요청과는 상관없다.
     const renewal = renewSessionIfStale(context.env.DB, request)
     if (context.waitUntil) context.waitUntil(renewal)
     else await renewal.catch(() => {})
   }
 
-  return context.next()
+  const response = await context.next()
+  if (!renew) return response
+
+  // 서버 쪽 만료만 미루고 쿠키는 그대로 두고 있었다.
+  //
+  // 브라우저의 쿠키는 로그인한 순간부터 30일짜리다. DB 의 expires_at 을 아무리
+  // 미뤄도 그 쿠키가 사라지면 보낼 것이 없어 로그아웃된다. 매일 들어와도
+  // 30일째에 끊기는 증상 — 고치겠다고 적어 놓고 절반만 고친 셈이었다.
+  //
+  // 미룰 때마다 쿠키도 새로 내려 두 시계를 함께 맞춘다.
+  const token = parseCookie(request, 'session')
+  if (!token) return response
+  const withCookie = new Response(response.body, response)
+  withCookie.headers.append('Set-Cookie', sessionCookieHeader(token))
+  return withCookie
 }

@@ -26,10 +26,6 @@ export async function onRequestPost({ request, env, data, params }) {
   const language = findLanguage(body?.language)
   if (!language) return jsonError('지원하지 않는 언어입니다.', 400)
 
-  const bucket = `translate:${params.roomId}`
-  const ticket = await checkRateLimit(env, bucket, 5, 300)
-  if (!ticket) return jsonError('번역 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)
-
   // 이 경로는 방 상태를 아예 보지 않고 있었다. 보관된 방에서 계약서를 새로
   // 번역하면 잠근 문서에 새 문서가 붙는다.
   const room = await env.DB.prepare(
@@ -39,6 +35,12 @@ export async function onRequestPost({ request, env, data, params }) {
     .first()
   const archived = blockedWhenArchived(room, 'translate')
   if (archived) return jsonError(archived, 409)
+
+  // 한도는 몇 번 해냈는가를 세는 것이지 몇 번 막혔는가를 세는 것이 아니다.
+  // 잠금 검사를 뒤에 두어, 막힌 시도가 쿨다운을 갉아먹고 있었다.
+  const bucket = `translate:${params.roomId}`
+  const ticket = await checkRateLimit(env, bucket, 5, 300)
+  if (!ticket) return jsonError('번역 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)
 
   const termsRow = await env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?')
     .bind(params.roomId)

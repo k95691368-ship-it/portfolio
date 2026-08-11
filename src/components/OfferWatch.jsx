@@ -15,7 +15,7 @@ import { useToast } from '../context/ToastContext.jsx'
 // 회사 쪽에만 보인다. 지원자에게 "지금 내정이 성립했습니다"라고 알리는 것은
 // 이 도구의 목적이 아니고, 회사가 아직 확정할 뜻이 없었다면 오히려 분쟁을
 // 만든다.
-export default function OfferWatch({ offer, roomId, onChanged }) {
+export default function OfferWatch({ offer, roomId, archived = false, onChanged }) {
   const toast = useToast()
   const [saving, setSaving] = useState(false)
 
@@ -77,7 +77,9 @@ export default function OfferWatch({ offer, roomId, onChanged }) {
         {offer.risk?.remedies?.length > 0 && ` 지원자가 취할 수 있는 조치: ${offer.risk.remedies.join(' · ')}.`}
       </p>
 
-      {phraseOnly && (
+      {/* 보관된 방에서는 확정 기록도 잠긴다(서버도 409). 버튼만 남겨 두면
+          눌러 봐야 안 되는 화면이 된다. */}
+      {phraseOnly && !archived && (
         <div className="offer-actions">
           <p className="offer-hint">
             실제로 채용을 확정했다면 기록으로 남겨 주세요. 확정 시각이 남아 있어야 나중에 어떤
