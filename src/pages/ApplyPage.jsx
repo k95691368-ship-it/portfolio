@@ -6,7 +6,6 @@ import { CONSENT_ITEMS } from '../lib/consentText.js'
 import { isApplyFormDirty, LEAVE_CONFIRM_MESSAGE } from '../lib/applyForm.js'
 
 const EMPLOYMENT_TYPES = ['정규직', '계약직', '인턴', '아르바이트', '프리랜서', '기타']
-const SOURCES = ['채용 사이트', '회사 홈페이지', '지인 추천', '검색', 'SNS', '기타']
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
 function emptyCareer(key) {
@@ -32,14 +31,16 @@ function ConsentItem({ item, checked, onToggle }) {
           "…동의 (필수) 전문 보기 체크박스"가 된다. 무엇에 동의하는지가 흐려지므로
           버튼을 label 밖으로 뺐다. */}
       <div className="consent-head">
+        {/* 체크할 칸을 (필수)·(선택) 표시 바로 옆에 둔다. 무엇에 동의하는지
+            읽고 나서 그 자리에서 누르게 된다. */}
         <label className="consent-label">
-          <input type="checkbox" checked={checked} onChange={(e) => onToggle(e.target.checked)} />
           <span>
             {item.label}{' '}
             <span className={item.required ? 'consent-required' : 'consent-optional'}>
               ({item.required ? '필수' : '선택'})
             </span>
           </span>
+          <input type="checkbox" checked={checked} onChange={(e) => onToggle(e.target.checked)} />
         </label>
         <button
           type="button"
@@ -71,8 +72,6 @@ export default function ApplyPage() {
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [careers, setCareers] = useState([])
-  const [source, setSource] = useState('')
-  const [coverLetter, setCoverLetter] = useState('')
   const [resume, setResume] = useState(null)
   const [portfolio, setPortfolio] = useState(null)
 
@@ -108,7 +107,7 @@ export default function ApplyPage() {
 
   // 로그인 없이 지원하는 구조라 쓰다 만 지원서는 어디에도 남지 않는다.
   // 실수로 탭을 닫거나 새로고침하면 전부 사라지므로 한 번 되묻는다.
-  const dirty = isApplyFormDirty({ name, email, phone, source, coverLetter, careers, resume, portfolio })
+  const dirty = isApplyFormDirty({ name, email, phone, careers, resume, portfolio })
   useEffect(() => {
     if (!dirty || done) return undefined
     const onBeforeUnload = (event) => {
@@ -158,8 +157,6 @@ export default function ApplyPage() {
       form.append('applicantName', name)
       form.append('applicantEmail', email)
       form.append('applicantPhone', phone)
-      form.append('applicationSource', source)
-      form.append('coverLetter', coverLetter)
       form.append('careerJson', JSON.stringify(careers))
       form.append('consentRequired', consents.consentRequired ? 'true' : 'false')
       form.append('consentOptional', consents.consentOptional ? 'true' : 'false')
@@ -397,35 +394,7 @@ export default function ApplyPage() {
         </section>
 
         <section className="apply-section">
-          <h2>지원정보</h2>
-          <label>
-            지원 경로
-            <select value={source} onChange={(e) => setSource(e.target.value)}>
-              <option value="">선택</option>
-              {SOURCES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            자기소개 / 지원동기
-            <textarea
-              value={coverLetter}
-              onChange={(e) => setCoverLetter(e.target.value)}
-              maxLength={5000}
-              rows={6}
-            />
-          </label>
-        </section>
-
-        <section className="apply-section">
           <h2>개인정보 수집 및 이용 동의</h2>
-          <label className="consent-all">
-            <input type="checkbox" checked={allChecked} onChange={(e) => toggleAll(e.target.checked)} />
-            <span>전체 동의</span>
-          </label>
           {CONSENT_ITEMS.map((item) => (
             <ConsentItem
               key={item.key}
@@ -434,6 +403,12 @@ export default function ApplyPage() {
               onToggle={(value) => setConsents((prev) => ({ ...prev, [item.key]: value }))}
             />
           ))}
+          {/* 전체 동의는 항목을 다 읽은 뒤에 누르는 것이다. 맨 위에 두면
+              무엇에 동의하는지 보기 전에 먼저 누르게 된다. */}
+          <label className="consent-all">
+            <span>전체 동의</span>
+            <input type="checkbox" checked={allChecked} onChange={(e) => toggleAll(e.target.checked)} />
+          </label>
         </section>
 
         <button type="submit" className="btn-primary btn-block" disabled={submitting}>
