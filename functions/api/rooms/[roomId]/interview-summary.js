@@ -1,4 +1,5 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
+import { blockedWhenArchived } from '../../../_lib/roomLifecycle.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { summarizeInterview } from '../../../_lib/claude.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
@@ -62,6 +63,14 @@ export async function onRequestPost({ env, data, params }) {
   if (!data.user.is_admin && !data.user.is_recruiter) {
     return jsonError('면접 요약은 채용자 또는 관리자 권한이 있는 계정만 작성할 수 있습니다.', 403)
   }
+
+  const roomLock = await env.DB.prepare(
+    'SELECT status, archived_at FROM interview_rooms WHERE id = ?'
+  )
+    .bind(params.roomId)
+    .first()
+  const archived = blockedWhenArchived(roomLock, 'interview_summary')
+  if (archived) return jsonError(archived, 409)
 
   const bucket = `interview-summary:${params.roomId}`
   const ticket = await checkRateLimit(env, bucket, 5, 300)

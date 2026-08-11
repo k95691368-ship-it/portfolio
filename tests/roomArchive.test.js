@@ -77,6 +77,14 @@ describe('보관된 방에서 막히는 것', () => {
     expect(blockedWhenArchived(archived, '아직없는작업')).toBeTruthy()
   })
 
+  // 방에 무언가를 더하는 일은 전부 막힌다. 특히 최종합격 통보는 채용내정을
+  // 성립시키는 바로 그 행위인데, 정작 그 방에서는 답할 수 없다.
+  it('최종합격·초대 이메일과 면접 요약도 막힌다', () => {
+    expect(blockedWhenArchived(archived, 'final_offer_email')).toMatch(/최종합격/)
+    expect(blockedWhenArchived(archived, 'invite_email')).toMatch(/초대/)
+    expect(blockedWhenArchived(archived, 'interview_summary')).toMatch(/면접 요약/)
+  })
+
   it('보관되지 않았으면 아무것도 막지 않는다', () => {
     expect(blockedWhenArchived(room(), 'message')).toBeNull()
     expect(blockedWhenArchived(room(), 'sign')).toBeNull()

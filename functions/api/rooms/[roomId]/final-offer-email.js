@@ -1,4 +1,5 @@
 import { genId } from '../../../_lib/db.js'
+import { blockedWhenArchived } from '../../../_lib/roomLifecycle.js'
 import { maskEmail, sendFinalOfferEmail, isEmailConfigured } from '../../../_lib/email.js'
 import { jsonError, jsonResponse } from '../../../_lib/http.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
@@ -81,6 +82,17 @@ export async function onRequestGet({ env, data, params }) {
 export async function onRequestPost({ request, env, data, params }) {
   const access = await requireCompanyParticipant(env, data, params.roomId)
   if (access.error) return access.error
+
+  // 보관된 방에서 최종합격을 통보하는 것은 앞뒤가 맞지 않는다. 합격 통보는
+  // 채용내정을 성립시키는 바로 그 행위인데, 그 방에서는 대화도 서명도 할 수
+  // 없다. 받은 사람은 답할 곳이 없다.
+  const roomLock = await env.DB.prepare(
+    'SELECT status, archived_at FROM interview_rooms WHERE id = ?'
+  )
+    .bind(params.roomId)
+    .first()
+  const archived = blockedWhenArchived(roomLock, 'final_offer_email')
+  if (archived) return jsonError(archived, 409)
 
   const body = await request.json().catch(() => null)
   const subject = typeof body?.subject === 'string' ? body.subject.trim() : ''

@@ -1,4 +1,5 @@
 import { maskEmail, sendRoomInviteEmail, isEmailConfigured } from '../../../_lib/email.js'
+import { blockedWhenArchived } from '../../../_lib/roomLifecycle.js'
 import { jsonError, jsonResponse } from '../../../_lib/http.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { notifyUser } from '../../../_lib/notify.js'
@@ -44,6 +45,15 @@ export async function onRequestGet({ env, data, params }) {
 export async function onRequestPost({ request, env, data, params }) {
   const access = await requireCompanyParticipant(env, data, params.roomId)
   if (access.error) return access.error
+
+  // 대화할 수 없는 방으로 사람을 부르지 않는다.
+  const roomLock = await env.DB.prepare(
+    'SELECT status, archived_at FROM interview_rooms WHERE id = ?'
+  )
+    .bind(params.roomId)
+    .first()
+  const archived = blockedWhenArchived(roomLock, 'invite_email')
+  if (archived) return jsonError(archived, 409)
 
   const body = await request.json().catch(() => null)
   const subject = typeof body?.subject === 'string' ? body.subject.trim() : ''
