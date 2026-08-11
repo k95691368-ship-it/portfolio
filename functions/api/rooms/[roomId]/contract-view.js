@@ -57,7 +57,9 @@ export async function onRequestGet({ env, data, params, request }) {
     certificateRows,
     lifecycleRows,
   ] = await Promise.all([
-      env.DB.prepare('SELECT id, title, invite_code, status, created_at FROM interview_rooms WHERE id = ?')
+      env.DB.prepare(// archived_at 을 읽지 않아 계약서 화면이 잠금을 받지 못했다. 서버는 막는데
+      // 화면은 수정할 수 있는 것처럼 보인다 — 눌러 봐야 안 되는 화면이 된다.
+      'SELECT id, title, invite_code, status, archived_at, created_at FROM interview_rooms WHERE id = ?')
         .bind(roomId)
         .first(),
       env.DB.prepare(
