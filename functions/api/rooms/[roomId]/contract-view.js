@@ -1,5 +1,6 @@
 import { jsonResponse, jsonError, isAppFetch } from '../../../_lib/http.js'
 import { getRoomAccess } from '../../../_lib/rooms.js'
+import { loadContinuity } from '../../../_lib/continuityChain.js'
 import { rowToCamelTerms, buildArticlesFromTerms } from '../../../_lib/contract.js'
 import { buildAuditEvents, describeSigningEnvironment } from '../../../_lib/auditTrail.js'
 import { maskEmail, isEmailConfigured } from '../../../_lib/email.js'
