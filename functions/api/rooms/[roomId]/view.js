@@ -1,7 +1,7 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { describeOfferStatus } from '../../../_lib/jobOffer.js'
 import { describeNegotiation } from '../../../_lib/termsNegotiation.js'
-import { getRoomAccess } from '../../../_lib/rooms.js'
+import { getRoomAccess, loadCompanyMessages } from '../../../_lib/rooms.js'
 import { rowToCamelTerms } from '../../../_lib/contract.js'
 import { mapDocumentRow } from '../../../_lib/documents.js'
 import { maskEmail, isEmailConfigured } from '../../../_lib/email.js'
@@ -29,7 +29,8 @@ export async function onRequestGet({ env, data, params }) {
 
   const isCompany = access.role_in_room === 'company'
 
-  const [participantRows, termsRow, negotiationRows, messageRows, finalOffer] = await Promise.all([
+  const [participantRows, termsRow, negotiationRows, messageRows, offerMessages, finalOffer] =
+    await Promise.all([
     env.DB.prepare(
       `SELECT u.id, u.display_name, u.company_name, u.email, rp.role_in_room
          FROM room_participants rp
@@ -62,6 +63,10 @@ export async function onRequestGet({ env, data, params }) {
     )
       .bind(roomId, MESSAGE_LIMIT)
       .all(),
+    // 판정은 화면과 다른 조회를 쓴다. 화면에 뿌리는 목록은 최근 것부터 잘라
+    // 오는 창이라, 대화가 길어지면 확정을 성립시킨 문장이 창 밖으로 밀려나며
+    // 경고가 조용히 꺼진다.
+    loadCompanyMessages(env, roomId),
     isCompany
       ? env.DB.prepare(
           `SELECT status, recipient_email, subject, attempt_count, sent_at, created_at, updated_at
@@ -70,7 +75,7 @@ export async function onRequestGet({ env, data, params }) {
           .bind(roomId)
           .first()
       : Promise.resolve(null),
-  ])
+    ])
 
   const participants = participantRows.results
   // 근로자를 한 번만 찾아 서류·초대 이메일·최종합격 이메일이 함께 쓴다.
@@ -152,18 +157,13 @@ export async function onRequestGet({ env, data, params }) {
     negotiation: isCompany ? describeNegotiation(negotiationRows.results) : null,
     // 채용내정이 성립했는가, 그리고 지금 끝내면 무슨 일이 벌어지는가.
     //
-    // 메시지 조회에는 역할이 없으므로 참여자 목록으로 발신자를 회사/지원자로
-    // 가른다. 확정은 회사만 할 수 있어서, 지원자가 "언제 출근하면 되나요"라고
-    // 묻는 것을 확정으로 읽으면 안 된다.
+    // 확정은 회사만 할 수 있어서, 지원자가 "언제 출근하면 되나요"라고 묻는
+    // 것을 확정으로 읽으면 안 된다. 그래서 회사 발화만 처음부터 읽는다.
     offer: describeOfferStatus({
       // 원본 행을 그대로 넘긴다. rowToCamelTerms 는 hire_confirmed 를 담지
       // 않아서, 카멜만 넘기면 확정 여부가 판정에 도달하지 않는다.
       terms: termsRow,
-      messages: messageRows.results.map((m) => ({
-        body: m.body,
-        created_at: m.created_at,
-        role_in_room: participants.find((p) => p.id === m.sender_user_id)?.role_in_room ?? null,
-      })),
+      messages: offerMessages,
     }),
     // 아래 셋은 회사 측 화면에만 쓰인다.
     interviewSummary: isCompany ? interviewSummary : null,

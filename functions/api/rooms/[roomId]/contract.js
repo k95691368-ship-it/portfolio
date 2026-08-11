@@ -8,7 +8,7 @@ import {
   alignWageItemsWithBase,
   baseAmountFromItems,
 } from '../../../_lib/wageItems.js'
-import { getRoomParticipant, getRoomAccess } from '../../../_lib/rooms.js'
+import { getRoomParticipant, getRoomAccess, loadCompanyMessages } from '../../../_lib/rooms.js'
 import { revokeSignaturesOnChange } from '../../../_lib/signatureLock.js'
 
 export async function onRequestGet({ env, data, params }) {
@@ -228,9 +228,13 @@ export async function onRequestPatch({ env, data, params, request }) {
         })
       : { revoked: 0 }
 
-  const row = await env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?')
-    .bind(params.roomId)
-    .first()
+  const [row, offerMessages] = await Promise.all([
+    env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?').bind(params.roomId).first(),
+    // 대화를 넘기지 않고 있었다. 그러면 AI 가 확정 처리를 해 둔 방에서만 이
+    // 경고가 뜬다 — AI 조건 정리는 회사가 버튼을 눌러야 돌고, 크레딧이 없으면
+    // 아예 돌지 않는다. 정작 조건을 조용히 깎는 상황에서 꺼져 있는 것이다.
+    loadCompanyMessages(env, params.roomId),
+  ])
 
   // 확정 뒤의 불리한 조건 변경은 실질적으로 취소일 수 있다.
   //
@@ -238,7 +242,7 @@ export async function onRequestPatch({ env, data, params, request }) {
   // 무엇인지 모르고 하는 일이 없도록, 무엇이 어떻게 불리해졌는지 짚어 준다.
   // 임금을 깎거나 출근일을 미뤄 지원자가 스스로 포기하게 만드는 쪽이 노골적인
   // 통보보다 흔하고, 회사는 그것을 취소라고 자각하지 못한다.
-  const offer = describeOfferStatus({ terms: row, messages: [] })
+  const offer = describeOfferStatus({ terms: row, messages: offerMessages })
   const unfavourable = offer.established ? describeUnfavourableChanges(changes) : []
 
   return jsonResponse({

@@ -1,5 +1,5 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
-import { getRoomParticipant } from '../../../_lib/rooms.js'
+import { getRoomParticipant, loadCompanyMessages } from '../../../_lib/rooms.js'
 import { notifyUser } from '../../../_lib/notify.js'
 import { logLifecycle } from '../../../_lib/roomLifecycleLog.js'
 import { canClose, normalizeCloseReason, isClosed } from '../../../_lib/roomLifecycle.js'
@@ -41,24 +41,12 @@ export async function onRequestPost({ request, env, data, params }) {
   // 단정해서 막지는 않는다. 확정으로 본 근거가 된 회사 자신의 문장을 돌려주고,
   // 그것을 확인했다는 표시가 함께 와야 통과시킨다. AI 판정이 없어도 대화에
   // 확정으로 읽힐 표현이 있으면 같은 절차를 밟는다.
-  const [termsRow, messageRows] = await Promise.all([
+  const [termsRow, companyMessages] = await Promise.all([
     env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?').bind(params.roomId).first(),
-    env.DB.prepare(
-      `SELECT m.body, m.created_at, rp.role_in_room
-         FROM chat_messages m
-         JOIN room_participants rp ON rp.room_id = m.room_id AND rp.user_id = m.sender_user_id
-        WHERE m.room_id = ?
-        ORDER BY m.id DESC
-        LIMIT 200`
-    )
-      .bind(params.roomId)
-      .all(),
+    loadCompanyMessages(env, params.roomId),
   ])
 
-  const offer = describeOfferStatus({
-    terms: termsRow,
-    messages: (messageRows.results || []).slice().reverse(),
-  })
+  const offer = describeOfferStatus({ terms: termsRow, messages: companyMessages })
 
   if (offer.established && body?.acknowledgedDismissal !== true) {
     return jsonResponse(
