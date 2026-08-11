@@ -1,6 +1,6 @@
 import { genId } from '../../../../_lib/db.js'
 import { jsonResponse, jsonError } from '../../../../_lib/http.js'
-import { blockedWhenClosed } from '../../../../_lib/roomLifecycle.js'
+import { blockedWhenFrozen } from '../../../../_lib/roomLifecycle.js'
 import { getRoomParticipant, getRoomAccess } from '../../../../_lib/rooms.js'
 import { EDITABLE_FIELDS } from '../../../../_lib/contract.js'
 import { FIELD_LABELS } from '../../../../_lib/contractCheck.js'
@@ -38,14 +38,14 @@ export async function onRequestPost({ request, env, data, params }) {
     return jsonError('수정 요청은 지원자만 보낼 수 있습니다. 회사 측은 계약서를 직접 수정하세요.', 403)
   }
 
-  const room = await env.DB.prepare('SELECT status FROM interview_rooms WHERE id = ?')
+  const room = await env.DB.prepare('SELECT status, archived_at FROM interview_rooms WHERE id = ?')
     .bind(params.roomId)
     .first()
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
   if (room.status === 'signed') {
     return jsonError('이미 서명이 완료된 계약서는 수정을 요청할 수 없습니다.', 409)
   }
-  const closedBlock = blockedWhenClosed(room, 'change_request')
+  const closedBlock = blockedWhenFrozen(room, 'change_request')
   if (closedBlock) return jsonError(closedBlock, 409)
 
 

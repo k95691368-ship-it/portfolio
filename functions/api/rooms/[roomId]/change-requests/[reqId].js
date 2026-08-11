@@ -4,7 +4,7 @@ import { EDITABLE_FIELDS } from '../../../../_lib/contract.js'
 import { FIELD_LABELS } from '../../../../_lib/contractCheck.js'
 import { notifyUser } from '../../../../_lib/notify.js'
 import { revokeSignaturesOnChange } from '../../../../_lib/signatureLock.js'
-import { blockedWhenClosed } from '../../../../_lib/roomLifecycle.js'
+import { blockedWhenFrozen } from '../../../../_lib/roomLifecycle.js'
 import {
   parseWageItemsJson,
   alignWageItemsWithBase,
@@ -36,7 +36,7 @@ export async function onRequestPost({ request, env, data, params }) {
   if (!req) return jsonError('수정 요청을 찾을 수 없습니다.', 404)
   if (req.status !== 'pending') return jsonError('이미 처리된 요청입니다.', 409)
 
-  const room = await env.DB.prepare('SELECT status FROM interview_rooms WHERE id = ?')
+  const room = await env.DB.prepare('SELECT status, archived_at FROM interview_rooms WHERE id = ?')
     .bind(params.roomId)
     .first()
   if (room?.status === 'signed') {
@@ -44,7 +44,7 @@ export async function onRequestPost({ request, env, data, params }) {
   }
   // 종료된 전형에서는 수정 요청을 새로 보내는 것만 막고 있었다. 이미 쌓여 있던
   // 요청을 수락하면 조건이 바뀌고 서명이 무효화된다 — 끝난 전형에서.
-  const closedError = blockedWhenClosed(room, 'respond_change_request')
+  const closedError = blockedWhenFrozen(room, 'respond_change_request')
   if (closedError) return jsonError(closedError, 409)
 
   const column = EDITABLE_FIELDS[req.field]

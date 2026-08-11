@@ -1,4 +1,5 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
+import { blockedWhenArchived } from '../../../_lib/roomLifecycle.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { rowToCamelTerms, buildArticlesForTranslation } from '../../../_lib/contract.js'
 import { findLanguage } from '../../../_lib/languages.js'
@@ -28,6 +29,16 @@ export async function onRequestPost({ request, env, data, params }) {
   const bucket = `translate:${params.roomId}`
   const ticket = await checkRateLimit(env, bucket, 5, 300)
   if (!ticket) return jsonError('번역 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)
+
+  // 이 경로는 방 상태를 아예 보지 않고 있었다. 보관된 방에서 계약서를 새로
+  // 번역하면 잠근 문서에 새 문서가 붙는다.
+  const room = await env.DB.prepare(
+    'SELECT status, archived_at FROM interview_rooms WHERE id = ?'
+  )
+    .bind(params.roomId)
+    .first()
+  const archived = blockedWhenArchived(room, 'translate')
+  if (archived) return jsonError(archived, 409)
 
   const termsRow = await env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?')
     .bind(params.roomId)

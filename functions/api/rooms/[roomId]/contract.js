@@ -1,6 +1,6 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { describeOfferStatus, describeUnfavourableChanges } from '../../../_lib/jobOffer.js'
-import { blockedWhenClosed } from '../../../_lib/roomLifecycle.js'
+import { blockedWhenFrozen } from '../../../_lib/roomLifecycle.js'
 import { rowToCamelTerms, EDITABLE_FIELDS } from '../../../_lib/contract.js'
 import {
   normalizeWageItems,
@@ -71,12 +71,12 @@ export async function onRequestPatch({ env, data, params, request }) {
     return jsonError('계약서는 회사(고용) 측만 수정할 수 있습니다.', 403)
   }
 
-  const room = await env.DB.prepare('SELECT status FROM interview_rooms WHERE id = ?')
+  const room = await env.DB.prepare('SELECT status, archived_at FROM interview_rooms WHERE id = ?')
     .bind(params.roomId)
     .first()
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
   if (room.status === 'signed') return jsonError('이미 서명이 완료된 계약서는 수정할 수 없습니다.', 409)
-  const editBlock = blockedWhenClosed(room, 'edit_terms')
+  const editBlock = blockedWhenFrozen(room, 'edit_terms')
   if (editBlock) return jsonError(editBlock, 409)
 
   let body

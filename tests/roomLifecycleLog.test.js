@@ -12,11 +12,13 @@ const ROOM = { id: 'r1', title: '백엔드 개발자 계약', created_at: '2026-
 describe('lifecycleEvents', () => {
   it('기록하는 사건을 모두 사람이 읽는 말로 옮긴다', () => {
     expect(Object.keys(LIFECYCLE_ACTIONS).sort()).toEqual([
+      'archived',
       'closed',
       'employment_end_cleared',
       'employment_end_recorded',
       'offer_withdrawn',
       'reopened',
+      'unarchived',
     ])
   })
 
@@ -79,5 +81,18 @@ describe('감사추적에 합류', () => {
     const before = buildAuditEvents(base).length
     expect(buildAuditEvents({ ...base, lifecycle: [] })).toHaveLength(before)
     expect(buildAuditEvents({ ...base, lifecycle: undefined })).toHaveLength(before)
+  })
+})
+
+// 잠그는 일과 푸는 일은 둘 다 일어난 일이다. 잠겨 있는 동안 무엇을 할 수
+// 없었는지가 나중에 다툼의 대상이 된다.
+describe('보관 기록', () => {
+  it('보관과 해제가 사람이 읽는 말로 남는다', () => {
+    const events = lifecycleEvents([
+      { action: 'archived', actor_name: '김담당', detail: null, created_at: '2026-08-12 09:00:00' },
+      { action: 'unarchived', actor_name: '김담당', detail: null, created_at: '2026-08-12 10:00:00' },
+    ])
+    expect(events[0].event).toBe('면접방 보관 (대화·계약서 잠금)')
+    expect(events[1].event).toBe('면접방 보관 해제')
   })
 })

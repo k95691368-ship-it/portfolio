@@ -43,6 +43,54 @@ export default function RoomPage() {
   const [closeReason, setCloseReason] = useState('other_candidate')
   const [closeNote, setCloseNote] = useState('')
   const [withdrawalOpen, setWithdrawalOpen] = useState(false)
+  const [archiving, setArchiving] = useState(false)
+  // 확인 창을 종료와 보관이 함께 쓴다. 무엇을 하려던 것인지 기억하지 않으면
+  // 보관을 눌렀는데 종료가 실행된다.
+  const [withdrawalMode, setWithdrawalMode] = useState('close')
+
+  // 보관 — 지금 상태 그대로 잠근다. 대화도 계약서도 손댈 수 없게 된다.
+  //
+  // 채용이 확정됐는데 아직 서명 전이면 서버가 409 로 되묻는다. 그때는 전형
+  // 종료와 같은 확인 창을 띄운다 — 보관은 지원자가 받아야 할 계약서에 서명할
+  // 길을 막는 일이라, 그 자리에서 무엇을 하는 것인지 알아야 한다.
+  const handleArchive = async (acknowledged = false) => {
+    if (
+      !acknowledged &&
+      !window.confirm(
+        '이 면접방을 보관하시겠습니까?\n\n대화와 계약서 수정·서명·파일 저장이 잠깁니다. 지금까지의 기록은 그대로 볼 수 있고, 보관은 언제든 해제할 수 있습니다.'
+      )
+    ) {
+      return
+    }
+    setArchiving(true)
+    try {
+      await api.post(`/rooms/${roomId}/archive`, acknowledged ? { acknowledgedDismissal: true } : {})
+      await loadView()
+      toast.success('면접방을 보관했습니다.')
+      setWithdrawalOpen(false)
+    } catch (err) {
+      if (err.status === 409 && !acknowledged) {
+        setWithdrawalMode('archive')
+        setWithdrawalOpen(true)
+      }
+      else toast.error(err.message)
+    } finally {
+      setArchiving(false)
+    }
+  }
+
+  const handleUnarchive = async () => {
+    setArchiving(true)
+    try {
+      await api.delete(`/rooms/${roomId}/archive`)
+      await loadView()
+      toast.success('보관을 해제했습니다.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setArchiving(false)
+    }
+  }
 
   // 이 화면에 필요한 모든 정보를 한 번의 요청으로 받는다.
   const loadView = useCallback(async () => {
@@ -58,6 +106,7 @@ export default function RoomPage() {
   // 담당자는 "예"를 누르고 지나간다. 사실을 앞에 놓는 창을 따로 띄운다.
   const requestClose = () => {
     if (view?.offer?.established) {
+      setWithdrawalMode('close')
       setWithdrawalOpen(true)
       return
     }
@@ -181,6 +230,24 @@ export default function RoomPage() {
         </span>
       </header>
 
+      {/* 보관은 잠금이다. 무엇이 잠겼는지 말하지 않으면, 대화창이 왜 사라졌는지
+          모른 채 상대가 답을 안 한다고 생각하게 된다. */}
+      {room.archivedAt && (
+        <div className="room-archived" role="status">
+          <p className="period-alert">이 면접방은 보관되었습니다.</p>
+          <p className="period-detail">
+            대화와 계약 조건 수정·서명·계약서 파일 저장이 잠겨 있습니다. 지금까지의 기록과 이미
+            저장된 계약서는 그대로 보고 내려받을 수 있습니다.
+            {room.archivedByName && ` (보관: ${room.archivedByName})`}
+          </p>
+          {room.myRole === 'company' && (
+            <button type="button" className="btn-sm" onClick={handleUnarchive} disabled={archiving}>
+              보관 해제하기
+            </button>
+          )}
+        </div>
+      )}
+
       {/* 끝난 전형이 "진행중"으로 남아 있으면 지원자는 계속 기다린다. */}
       {room.status === 'closed' && (
         <div className="room-closed" role="status">
@@ -297,12 +364,32 @@ export default function RoomPage() {
       {withdrawalOpen && (
         <OfferWithdrawalModal
           offer={offer}
+          mode={withdrawalMode}
           reasonLabel={CLOSE_REASONS.find((r) => r.value === closeReason)?.label}
           note={closeNote}
-          busy={closing}
-          onConfirm={() => submitClose(true)}
+          busy={withdrawalMode === 'archive' ? archiving : closing}
+          onConfirm={() =>
+            withdrawalMode === 'archive' ? handleArchive(true) : submitClose(true)
+          }
           onClose={() => setWithdrawalOpen(false)}
         />
+      )}
+
+      {/* 보관 — 더 일어날 일이 없을 때 지금 상태 그대로 잠근다.
+          종료 칸과 나란히 두지 않는다. 둘은 다른 뜻이고, 나란히 있으면
+          "끝내기 두 개" 로 읽혀 아무거나 누르게 된다. */}
+      {room.myRole === 'company' && !room.archivedAt && (
+        <section className="room-archive">
+          <h2>면접방 보관</h2>
+          <p>
+            더 오갈 이야기가 없으면 지금 상태 그대로 잠급니다. 대화와 계약 조건 수정·서명·계약서
+            파일 저장이 막히고, 지금까지의 기록과 이미 저장된 계약서는 그대로 볼 수 있습니다.
+            보관은 언제든 해제할 수 있습니다.
+          </p>
+          <button type="button" onClick={() => handleArchive(false)} disabled={archiving}>
+            {archiving ? '보관하는 중...' : '이 면접방 보관하기'}
+          </button>
+        </section>
       )}
 
       <RoomDocuments documents={view.documents} />
@@ -328,7 +415,9 @@ export default function RoomPage() {
           </p>
         )}
         <ChatMessageList messages={messages} participants={room.participants} />
-        {room.myRole === 'admin' ? (
+        {room.archivedAt ? (
+          <p className="notice">보관된 면접방입니다. 대화는 잠겨 있습니다.</p>
+        ) : room.myRole === 'admin' ? (
           <p className="notice">관리자 열람 모드입니다. 채팅 작성은 참여자만 가능합니다.</p>
         ) : (
           <ChatComposer onSend={sendMessage} />

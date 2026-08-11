@@ -2,7 +2,12 @@ import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { getRoomParticipant, loadCompanyMessages } from '../../../_lib/rooms.js'
 import { notifyUser } from '../../../_lib/notify.js'
 import { logLifecycle } from '../../../_lib/roomLifecycleLog.js'
-import { canClose, normalizeCloseReason, isClosed } from '../../../_lib/roomLifecycle.js'
+import {
+  canClose,
+  normalizeCloseReason,
+  isClosed,
+  blockedWhenArchived,
+} from '../../../_lib/roomLifecycle.js'
 import { describeOfferStatus } from '../../../_lib/jobOffer.js'
 
 // 전형을 종료한다.
@@ -23,9 +28,11 @@ export async function onRequestPost({ request, env, data, params }) {
     return jsonError('전형 종료는 회사(고용) 측만 할 수 있습니다.', 403)
   }
 
-  const room = await env.DB.prepare('SELECT id, title, status FROM interview_rooms WHERE id = ?')
+  const room = await env.DB.prepare('SELECT id, title, status, archived_at FROM interview_rooms WHERE id = ?')
     .bind(params.roomId)
     .first()
+  const frozen = blockedWhenArchived(room, 'close')
+  if (frozen) return jsonError(frozen, 409)
   const allowed = canClose(room)
   if (!allowed.ok) return jsonError(allowed.error, room ? 409 : 404)
 
@@ -108,10 +115,12 @@ export async function onRequestDelete({ env, data, params }) {
     return jsonError('전형 종료는 회사(고용) 측만 할 수 있습니다.', 403)
   }
 
-  const room = await env.DB.prepare('SELECT id, title, status FROM interview_rooms WHERE id = ?')
+  const room = await env.DB.prepare('SELECT id, title, status, archived_at FROM interview_rooms WHERE id = ?')
     .bind(params.roomId)
     .first()
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
+  const frozen = blockedWhenArchived(room, 'close')
+  if (frozen) return jsonError(frozen, 409)
   if (!isClosed(room)) return jsonError('종료되지 않은 전형입니다.', 409)
 
   // 어느 상태로 되돌릴지는 채용이 확정돼 있었는지로 정한다.

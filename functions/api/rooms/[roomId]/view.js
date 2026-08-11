@@ -131,6 +131,10 @@ export async function onRequestGet({ env, data, params }) {
       inviteCode: room.invite_code,
       status: room.status,
       closeReason: room.close_reason ?? null,
+      // 보관은 status 를 덮지 않는다. 종료였는지 체결이었는지가 지워지면
+      // 채용내정을 다투는 자리에서 그 구분이 사라진다.
+      archivedAt: room.archived_at ?? null,
+      archivedByName: room.archived_by_name ?? null,
       myRole: access.role_in_room,
       participants: participants.map((p) => ({
         id: p.id,

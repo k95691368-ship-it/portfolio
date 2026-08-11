@@ -1,4 +1,5 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
+import { blockedWhenArchived } from '../../../_lib/roomLifecycle.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { notifyUser } from '../../../_lib/notify.js'
 import { logLifecycle } from '../../../_lib/roomLifecycleLog.js'
@@ -25,10 +26,14 @@ export async function onRequestPost({ request, env, data, params }) {
     return jsonError('근로관계 종료 기록은 회사(고용) 측만 남길 수 있습니다.', 403)
   }
 
-  const room = await env.DB.prepare('SELECT status FROM interview_rooms WHERE id = ?')
+  const room = await env.DB.prepare(
+    'SELECT status, archived_at FROM interview_rooms WHERE id = ?'
+  )
     .bind(params.roomId)
     .first()
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
+  const archived = blockedWhenArchived(room, 'employment_end')
+  if (archived) return jsonError(archived, 409)
   if (room.status !== 'signed') {
     return jsonError('체결이 완료된 계약에만 근로관계 종료를 기록할 수 있습니다.', 409)
   }
@@ -109,6 +114,15 @@ export async function onRequestDelete({ env, data, params }) {
   if (participant.role_in_room !== 'company') {
     return jsonError('근로관계 종료 기록은 회사(고용) 측만 남길 수 있습니다.', 403)
   }
+
+  // 기록하는 것을 막으면서 지우는 것을 열어 두면 잠금이 아니다.
+  const room = await env.DB.prepare(
+    'SELECT status, archived_at FROM interview_rooms WHERE id = ?'
+  )
+    .bind(params.roomId)
+    .first()
+  const archived = blockedWhenArchived(room, 'employment_end')
+  if (archived) return jsonError(archived, 409)
 
   await env.DB.prepare(
     `UPDATE contract_terms SET employment_ended_at = NULL, employment_end_reason = NULL,

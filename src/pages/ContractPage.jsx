@@ -818,11 +818,13 @@ export default function ContractPage() {
     setForm((f) => ({ ...f, customTerms: f.customTerms.filter((_, i) => i !== idx) }))
 
   const isSigned = room?.status === 'signed'
+  // 보관된 방은 계약서가 잠긴다 — 수정도 서명도 파일 저장도.
+  const archived = !!room?.archivedAt
   const myRole = room?.myRole
   const otherRole = myRole === 'company' ? 'candidate' : 'company'
   const mySignature = signatures.find((s) => s.role === myRole)
   const otherSignature = signatures.find((s) => s.role === otherRole)
-  const canEdit = !isSigned && myRole === 'company'
+  const canEdit = !isSigned && !archived && myRole === 'company'
 
   const handleSave = async () => {
     setSaving(true)
@@ -1139,6 +1141,14 @@ export default function ContractPage() {
         </Link>
         <h1>전자근로계약서</h1>
         <p>{room.title}</p>
+        {/* 무엇이 왜 막혔는지 말하지 않으면 잠금은 고장으로 읽힌다. 버튼을
+            눌러도 아무 일이 없는 화면에서 사람은 자기 잘못을 찾는다. */}
+        {archived && (
+          <p className="room-archived-note" role="status">
+            보관된 면접방입니다. 계약 조건 수정·서명·계약서 파일 저장이 잠겨 있습니다. 내용을 보고
+            내려받는 것은 그대로 됩니다.
+          </p>
+        )}
       </header>
 
       {!contractMeta.hireConfirmed && (
@@ -1492,10 +1502,15 @@ export default function ContractPage() {
               type="button"
               className="btn-primary"
               onClick={() => setSigningRole(myRole)}
-              disabled={!contractMeta.hireConfirmed || (preSign?.hasBlocking && !acknowledged)}
+              disabled={
+                archived || !contractMeta.hireConfirmed || (preSign?.hasBlocking && !acknowledged)
+              }
             >
               서명하기
             </button>
+            {archived && (
+              <p className="notice">보관된 면접방입니다. 서명은 잠겨 있습니다.</p>
+            )}
             {!contractMeta.hireConfirmed && <p className="notice">채용이 확정된 후에 서명할 수 있습니다.</p>}
           </>
         )}
@@ -1546,7 +1561,12 @@ export default function ContractPage() {
             </p>
           )}
           {myRole === 'company' && (
-            <button type="button" className="btn-primary" onClick={handleStoreAndSend} disabled={storing}>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={handleStoreAndSend}
+              disabled={storing || archived}
+            >
               {storing
                 ? '처리 중...'
                 : signedContract

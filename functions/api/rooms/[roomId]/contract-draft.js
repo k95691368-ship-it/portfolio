@@ -1,5 +1,5 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
-import { blockedWhenClosed } from '../../../_lib/roomLifecycle.js'
+import { blockedWhenFrozen } from '../../../_lib/roomLifecycle.js'
 import { draftContractDocument } from '../../../_lib/claude.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
@@ -18,12 +18,12 @@ export async function onRequestPost({ env, data, params, request }) {
     return jsonError('근로계약서 자동완성은 채용자 또는 관리자 권한이 있는 계정만 사용할 수 있습니다.', 403)
   }
 
-  const room = await env.DB.prepare('SELECT status FROM interview_rooms WHERE id = ?')
+  const room = await env.DB.prepare('SELECT status, archived_at FROM interview_rooms WHERE id = ?')
     .bind(params.roomId)
     .first()
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
   if (room.status === 'signed') return jsonError('이미 서명이 완료된 계약서는 다시 작성할 수 없습니다.', 409)
-  const draftBlock = blockedWhenClosed(room, 'draft')
+  const draftBlock = blockedWhenFrozen(room, 'draft')
   if (draftBlock) return jsonError(draftBlock, 409)
 
   const bucket = `contract-draft:${params.roomId}`

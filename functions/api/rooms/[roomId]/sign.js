@@ -1,5 +1,5 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
-import { blockedWhenClosed } from '../../../_lib/roomLifecycle.js'
+import { blockedWhenFrozen } from '../../../_lib/roomLifecycle.js'
 import { genId } from '../../../_lib/db.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { notifyUser } from '../../../_lib/notify.js'
@@ -19,12 +19,12 @@ export async function onRequestPost({ env, data, params, request }) {
   const participant = await getRoomParticipant(env, params.roomId, data.user.id)
   if (!participant) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
 
-  const room = await env.DB.prepare('SELECT status FROM interview_rooms WHERE id = ?')
+  const room = await env.DB.prepare('SELECT status, archived_at FROM interview_rooms WHERE id = ?')
     .bind(params.roomId)
     .first()
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
   if (room.status === 'signed') return jsonError('이미 서명이 완료된 계약서입니다.', 409)
-  const signBlock = blockedWhenClosed(room, 'sign')
+  const signBlock = blockedWhenFrozen(room, 'sign')
   if (signBlock) return jsonError(signBlock, 409)
 
   // 조건을 읽기 전에 본문부터 받는다.

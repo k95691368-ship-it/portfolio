@@ -1,5 +1,5 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
-import { blockedWhenClosed } from '../../../_lib/roomLifecycle.js'
+import { blockedWhenFrozen } from '../../../_lib/roomLifecycle.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { notifyUser } from '../../../_lib/notify.js'
 
@@ -31,7 +31,7 @@ export async function onRequestPost({ request, env, data, params }) {
     return jsonError('이전 계약 연결은 회사(고용) 측만 설정할 수 있습니다.', 403)
   }
 
-  const room = await env.DB.prepare('SELECT status FROM interview_rooms WHERE id = ?')
+  const room = await env.DB.prepare('SELECT status, archived_at FROM interview_rooms WHERE id = ?')
     .bind(params.roomId)
     .first()
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
@@ -40,7 +40,7 @@ export async function onRequestPost({ request, env, data, params }) {
   }
   // 규칙은 적어 두고 부르지 않고 있었다. 끝난 전형이 체결된 계약의 '갱신
   // 자리'를 계속 차지하면, 정작 이어받아야 할 새 계약이 연결하지 못한다.
-  const closedBlock = blockedWhenClosed(room, 'link_previous')
+  const closedBlock = blockedWhenFrozen(room, 'link_previous')
   if (closedBlock) return jsonError(closedBlock, 409)
 
   const body = await request.json().catch(() => null)
@@ -152,7 +152,7 @@ export async function onRequestDelete({ env, data, params }) {
     return jsonError('이전 계약 연결은 회사(고용) 측만 설정할 수 있습니다.', 403)
   }
 
-  const room = await env.DB.prepare('SELECT status FROM interview_rooms WHERE id = ?')
+  const room = await env.DB.prepare('SELECT status, archived_at FROM interview_rooms WHERE id = ?')
     .bind(params.roomId)
     .first()
   if (room?.status === 'signed') {

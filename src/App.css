@@ -3555,3 +3555,46 @@
   accent-color: var(--accent);
   cursor: pointer;
 }
+
+/* 면접방 보관 — 지금 상태 그대로 잠근다. */
+.room-archive {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.room-archive h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.room-archive p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.room-archived {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 16px 20px;
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius);
+  background: var(--warning-bg);
+}
+
+.room-archived-note {
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-sm);
+  background: var(--warning-bg);
+  color: var(--text-h);
+  font-size: 13px;
+  line-height: 1.5;
+}

@@ -10,6 +10,10 @@ export const LIFECYCLE_ACTIONS = {
   reopened: '전형 종료 취소',
   employment_end_recorded: '근로관계 종료일 기록',
   employment_end_cleared: '근로관계 종료 기록 취소',
+  // 잠그는 일과 푸는 일은 둘 다 일어난 일이다. 잠겨 있는 동안 무엇을 할 수
+  // 없었는지가 나중에 다툼의 대상이 된다.
+  archived: '면접방 보관 (대화·계약서 잠금)',
+  unarchived: '면접방 보관 해제',
 }
 
 // 기록에 실패해도 본 작업까지 되돌리지는 않는다. 다만 조용히 넘어가지 않고

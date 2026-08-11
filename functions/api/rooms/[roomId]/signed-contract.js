@@ -1,4 +1,5 @@
 import { genId } from '../../../_lib/db.js'
+import { blockedWhenArchived } from '../../../_lib/roomLifecycle.js'
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import {
@@ -71,10 +72,16 @@ export async function onRequestPost({ request, env, data, params }) {
     return jsonError('회사 측만 계약서를 저장·전송할 수 있습니다.', 403)
   }
 
-  const room = await env.DB.prepare('SELECT id, status FROM interview_rooms WHERE id = ?')
+  const room = await env.DB.prepare(
+    'SELECT id, status, archived_at FROM interview_rooms WHERE id = ?'
+  )
     .bind(params.roomId)
     .first()
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
+  // 보관된 방은 계약서 파일 저장까지 잠근다. 이미 저장된 파일을 내려받는
+  // 것은 그대로 된다 — 보관은 없애는 것이 아니라 굳히는 것이다.
+  const archived = blockedWhenArchived(room, 'store_contract')
+  if (archived) return jsonError(archived, 409)
   if (room.status !== 'signed') {
     return jsonError('양측 서명이 완료된 후에 계약서를 저장할 수 있습니다.', 409)
   }

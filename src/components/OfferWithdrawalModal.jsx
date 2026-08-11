@@ -11,13 +11,31 @@ import Modal from './Modal.jsx'
 // 실제로 쓴 문장, 그 문장이 만든 법적 상태, 지금 누르면 벌어질 일, 그리고
 // 취소가 인정될 수 있는 사유. 그것을 보고도 진행하겠다면 그건 판단이지 실수가
 // 아니다.
-export default function OfferWithdrawalModal({ offer, reasonLabel, note, onConfirm, onClose, busy }) {
+// mode: 'close' = 전형 종료, 'archive' = 보관.
+//
+// 이 창을 두 동작이 함께 쓴다. 무엇을 하려던 것인지 창이 모르면, 보관을
+// 눌렀는데 종료가 실행되고 화면에는 종료 문구가 뜬다 — 확인 창이 확인하지
+// 않은 일을 시키는 셈이다.
+export default function OfferWithdrawalModal({
+  offer,
+  reasonLabel,
+  note,
+  onConfirm,
+  onClose,
+  busy,
+  mode = 'close',
+}) {
   const [acknowledged, setAcknowledged] = useState(false)
   const risk = offer?.risk
+  const archiving = mode === 'archive'
 
   return (
-    <Modal title="채용내정 취소 확인" onClose={onClose}>
-      <h3 className="withdrawal-title">{risk?.headline}</h3>
+    <Modal title={archiving ? '보관 확인 — 채용 확정된 전형' : '채용내정 취소 확인'} onClose={onClose}>
+      <h3 className="withdrawal-title">
+        {archiving
+          ? '채용이 확정된 전형입니다. 지금 보관하면 지원자는 계약서에 서명할 수 없게 됩니다.'
+          : risk?.headline}
+      </h3>
 
       <p className="withdrawal-reason">{risk?.reason}</p>
 
@@ -35,10 +53,18 @@ export default function OfferWithdrawalModal({ offer, reasonLabel, note, onConfi
 
       <dl className="withdrawal-facts">
         <dt>지금 누르면</dt>
-        <dd>
-          전형 종료가 아니라 해고로 기록되고, 지원자에게 종료 사실과 사유가 안내됩니다.
-          {reasonLabel ? ` (사유: ${reasonLabel}${note ? ` · ${note}` : ''})` : ''}
-        </dd>
+        {archiving ? (
+          <dd>
+            대화와 계약서 서명·수정·파일 저장이 잠깁니다. 근로계약이 이미 성립한 것으로 다뤄지는
+            상태에서 계약을 마무리하지 못하게 막는 것은, 실질적으로 내정 취소와 같은 자리에 섭니다.
+            보관 사실은 지원자에게 안내되고 이력에 남습니다.
+          </dd>
+        ) : (
+          <dd>
+            전형 종료가 아니라 해고로 기록되고, 지원자에게 종료 사실과 사유가 안내됩니다.
+            {reasonLabel ? ` (사유: ${reasonLabel}${note ? ` · ${note}` : ''})` : ''}
+          </dd>
+        )}
 
         <dt>지원자가 취할 수 있는 조치</dt>
         <dd>{risk?.remedies?.join(' · ')}</dd>
@@ -68,7 +94,9 @@ export default function OfferWithdrawalModal({ offer, reasonLabel, note, onConfi
           onChange={(e) => setAcknowledged(e.target.checked)}
           disabled={busy}
         />
-        위 내용을 확인했으며, 이것이 해고로 다뤄질 수 있음을 알고 진행합니다.
+        {archiving
+          ? '위 내용을 확인했으며, 지원자가 서명할 수 없게 된다는 것을 알고 보관합니다.'
+          : '위 내용을 확인했으며, 이것이 해고로 다뤄질 수 있음을 알고 진행합니다.'}
       </label>
 
       <div className="modal-actions">
@@ -81,7 +109,7 @@ export default function OfferWithdrawalModal({ offer, reasonLabel, note, onConfi
           onClick={onConfirm}
           disabled={busy || !acknowledged}
         >
-          {busy ? '처리하는 중...' : '해고로 기록하고 전형 종료'}
+          {busy ? '처리하는 중...' : archiving ? '확인하고 보관하기' : '해고로 기록하고 전형 종료'}
         </button>
       </div>
     </Modal>

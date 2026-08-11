@@ -327,6 +327,8 @@ export async function onRequestGet({ env, data, params, request }) {
       title: room.title,
       inviteCode: room.invite_code,
       status: room.status,
+      // 보관되면 계약 조건 수정·서명·계약서 파일 저장이 잠긴다.
+      archivedAt: room.archived_at ?? null,
       myRole: access.role_in_room,
       participants: participantRows.map((p) => ({
         id: p.id,

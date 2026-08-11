@@ -1,6 +1,6 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
-import { blockedWhenClosed } from '../../../_lib/roomLifecycle.js'
+import { blockedWhenFrozen } from '../../../_lib/roomLifecycle.js'
 import { buildTranscript } from '../../../_lib/transcript.js'
 import { reviewNegotiation } from '../../../_lib/claude.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
@@ -44,11 +44,11 @@ export async function onRequestPost({ env, data, params }) {
     return jsonError('계약 전 검토는 회사(고용) 측만 실행할 수 있습니다.', 403)
   }
 
-  const room = await env.DB.prepare('SELECT status FROM interview_rooms WHERE id = ?')
+  const room = await env.DB.prepare('SELECT status, archived_at FROM interview_rooms WHERE id = ?')
     .bind(params.roomId)
     .first()
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
-  const closed = blockedWhenClosed(room, 'analyze')
+  const closed = blockedWhenFrozen(room, 'analyze')
   if (closed) return jsonError(closed, 409)
 
   const [termsRow, negotiationRows, messageRows, posting] = await Promise.all([

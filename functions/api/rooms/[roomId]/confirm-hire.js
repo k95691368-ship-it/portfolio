@@ -1,5 +1,5 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
-import { blockedWhenClosed } from '../../../_lib/roomLifecycle.js'
+import { blockedWhenFrozen } from '../../../_lib/roomLifecycle.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { notifyUser } from '../../../_lib/notify.js'
 
@@ -18,11 +18,11 @@ export async function onRequestPost({ env, data, params }) {
     return jsonError('채용 확정은 회사(고용) 측만 할 수 있습니다.', 403)
   }
 
-  const room = await env.DB.prepare('SELECT status FROM interview_rooms WHERE id = ?')
+  const room = await env.DB.prepare('SELECT status, archived_at FROM interview_rooms WHERE id = ?')
     .bind(params.roomId)
     .first()
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
-  const closedBlock = blockedWhenClosed(room, 'confirm_hire')
+  const closedBlock = blockedWhenFrozen(room, 'confirm_hire')
   if (closedBlock) return jsonError(closedBlock, 409)
 
   const candidate = await env.DB.prepare(
