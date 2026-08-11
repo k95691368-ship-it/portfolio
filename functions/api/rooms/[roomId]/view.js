@@ -41,10 +41,15 @@ export async function onRequestGet({ env, data, params }) {
       .all(),
     env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?').bind(roomId).first(),
     // 처우 협의 이력. 계약서에 적히기 전에 대화에서 정해진 것들이다.
+    //
+    // 오래된 것부터 잘라 오면 협의가 길어질수록 화면의 '지금까지 합의된 값'이
+    // 옛날 값에서 멈춘다. 최근 것부터 잘라 다시 뒤집는다.
     env.DB.prepare(
-      `SELECT id, message_id, speaker_role, field, label, value, value_display,
-              previous_value, excerpt, created_at
-         FROM negotiation_log WHERE room_id = ? ORDER BY id ASC LIMIT 200`
+      `SELECT * FROM (
+         SELECT id, message_id, speaker_role, field, label, value, value_display,
+                previous_value, excerpt, created_at
+           FROM negotiation_log WHERE room_id = ? ORDER BY id DESC LIMIT 200
+       ) ORDER BY id ASC`
     )
       .bind(roomId)
       .all(),

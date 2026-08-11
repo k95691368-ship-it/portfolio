@@ -47,9 +47,14 @@ export async function onRequestPost({ env, data, params }) {
 
   const [termsRow, negotiationRows, messageRows, posting] = await Promise.all([
     env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?').bind(params.roomId).first(),
+    // 오래된 것부터 잘라 오고 있었다. 여기서 필요한 것은 항목별 '마지막' 값인데
+    // 그러면 협의가 길어질수록 옛날 값으로 점검하게 된다 — 점검은 도는데
+    // 점검하려던 값이 아닌 것을 점검하는 꼴이다. 최근 것부터 잘라 다시 뒤집는다.
     env.DB.prepare(
-      `SELECT field, label, value, value_display, speaker_role, excerpt, created_at
-         FROM negotiation_log WHERE room_id = ? ORDER BY id ASC LIMIT 200`
+      `SELECT * FROM (
+         SELECT id, field, label, value, value_display, speaker_role, excerpt, created_at
+           FROM negotiation_log WHERE room_id = ? ORDER BY id DESC LIMIT 200
+       ) ORDER BY id ASC`
     )
       .bind(params.roomId)
       .all(),
