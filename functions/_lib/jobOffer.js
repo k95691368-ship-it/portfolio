@@ -71,6 +71,24 @@ function excerpt(body) {
   return text.length > EXCERPT_MAX ? `${text.slice(0, EXCERPT_MAX)}…` : text
 }
 
+// 한 메시지 안에서도 문장마다 말하는 바가 다르다.
+//
+// 부정 표현을 메시지 통째로 보고 있었다. 그래서 "최종 합격하셨습니다. 9월
+// 1일부터 출근해 주세요. 사정이 생기면 미리 알려 주세요 — 취소는 어렵습니다"
+// 같은 메시지가 '취소'라는 두 글자 때문에 통째로 건너뛰어졌다. 확정을 알리는
+// 바로 그 메시지가 확정 근거에서 빠진 것이다. "걱정하지 마세요, 최종
+// 합격입니다"도 마찬가지였다.
+//
+// 반대 방향도 같다. 부정을 아예 안 보면 "합격이 아닙니다"가 확정이 된다.
+// 그래서 문장 단위로 본다 — 부정이 있는 문장은 버리고, 남은 문장에서 찾는다.
+// 문장 부호가 없으면 통째로 한 문장이라 예전과 같게 동작한다(보수적).
+function sentencesOf(body) {
+  return String(body ?? '')
+    .split(/(?<=[.!?…])\s+|[\n·]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
 // 회사가 보낸 메시지만 본다. 지원자가 "언제부터 출근하면 되나요"라고 묻는 것은
 // 확정이 아니다. 확정은 회사만 할 수 있다.
 export function scanForOfferSignals(messages) {
@@ -83,23 +101,37 @@ export function scanForOfferSignals(messages) {
     const body = String(m.body ?? '')
     if (!body.trim()) continue
 
-    // 확정을 부정하거나 아직 알리지 않겠다는 문장은 확정 근거로 삼지 않는다.
-    // 없는 확정을 만들면 회사가 방을 닫지 못하고, 감사 증명서에는 있지도
-    // 않았던 채용내정의 취소가 기록된다.
-    if (NEGATION_RE.test(body) || PENDING_RE.test(body)) continue
+    const at = m.created_at ?? m.createdAt ?? null
+    let strongHit = null
+    let weakHit = null
 
-    for (const p of STRONG_PATTERNS) {
-      if (p.re.test(body)) {
-        strong.push({ label: p.label, text: excerpt(body), at: m.created_at ?? m.createdAt ?? null })
-        break
+    for (const sentence of sentencesOf(body)) {
+      // 확정을 부정하거나 아직 알리지 않겠다는 문장은 확정 근거로 삼지 않는다.
+      // 없는 확정을 만들면 회사가 방을 닫지 못하고, 감사 증명서에는 있지도
+      // 않았던 채용내정의 취소가 기록된다.
+      if (NEGATION_RE.test(sentence) || PENDING_RE.test(sentence)) continue
+
+      if (!strongHit) {
+        for (const p of STRONG_PATTERNS) {
+          if (p.re.test(sentence)) {
+            strongHit = { label: p.label, text: excerpt(sentence), at }
+            break
+          }
+        }
       }
-    }
-    for (const p of WEAK_PATTERNS) {
-      if (p.re.test(body)) {
-        weak.push({ label: p.label, text: excerpt(body), at: m.created_at ?? m.createdAt ?? null })
-        break
+      if (!weakHit) {
+        for (const p of WEAK_PATTERNS) {
+          if (p.re.test(sentence)) {
+            weakHit = { label: p.label, text: excerpt(sentence), at }
+            break
+          }
+        }
       }
+      if (strongHit && weakHit) break
     }
+
+    if (strongHit) strong.push(strongHit)
+    if (weakHit) weak.push(weakHit)
   }
 
   // 앞에서부터 남긴다. 확정을 성립시킨 것은 처음 그렇게 말한 문장이므로,
@@ -208,7 +240,12 @@ const UNFAVOURABLE_FIELDS = {
 }
 
 function toNumber(v) {
-  const n = Number(String(v ?? '').replace(/[,\s원]/g, ''))
+  // 빈 값을 0 으로 읽고 있었다. 임금 칸을 비우면 "2,900,000원에서 0원으로
+  // 낮아집니다"라는, 아무도 하지 않은 제안이 불이익 변경으로 기록됐다.
+  // 비어 있는 것은 0원이 아니라 모르는 것이다.
+  const s = String(v ?? '').replace(/[,\s원]/g, '')
+  if (!s) return null
+  const n = Number(s)
   return Number.isFinite(n) ? n : null
 }
 

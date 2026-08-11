@@ -242,3 +242,42 @@ describe('금액과 날짜의 경계', () => {
     ).toBe('2028-02-29')
   })
 })
+
+// 값이 어느 문장에 있었는지가 곧 그 값이 무엇에 대한 값인지다.
+// 메시지를 한 덩어리로 읽으면 주제와 값이 서로 다른 문장에서 묶인다.
+describe('여러 문장이 섞인 메시지', () => {
+  it('다른 문장의 날짜를 근로개시일로 가져오지 않는다', () => {
+    expect(fieldsOf('면접은 8월 20일입니다. 출근일은 추후 안내드립니다.')).not.toContain(
+      'contractStartDate'
+    )
+  })
+
+  it('뒤 문장의 휴게시간 안내가 앞 문장의 근무시간을 버리게 하지 않는다', () => {
+    const [e] = read('근무시간은 9시부터 18시까지입니다. 점심 휴게는 12시~13시입니다.')
+    expect(e.field).toBe('workHours')
+    expect(e.value).toBe('09:00~18:00')
+  })
+
+  it('근거로 남기는 인용문은 그 값을 말한 문장이다', () => {
+    const [e] = read('안녕하세요. 기본급은 290만원입니다. 확인 부탁드립니다.')
+    expect(e.excerpt).toBe('기본급은 290만원입니다.')
+  })
+
+  it('같은 항목을 되풀이해도 한 번만 기록한다', () => {
+    const entries = read('급여는 290만원입니다. 급여는 290만원으로 하시죠.')
+    expect(entries.filter((e) => e.field === 'wageBaseAmount')).toHaveLength(1)
+  })
+
+  // 날짜의 하이픈을 음수 부호로 읽어, 날짜를 함께 말한 문장에서는 임금이
+  // 통째로 사라졌다.
+  it('날짜와 임금을 한 문장에서 말해도 임금을 읽는다', () => {
+    const entries = read('입사일은 2026-09-01이고 급여는 290만원입니다.')
+    expect(entries.find((e) => e.field === 'wageBaseAmount')?.value).toBe('2900000')
+    expect(entries.find((e) => e.field === 'contractStartDate')?.value).toBe('2026-09-01')
+  })
+
+  it('그래도 음수 금액은 임금이 아니다', () => {
+    expect(fieldsOf('급여는 -100만원')).not.toContain('wageBaseAmount')
+    expect(fieldsOf('급여 조정: -50만원')).not.toContain('wageBaseAmount')
+  })
+})

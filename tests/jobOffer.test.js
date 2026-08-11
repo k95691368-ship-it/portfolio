@@ -257,3 +257,41 @@ describe('근거로 인용하는 문장', () => {
     expect(o.at).toBe('2026-09-01 10:00:00')
   })
 })
+
+// 부정 표현을 메시지 통째로 보고 있었다. 확정을 알리는 바로 그 메시지가
+// 뒤에 붙은 한 문장 때문에 확정 근거에서 통째로 빠졌다.
+describe('한 메시지 안에 확정과 다른 말이 섞여 있을 때', () => {
+  const co = (body) => ({ role_in_room: 'company', body, created_at: '2026-09-01 10:00:00' })
+
+  it('뒤 문장의 "취소" 때문에 앞 문장의 합격 통보를 놓치지 않는다', () => {
+    const s = scanForOfferSignals([
+      co('최종 합격하셨습니다. 9월 1일부터 출근해 주세요. 사정이 생기면 미리 알려 주세요, 취소는 어렵습니다.'),
+    ])
+    expect(s.strong).toHaveLength(1)
+    expect(s.strong[0].text).toContain('최종 합격')
+    // 확정을 성립시킨 문장만 인용한다. 부정이 섞인 문장을 근거로 보여 주면
+    // 그 인용을 본 사람이 판정을 믿지 않는다.
+    expect(s.strong[0].text).not.toContain('취소는 어렵습니다')
+  })
+
+  it('"걱정하지 마세요" 같은 상투구가 확정 판정을 끄지 않는다', () => {
+    expect(scanForOfferSignals([co('걱정하지 마세요. 최종 합격입니다!')]).strong).toHaveLength(1)
+  })
+
+  it('그래도 부정하는 문장 자체는 확정으로 읽지 않는다', () => {
+    expect(scanForOfferSignals([co('아쉽게도 불합격입니다.')]).strong).toHaveLength(0)
+    expect(scanForOfferSignals([co('아직 채용을 확정하지 않았습니다.')]).strong).toHaveLength(0)
+    expect(scanForOfferSignals([co('내정 취소를 검토 중입니다.')]).strong).toHaveLength(0)
+  })
+
+  it('문장 부호가 없으면 통째로 한 문장으로 본다 — 보수적으로', () => {
+    expect(
+      scanForOfferSignals([co('최종 합격이지만 취소될 수 있습니다')]).strong
+    ).toHaveLength(0)
+  })
+
+  it('같은 메시지에서 확정 신호는 한 번만 센다', () => {
+    const s = scanForOfferSignals([co('최종 합격하셨습니다. 9월 1일부터 출근해 주세요.')])
+    expect(s.strong).toHaveLength(1)
+  })
+})

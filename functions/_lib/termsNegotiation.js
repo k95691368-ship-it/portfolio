@@ -41,7 +41,11 @@ const SCALE = { 억: 100000000, 천만: 10000000, 만: 10000, 천: 1000 }
 function parseWon(text) {
   const raw = String(text ?? '')
   // 음수 금액은 임금이 아니다. 부호를 무시하면 "-100만원"이 100만원이 된다.
-  if (/[-−]\s*\d/.test(raw)) return null
+  //
+  // 다만 '-' 하나만 보고 문장 전체를 버리면 안 된다. "입사일은 2026-09-01이고
+  // 급여는 290만원입니다"의 날짜에도 '-' 가 있어서, 날짜를 함께 말한 문장에서는
+  // 임금이 통째로 읽히지 않았다. 부호는 숫자 앞에 홀로 설 때만 부호다.
+  if (/(?:^|[\s(=:])[-−]\s*\d/.test(raw)) return null
   const t = raw.replace(/(\d),(?=\d{3}(?!\d))/g, '$1')
 
   // 한 금액의 자릿수를 합치는 것과, 문장 안의 서로 다른 금액을 더하는 것은
@@ -238,6 +242,22 @@ const FIELD_RULES = [
   },
 ]
 
+// 값이 어느 문장에 있었는지가 곧 그 값이 무엇에 대한 값인지다.
+//
+// 메시지 전체를 한 덩어리로 읽고 있었다. 그래서 "면접은 8월 20일입니다.
+// 출근일은 추후 안내드립니다"에서 면접 날짜가 근로개시일로 기록됐다 — 주제어와
+// 값이 서로 다른 문장에 있었는데도 같은 문장인 것처럼 묶인 것이다. 반대로
+// "근무시간은 9시부터 18시까지입니다. 점심 휴게는 12시~13시입니다"는 뒤 문장의
+// '휴게' 때문에 앞 문장의 근무시간까지 통째로 버려졌다.
+//
+// 문장 부호가 없으면 통째로 한 문장이라 예전과 같게 동작한다.
+function sentencesOf(body) {
+  return String(body ?? '')
+    .split(/(?<=[.!?…])\s+|[\n·]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
 // 메시지 한 건에서 읽어 낸 처우 조건.
 //
 // 한 문장에 여러 조건이 들어 있으면 모두 뽑는다 — "9시부터 18시까지 주 5일,
@@ -246,19 +266,26 @@ export function extractTermsFromMessage(message, options = {}) {
   const body = String(message?.body ?? '')
   if (!body.trim()) return []
 
+  const sentences = sentencesOf(body)
   const found = []
   for (const rule of FIELD_RULES) {
-    if (!rule.topic.test(body)) continue
-    if (rule.exclude && rule.exclude.test(body)) continue
-    const read = rule.read(body, options)
-    if (!read) continue
-    found.push({
-      field: rule.field,
-      label: rule.label,
-      value: String(read.value),
-      display: read.display,
-      excerpt: excerpt(body),
-    })
+    for (const sentence of sentences) {
+      if (!rule.topic.test(sentence)) continue
+      if (rule.exclude && rule.exclude.test(sentence)) continue
+      const read = rule.read(sentence, options)
+      if (!read) continue
+      found.push({
+        field: rule.field,
+        label: rule.label,
+        value: String(read.value),
+        display: read.display,
+        // 근거로 인용하는 것은 그 값을 말한 문장이다. 메시지 전체를 인용하면
+        // 어느 대목이 근거인지 다시 사람이 찾아야 한다.
+        excerpt: excerpt(sentence),
+      })
+      // 한 항목은 한 메시지에서 한 번만 — 뒷문장에서 되풀이해도 진전이 아니다.
+      break
+    }
   }
   return found
 }
