@@ -11,6 +11,21 @@ export default function Modal({ title, onClose, children, className = '' }) {
   const contentRef = useRef(null)
   const restoreRef = useRef(null)
 
+  // 초점 가두기는 창이 뜨고 질 때 한 번씩만 일어나야 한다.
+  //
+  // 의존성에 onClose 를 걸어 두었는데, 호출부는 전부 인라인 화살표를 넘긴다.
+  // 그래서 부모가 다시 그려질 때마다 새 함수가 되고, effect 가 정리됐다가 다시
+  // 걸렸다. 정리는 초점을 창 뒤로 돌려주고 재설치는 창의 첫 요소로 잡는다.
+  //
+  // 방 화면은 2.5초마다 대화를 확인하므로, 상대가 입력 중이면 이 일이 계속
+  // 반복된다. 채용내정 취소 확인창에서 Tab 으로 버튼까지 갔다가 메시지 하나에
+  // 초점이 체크박스로 되돌아가면, 키보드만 쓰는 사람은 이 앱에서 가장 중요한
+  // 창을 끝까지 조작할 수 없다.
+  //
+  // onClose 를 ref 에 담아 최신 것을 부르되, 설치·해제는 마운트/언마운트에서만.
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
   useEffect(() => {
     // 닫은 뒤 원래 있던 자리로 초점을 돌려주기 위해 기억해 둔다.
     restoreRef.current = document.activeElement
@@ -29,7 +44,7 @@ export default function Modal({ title, onClose, children, className = '' }) {
     const onKeyDown = (event) => {
       if (event.key === 'Escape') {
         event.preventDefault()
-        onClose()
+        onCloseRef.current()
         return
       }
       if (event.key !== 'Tab') return
@@ -56,10 +71,12 @@ export default function Modal({ title, onClose, children, className = '' }) {
       document.body.style.overflow = previousOverflow
       restoreRef.current?.focus?.()
     }
-  }, [onClose])
+    // 마운트/언마운트에서만. 위 주석 참고.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={() => onCloseRef.current()}>
       <div
         ref={contentRef}
         className={`modal-content ${className}`.trim()}

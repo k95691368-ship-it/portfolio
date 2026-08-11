@@ -24,6 +24,9 @@ export function mergeById(existing, incoming) {
 export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null) {
   const [messages, setMessages] = useState([])
   const [error, setError] = useState('')
+  // 마지막으로 실제 새 내용을 확인한 시각. 실패가 이어질 때 "언제부터"를
+  // 말할 수 있어야 화면이 멈춘 것인지 상대가 조용한 것인지 구분된다.
+  const [lastSyncedAt, setLastSyncedAt] = useState(null)
   const [ready, setReady] = useState(false)
   const lastIdRef = useRef(0)
   const fetchingRef = useRef(false)
@@ -65,6 +68,7 @@ export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null
         emptyRunsRef.current += 1
       }
       setError('')
+      setLastSyncedAt(new Date().toISOString())
     } catch (err) {
       setError(err.message)
     } finally {
@@ -130,5 +134,5 @@ export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null
     [roomId]
   )
 
-  return { messages, error, sendMessage }
+  return { messages, error, lastSyncedAt, sendMessage }
 }

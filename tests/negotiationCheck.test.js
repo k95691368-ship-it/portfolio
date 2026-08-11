@@ -194,3 +194,27 @@ describe('공고 위반이 판정에 들어간다', () => {
     expect(r.counts.high).toBeGreaterThanOrEqual(highs.length)
   })
 })
+
+// 계약서 화면은 계속근로 2년 초과를 검사하는데 계약 전 검토는 하지 않았다.
+// 같은 방을 두고 두 화면의 판정이 갈리면, 둘 중 하나는 반드시 거짓말이다.
+describe('바깥 사실이 있어야 나오는 판정', () => {
+  const full = {
+    employerName: '회사', employeeName: '지원자', contractStartDate: '2026-09-01',
+    workLocation: '서울', jobDescription: '사무', workHoursStart: '09:00',
+    workHoursEnd: '18:00', workDays: '주 5일', restDays: '토, 일',
+    wageType: 'monthly', wageBaseAmount: 2500000, wagePayDate: '매월 10일',
+    breakTime: '12:00~13:00',
+  }
+
+  it('호출부가 넣어 준 위반이 판정에 함께 들어간다', () => {
+    const extra = [{ severity: 'high', title: '계속근로 2년 초과', detail: '기간제법 제4조' }]
+    const r = checkNegotiatedTerms(full, null, extra)
+    expect(r.issues).toContainEqual(extra[0])
+    expect(r.ready).toBe(false)
+    expect(r.counts.high).toBeGreaterThanOrEqual(1)
+  })
+
+  it('넣지 않으면 예전과 같다', () => {
+    expect(checkNegotiatedTerms(full, null).issues).toEqual(checkNegotiatedTerms(full, null, []).issues)
+  })
+})

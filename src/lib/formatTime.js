@@ -41,3 +41,9 @@ export function formatKstDate(value) {
   const k = new Date(d.getTime() + KST_OFFSET_MS)
   return `${k.getUTCFullYear()}-${pad(k.getUTCMonth() + 1)}-${pad(k.getUTCDate())}`
 }
+
+// "01:00" — 같은 날 안에서 오간 대화에는 날짜가 군더더기다.
+export function formatKstTime(value) {
+  const full = formatKst(value)
+  return full ? full.slice(11) : ''
+}

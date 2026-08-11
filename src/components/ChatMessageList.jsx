@@ -1,13 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
-import { formatKst } from '../lib/formatTime.js'
+import { formatKstTime } from '../lib/formatTime.js'
 
 // 말풍선 옆에는 시:분만 둔다. 날짜까지 붙이면 줄이 길어져 대화가 밀린다.
-function formatKstTime(value) {
-  const full = formatKst(value)
-  return full ? full.slice(11) : ''
-}
-
 // 대화 목록.
 //
 // 서버가 최근 메시지부터 보내 주므로 목록의 끝이 최신이다. 그런데 스크롤 상자는

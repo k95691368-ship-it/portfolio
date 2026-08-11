@@ -10,6 +10,8 @@ import {
   candidateRequests,
 } from '../../../_lib/negotiationCheck.js'
 import { rowToCamelTerms } from '../../../_lib/contract.js'
+import { loadContinuity } from '../../../_lib/continuityChain.js'
+import { checkContinuityCompliance } from '../../../_lib/contractPeriod.js'
 
 // 계약서를 쓰기 전에 대화를 검토한다.
 //
@@ -98,7 +100,12 @@ export async function onRequestPost({ env, data, params }) {
   // 항목"으로 보여 준다 — 계약서를 쓰기 전에 봐야 하는 것이 바로 그것이다.
   const terms = termsFromNegotiation(negotiationRows.results, rowToCamelTerms(termsRow))
   const requests = candidateRequests(negotiationRows.results, terms)
-  const deterministic = checkNegotiatedTerms(terms, posting)
+
+  // 갱신으로 이어진 계약이 있으면 계속근로기간을 합산해야 2년 상한을 제대로
+  // 본다(기간제법 제4조). 계약서 화면은 이 검사를 하는데 여기서는 하지 않아,
+  // 같은 방을 두고 두 화면의 판정이 갈렸다.
+  const continuity = await loadContinuity(env, params.roomId, termsRow)
+  const deterministic = checkNegotiatedTerms(terms, posting, checkContinuityCompliance(continuity))
 
   // AI 검토는 비싸므로 쿨다운을 건다. 실패하면 소모한 쿨다운을 돌려준다 —
   // 실패한 시도가 다음 시도를 막으면 안 된다.
@@ -108,6 +115,7 @@ export async function onRequestPost({ env, data, params }) {
     return jsonResponse({
       terms,
       requests,
+      continuity,
       deterministic,
       review: null,
       reviewError: `검토는 ${COOLDOWN_SECONDS}초에 한 번만 실행할 수 있습니다. 아래 계산 결과는 지금 값 기준입니다.`,
@@ -140,5 +148,5 @@ export async function onRequestPost({ env, data, params }) {
     reviewError = err.message
   }
 
-  return jsonResponse({ terms, requests, deterministic, review, reviewError })
+  return jsonResponse({ terms, requests, continuity, deterministic, review, reviewError })
 }

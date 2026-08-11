@@ -4,6 +4,7 @@ import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useChatPolling } from '../hooks/useChatPolling.js'
+import { formatKstTime } from '../lib/formatTime.js'
 import ChatMessageList from '../components/ChatMessageList.jsx'
 import ChatComposer from '../components/ChatComposer.jsx'
 import RoomDocuments from '../components/RoomDocuments.jsx'
@@ -106,7 +107,18 @@ export default function RoomPage() {
   }, [loadView])
 
   // 대화의 첫 묶음은 위 요청에 이미 들어 있다. 그다음부터만 증분으로 확인한다.
-  const { messages, sendMessage: postMessage } = useChatPolling(roomId, 2500, view?.messages ?? null)
+  const {
+    messages,
+    // 훅이 내보내는 실패를 아무도 받지 않고 있었다. 세션이 끊기거나 서버가
+    // 5xx 를 내면 2.5초마다 실패만 반복하고 대화는 그대로 멈추는데, 화면에는
+    // 오류도 재시도 표시도 마지막 갱신 시각도 없었다. 그러면 '멈춘 것'과
+    // '상대가 조용한 것'이 구별되지 않는다 — 지원자가 근로조건을 보내도
+    // 담당자는 답이 없다고 판단하고 기다린다. 보내기는 오류를 보여 주는데
+    // 받기만 완전히 침묵하는 비대칭이었다.
+    error: chatError,
+    lastSyncedAt,
+    sendMessage: postMessage,
+  } = useChatPolling(roomId, 2500, view?.messages ?? null)
 
   // 말하는 그 순간에 알려야 예방이다.
   //
@@ -308,6 +320,13 @@ export default function RoomPage() {
       )}
 
       <div className="chat-panel">
+        {chatError && (
+          <p className="chat-offline" role="status">
+            새 메시지를 받지 못하고 있습니다.
+            {lastSyncedAt ? ` 마지막 확인 ${formatKstTime(lastSyncedAt)}.` : ''} 연결이 돌아오면
+            자동으로 이어집니다 — 계속 이 표시가 남으면 화면을 새로 고쳐주세요.
+          </p>
+        )}
         <ChatMessageList messages={messages} participants={room.participants} />
         {room.myRole === 'admin' ? (
           <p className="notice">관리자 열람 모드입니다. 채팅 작성은 참여자만 가능합니다.</p>

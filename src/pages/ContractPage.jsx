@@ -701,6 +701,9 @@ export default function ContractPage() {
   const [deliveries, setDeliveries] = useState([])
   const [deliveryState, setDeliveryState] = useState(null)
   const [documentSha256, setDocumentSha256] = useState(null)
+  // 임금 구성항목은 인쇄는 되는데 지문에는 들어가지 않는다. 지문만 보면
+  // 식대만 바꾼 변경을 놓치므로, 화면이 읽은 시각도 함께 들고 있다가 보낸다.
+  const [termsUpdatedAt, setTermsUpdatedAt] = useState(null)
   const [revokedSignatures, setRevokedSignatures] = useState([])
   const [continuity, setContinuity] = useState(null)
   const [retention, setRetention] = useState(null)
@@ -764,6 +767,7 @@ export default function ContractPage() {
     setDeliveries(view.deliveries ?? [])
     setDeliveryState(view.deliveryState ?? null)
     setDocumentSha256(view.documentSha256 ?? null)
+    setTermsUpdatedAt(view.contract?.updatedAt ?? view.updatedAt ?? null)
     setRevokedSignatures(view.revokedSignatures ?? [])
     setCertificates(view.certificates ?? [])
     setWageComposition(view.wageComposition ?? null)
@@ -1000,6 +1004,8 @@ export default function ContractPage() {
         acknowledgedIssues: acknowledged,
         // 화면이 보여 준 내용의 지문. 그동안 내용이 바뀌었으면 서버가 막는다.
         documentSha256,
+        // 지문에 들어가지 않는 항목(임금 구성항목 등)의 변경까지 잡는다.
+        termsUpdatedAt,
       })
       setSigningRole(null)
       await loadAll()

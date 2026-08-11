@@ -15,6 +15,13 @@
   --btn-face: #eceff3;
   --btn-face-hover: #dee3e9;
   --btn-border: #8b95a1;
+  /* --success / --danger 는 면과 테두리용이다. 밝은 화면에서 그대로 글자색으로
+     쓰면 흰 바탕 대비가 2.1:1(초록), 3.7:1(빨강)까지 떨어진다. 서명 직전
+     최종 확인처럼 "무엇이 바뀌었는가"를 읽어야 하는 자리에서 그 글자가 가장
+     안 보였다. 글자 전용 색을 따로 둔다. */
+  --success-text: #00734c;
+  --danger-text: #c11b2a;
+  --warning-text: #8a5300;
   /* 강조색 면 위에 얹는 글자색. 밝은 화면에서 --accent는 진한 파랑이라 흰 글자가
      읽히지만, 어두운 화면에서는 --accent가 밝아지므로 이 값도 함께 뒤집힌다. */
   --on-accent: #fff;
@@ -94,6 +101,10 @@
     --btn-face: #2b2b34;
     --btn-face-hover: #383843;
     --btn-border: #6a6a7a;
+    /* 어두운 화면에서는 원래 색이 밝아서 그대로 써도 대비가 선다. */
+    --success-text: var(--success);
+    --danger-text: var(--danger);
+    --warning-text: var(--warning);
 
     --accent: #4d94ff;
     --accent-bg: rgba(77, 148, 255, 0.14);
@@ -142,6 +153,10 @@
   --btn-face: #2b2b34;
   --btn-face-hover: #383843;
   --btn-border: #6a6a7a;
+  /* 어두운 화면에서는 원래 색이 밝아서 그대로 써도 대비가 선다. */
+  --success-text: var(--success);
+  --danger-text: var(--danger);
+  --warning-text: var(--warning);
 
   --accent: #4d94ff;
   --accent-bg: rgba(77, 148, 255, 0.14);
@@ -464,6 +479,15 @@ input[type='checkbox'] {
   font-weight: 600;
   line-height: 1.4;
   border: 1px solid transparent;
+  /* nowrap 이었다. 심각도 배지에는 한 문장짜리 제목이 들어가는데, 줄바꿈을
+     막아 두어 좁은 화면에서 그대로 상자를 넘어갔다. 서명 직전 경고가 화면
+     밖으로 밀려나면 그 경고는 없는 것과 같다. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+/* 짧은 라벨은 예전처럼 한 줄로. */
+.badge-nowrap {
   white-space: nowrap;
 }
 .badge-neutral {

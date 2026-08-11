@@ -12,7 +12,6 @@ import {
 import {
   describeContractPeriod,
   checkPeriodCompliance,
-  describeContinuousEmployment,
   checkContinuityCompliance,
   describeRetention,
 } from '../../../_lib/contractPeriod.js'
@@ -29,7 +28,6 @@ import { comparePostingToContract } from '../../../_lib/postingMatch.js'
 import { postingConditionsFromRow } from '../../../_lib/postingConditions.js'
 
 // 갱신 사슬을 거슬러 올라가는 최대 깊이 (link-previous의 제한과 같아야 한다)
-const MAX_CHAIN_DEPTH = 10
 import { findLanguage, SUPPORTED_LANGUAGES } from '../../../_lib/languages.js'
 
 // 계약서 화면이 필요한 모든 정보를 한 번에 돌려준다.
@@ -164,37 +162,7 @@ export async function onRequestGet({ env, data, params, request }) {
 
   // 갱신으로 이어진 계약이 있으면 계속근로기간을 합산해야 2년 상한을 제대로 본다.
   // 이어진 계약이 없을 때는 조회 자체를 하지 않는다.
-  let continuity = { linked: false, count: termsRow ? 1 : 0 }
-  if (termsRow?.previous_room_id) {
-    const { results: chain } = await env.DB.prepare(
-      `WITH RECURSIVE chain(room_id, previous_room_id, depth) AS (
-         SELECT room_id, previous_room_id, 0 FROM contract_terms WHERE room_id = ?1
-         UNION ALL
-         SELECT ct.room_id, ct.previous_room_id, chain.depth + 1
-           FROM contract_terms ct, chain
-          WHERE ct.room_id = chain.previous_room_id AND chain.depth < ?2
-       )
-       SELECT chain.depth, ct.room_id, ct.contract_start_date, ct.contract_end_date, r.title
-         FROM chain
-         JOIN contract_terms ct ON ct.room_id = chain.room_id
-         JOIN interview_rooms r ON r.id = chain.room_id
-        ORDER BY chain.depth DESC`
-    )
-      .bind(roomId, MAX_CHAIN_DEPTH)
-      .all()
-    continuity = describeContinuousEmployment(
-      chain.map((c) => ({
-        roomId: c.room_id,
-        title: c.title,
-        startDate: c.contract_start_date,
-        endDate: c.contract_end_date,
-      }))
-    )
-    continuity.previousRoomId = termsRow.previous_room_id
-    // 위 조회는 열 단계까지만 거슬러 올라간다. 거기서 끊겼다면 합산된 기간이
-    // 실제보다 짧다는 뜻이므로, 그 사실을 감추지 않고 함께 알린다.
-    continuity.truncated = chain.some((c) => c.depth >= MAX_CHAIN_DEPTH)
-  }
+  const continuity = await loadContinuity(env, roomId, termsRow)
 
   // 체결이 끝난 계약은 보존 의무 기간을 관리해야 한다 (근로기준법 제42조).
   //
@@ -371,6 +339,13 @@ export async function onRequestGet({ env, data, params, request }) {
       hireConfirmed: !!termsRow?.hire_confirmed,
       hireConfirmedAt: termsRow?.hire_confirmed_at ?? null,
       confirmationExcerpt: termsRow?.hire_confirmation_excerpt ?? null,
+      // 화면이 이 내용을 읽은 시각. 서명할 때 함께 보내 대조한다.
+      //
+      // 아래 documentSha256 만으로는 부족하다. 정본 직렬화의 항목 목록에 임금
+      // 구성항목이 없어서, 기본급을 그대로 두고 식대만 낮추면 인쇄되는 내용은
+      // 달라지는데 지문은 같다. 목록에 줄을 더하면 이미 서명된 계약서의 지문이
+      // 소급해 바뀌므로, 대신 저장 시각을 함께 본다.
+      updatedAt: termsRow?.updated_at ?? null,
     },
     signatures: signatures.map((s) => ({
       role: s.signer_role,

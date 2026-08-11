@@ -130,13 +130,16 @@ export function pendingAgreements(terms) {
 // 계약서 점검과 같은 함수를 쓴다. 여기서만 다른 규칙을 쓰면 "협의 때는
 // 괜찮다더니 계약서에서는 막힌다"가 되어, 두 화면 중 하나는 반드시 거짓말이
 // 된다.
-export function checkNegotiatedTerms(terms, postingRow = null) {
+// extraIssues: 이 방 밖의 사실이 있어야 나오는 판정(갱신으로 이어진 계약의
+// 계속근로기간 등). 순수 함수는 DB 를 읽을 수 없으므로 호출부가 넣어 준다.
+export function checkNegotiatedTerms(terms, postingRow = null, extraIssues = []) {
   const t = terms || {}
 
   const issues = [
     ...checkLegalCompliance(t),
     ...checkPeriodCompliance(t),
     ...checkProbationCompliance(t),
+    ...(extraIssues || []),
   ]
 
   const posting = postingRow
