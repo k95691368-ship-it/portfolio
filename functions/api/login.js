@@ -23,7 +23,12 @@ export async function onRequestPost({ request, env }) {
 
   if (user.is_suspended) return jsonError('정지된 계정입니다. 관리자에게 문의해주세요.', 403)
 
-  const { token } = await createSession(env.DB, user.id)
+  // 로그인 유지를 고르지 않았으면 브라우저를 닫을 때 끝난다.
+  //
+  // 값을 보내지 않는 호출부(예전 클라이언트, 검증 스크립트)는 예전처럼
+  // 유지한다. 새 화면은 항상 명시해서 보낸다.
+  const persistent = body.remember !== false
+  const { token } = await createSession(env.DB, user.id, { persistent })
 
   return jsonResponse(
     {
@@ -37,6 +42,6 @@ export async function onRequestPost({ request, env }) {
       mustChangePassword: !!user.must_change_password,
     },
     200,
-    { 'Set-Cookie': sessionCookieHeader(token) }
+    { 'Set-Cookie': sessionCookieHeader(token, { persistent }) }
   )
 }

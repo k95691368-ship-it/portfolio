@@ -1,4 +1,4 @@
-import { getSessionUser } from '../_lib/auth.js'
+import { getSessionUser, renewSessionIfStale } from '../_lib/auth.js'
 import { jsonError } from '../_lib/http.js'
 
 // 다른 사이트가 이 API 를 대신 부르는 것을 막는다.
@@ -33,5 +33,14 @@ export async function onRequest(context) {
   }
 
   context.data.user = await getSessionUser(context.env.DB, request)
+
+  // 쓰고 있는 동안에는 로그인이 끝나지 않게 만료를 미룬다. 응답을 붙잡아 두지
+  // 않도록 뒤로 넘긴다 — 실패해도 이번 요청과는 상관없는 일이다.
+  if (context.data.user) {
+    const renewal = renewSessionIfStale(context.env.DB, request)
+    if (context.waitUntil) context.waitUntil(renewal)
+    else await renewal.catch(() => {})
+  }
+
   return context.next()
 }

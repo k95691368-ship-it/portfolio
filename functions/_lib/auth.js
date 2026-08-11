@@ -1,5 +1,15 @@
 const PBKDF2_ITERATIONS = 100000
+// 로그인 유지를 고른 경우와 아닌 경우.
+//
+// 지금까지는 30일 하나뿐이었다. 즉 이 서비스는 로그인 유지를 끌 방법이 없었고,
+// PC방이나 학교 컴퓨터에서 지원한 사람이 창을 닫아도 세션이 그대로 살아
+// 있었다. 그 계정 안에는 서명한 근로계약서와 연락처가 들어 있다.
+//
+// 유지를 고르지 않으면 브라우저를 닫는 순간 쿠키가 사라지고, 서버 쪽 토큰도
+// 하루 안에 죽는다. 쿠키만 지우면 훔쳐 간 토큰은 그대로 살아 있으므로 둘 다
+// 짧게 잡는다.
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30 // 30일
+const SHORT_SESSION_TTL_SECONDS = 60 * 60 * 12 // 12시간 — 하루 일과
 
 function toBase64(bytes) {
   return btoa(String.fromCharCode(...bytes))
@@ -66,10 +76,13 @@ export async function verifyPassword(password, storedHash, storedSalt) {
   return timingSafeEqual(toBase64(hashBytes), storedHash)
 }
 
-export async function createSession(db, userId) {
+export async function createSession(db, userId, options = {}) {
+  // 명시하지 않으면 유지한다 — 예전 동작 그대로.
+  const persistent = options.persistent !== false
+  const ttl = persistent ? SESSION_TTL_SECONDS : SHORT_SESSION_TTL_SECONDS
   const token = toBase64Url(crypto.getRandomValues(new Uint8Array(32)))
   const tokenHash = await sha256Hex(token)
-  const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000).toISOString()
+  const expiresAt = new Date(Date.now() + ttl * 1000).toISOString()
 
   // 만료된 세션 행은 아무도 지우지 않아 영원히 쌓이고 있었다. 새 세션을 만들
   // 때 이 사용자의 죽은 행을 함께 치운다 — 따로 도는 청소 작업이 없는 환경이라,
@@ -101,8 +114,11 @@ export function parseCookie(request, name) {
   return match ? decodeURIComponent(match[1]) : null
 }
 
-export function sessionCookieHeader(token) {
-  return `session=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL_SECONDS}`
+// Max-Age 를 붙이지 않으면 브라우저를 닫을 때 쿠키가 사라진다(세션 쿠키).
+export function sessionCookieHeader(token, options = {}) {
+  const base = `session=${token}; HttpOnly; Secure; SameSite=Lax; Path=/`
+  if (options.persistent === false) return base
+  return `${base}; Max-Age=${SESSION_TTL_SECONDS}`
 }
 
 export function clearSessionCookieHeader() {
@@ -131,4 +147,41 @@ export async function getSessionUser(db, request) {
     .first()
   if (!row || row.is_suspended) return null
   return row
+}
+
+// 쓰고 있는 동안에는 로그인이 끝나지 않게 만료를 미룬다.
+//
+// 30일은 로그인한 순간부터 세는 값이고 한 번도 늘어나지 않았다. 매일 들어와도
+// 31일째에는 로그아웃된다 — 쓰지 않아서가 아니라 그냥 시간이 지나서. "로그인
+// 유지"라고 부르려면 쓰는 동안에는 유지되어야 한다.
+//
+// 매 요청마다 쓰지는 않는다. 남은 기간이 절반 아래로 내려갔을 때만 미루므로
+// 활동하는 사람 기준 보름에 한 번이다.
+//
+// 브라우저를 닫으면 끝나기로 한 세션(유지를 고르지 않은 로그인)은 미루지
+// 않는다. 그 구분은 따로 저장하지 않고 처음 잡았던 기간으로 안다 — 하루보다
+// 길게 잡혔으면 유지를 고른 로그인이다.
+const RENEW_WHEN_REMAINING_SECONDS = SESSION_TTL_SECONDS / 2
+
+export async function renewSessionIfStale(db, request) {
+  const token = parseCookie(request, 'session')
+  if (!token) return
+  const tokenHash = await sha256Hex(token)
+
+  await db
+    .prepare(
+      `UPDATE sessions
+          SET expires_at = ?1
+        WHERE token_hash = ?2
+          AND datetime(expires_at) > datetime('now')
+          AND datetime(expires_at) < datetime('now', ?3)
+          AND (julianday(expires_at) - julianday(created_at)) > 1`
+    )
+    .bind(
+      new Date(Date.now() + SESSION_TTL_SECONDS * 1000).toISOString(),
+      tokenHash,
+      `+${RENEW_WHEN_REMAINING_SECONDS} seconds`
+    )
+    .run()
+    .catch(() => {})
 }
