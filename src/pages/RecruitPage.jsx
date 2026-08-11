@@ -319,81 +319,6 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
   )
 }
 
-function RecruitStats({ postings, applications, truncatedAt }) {
-  const stats = useMemo(() => {
-    const openPostings = postings.filter((p) => p.status === 'open').length
-    const submitted = applications.filter((a) => a.status === 'submitted').length
-    const passed = applications.filter((a) => a.status === 'passed').length
-    const rejected = applications.filter((a) => a.status === 'rejected').length
-    const total = applications.length
-    const decided = passed + rejected
-    const passRate = decided > 0 ? Math.round((passed / decided) * 100) : null
-    return { total, openPostings, submitted, passed, rejected, passRate, count: postings.length }
-  }, [postings, applications])
-
-  const seg = (n) => (stats.total > 0 ? `${(n / stats.total) * 100}%` : '0%')
-
-  return (
-    <section className="recruit-section">
-      <h2>채용 현황</h2>
-      {/* 지원서를 최근 N건만 불러온 상태에서 그 목록으로 통계를 냈다.
-          아래 공고 표는 전수 COUNT 를 보여 주므로 두 숫자가 어긋난다.
-          무엇을 센 숫자인지 밝히지 않으면 둘 다 틀린 것이 된다. */}
-      {truncatedAt && (
-        <p className="notice">
-          지원서가 많아 최근 {truncatedAt}건만 불러왔습니다. 아래 숫자는 그 범위 안에서만 센
-          것이라, 공고별 지원자 수와 다를 수 있습니다.
-        </p>
-      )}
-      <div className="stat-row">
-        <div className="stat-tile">
-          <span className="stat-value">{stats.count}</span>
-          <span className="stat-label">전체 공고</span>
-          <span className="stat-sub">모집 중 {stats.openPostings}</span>
-        </div>
-        <div className="stat-tile">
-          <span className="stat-value">{stats.total}</span>
-          <span className="stat-label">전체 지원자</span>
-        </div>
-        <div className="stat-tile">
-          <span className="stat-value">{stats.submitted}</span>
-          <span className="stat-label">심사 대기</span>
-        </div>
-        <div className="stat-tile">
-          <span className="stat-value">{stats.passed}</span>
-          <span className="stat-label">서류합격</span>
-        </div>
-        <div className="stat-tile">
-          <span className="stat-value">{stats.passRate === null ? '—' : `${stats.passRate}%`}</span>
-          <span className="stat-label">서류 합격률</span>
-          <span className="stat-sub">합격/(합격+불합격)</span>
-        </div>
-      </div>
-
-      {stats.total > 0 && (
-        <div className="status-breakdown">
-          <div className="status-bar" role="img" aria-label={`심사 대기 ${stats.submitted}, 서류합격 ${stats.passed}, 불합격 ${stats.rejected}`}>
-            {stats.submitted > 0 && <span className="status-seg-submitted" style={{ width: seg(stats.submitted) }} />}
-            {stats.passed > 0 && <span className="status-seg-passed" style={{ width: seg(stats.passed) }} />}
-            {stats.rejected > 0 && <span className="status-seg-rejected" style={{ width: seg(stats.rejected) }} />}
-          </div>
-          <div className="status-legend">
-            <span className="status-legend-item">
-              <span className="status-dot status-seg-submitted" /> 심사 대기 {stats.submitted}
-            </span>
-            <span className="status-legend-item">
-              <span className="status-dot status-seg-passed" /> 서류합격 {stats.passed}
-            </span>
-            <span className="status-legend-item">
-              <span className="status-dot status-seg-rejected" /> 불합격 {stats.rejected}
-            </span>
-          </div>
-        </div>
-      )}
-    </section>
-  )
-}
-
 export default function RecruitPage() {
   const { user } = useAuth()
   const toast = useToast()
@@ -492,10 +417,6 @@ export default function RecruitPage() {
           </Link>
         </div>
       </header>
-
-      {!loading && (
-        <RecruitStats postings={postings} applications={applications} truncatedAt={appsTruncated} />
-      )}
 
       <section className="recruit-section">
         <h2>채용 공고 등록</h2>
@@ -643,7 +564,12 @@ export default function RecruitPage() {
                 {postings.map((p) => (
                   <tr key={p.id}>
                     <th scope="row" className="cell-rowhead">
-                      {p.title}
+                      {/* 제목이 그냥 글자였다. 표에서 이름을 누르면 그것으로
+                          가는 것은 설명이 필요 없는 동작인데, 여기서만 아무
+                          일도 일어나지 않았다. 지원자에게 보이는 바로 그
+                          화면으로 보낸다 — 공고와 계약 조건이 어긋났는지
+                          따지는 판정의 기준이 이 화면의 내용이다. */}
+                      <Link to={`/jobs/${p.id}`}>{p.title}</Link>
                     </th>
                     <td>
                       <span className={`badge ${p.status === 'open' ? 'badge-success' : 'badge-neutral'}`}>

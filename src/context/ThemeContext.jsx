@@ -8,27 +8,13 @@ import {
 
 const ThemeContext = createContext(null)
 
-const DARK_QUERY = '(prefers-color-scheme: dark)'
-
 export function ThemeProvider({ children }) {
-  // 고른 값이 있으면 그것을, 없으면 기기 설정을 따른다.
+  // 고른 값이 있으면 그것을, 없으면 밝은 화면으로 연다.
   const [stored, setStored] = useState(() =>
     typeof window === 'undefined' ? null : readStoredTheme(window.localStorage)
   )
-  const [prefersDark, setPrefersDark] = useState(() =>
-    typeof window === 'undefined' ? false : window.matchMedia?.(DARK_QUERY).matches === true
-  )
 
-  // 아직 고르지 않은 사람은 기기 설정이 바뀌면 따라 바뀐다.
-  useEffect(() => {
-    const mq = window.matchMedia?.(DARK_QUERY)
-    if (!mq) return undefined
-    const onChange = (e) => setPrefersDark(e.matches)
-    mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
-  }, [])
-
-  const theme = resolveTheme(stored, prefersDark)
+  const theme = resolveTheme(stored)
 
   useEffect(() => {
     const root = document.documentElement
@@ -40,7 +26,7 @@ export function ThemeProvider({ children }) {
   const value = useMemo(
     () => ({
       theme,
-      // 고른 값이 없으면 기기 설정을 따르고 있다는 뜻이다.
+      // 아직 직접 고른 적이 없다는 뜻.
       followsSystem: stored === null,
       toggle: () => {
         const next = nextTheme(theme)

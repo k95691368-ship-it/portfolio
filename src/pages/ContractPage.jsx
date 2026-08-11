@@ -9,6 +9,7 @@ import AuditCertificate from '../components/AuditCertificate.jsx'
 import WageComposition from '../components/WageComposition.jsx'
 import WorkerRights from '../components/WorkerRights.jsx'
 import SeverityBadge from '../components/SeverityBadge.jsx'
+import { EMPTY_FORM, formFromTerms } from '../lib/contractForm.js'
 import { formatKst } from '../lib/formatTime.js'
 import { IDENTITY_FIELDS, TERM_FIELDS, SOCIAL_INSURANCE_FIELDS } from '../lib/contractTemplate.js'
 
@@ -40,28 +41,6 @@ function formatHistoryValue(field, value) {
   return String(value)
 }
 
-const EMPTY_FORM = {
-  employerName: '',
-  employerAddress: '',
-  employeeName: '',
-  employeeAddress: '',
-  contractStartDate: '',
-  contractEndDate: '',
-  workLocation: '',
-  jobDescription: '',
-  workHoursStart: '',
-  workHoursEnd: '',
-  workDays: '',
-  restDays: '',
-  wageBaseAmount: '',
-  wagePayMethod: '',
-  wagePayDate: '',
-  annualLeave: '',
-  employeeCount: '',
-  socialInsurance: {},
-  customTerms: [],
-  wageItems: [],
-}
 
 
 // 외국인 근로자용 번역본 — 원본과 나란히 보여준다(공식 표준근로계약서 외국어본 방식).
@@ -756,31 +735,7 @@ export default function ContractPage() {
     })
     setAiDocument(contractData.terms?.aiDocument ?? null)
 
-    const t = contractData.terms || {}
-    const company = roomData.participants.find((p) => p.role === 'company')
-    const candidate = roomData.participants.find((p) => p.role === 'candidate')
-
-    const nextForm = {
-      employerName: t.employerName ?? company?.companyName ?? company?.displayName ?? '',
-      employerAddress: t.employerAddress ?? '',
-      employeeName: t.employeeName ?? candidate?.displayName ?? '',
-      employeeAddress: t.employeeAddress ?? '',
-      contractStartDate: t.contractStartDate ?? '',
-      contractEndDate: t.contractEndDate ?? '',
-      workLocation: t.workLocation ?? '',
-      jobDescription: t.jobDescription ?? '',
-      workHoursStart: t.workHoursStart ?? '',
-      workHoursEnd: t.workHoursEnd ?? '',
-      workDays: t.workDays ?? '',
-      restDays: t.restDays ?? '',
-      wageBaseAmount: t.wageBaseAmount ?? '',
-      wagePayMethod: t.wagePayMethod ?? '',
-      wagePayDate: t.wagePayDate ?? '',
-      annualLeave: t.annualLeave ?? '',
-      socialInsurance: t.socialInsurance ?? {},
-      customTerms: t.customTerms ?? [],
-      wageItems: t.wageItems ?? [],
-    }
+    const nextForm = formFromTerms(contractData.terms, roomData.participants)
 
     // 저장하지 않은 입력을 서버 값으로 덮어쓰지 않는다.
     //
@@ -799,6 +754,7 @@ export default function ContractPage() {
       setServerChangedWhileEditing(true)
     }
 
+    const t = contractData.terms || {}
     setEmploymentEnd({ endedAt: t.employmentEndedAt ?? null, reason: t.employmentEndReason ?? null })
     setSignatures(sigData.signatures)
     setChangeRequests(view.changeRequests ?? [])
@@ -1083,7 +1039,27 @@ export default function ContractPage() {
     return pdf
   }
 
+  // 보관·교부되는 문서는 저장된 조건이어야 한다.
+  //
+  // 인쇄 영역은 서버의 terms 가 아니라 화면의 입력값(form)을 그린다. 그리고
+  // loadAll 은 저장하지 않은 입력을 일부러 지킨다 — 입력 중에 다른 버튼을
+  // 눌렀다고 쓰던 내용이 사라지면 안 되니까. 그 둘이 겹치면, 저장한 적 없는
+  // 금액이 찍힌 PDF 가 R2 에 보관되고 지원자에게 교부되며 그 SHA-256 이
+  // '문서 무결성 지문'으로 표시된다. DB·수정 이력·감사추적·서명 지문은 전부
+  // 다른 값인데, 종이로 남는 유일한 증거는 그쪽이다.
+  const unsavedForPrint = () =>
+    JSON.stringify(formRef.current) !== JSON.stringify(savedFormRef.current)
+
+  const blockIfUnsaved = () => {
+    if (!unsavedForPrint()) return false
+    toast.error(
+      '저장하지 않은 입력이 있습니다. 지금 만들면 저장된 계약 내용과 다른 문서가 남습니다. 저장하거나 입력을 되돌린 뒤 다시 시도해주세요.'
+    )
+    return true
+  }
+
   const handleExportPdf = async () => {
+    if (blockIfUnsaved()) return
     setExporting(true)
     try {
       const pdf = await buildPdf()
@@ -1096,6 +1072,7 @@ export default function ContractPage() {
   }
 
   const handleStoreAndSend = async () => {
+    if (blockIfUnsaved()) return
     setStoring(true)
     try {
       const pdf = await buildPdf()
@@ -1130,13 +1107,17 @@ export default function ContractPage() {
     (w) => w?.name && Number(w.amount) > 0
   )
   // 계약 체결일. 양측이 서명한 뒤에는 마지막 서명 시각이 곧 체결일이다.
+  //
+  // 서명이 몇 개인지 보지 않고 '가장 늦은 서명 시각'만 골라 쓰고 있었다.
+  // 그래서 회사만 서명한 계약서에도 체결일이 찍혔다 — 근로자 서명란은 빈칸인
+  // 채로. 계약이 언제 성립했는지를 다투기 위해 만든 서비스가, 아직 성립하지
+  // 않은 계약에 성립일을 적어 내보내는 문서를 만든 것이다.
   const signedDateText = (() => {
-    const last = signatures
-      .map((s) => s.signedAt)
-      .filter(Boolean)
-      .sort()
-      .pop()
-    if (!last) return '____년 __월 __일'
+    const at = (role) => signatures.find((x) => x.role === role)?.signedAt || null
+    const company = at('company')
+    const candidate = at('candidate')
+    if (!company || !candidate) return '____년 __월 __일'
+    const last = [company, candidate].sort().pop()
     const [y, m, d] = formatKst(last).slice(0, 10).split('-')
     return `${y}년 ${Number(m)}월 ${Number(d)}일`
   })()
@@ -1649,8 +1630,13 @@ export default function ContractPage() {
             <li>
               <span className="clause-name">근로계약기간</span>
               <span className="clause-value">
+                {/* 종료일이 비어 있으면 기간의 정함이 없는 계약이다. 빈칸으로
+                    찍으면 종료일만 안 채운 기간제 계약서처럼 보이고, 서명·보관
+                    뒤에도 그 자리는 채워 넣을 수 있는 칸으로 남는다. 기간제냐
+                    무기계약이냐는 갱신기대권과 이 앱이 지키려는 해고 보호에서
+                    가장 큰 갈림이다. */}
                 {form.contractStartDate || '____년 __월 __일'}부터{' '}
-                {form.contractEndDate || '____년 __월 __일'}까지
+                {form.contractEndDate ? `${form.contractEndDate}까지` : '기간의 정함 없음'}
               </span>
               <span className="clause-note">
                 ※ 근로계약기간을 정하지 않는 경우에는 "근로개시일"만 기재
@@ -1674,7 +1660,10 @@ export default function ContractPage() {
             <li>
               <span className="clause-name">근무일/휴일</span>
               <span className="clause-value">
-                매주 {form.workDays || '__일'} 근무, 주휴일 {form.restDays || '매주 __요일'}
+                {/* 입력란의 이름은 '휴일'인데 여기서만 '주휴일'로 찍고 있었다.
+                    토요일까지 유급 주휴일로 선언되면 제55조·제56조 제2항의
+                    가산 대상이 달라진다. 저장된 값이 무엇인지 그대로 적는다. */}
+                매주 {form.workDays || '__일'} 근무, 휴일 {form.restDays || '매주 __요일'}
               </span>
             </li>
             <li>

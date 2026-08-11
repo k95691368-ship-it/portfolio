@@ -11,20 +11,21 @@ import {
 } from '../src/lib/theme.js'
 
 describe('resolveTheme', () => {
-  it('고른 값이 있으면 기기 설정보다 그것을 따른다', () => {
-    expect(resolveTheme('light', true)).toBe('light')
-    expect(resolveTheme('dark', false)).toBe('dark')
+  it('고른 값이 있으면 그것을 따른다 — 무엇으로도 덮지 않는다', () => {
+    expect(resolveTheme('light')).toBe('light')
+    expect(resolveTheme('dark')).toBe('dark')
   })
 
-  it('고른 값이 없으면 기기 설정을 따른다', () => {
-    expect(resolveTheme(null, true)).toBe('dark')
-    expect(resolveTheme(null, false)).toBe('light')
+  // 처음 열리는 화면은 근로계약서다. 계약서는 종이로 출력되고 PDF 로 교부되는
+  // 흰 문서이므로, 고른 적 없는 사람에게는 그 모양 그대로 보여 준다.
+  it('고른 적이 없으면 밝은 화면으로 연다', () => {
+    expect(resolveTheme(null)).toBe('light')
+    expect(resolveTheme(undefined)).toBe('light')
   })
 
   it('알 수 없는 값은 고르지 않은 것으로 본다', () => {
-    expect(resolveTheme('보라색', true)).toBe('dark')
-    expect(resolveTheme('', false)).toBe('light')
-    expect(resolveTheme(undefined, true)).toBe('dark')
+    expect(resolveTheme('보라색')).toBe('light')
+    expect(resolveTheme('')).toBe('light')
   })
 })
 

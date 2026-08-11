@@ -60,17 +60,29 @@ export default function JobDetailPage() {
         )}
       </header>
 
+      {/* 공고를 낸 사람은 마감 뒤에도 자기 공고를 볼 수 있다. 무엇을 적었는지가
+          계약 조건이 공고보다 불리해졌는지를 따지는 기준이기 때문이다. 다만
+          지원은 받지 않는다 — 볼 수 있는 것과 지원할 수 있는 것은 다르다. */}
+      {posting.open === false && (
+        <p className="notice" role="status">
+          {posting.closedReason === 'expired' ? '마감일이 지난 공고입니다.' : '마감된 공고입니다.'}{' '}
+          지원자에게는 보이지 않습니다.
+        </p>
+      )}
+
       <div className="job-detail-body">{posting.description}</div>
 
-      <div className="job-detail-actions">
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={() => navigate(`/jobs/${id}/apply`)}
-        >
-          지원하기
-        </button>
-      </div>
+      {posting.open !== false && (
+        <div className="job-detail-actions">
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => navigate(`/jobs/${id}/apply`)}
+          >
+            지원하기
+          </button>
+        </div>
+      )}
     </div>
   )
 }

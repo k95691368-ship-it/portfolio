@@ -22,6 +22,14 @@ import { comparePostingToContract } from './postingMatch.js'
 //
 // 계약서에 이미 저장된 값이 있으면 그것을 바닥에 깔고, 대화에서 나중에 정해진
 // 값으로 덮는다. 계약서를 아직 쓰지 않은 방에서도 점검이 돌아야 한다.
+//
+// 다만 누가 말했는지를 보지 않고 있었다. 그래서 지원자가 "저는 월 400만원을
+// 희망합니다"라고 말하기만 하면 회사가 저장해 둔 290만원이 그 값으로 덮이고,
+// 최저임금 미달 여부를 아무도 제안하지 않은 금액으로 판정했다. 협의는 두
+// 사람이 서로 다른 값을 말하는 자리라, 발화자를 지우면 그 자리가 사라진다.
+//
+// 조건을 정하는 것은 회사다. 지원자의 발언은 덮지 않고 따로 모아 "양측이
+// 다르게 말한 항목"으로 돌려준다.
 export function termsFromNegotiation(rows, savedTerms = null) {
   const terms = { ...(savedTerms || {}) }
 
@@ -29,6 +37,11 @@ export function termsFromNegotiation(rows, savedTerms = null) {
     const field = r.field
     const value = r.value
     if (!field || value === null || value === undefined || value === '') continue
+
+    // 지원자가 말한 값은 판정에 넣지 않는다. 조건을 정하는 것은 회사이고,
+    // 지원자의 발언은 아래 candidateRequests 가 따로 모아 보여 준다.
+    const role = r.speaker_role ?? r.role ?? null
+    if (role === 'candidate') continue
 
     if (field === 'workHours') {
       // 협의 이력은 "09:00~18:00" 한 덩어리로 남지만, 계산은 시작·종료를
@@ -54,6 +67,49 @@ export function termsFromNegotiation(rows, savedTerms = null) {
   }
 
   return terms
+}
+
+// 지원자가 말했는데 회사 쪽 값과 다른 것.
+//
+// 판정에서 뺐다고 없던 말이 되는 것은 아니다. 오히려 이것이 계약서를 쓰기
+// 전에 봐야 하는 것이다 — 양측이 서로 다른 값을 말한 채로 계약서에 들어가면,
+// 나중에 "그렇게 합의한 적 없다"가 되고 그 다툼에는 근거가 없다.
+export function candidateRequests(rows, terms) {
+  const t = terms || {}
+  const latest = new Map()
+
+  for (const r of rows || []) {
+    const role = r.speaker_role ?? r.role ?? null
+    if (role !== 'candidate') continue
+    const field = r.field
+    const value = r.value
+    if (!field || value === null || value === undefined || value === '') continue
+
+    // 회사 쪽 값과 같으면 이견이 아니라 합의다.
+    const theirs =
+      field === 'workHours'
+        ? t.workHoursStart && t.workHoursEnd
+          ? `${t.workHoursStart}~${t.workHoursEnd}`
+          : null
+        : t[field] === null || t[field] === undefined
+          ? null
+          : String(t[field])
+    if (theirs !== null && theirs === String(value)) {
+      latest.delete(field)
+      continue
+    }
+
+    latest.set(field, {
+      field,
+      label: r.label ?? field,
+      requested: r.value_display ?? r.display ?? String(value),
+      current: theirs,
+      excerpt: r.excerpt ?? null,
+      at: r.created_at ?? r.at ?? null,
+    })
+  }
+
+  return [...latest.values()]
 }
 
 // 계약서에 반드시 있어야 하는데 아직 대화에서 정해지지 않은 것.
@@ -99,16 +155,30 @@ export function checkNegotiatedTerms(terms, postingRow = null) {
 
   const pending = pendingAgreements(t)
 
+  // 공고와 어긋난 것도 위법이다 — 채용절차법 제4조 제3항.
+  //
+  // 스스로 계산해 놓고 판정에서 빼고 있었다. 공고보다 임금이 낮아 high 경고가
+  // 떠 있는데도 '계약서를 써도 됩니다'가 함께 표시됐다. 화면에 경고와 통과가
+  // 나란히 있으면 사람은 통과를 읽는다.
+  const postingIssues = postingComparison?.issues ?? []
+
   return {
     issues,
     pending,
     postingComparison,
     // 지금 계약서를 써도 되는가. 위법 소지가 있거나 필수 항목이 안 정해졌으면
     // 아직이다.
-    ready: issues.every((i) => i.severity !== 'high') && pending.length === 0,
+    ready:
+      issues.every((i) => i.severity !== 'high') &&
+      postingIssues.every((i) => i.severity !== 'high') &&
+      pending.length === 0,
     counts: {
-      high: issues.filter((i) => i.severity === 'high').length,
-      medium: issues.filter((i) => i.severity === 'medium').length,
+      high:
+        issues.filter((i) => i.severity === 'high').length +
+        postingIssues.filter((i) => i.severity === 'high').length,
+      medium:
+        issues.filter((i) => i.severity === 'medium').length +
+        postingIssues.filter((i) => i.severity === 'medium').length,
       pending: pending.length,
     },
   }

@@ -4,7 +4,11 @@ import { blockedWhenClosed } from '../../../_lib/roomLifecycle.js'
 import { buildTranscript } from '../../../_lib/transcript.js'
 import { reviewNegotiation } from '../../../_lib/claude.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
-import { termsFromNegotiation, checkNegotiatedTerms } from '../../../_lib/negotiationCheck.js'
+import {
+  termsFromNegotiation,
+  checkNegotiatedTerms,
+  candidateRequests,
+} from '../../../_lib/negotiationCheck.js'
 import { rowToCamelTerms } from '../../../_lib/contract.js'
 
 // 계약서를 쓰기 전에 대화를 검토한다.
@@ -87,7 +91,13 @@ export async function onRequestPost({ env, data, params }) {
   }
 
   // 협의된 값으로 미리 돌리는 법정 계산. 크레딧과 무관하게 언제나 나온다.
+  //
+  // 판정은 회사가 말한 값으로만 세운다. 지원자가 희망 조건을 말했다는 이유로
+  // 그 값이 판정에 들어가면, 아무도 제안하지 않은 금액으로 최저임금 미달 여부를
+  // 따지게 된다. 지원자의 말은 아래 requests 로 따로 내려 "양측이 다르게 말한
+  // 항목"으로 보여 준다 — 계약서를 쓰기 전에 봐야 하는 것이 바로 그것이다.
   const terms = termsFromNegotiation(negotiationRows.results, rowToCamelTerms(termsRow))
+  const requests = candidateRequests(negotiationRows.results, terms)
   const deterministic = checkNegotiatedTerms(terms, posting)
 
   // AI 검토는 비싸므로 쿨다운을 건다. 실패하면 소모한 쿨다운을 돌려준다 —
@@ -97,6 +107,7 @@ export async function onRequestPost({ env, data, params }) {
   if (!ticket) {
     return jsonResponse({
       terms,
+      requests,
       deterministic,
       review: null,
       reviewError: `검토는 ${COOLDOWN_SECONDS}초에 한 번만 실행할 수 있습니다. 아래 계산 결과는 지금 값 기준입니다.`,
@@ -129,5 +140,5 @@ export async function onRequestPost({ env, data, params }) {
     reviewError = err.message
   }
 
-  return jsonResponse({ terms, deterministic, review, reviewError })
+  return jsonResponse({ terms, requests, deterministic, review, reviewError })
 }

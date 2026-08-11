@@ -5,6 +5,7 @@ import { api } from '../api/client.js'
 import { roomStatusInfo } from '../lib/roomStatus.js'
 import Modal from '../components/Modal.jsx'
 import { formatKst, formatKstDate } from '../lib/formatTime.js'
+import { describeAuditDetail } from '../lib/auditDetail.js'
 
 const EMPTY_NEW_ACCOUNT = { email: '', displayName: '', role: 'candidate', companyName: '', isRecruiter: false }
 
@@ -466,7 +467,7 @@ export default function AdminPage() {
                 <td>{entry.actorEmail}</td>
                 <td>{AUDIT_ACTION_LABELS[entry.action] || entry.action}</td>
                 <td>{entry.targetEmail || entry.roomTitle || '-'}</td>
-                <td>{entry.detail || '-'}</td>
+                <td>{describeAuditDetail(entry.detail)}</td>
               </tr>
             ))
           )}

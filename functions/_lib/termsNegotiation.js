@@ -169,14 +169,24 @@ function parseHours(text) {
   // 보정보다 먼저 걸러야 한다 — "09:00부터 09:00까지"가 9시간으로 읽혔다.
   if (s === e && !sMeri && !eMeri) return null
 
-  if (e <= s) {
+  if (e <= s && !eMeri) {
     // "9시부터 6시까지"는 오후를 생략한 것이고, "22시부터 6시까지"는 자정을
-    // 넘기는 교대다. 시작이 오후면 뒤로 미룰 자리가 없으므로 교대로 본다.
-    if (!eMeri && e < 12 && s < 12) e += 12
+    // 넘기는 교대다. 어느 쪽인지는 오후로 밀어 봐야 알 수 있다.
+    //
+    // 시작이 이미 오후일 때 보정을 아예 끄고 있었다. "오후 1시부터 6시까지"의
+    // 시작은 13 으로 보정된 뒤라 s < 12 가 깨지고, 그래서 13:00~06:00 —
+    // 17시간 근무가 되어 제53조 판정이 정반대로 선다.
+    const pushed = e + 12
+    if (pushed > s && pushed <= 24) e = pushed
     // 그래도 뒤집혀 있으면 자정을 넘긴 근무다. 그대로 두면
     // computeWeeklyHours 가 24시간을 더해 제대로 센다.
   }
   if (e === s) return null
+
+  // 사람이 하루에 그만큼 일한다고 합의했을 리 없는 값은 잘못 읽은 것이다.
+  // 틀린 근로시간이 근거로 남는 것은 아무것도 남지 않는 것보다 나쁘다.
+  const span = e > s ? e - s : 24 - s + e
+  if (span > 16) return null
 
   const pad = (n) => String(n).padStart(2, '0')
   return { start: `${pad(s)}:${sm ?? '00'}`, end: `${pad(e)}:${em ?? '00'}` }
@@ -204,9 +214,33 @@ const FIELD_RULES = [
     field: 'wageBaseAmount',
     label: '임금',
     topic: /임금|급여|월급|연봉|기본급|페이|보수/,
+    // 계약서의 wageBaseAmount 는 언제나 '월' 기본급이다. 최저임금 판정은 그
+    // 값을 월 소정근로시간으로 나눠 시급을 낸다(contractCheck.js).
+    //
+    // 그런데 문장에 적힌 금액이 월액인지는 보지 않고 있었다. "연봉 3,600만원"이
+    // 월 기본급 36,000,000원으로 기록되어, 최저임금 미달을 따지는 계산이 실제의
+    // 12배를 보고 언제나 통과시켰다. 그 값은 나중에 "그때 얼마를 제시했는가"의
+    // 근거로도 인용된다.
     read: (t) => {
       const won = parseWon(t)
-      return won === null ? null : { value: won, display: `${won.toLocaleString('ko-KR')}원` }
+      if (won === null) return null
+
+      // 시급·일급·주급은 월액으로 옮길 수 없다. 소정근로시간을 알아야 하는데
+      // 그것은 이 문장에 없다. 어림으로 환산한 월급이 근거로 남는 것보다
+      // 기록하지 않는 편이 낫다.
+      if (/시급|시간당|일급|일당|주급/.test(t)) return null
+
+      if (/연봉|연\s*\d|년봉/.test(t)) {
+        const monthly = Math.round(won / 12)
+        if (monthly < 10000) return null
+        return {
+          value: monthly,
+          // 무엇을 어떻게 옮겼는지 보여 준다. "2,916,667원"만 남으면 나중에
+          // 그 숫자가 어디서 왔는지 아무도 되짚지 못한다.
+          display: `연봉 ${won.toLocaleString('ko-KR')}원 (월 ${monthly.toLocaleString('ko-KR')}원)`,
+        }
+      }
+      return { value: won, display: `${won.toLocaleString('ko-KR')}원` }
     },
   },
   {

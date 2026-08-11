@@ -8,6 +8,7 @@ import {
   termsFromNegotiation,
   pendingAgreements,
   checkNegotiatedTerms,
+  candidateRequests,
 } from '../functions/_lib/negotiationCheck.js'
 
 const row = (field, value, extra = {}) => ({ field, value, ...extra })
@@ -133,5 +134,63 @@ describe('근무시간 이력이 온전하지 않을 때', () => {
     const t = termsFromNegotiation([row('workHours', '09:00~18:00')])
     expect(t.workHoursStart).toBe('09:00')
     expect(t.workHoursEnd).toBe('18:00')
+  })
+})
+
+// 협의는 두 사람이 서로 다른 값을 말하는 자리다. 발화자를 지우면 그 자리가
+// 사라지고, 아무도 제안하지 않은 금액으로 위법 여부를 판정하게 된다.
+describe('누가 말한 값인가', () => {
+  const row = (role, field, value, display) => ({
+    speaker_role: role, field, value, value_display: display ?? value,
+  })
+
+  it('지원자의 희망 조건이 회사의 저장된 값을 덮지 않는다', () => {
+    const terms = termsFromNegotiation(
+      [row('company', 'wageBaseAmount', '2900000'), row('candidate', 'wageBaseAmount', '4000000')],
+      { wageBaseAmount: 2900000 }
+    )
+    expect(terms.wageBaseAmount).toBe(2900000)
+  })
+
+  it('회사가 말한 값은 계약서 저장값을 덮는다', () => {
+    const terms = termsFromNegotiation([row('company', 'wageBaseAmount', '3100000')], {
+      wageBaseAmount: 2900000,
+    })
+    expect(terms.wageBaseAmount).toBe(3100000)
+  })
+
+  it('지원자가 다르게 말한 항목은 따로 모아 보여 준다', () => {
+    const rows = [row('company', 'wageBaseAmount', '2900000'), row('candidate', 'wageBaseAmount', '4000000', '4,000,000원')]
+    const terms = termsFromNegotiation(rows, {})
+    const asked = candidateRequests(rows, terms)
+    expect(asked).toHaveLength(1)
+    expect(asked[0].requested).toBe('4,000,000원')
+    expect(asked[0].current).toBe('2900000')
+  })
+
+  it('같은 값을 말했으면 이견이 아니다', () => {
+    const rows = [row('company', 'workDays', '주 5일'), row('candidate', 'workDays', '주 5일')]
+    expect(candidateRequests(rows, termsFromNegotiation(rows, {}))).toHaveLength(0)
+  })
+})
+
+// 공고와 어긋난 것도 위법이다(채용절차법 제4조 제3항). 스스로 계산해 놓고
+// 판정에서 빼면, 경고와 '써도 됩니다'가 한 화면에 나란히 뜬다.
+describe('공고 위반이 판정에 들어간다', () => {
+  const full = {
+    employerName: '회사', employeeName: '지원자', contractStartDate: '2026-09-01',
+    workLocation: '서울', jobDescription: '사무', workHoursStart: '09:00',
+    workHoursEnd: '18:00', workDays: '주 5일', restDays: '토, 일',
+    wageType: 'monthly', wageBaseAmount: 2500000, wagePayDate: '매월 10일',
+    breakTime: '12:00~13:00',
+  }
+
+  it('공고보다 불리한 조건이면 아직 계약서를 쓸 때가 아니다', () => {
+    const posting = { wage_type: 'monthly', wage_min: 3000000, wage_max: 3200000 }
+    const r = checkNegotiatedTerms(full, posting)
+    const highs = r.postingComparison.issues.filter((i) => i.severity === 'high')
+    expect(highs.length).toBeGreaterThan(0)
+    expect(r.ready).toBe(false)
+    expect(r.counts.high).toBeGreaterThanOrEqual(highs.length)
   })
 })
