@@ -10,6 +10,7 @@ import {
   diffAgreedVsCurrent,
   normalizeForCompare,
   MINIMUM_HOURLY_WAGE_2026,
+  parseBreakMinutes,
 } from '../functions/_lib/contractCheck.js'
 
 describe('parseTimeToMinutes', () => {
@@ -80,6 +81,9 @@ describe('checkLegalCompliance', () => {
   const lawful = {
     workHoursStart: '09:00',
     workHoursEnd: '18:00',
+    // 9시간 근무에는 제54조상 1시간 휴게가 필요하다. 적법한 계약이라면
+    // 이 값도 함께 있어야 한다 — 없으면 그것부터 문제다.
+    breakTime: '12:00~13:00',
     workDays: '주 5일 (월~금)',
     wageBaseAmount: 2800000,
   }
@@ -374,5 +378,73 @@ describe('parseDaysPerWeek — "요일"을 붙여 쓴 표기', () => {
     })
     expect(issues.some((i) => i.title.includes('최저임금'))).toBe(false)
     expect(issues.some((i) => i.title.includes('52시간'))).toBe(false)
+  })
+})
+
+// 계약서 인쇄본의 소정근로시간 줄은 괄호 안이 상수로 박힌 빈칸이었다.
+// 입력란도 저장할 칸도 없어 채울 방법 자체가 없었다.
+//
+// 휴게시간은 적어도 되는 항목이 아니다 — 제54조가 길이를 정하고, 제17조
+// 제1항 제5호·시행령 제8조 제2호(제93조 제1호)가 명시를 요구한다.
+describe('휴게시간 (근로기준법 제54조)', () => {
+  const base = {
+    employerName: 'A', employeeName: 'B', contractStartDate: '2026-09-01',
+    workLocation: '서울', jobDescription: '사무',
+    workHoursStart: '09:00', workHoursEnd: '18:00', workDays: '주 5일',
+    restDays: '토, 일', wageType: 'monthly', wageBaseAmount: 3000000,
+    wagePayMethod: '계좌이체', wagePayDate: '매월 10일', annualLeave: '법에 따름',
+    employeeCount: 10,
+  }
+  const find = (terms, title) => checkLegalCompliance(terms).find((i) => i.title === title)
+
+  it('구간으로 적은 휴게시간을 분으로 읽는다', () => {
+    expect(parseBreakMinutes('12:00~13:00')).toBe(60)
+    expect(parseBreakMinutes('12시 ~ 12시 30분')).toBe(30)
+  })
+
+  it('길이로 적어도 읽는다 — 사람이 실제로 쓰는 방식이 둘 다다', () => {
+    expect(parseBreakMinutes('1시간')).toBe(60)
+    expect(parseBreakMinutes('30분')).toBe(30)
+    expect(parseBreakMinutes('1시간 30분')).toBe(90)
+  })
+
+  // "12:00~13:00" 을 '12시간 00분'으로 읽으면 720분이 되어, 부족한 휴게가
+  // 넉넉한 것으로 통과한다.
+  it('구간을 길이로 오해하지 않는다', () => {
+    expect(parseBreakMinutes('12:00~13:00')).not.toBe(720)
+  })
+
+  it('읽을 수 없으면 모르는 것으로 둔다', () => {
+    expect(parseBreakMinutes('')).toBeNull()
+    expect(parseBreakMinutes(null)).toBeNull()
+    expect(parseBreakMinutes('점심시간 있음')).toBeNull()
+  })
+
+  it('9시간 근무에 휴게가 없으면 알린다', () => {
+    const issue = find(base, '휴게시간 미기재')
+    expect(issue).toBeTruthy()
+    expect(issue.detail).toContain('60분')
+  })
+
+  it('9시간 근무에 30분만 주면 위반이다', () => {
+    const issue = find({ ...base, breakTime: '12:00~12:30' }, '휴게시간 부족')
+    expect(issue?.severity).toBe('high')
+  })
+
+  it('법정 시간을 채우면 아무 말도 하지 않는다', () => {
+    const issues = checkLegalCompliance({ ...base, breakTime: '12:00~13:00' })
+    expect(issues.some((i) => i.title.includes('휴게시간'))).toBe(false)
+  })
+
+  // 4시간 이하 근무에는 휴게 의무가 없다. 없는 위반을 만들면 진짜 경고까지
+  // 함께 무시된다.
+  it('짧은 근무에는 휴게를 요구하지 않는다', () => {
+    const short = { ...base, workHoursStart: '09:00', workHoursEnd: '13:00' }
+    expect(checkLegalCompliance(short).some((i) => i.title.includes('휴게시간'))).toBe(false)
+  })
+
+  it('근무 시각을 모르면 판단하지 않는다', () => {
+    const unknown = { ...base, workHoursStart: '', workHoursEnd: '' }
+    expect(checkLegalCompliance(unknown).some((i) => i.title.includes('휴게시간'))).toBe(false)
   })
 })

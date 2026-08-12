@@ -160,6 +160,8 @@ export const DEMO_ROOM_SIGNED = {
     contractEndDate: null,
     workHoursStart: '09:00',
     workHoursEnd: '18:00',
+    // 9시간 근무 → 제54조상 1시간 이상.
+    breakTime: '12:00~13:00',
     workDays: '주 5일 (월~금)',
     restDays: '토요일, 일요일 (주휴일: 일요일)',
     wageBaseAmount: 2900000,
@@ -223,6 +225,7 @@ export const DEMO_ROOM_PENDING = {
     contractEndDate: '2028-12-31',
     workHoursStart: '09:00',
     workHoursEnd: '20:00',
+    breakTime: '12:00~13:00',
     workDays: '주 6일 (월~토)',
     restDays: '일요일',
     wageBaseAmount: 1900000,
@@ -262,6 +265,8 @@ export const DEMO_ROOM_PREVIOUS = {
     contractEndDate: '2026-08-31',
     workHoursStart: '09:00',
     workHoursEnd: '18:00',
+    // 9시간 근무 → 제54조상 1시간 이상.
+    breakTime: '12:00~13:00',
     workDays: '주 5일 (월~금)',
     restDays: '토요일, 일요일 (주휴일: 일요일)',
     wageBaseAmount: 2600000,

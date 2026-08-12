@@ -45,6 +45,7 @@ const CAMEL_TO_COLUMN = {
   jobDescription: 'job_description',
   workHoursStart: 'work_hours_start',
   workHoursEnd: 'work_hours_end',
+  breakTime: 'break_time',
   workDays: 'work_days',
   restDays: 'rest_days',
   wageBaseAmount: 'wage_base_amount',

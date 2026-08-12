@@ -11,6 +11,12 @@ export const EDITABLE_FIELDS = {
   contractEndDate: 'contract_end_date',
   workHoursStart: 'work_hours_start',
   workHoursEnd: 'work_hours_end',
+  // 휴게시간. 인쇄본에는 자리가 있었는데 저장할 칸이 없어 언제나 빈칸으로
+  // 나갔다. 근로기준법 제54조가 정하고 제17조가 명시를 요구하는 값이다.
+  //
+  // TERM_ORDER 에는 넣지 않는다 — 넣으면 이미 서명된 계약서의 지문이 소급해
+  // 바뀐다. employeeCount 와 같은 이유다.
+  breakTime: 'break_time',
   workDays: 'work_days',
   restDays: 'rest_days',
   wageBaseAmount: 'wage_base_amount',

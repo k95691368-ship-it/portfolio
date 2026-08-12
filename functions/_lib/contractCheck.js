@@ -28,6 +28,7 @@ export const FIELD_LABELS = {
   workHoursEnd: '근무 종료 시각',
   workDays: '근무일',
   restDays: '휴일',
+  breakTime: '휴게시간',
   wageBaseAmount: '기본급',
   wagePayMethod: '임금 지급방법',
   wagePayDate: '임금 지급일',
@@ -128,6 +129,35 @@ export function breakMinutesFor(spanMinutes) {
   return 0
 }
 
+// 계약서에 적힌 휴게시간이 실제로 몇 분인가. 읽을 수 없으면 null.
+//
+// "12:00~13:00" 같은 구간과 "1시간", "60분" 같은 길이를 모두 받는다. 사람이
+// 실제로 적는 방식이 둘 다이고, 한쪽만 읽으면 적어 넣은 값이 없는 것으로
+// 취급되어 있지도 않은 위반이 뜬다.
+export function parseBreakMinutes(value) {
+  const text = String(value ?? '').trim()
+  if (!text) return null
+
+  // 구간 표기가 먼저다. "12:00~13:00" 은 '12시간 00분'이 아니다.
+  const range = text.match(/(\d{1,2}\s*[:시]\s*\d{0,2})\s*(?:~|-|–|부터|to)\s*(\d{1,2}\s*[:시]\s*\d{0,2})/)
+  if (range) {
+    const start = parseTimeToMinutes(range[1])
+    const end = parseTimeToMinutes(range[2])
+    if (start === null || end === null) return null
+    let span = end - start
+    if (span < 0) span += 24 * 60
+    return span > 0 && span <= 12 * 60 ? span : null
+  }
+
+  const hours = text.match(/(\d+(?:\.\d+)?)\s*시간/)
+  const minutes = text.match(/(\d+)\s*분/)
+  if (hours || minutes) {
+    const total = (hours ? Number(hours[1]) * 60 : 0) + (minutes ? Number(minutes[1]) : 0)
+    return total > 0 && total <= 12 * 60 ? Math.round(total) : null
+  }
+  return null
+}
+
 // 근무 시각·근무일에서 주간 실근로시간을 계산. 정보 부족 시 null.
 // 계약 조건이 아직 없는 방에서도 호출되므로 빈 값을 받아도 깨지지 않게 한다.
 export function computeWeeklyHours(terms) {
@@ -183,6 +213,39 @@ export function checkLegalCompliance(terms) {
   // high 로 띄우면, 위반이 아닌 계약의 서명을 서버가 거부한다.
   const scope = workplaceScope(terms)
   const sizeNote = scope.known ? '' : ` ${UNKNOWN_SIZE_CAVEAT}`
+
+  // 근로기준법 제54조 — 4시간 근로에 30분 이상, 8시간 근로에 1시간 이상의
+  // 휴게를 근로시간 도중에 주어야 한다. 상시 근로자 수와 무관하게 적용된다.
+  //
+  // 주 근로시간 계산은 이 최소 휴게를 이미 뺀 값으로 돌고 있었다. 즉 "법정
+  // 휴게를 준다"고 전제하면서, 정작 계약서에 적힌 휴게시간이 그만큼인지는
+  // 아무도 보지 않았다. 전제와 문서가 어긋나 있어도 통과한다.
+  const startMin = parseTimeToMinutes(terms?.workHoursStart)
+  const endMin = parseTimeToMinutes(terms?.workHoursEnd)
+  if (startMin !== null && endMin !== null && endMin !== startMin) {
+    let span = endMin - startMin
+    if (span < 0) span += 24 * 60
+    const required = breakMinutesFor(span)
+    if (required > 0) {
+      const given = parseBreakMinutes(terms?.breakTime)
+      if (given === null) {
+        issues.push({
+          severity: 'medium',
+          title: '휴게시간 미기재',
+          detail: `1일 근무시간이 ${Math.round((span / 60) * 10) / 10}시간이면 근로기준법 제54조에 따라 최소 ${required}분의 휴게를 근로시간 도중에 주어야 합니다. 계약서에 휴게시간이 적혀 있지 않으면 그 사실을 확인할 수 없고, 휴게시간은 제17조 제1항 제5호·시행령 제8조 제2호(제93조 제1호)의 명시사항입니다.`,
+          field: 'breakTime',
+        })
+      } else if (given < required) {
+        issues.push({
+          severity: 'high',
+          title: '휴게시간 부족',
+          detail: `1일 근무시간 ${Math.round((span / 60) * 10) / 10}시간에는 최소 ${required}분의 휴게가 필요한데(근로기준법 제54조), 계약서에는 ${given}분으로 적혀 있습니다. 위반 시 2년 이하 징역 또는 2천만원 이하 벌금(제110조)입니다.`,
+          field: 'breakTime',
+          suggestedValue: null,
+        })
+      }
+    }
+  }
 
   if (!scope.small && weeklyHours !== null && weeklyHours > MAX_WEEKLY_HOURS) {
     issues.push({

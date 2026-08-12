@@ -12,6 +12,8 @@ export const TERM_FIELDS = [
   { key: 'jobDescription', label: '업무의 내용' },
   { key: 'workHoursStart', label: '근무 시작 시각', placeholder: '예: 09:00' },
   { key: 'workHoursEnd', label: '근무 종료 시각', placeholder: '예: 18:00' },
+  // 근로기준법 제54조 — 4시간에 30분, 8시간에 1시간 이상. 제17조 명시사항이다.
+  { key: 'breakTime', label: '휴게시간', placeholder: '예: 12:00~13:00' },
   { key: 'workDays', label: '근무일', placeholder: '예: 주 5일 (월~금)' },
   { key: 'restDays', label: '휴일', placeholder: '예: 토, 일' },
   { key: 'wageBaseAmount', label: '기본급(원)', type: 'number' },

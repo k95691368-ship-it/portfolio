@@ -1694,8 +1694,12 @@ export default function ContractPage() {
             <li>
               <span className="clause-name">소정근로시간</span>
               <span className="clause-value">
+                {/* 괄호 안이 상수로 박힌 빈칸이었다. 입력란도 저장할 칸도 없어
+                    채울 방법 자체가 없었고, 서명·보관·교부되는 문서에 언제나
+                    빈칸 하나가 남았다. 휴게시간은 제54조가 정하고 제17조가
+                    명시를 요구하는 값이다. */}
                 {form.workHoursStart || '__시 __분'}부터 {form.workHoursEnd || '__시 __분'}까지
-                {' '}(휴게시간 : __시 __분 ~ __시 __분)
+                {' '}(휴게시간 : {form.breakTime || '__시 __분 ~ __시 __분'})
               </span>
             </li>
             <li>

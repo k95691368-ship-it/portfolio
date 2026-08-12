@@ -20,6 +20,7 @@ export const EMPTY_FORM = {
   jobDescription: '',
   workHoursStart: '',
   workHoursEnd: '',
+  breakTime: '',
   workDays: '',
   restDays: '',
   wageBaseAmount: '',

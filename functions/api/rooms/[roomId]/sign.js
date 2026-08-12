@@ -110,6 +110,16 @@ export async function onRequestPost({ env, data, params, request }) {
   // 동의했는가"를 서명 기록만으로 특정할 수 있게 한다.
   const documentSha256 = await contractFingerprint(terms)
 
+  // 이미 이 역할의 서명이 있으면 아래 INSERT 가 덮어쓴다. 덮어쓰기 전에
+  // 읽어 두어야 앞선 서명을 무효 기록으로 옮길 수 있다.
+  const previousSignature = await env.DB.prepare(
+    `SELECT signer_role, signer_user_id, signed_at, signer_ip, signer_user_agent,
+            signer_country, document_sha256
+       FROM signatures WHERE room_id = ? AND signer_role = ?`
+  )
+    .bind(params.roomId, participant.role_in_room)
+    .first()
+
   // 화면이 보여 준 내용과 지금 저장된 내용이 다르면, 사용자는 자기가 본 것과
   // 다른 문서에 서명하게 된다. 화면이 보낸 지문과 다르면 새로 고치게 한다.
   if (typeof body.documentSha256 === 'string' && body.documentSha256 !== documentSha256) {
@@ -193,6 +203,42 @@ export async function onRequestPost({ env, data, params, request }) {
       '서명하는 사이에 계약 조건이 바뀌었습니다. 화면을 새로 고쳐 바뀐 내용을 확인한 뒤 다시 서명해주세요.',
       409
     )
+  }
+
+  // 다시 서명하면 앞선 서명이 흔적 없이 사라지고 있었다.
+  //
+  // 위 문장은 (room_id, signer_role) 충돌 시 덮어쓴다. 상대가 아직 서명하지
+  // 않은 동안에는 다시 그릴 수 있어야 하니 덮어쓰는 것 자체는 맞다. 그런데
+  // 덮어쓰면 먼저 한 서명의 시각·접속 환경이 지워진다.
+  //
+  // 이 앱은 "언제 무엇에 동의했는가"를 다투기 위해 만든 것이고, 그래서 조건이
+  // 바뀌어 무효가 된 서명도 지우지 않고 signature_revocations 에 옮겨 둔다
+  // (0032 마이그레이션). 본인이 다시 서명한 경우만 예외로 두면 그 원칙에
+  // 구멍이 난다. 같은 자리에 같은 방식으로 남긴다.
+  if (previousSignature) {
+    await env.DB.prepare(
+      `INSERT INTO signature_revocations
+         (room_id, signer_role, signer_user_id, signed_at, signer_ip,
+          signer_user_agent, signer_country, revoked_by_user_id, reason, document_sha256)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+      .bind(
+        params.roomId,
+        previousSignature.signer_role,
+        previousSignature.signer_user_id,
+        previousSignature.signed_at,
+        previousSignature.signer_ip,
+        previousSignature.signer_user_agent,
+        previousSignature.signer_country,
+        data.user.id,
+        '본인이 다시 서명함',
+        previousSignature.document_sha256
+      )
+      .run()
+      .catch((err) => {
+        // 기록이 실패해도 서명까지 되돌리지는 않는다. 다만 조용히 넘기지 않는다.
+        console.error(`signature replace log failed (${params.roomId}):`, err)
+      })
   }
 
   const { results: sigs } = await env.DB.prepare('SELECT signer_role FROM signatures WHERE room_id = ?')
