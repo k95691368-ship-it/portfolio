@@ -408,13 +408,16 @@ textarea:focus-visible {
 }
 
 /* 헤더 내비게이션용 버튼형 링크 (주 버튼과 경쟁하지 않도록 보조 스타일) */
+/* 헤더에 나란히 놓이는 버튼들은 같은 면을 쓴다.
+   알림 종은 --surface, 이동 버튼은 --btn-face 를 써서 한 줄 안에서 회색이
+   두 가지로 보였다. 바탕과 같은 흰 면에 테두리로만 경계를 준다. */
 .btn-nav {
   display: inline-flex;
   align-items: center;
   padding: 9px 19px;
   border: 1px solid var(--btn-border);
   border-radius: var(--radius-full);
-  background: var(--btn-face);
+  background: var(--bg);
   color: var(--accent);
   font-size: 15px;
   font-weight: 600;
@@ -424,7 +427,7 @@ textarea:focus-visible {
     border-color 0.15s ease;
 }
 .btn-nav:hover {
-  background: var(--btn-face-hover);
+  background: var(--btn-face);
   text-decoration: none;
 }
 .btn-block {

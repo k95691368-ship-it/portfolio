@@ -50,7 +50,9 @@
   padding: 7px 15px;
   border: 1px solid var(--btn-border);
   border-radius: var(--radius-full);
-  background: var(--btn-face);
+  /* 이동 버튼들과 같은 면. 돌아가기·대시보드·채용 관리·알림이 화면마다
+     다른 회색이면, 같은 성격의 버튼이라는 것이 읽히지 않는다. */
+  background: var(--bg);
   color: var(--text-h);
   font-size: 14px;
   font-weight: 600;
@@ -60,7 +62,7 @@
     border-color 0.15s ease;
 }
 .back-link:hover {
-  background: var(--btn-face-hover);
+  background: var(--btn-face);
   text-decoration: none;
 }
 
@@ -1582,13 +1584,18 @@
 .notif-root {
   position: relative;
 }
+/* 옆의 이동 버튼(.btn-nav)과 같은 면·같은 테두리. 한 줄에 나란히 서는
+   것들이 서로 다른 회색이면 그 자체가 어수선하다. */
 .notif-bell {
   position: relative;
-  background: var(--surface);
+  background: var(--bg);
   border-radius: var(--radius-full);
   padding: 8px 12px;
   font-size: 16px;
   line-height: 1;
+}
+.notif-bell:hover:not(:disabled) {
+  background: var(--btn-face);
 }
 .notif-badge {
   position: absolute;
