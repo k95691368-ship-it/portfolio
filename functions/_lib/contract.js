@@ -142,6 +142,9 @@ export function rowToCamelTerms(row) {
     contractEndDate: row.contract_end_date ?? null,
     workHoursStart: row.work_hours_start ?? null,
     workHoursEnd: row.work_hours_end ?? null,
+    // 저장은 되는데 읽어 오지 않으면 화면에도 계약서에도 나타나지 않는다.
+    // 값은 DB 에 있고 판정만 꺼지는, 이 저장소에서 반복된 모양이다.
+    breakTime: row.break_time ?? null,
     workDays: row.work_days ?? null,
     restDays: row.rest_days ?? null,
     wageBaseAmount: row.wage_base_amount ?? null,
