@@ -65,6 +65,16 @@ export async function onRequest(context) {
   // 미룰 때마다 쿠키도 새로 내려 두 시계를 함께 맞춘다.
   const token = parseCookie(request, 'session')
   if (!token) return response
+
+  // 응답이 이미 세션 쿠키를 내보내고 있으면 손대지 않는다.
+  //
+  // 비밀번호 변경·로그인·로그아웃은 새 토큰(또는 삭제)을 내려보낸다. 거기에
+  // 옛 토큰으로 만든 쿠키를 덧붙이면 브라우저에 같은 이름의 쿠키가 두 번
+  // 도착한다. 뒤에 온 것이 이기므로 방금 만든 세션이 이미 지운 세션으로
+  // 덮이고, 비밀번호를 바꾼 사람이 그 자리에서 로그아웃된다.
+  const existing = response.headers.get('Set-Cookie')
+  if (existing && existing.includes('session=')) return response
+
   const withCookie = new Response(response.body, response)
   withCookie.headers.append('Set-Cookie', sessionCookieHeader(token))
   return withCookie

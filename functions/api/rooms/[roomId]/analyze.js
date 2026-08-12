@@ -3,12 +3,30 @@ import { analyzeConversation } from '../../../_lib/claude.js'
 import { rowToCamelTerms } from '../../../_lib/contract.js'
 import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { mergeValue, mergeSocialInsurance } from '../../../_lib/merge.js'
+import { revokeSignaturesOnChange } from '../../../_lib/signatureLock.js'
 import { notifyUser } from '../../../_lib/notify.js'
 import { buildTranscript } from '../../../_lib/transcript.js'
 import { blockedWhenFrozen } from '../../../_lib/roomLifecycle.js'
 
 const COOLDOWN_SECONDS = 45
 const TRANSCRIPT_LIMIT = 300 // AI에 넘길 최근 대화 수 상한
+
+// 이 항목들이 바뀌면 이미 받은 서명은 무효가 된다. 근로자가 무엇에 동의했는지를
+// 이루는 값들이다.
+const CHANGE_WATCH = [
+  ['근무장소', 'work_location'],
+  ['업무내용', 'job_description'],
+  ['근로개시일', 'contract_start_date'],
+  ['계약종료일', 'contract_end_date'],
+  ['근무 시작 시각', 'work_hours_start'],
+  ['근무 종료 시각', 'work_hours_end'],
+  ['근무일', 'work_days'],
+  ['휴일', 'rest_days'],
+  ['기본급', 'wage_base_amount'],
+  ['임금 지급방법', 'wage_pay_method'],
+  ['임금 지급일', 'wage_pay_date'],
+  ['연차', 'annual_leave'],
+]
 
 export async function onRequestPost({ env, data, params }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
@@ -219,6 +237,29 @@ export async function onRequestPost({ env, data, params }) {
       '조건을 정리하는 사이에 계약 조건이 바뀌었습니다. 바뀐 내용을 덮어쓰지 않도록 저장하지 않았습니다. 화면을 새로 고친 뒤 다시 시도해주세요.',
       409
     )
+  }
+
+  // 조건이 실제로 바뀌었으면 이미 받아 둔 서명은 더 이상 그 내용에 대한
+  // 동의가 아니다.
+  //
+  // 조건을 바꾸는 경로는 넷인데(계약서 수정, 수정 요청 수락, AI 초안, 이 곳)
+  // 여기만 무효화를 부르지 않고 있었다. 한쪽만 서명한 방의 상태는
+  // 'contract_pending' 이라 위의 status==='signed' 검사에 걸리지 않는다.
+  // 그래서 지원자가 서명한 뒤 회사가 'AI로 조건 정리하기'를 한 번 누르면,
+  // 임금이 덮인 계약에 지원자의 옛 서명이 그대로 붙은 채 체결까지 갔다 —
+  // 0032 마이그레이션이 막으려고 만들어진 바로 그 상황이다.
+  const changedFields = CHANGE_WATCH.filter(
+    ([, column]) => (existing?.[column] ?? null) !== (merged[column] ?? null)
+  ).map(([label]) => label)
+
+  if (changedFields.length > 0) {
+    await revokeSignaturesOnChange(env, params.roomId, {
+      actorUserId: data.user.id,
+      reason: `AI 조건 정리로 계약 조건 변경 (${changedFields.join(', ')})`,
+    }).catch((err) => {
+      // 무효화가 실패했는데 조건은 이미 바뀌었다. 조용히 넘기지 않는다.
+      console.error(`analyze revoke failed (${params.roomId}):`, err)
+    })
   }
 
   if (hireConfirmed && !wasConfirmed) {

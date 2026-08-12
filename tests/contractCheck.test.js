@@ -43,10 +43,14 @@ describe('parseDaysPerWeek', () => {
 })
 
 describe('breakMinutesFor (근로기준법 제54조)', () => {
-  it('gives 1 hour over 8 hours, 30 min over 4 hours', () => {
+  // 조문은 "근로시간이 4시간인 경우에는 30분 이상, 8시간인 경우에는 1시간
+  // 이상"이다. 초과일 때만으로 읽으면 정각 4시간 무휴게 계약이 통과한다.
+  it('4시간·8시간 정각을 포함한다', () => {
     expect(breakMinutesFor(9 * 60)).toBe(60)
+    expect(breakMinutesFor(8 * 60)).toBe(60)
     expect(breakMinutesFor(6 * 60)).toBe(30)
-    expect(breakMinutesFor(4 * 60)).toBe(0)
+    expect(breakMinutesFor(4 * 60)).toBe(30)
+    expect(breakMinutesFor(4 * 60 - 1)).toBe(0)
   })
 })
 
@@ -57,10 +61,11 @@ describe('computeWeeklyHours', () => {
     ).toBe(40)
   })
   it('handles overnight shifts', () => {
-    // 22:00~06:00 = 8시간 span → 30분 휴게 → 7.5h × 5 = 37.5
+    // 22:00~06:00 = 8시간 span. 근로시간 8시간이면 제54조상 1시간 휴게이므로
+    // 7h × 5 = 35. 예전에는 '8시간 초과'로만 읽어 30분을 뺐다.
     expect(
       computeWeeklyHours({ workHoursStart: '22:00', workHoursEnd: '06:00', workDays: '주 5일' })
-    ).toBe(37.5)
+    ).toBe(35)
   })
   it('returns null when information is incomplete', () => {
     expect(computeWeeklyHours({ workHoursStart: '09:00', workHoursEnd: null, workDays: '주 5일' })).toBeNull()
@@ -400,6 +405,34 @@ describe('휴게시간 (근로기준법 제54조)', () => {
   it('구간으로 적은 휴게시간을 분으로 읽는다', () => {
     expect(parseBreakMinutes('12:00~13:00')).toBe(60)
     expect(parseBreakMinutes('12시 ~ 12시 30분')).toBe(30)
+    expect(parseBreakMinutes('12:00-13:00')).toBe(60)
+  })
+
+  // 휴게를 나눠 주는 것은 제54조가 막지 않는다. 첫 구간만 읽으면 합계 60분이
+  // 30분으로 보여, 법을 지킨 계약에 형사처벌 문구가 붙은 경고가 뜬다.
+  it('나눠 적은 휴게를 모두 더한다', () => {
+    expect(parseBreakMinutes('12:00~12:30, 18:00~18:30')).toBe(60)
+    expect(parseBreakMinutes('점심 12:00~13:00, 저녁 18:00~19:00')).toBe(120)
+  })
+
+  it('분까지 적은 구간도 절반으로 읽지 않는다', () => {
+    expect(parseBreakMinutes('12시30분~13시30분')).toBe(60)
+    expect(parseBreakMinutes('12시 30분부터 13시 30분까지')).toBe(60)
+  })
+
+  // 오전·오후가 캡처 밖으로 잘리면 12시→1시가 거꾸로 읽혀 통째로 버려진다.
+  it('오전·오후를 붙여 적어도 읽는다', () => {
+    expect(parseBreakMinutes('오후 12시~오후 1시')).toBe(60)
+    expect(parseBreakMinutes('12시~1시')).toBe(60)
+  })
+
+  // 법 문구를 그대로 옮겨 적는 것이 가장 흔한 입력이다. 아무 숫자나 잡으면
+  // '휴게 480분'이 되어 제54조 검사가 통째로 꺼진다.
+  it('근무를 가리키는 말이 섞이면 읽지 않는다 — 480분으로 잘못 아느니 모르는 편이 낫다', () => {
+    expect(parseBreakMinutes('8시간 근무 시 1시간')).toBeNull()
+    expect(parseBreakMinutes('1일 8시간 기준 1시간')).toBeNull()
+    expect(parseBreakMinutes('4시간마다 30분')).toBeNull()
+    expect(parseBreakMinutes('09:00~18:00')).toBeNull()
   })
 
   it('길이로 적어도 읽는다 — 사람이 실제로 쓰는 방식이 둘 다다', () => {
@@ -438,13 +471,57 @@ describe('휴게시간 (근로기준법 제54조)', () => {
 
   // 4시간 이하 근무에는 휴게 의무가 없다. 없는 위반을 만들면 진짜 경고까지
   // 함께 무시된다.
-  it('짧은 근무에는 휴게를 요구하지 않는다', () => {
-    const short = { ...base, workHoursStart: '09:00', workHoursEnd: '13:00' }
+  it('4시간에 못 미치는 근무에는 휴게를 요구하지 않는다', () => {
+    // 09:00~13:00 은 정각 4시간이라 제54조 대상이다. 그보다 짧아야 면제된다.
+    const short = { ...base, workHoursStart: '09:00', workHoursEnd: '12:00' }
     expect(checkLegalCompliance(short).some((i) => i.title.includes('휴게시간'))).toBe(false)
   })
 
   it('근무 시각을 모르면 판단하지 않는다', () => {
     const unknown = { ...base, workHoursStart: '', workHoursEnd: '' }
     expect(checkLegalCompliance(unknown).some((i) => i.title.includes('휴게시간'))).toBe(false)
+  })
+})
+
+
+// 계약서에 적힌 휴게시간을 계산에 쓰지 않고 언제나 '법정 최소'만 빼고 있었다.
+// 휴게를 법보다 길게 주기로 한 계약이 실제보다 오래 일하는 것으로 읽힌다.
+describe('휴게시간이 근로시간 계산에 반영된다', () => {
+  const span12 = { workHoursStart: '09:00', workHoursEnd: '21:00', workDays: '주 5일' }
+
+  it('적힌 휴게를 뺀다', () => {
+    expect(computeWeeklyHours({ ...span12, breakTime: '15:00~17:00' })).toBe(50)
+  })
+
+  it('적히지 않았으면 법정 최소를 뺀다 — 모른다고 0으로 두면 과대 계산된다', () => {
+    expect(computeWeeklyHours(span12)).toBe(55)
+  })
+
+  // 12시간 구간에 휴게 2시간이면 실제 주 50시간이다. 55시간으로 읽으면
+  // 적법한 계약에 '주 52시간 초과'가 high 로 뜨고 서명이 막힌다.
+  it('휴게가 넉넉한 계약에 없는 위반을 만들지 않는다', () => {
+    const lawful = {
+      ...span12,
+      breakTime: '15:00~17:00',
+      employeeCount: 10,
+      wageType: 'monthly',
+      wageBaseAmount: 3000000,
+    }
+    expect(checkLegalCompliance(lawful).some((i) => i.title === '주 52시간 초과')).toBe(false)
+  })
+})
+
+// 제54조는 "근로시간이 4시간인 경우"라고 쓴다. 초과일 때만 요구하면 정각
+// 4시간 무휴게 계약이 경고 한 건 없이 통과한다.
+describe('제54조의 경계는 포함이다', () => {
+  it('정각 4시간·8시간도 휴게 대상이다', () => {
+    expect(breakMinutesFor(4 * 60)).toBe(30)
+    expect(breakMinutesFor(8 * 60)).toBe(60)
+    expect(breakMinutesFor(4 * 60 - 1)).toBe(0)
+  })
+
+  it('09:00~13:00 무휴게 계약을 잡는다', () => {
+    const four = { workHoursStart: '09:00', workHoursEnd: '13:00', workDays: '주 5일' }
+    expect(checkLegalCompliance(four).some((i) => i.title === '휴게시간 미기재')).toBe(true)
   })
 })

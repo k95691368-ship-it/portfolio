@@ -481,13 +481,18 @@ export default function RoomPage() {
         <InterviewSummary
           roomId={roomId}
           record={view.interviewSummary}
-          canWrite={!!(user?.isAdmin || user?.isRecruiter)}
+          // 보관된 방에서는 서버가 409 로 막는다. 지난 요약을 읽는 것은 그대로
+          // 두되, 새로 쓰는 버튼은 내린다.
+          canWrite={!room.archivedAt && !!(user?.isAdmin || user?.isRecruiter)}
           messageCount={messages.length}
           onChanged={loadView}
         />
       )}
 
-      {room.myRole === 'company' && (
+      {/* 보관된 방에서 최종합격·초대 이메일 폼이 그대로 살아 있었다. 다 쓰고
+          보내야 409 가 돌아온다. 최종합격 통보는 채용내정을 성립시키는 행위인데
+          정작 그 방에서는 답할 수도 없다. */}
+      {room.myRole === 'company' && !room.archivedAt && (
         <>
           <RoomInviteEmailForm
             roomId={roomId}

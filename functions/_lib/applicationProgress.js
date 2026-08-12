@@ -96,11 +96,15 @@ export function describeApplicationProgress(row) {
     linkLabel: row?.roomId
       ? closed
         ? '종료된 전형 보기'
-        : row?.roomStatus === 'signed'
-          ? '체결된 계약서 보기'
-          : row?.roomStatus === 'contract_pending'
-            ? '계약서 확인·서명하기'
-            : '면접방 들어가기'
+        : // 보관된 방은 서명이 잠겨 있다. '확인·서명하기'라고 부르면 하라는
+          // 대로 눌러 보고 아무 일도 일어나지 않는다.
+          row?.roomArchived
+          ? '보관된 면접방 보기'
+          : row?.roomStatus === 'signed'
+            ? '체결된 계약서 보기'
+            : row?.roomStatus === 'contract_pending'
+              ? '계약서 확인·서명하기'
+              : '면접방 들어가기'
       : null,
   }
 }

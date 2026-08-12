@@ -178,14 +178,24 @@ export function buildArticlesForTranslation(terms) {
 
   // 임금 조항은 구성항목이 있으면 항목별로 다시 쓴다.
   const wage = wageDescription(terms)
-  const articles = base.map((a) =>
-    a.heading.includes('임금') && wage
-      ? {
-          ...a,
-          body: [wage, terms?.wagePayMethod, terms?.wagePayDate].filter(Boolean).join(' · '),
-        }
-      : a
-  )
+  const articles = base.map((a) => {
+    if (a.heading.includes('임금') && wage) {
+      return {
+        ...a,
+        body: [wage, terms?.wagePayMethod, terms?.wagePayDate].filter(Boolean).join(' · '),
+      }
+    }
+    // 휴게시간은 한국어 인쇄본에만 있었다.
+    //
+    // 정본 본문(buildArticlesFromTerms)은 손대지 않는다 — 거기에 넣으면 이미
+    // 서명된 계약서의 지문이 소급해 바뀐다. 그런데 번역본은 그 본문을 그대로
+    // 옮기므로, 한국어 계약서에는 있고 외국어 계약서에만 없는 조항이 생겼다.
+    // 한국어를 읽지 못하는 근로자가 자기 휴게시간을 확인할 수 없다.
+    if (a.heading.includes('소정근로시간') && terms?.breakTime) {
+      return { ...a, body: `${a.body} (휴게시간 ${terms.breakTime})` }
+    }
+    return a
+  })
 
   const extra = [
     ['그 밖의 사항', describeCustomTerms(terms?.customTerms)],

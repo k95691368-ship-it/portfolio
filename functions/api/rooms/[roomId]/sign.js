@@ -241,12 +241,37 @@ export async function onRequestPost({ env, data, params, request }) {
       })
   }
 
-  const { results: sigs } = await env.DB.prepare('SELECT signer_role FROM signatures WHERE room_id = ?')
+  // 역할만 세고 있었다.
+  //
+  // 서명이 둘 있다는 것과 그 둘이 같은 문서에 붙어 있다는 것은 다른 말이다.
+  // 지원자가 서명한 뒤 조건이 바뀌고(무효화가 어떤 이유로든 돌지 않아) 옛
+  // 서명이 남은 채 회사가 서명하면, 서로 다른 내용에 붙은 서명 두 개로 계약이
+  // '체결 완료'가 되고 교부까지 기록된다. 감사추적증명서는 나중에 그 사실을
+  // "서명자마다 서로 다른 문서에 서명했다"고 설명할 줄 아는데, 정작 체결되는
+  // 순간에는 아무도 보지 않았다.
+  const { results: sigs } = await env.DB.prepare(
+    'SELECT signer_role, document_sha256 FROM signatures WHERE room_id = ?'
+  )
     .bind(params.roomId)
     .all()
 
   const roles = new Set(sigs.map((s) => s.signer_role))
-  const bothSigned = roles.has('company') && roles.has('candidate')
+  const haveBoth = roles.has('company') && roles.has('candidate')
+  // 지문이 남지 않은 옛 서명은 대조할 수 없다. 없는 것을 다르다고 하지 않는다.
+  const sameDocument = sigs
+    .filter((s) => s.document_sha256)
+    .every((s) => s.document_sha256 === documentSha256)
+  const bothSigned = haveBoth && sameDocument
+
+  if (haveBoth && !sameDocument) {
+    // 여기서 조용히 넘어가면 '서명이 하나 더 필요한 상태'로 남아 화면이
+    // 이유를 말하지 못한다. 무엇이 어긋났는지 알리고 다시 받게 한다.
+    console.error(`signature document mismatch (${params.roomId})`)
+    return jsonError(
+      '상대방이 서명한 계약 내용과 지금 내용이 다릅니다. 서명은 저장되었지만 체결로 넘기지 않았습니다. 계약 조건을 확인하고 상대방에게 다시 서명을 요청해주세요.',
+      409
+    )
+  }
 
   // 참여자를 한 번만 읽는다.
   //

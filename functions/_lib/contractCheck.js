@@ -122,10 +122,15 @@ export function parseDaysPerWeek(value) {
   return null
 }
 
-// 근로기준법 제54조 휴게: 4시간 초과 30분, 8시간 초과 1시간.
-export function breakMinutesFor(spanMinutes) {
-  if (spanMinutes > 8 * 60) return 60
-  if (spanMinutes > 4 * 60) return 30
+// 근로기준법 제54조 제1항 — "근로시간이 4시간인 경우에는 30분 이상, 8시간인
+// 경우에는 1시간 이상의 휴게시간을 근로시간 도중에 주어야 한다."
+//
+// 조문의 기준은 '근로시간'이지 근무 구간이 아니고, 4시간·8시간 '인 경우'를
+// 포함한다. 초과일 때만 요구하도록 되어 있어서, 09:00~13:00 정각 4시간
+// 무휴게 계약이 경고 한 건 없이 통과했다.
+export function breakMinutesFor(workMinutes) {
+  if (workMinutes >= 8 * 60) return 60
+  if (workMinutes >= 4 * 60) return 30
   return 0
 }
 
@@ -138,22 +143,49 @@ export function parseBreakMinutes(value) {
   const text = String(value ?? '').trim()
   if (!text) return null
 
-  // 구간 표기가 먼저다. "12:00~13:00" 은 '12시간 00분'이 아니다.
-  const range = text.match(/(\d{1,2}\s*[:시]\s*\d{0,2})\s*(?:~|-|–|부터|to)\s*(\d{1,2}\s*[:시]\s*\d{0,2})/)
-  if (range) {
-    const start = parseTimeToMinutes(range[1])
-    const end = parseTimeToMinutes(range[2])
-    if (start === null || end === null) return null
-    let span = end - start
-    if (span < 0) span += 24 * 60
-    return span > 0 && span <= 12 * 60 ? span : null
+  // 구간을 모두 더한다.
+  //
+  // 처음에는 첫 구간 하나만 읽었다. 그래서 "12:00~12:30, 18:00~18:30"(합계
+  // 60분)이 30분으로 읽혀, 법을 지킨 계약에 형사처벌 문구가 붙은 경고가 떴다.
+  // 휴게를 나눠 주는 것은 제54조가 막지 않는다 — 흔한 근무 형태다.
+  //
+  // "12시 30분 ~ 13시 30분"처럼 분까지 적는 표기도 받아야 한다. 이것을 놓치면
+  // 아래 길이 폴백으로 떨어져 '30분'만 잡히고 역시 절반으로 읽힌다.
+  const TIME = String.raw`(?:오전|오후|아침|점심|저녁|밤|새벽)?\s*\d{1,2}\s*(?::|시)\s*(?:\d{1,2}\s*분?)?`
+  const SEP = String.raw`\s*(?:~|-|–|—|부터|to)\s*`
+  const RANGE = new RegExp(`(${TIME})${SEP}(${TIME})`, 'g')
+
+  let total = 0
+  let found = 0
+  for (const m of text.matchAll(RANGE)) {
+    // 오전·오후는 캡처 안에 들어 있어야 한다. 밖으로 잘리면 parseTimeToMinutes
+    // 가 그것을 못 보고 "오후 12시~오후 1시"가 거꾸로 읽힌다.
+    const from = parseTimeToMinutes(m[1])
+    const to = parseTimeToMinutes(m[2])
+    if (from === null || to === null) continue
+    let span = to - from
+    // 12시→1시처럼 오후 표기가 없는 짧은 구간은 자정을 넘긴 것이 아니다.
+    if (span < 0) span += 12 * 60
+    if (span <= 0 || span > 8 * 60) continue
+    total += span
+    found += 1
   }
+  if (found > 0) return total
+
+  // 구간이 하나도 없을 때만 길이 표기를 본다.
+  //
+  // 그런데 "8시간 근무 시 1시간"처럼 법 문구를 그대로 옮겨 적는 것이 가장
+  // 흔한 입력이다. 아무 숫자나 잡으면 그것이 '휴게 480분'이 되어 제54조 검사가
+  // 통째로 꺼진다. 그래서 근무를 가리키는 말이 섞여 있으면 읽지 않는다 —
+  // 모르는 것으로 두는 편이 480분이라고 잘못 아는 것보다 낫다.
+  if (/근무|근로|소정|기준|이상|초과|마다|당|경우/.test(text)) return null
 
   const hours = text.match(/(\d+(?:\.\d+)?)\s*시간/)
   const minutes = text.match(/(\d+)\s*분/)
   if (hours || minutes) {
-    const total = (hours ? Number(hours[1]) * 60 : 0) + (minutes ? Number(minutes[1]) : 0)
-    return total > 0 && total <= 12 * 60 ? Math.round(total) : null
+    const length = (hours ? Number(hours[1]) * 60 : 0) + (minutes ? Number(minutes[1]) : 0)
+    // 휴게가 4시간을 넘는다고 적었다면 그건 휴게 길이가 아니다.
+    return length > 0 && length <= 4 * 60 ? Math.round(length) : null
   }
   return null
 }
@@ -177,7 +209,20 @@ export function computeWeeklyHours(terms) {
   if (span < 0) span += 24 * 60 // 야간 교대 등 자정을 넘기는 경우
   if (span <= 0 || span > 24 * 60) return null
 
-  const daily = (span - breakMinutesFor(span)) / 60
+  // 계약서에 적힌 휴게시간을 뺀다.
+  //
+  // 지금까지는 언제나 '법정 최소'만 뺐다. 그래서 휴게를 법보다 길게 주기로 한
+  // 계약이 실제보다 오래 일하는 것으로 계산됐다. 09:00~21:00 주 5일에 휴게
+  // 2시간이면 실제 주 50시간인데 55시간으로 읽혀, 적법한 계약에 '주 52시간
+  // 초과'가 high 로 뜨고 서명이 막혔다. 최저임금 계산도 같은 값을 나눗수로
+  // 쓰므로 필요 없는 인상액이 '최소 적법 금액'으로 제시됐다.
+  //
+  // 적히지 않았으면 예전처럼 법정 최소를 뺀다 — 법정 휴게는 주게 되어 있으므로
+  // 모른다고 0으로 두면 근로시간이 과대 계산된다. 그 경우 제54조 검사가 따로
+  // '휴게시간 미기재'로 알린다.
+  const stated = parseBreakMinutes(terms?.breakTime)
+  const rest = stated ?? breakMinutesFor(span)
+  const daily = (span - rest) / 60
   if (daily <= 0) return null
   return Math.round(daily * days * 100) / 100
 }
@@ -225,21 +270,29 @@ export function checkLegalCompliance(terms) {
   if (startMin !== null && endMin !== null && endMin !== startMin) {
     let span = endMin - startMin
     if (span < 0) span += 24 * 60
-    const required = breakMinutesFor(span)
+    const given = parseBreakMinutes(terms?.breakTime)
+    // 제54조의 기준은 근로시간이다. 근무 구간에서 실제 휴게를 뺀 값이 곧
+    // 근로시간이다.
+    //
+    // 적힌 것이 없을 때 '법정 최소를 준 것'으로 빼면 안 된다. 그러면 09:00~13:00
+    // 정각 4시간 계약에서 근로시간이 3.5시간이 되어 요구 자체가 사라지고,
+    // 휴게를 한 번도 적지 않은 계약이 경고 없이 통과한다. 요구량을 정할 때는
+    // 휴게가 없는 것으로 본다 — 그것이 그 문서가 말하고 있는 내용이다.
+    const workMinutes = span - (given ?? 0)
+    const required = breakMinutesFor(workMinutes)
     if (required > 0) {
-      const given = parseBreakMinutes(terms?.breakTime)
       if (given === null) {
         issues.push({
           severity: 'medium',
           title: '휴게시간 미기재',
-          detail: `1일 근무시간이 ${Math.round((span / 60) * 10) / 10}시간이면 근로기준법 제54조에 따라 최소 ${required}분의 휴게를 근로시간 도중에 주어야 합니다. 계약서에 휴게시간이 적혀 있지 않으면 그 사실을 확인할 수 없고, 휴게시간은 제17조 제1항 제5호·시행령 제8조 제2호(제93조 제1호)의 명시사항입니다.`,
+          detail: `1일 근로시간이 ${Math.round((workMinutes / 60) * 10) / 10}시간이면 근로기준법 제54조에 따라 최소 ${required}분의 휴게를 근로시간 도중에 주어야 합니다. 계약서에 휴게시간이 적혀 있지 않으면 그 사실을 확인할 수 없고, 휴게시간은 제17조 제1항 제5호·시행령 제8조 제2호(제93조 제1호)의 명시사항입니다.`,
           field: 'breakTime',
         })
       } else if (given < required) {
         issues.push({
           severity: 'high',
           title: '휴게시간 부족',
-          detail: `1일 근무시간 ${Math.round((span / 60) * 10) / 10}시간에는 최소 ${required}분의 휴게가 필요한데(근로기준법 제54조), 계약서에는 ${given}분으로 적혀 있습니다. 위반 시 2년 이하 징역 또는 2천만원 이하 벌금(제110조)입니다.`,
+          detail: `1일 근로시간 ${Math.round((workMinutes / 60) * 10) / 10}시간에는 최소 ${required}분의 휴게가 필요한데(근로기준법 제54조), 계약서에는 ${given}분으로 적혀 있습니다. 위반 시 2년 이하 징역 또는 2천만원 이하 벌금(제110조)입니다.`,
           field: 'breakTime',
           suggestedValue: null,
         })

@@ -1435,8 +1435,16 @@ export default function ContractPage() {
             왜 다시 서명해야 하는지 알 수 있게 사유와 시점을 함께 보여 준다. */}
         {revokedSignatures.length > 0 && (
           <div className="revoked-signatures" role="status">
+            {/* 무효 기록이 하나라도 있으면 언제나 "다시 서명해주세요"를 띄웠다.
+                체결이 끝난 계약에도, 본인이 다시 그린 것뿐이라 내용이 바뀐 적
+                없는 경우에도 그랬다. 사실이 아닌 문장을 한 번 보여 주면 진짜
+                경고도 같은 무게로 읽히지 않는다. */}
             <p className="period-alert">
-              계약 내용이 변경되어 이전 서명이 무효화되었습니다. 내용을 다시 확인하고 서명해주세요.
+              {isSigned
+                ? '이 계약이 체결되기까지 무효화된 서명이 있습니다. 아래는 그 기록입니다.'
+                : revokedSignatures.every((r) => r.reason === '본인이 다시 서명함')
+                  ? '아래 서명은 본인이 다시 서명하면서 대체되었습니다. 계약 내용은 바뀌지 않았습니다.'
+                  : '계약 내용이 변경되어 이전 서명이 무효화되었습니다. 내용을 다시 확인하고 서명해주세요.'}
             </p>
             <ul>
               {revokedSignatures.map((r, i) => (
