@@ -1,7 +1,7 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { blockedWhenFrozen } from '../../../_lib/roomLifecycle.js'
 import { genId } from '../../../_lib/db.js'
-import { getRoomParticipant } from '../../../_lib/rooms.js'
+import { getRoomParticipation } from '../../../_lib/rooms.js'
 import { notifyUser } from '../../../_lib/notify.js'
 import { rowToCamelTerms } from '../../../_lib/contract.js'
 import { checkContractDocument } from '../../../_lib/documentCheck.js'
@@ -16,13 +16,11 @@ const MAX_DATA_URL_LENGTH = 2_000_000
 export async function onRequestPost({ env, data, params, request }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
 
-  const participant = await getRoomParticipant(env, params.roomId, data.user.id)
-  if (!participant) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
-
-  const room = await env.DB.prepare('SELECT status, archived_at FROM interview_rooms WHERE id = ?')
-    .bind(params.roomId)
-    .first()
+  // 참여 여부와 방 상태는 같은 방에 대한 두 값이다. 한 번에 읽는다.
+  const room = await getRoomParticipation(env, params.roomId, data.user.id)
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
+  if (!room.role_in_room) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
+  const participant = { role_in_room: room.role_in_room }
   if (room.status === 'signed') return jsonError('이미 서명이 완료된 계약서입니다.', 409)
   const signBlock = blockedWhenFrozen(room, 'sign')
   if (signBlock) return jsonError(signBlock, 409)
@@ -43,9 +41,20 @@ export async function onRequestPost({ env, data, params, request }) {
     return jsonError('잘못된 요청입니다.', 400)
   }
 
-  const contract = await env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?')
-    .bind(params.roomId)
-    .first()
+  // 계약 조건과 '내 직전 서명'은 서로 다른 표이고 서로를 기다릴 이유가 없다.
+  // 서명은 사람이 버튼을 누르고 기다리는 자리다.
+  const [contract, previousSignature] = await Promise.all([
+    env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?').bind(params.roomId).first(),
+    // 이미 이 역할의 서명이 있으면 아래 INSERT 가 덮어쓴다. 덮어쓰기 전에
+    // 읽어 두어야 앞선 서명을 무효 기록으로 옮길 수 있다.
+    env.DB.prepare(
+      `SELECT signer_role, signer_user_id, signed_at, signer_ip, signer_user_agent,
+              signer_country, document_sha256
+         FROM signatures WHERE room_id = ? AND signer_role = ?`
+    )
+      .bind(params.roomId, room.role_in_room)
+      .first(),
+  ])
   if (!contract?.hire_confirmed) return jsonError('아직 채용이 확정되지 않아 서명할 수 없습니다.', 400)
 
   // 서명하는 문서는 계약 조건이 아니라 계약서 본문이다. 조건을 고친 뒤 본문을
@@ -110,15 +119,6 @@ export async function onRequestPost({ env, data, params, request }) {
   // 동의했는가"를 서명 기록만으로 특정할 수 있게 한다.
   const documentSha256 = await contractFingerprint(terms)
 
-  // 이미 이 역할의 서명이 있으면 아래 INSERT 가 덮어쓴다. 덮어쓰기 전에
-  // 읽어 두어야 앞선 서명을 무효 기록으로 옮길 수 있다.
-  const previousSignature = await env.DB.prepare(
-    `SELECT signer_role, signer_user_id, signed_at, signer_ip, signer_user_agent,
-            signer_country, document_sha256
-       FROM signatures WHERE room_id = ? AND signer_role = ?`
-  )
-    .bind(params.roomId, participant.role_in_room)
-    .first()
 
   // 화면이 보여 준 내용과 지금 저장된 내용이 다르면, 사용자는 자기가 본 것과
   // 다른 문서에 서명하게 된다. 화면이 보낸 지문과 다르면 새로 고치게 한다.
@@ -248,6 +248,19 @@ export async function onRequestPost({ env, data, params, request }) {
   const roles = new Set(sigs.map((s) => s.signer_role))
   const bothSigned = roles.has('company') && roles.has('candidate')
 
+  // 참여자를 한 번만 읽는다.
+  //
+  // 교부 기록에 쓸 근로자와 알림을 보낼 상대를 각각 따로 조회하고 있었다.
+  // 같은 요청에서 같은 표를 두 번 읽는 셈이라, 체결이 끝나는 그 순간에만
+  // 왕복이 하나 더 붙었다.
+  const { results: members } = await env.DB.prepare(
+    `SELECT u.id, u.email, rp.role_in_room
+       FROM room_participants rp JOIN users u ON u.id = rp.user_id
+      WHERE rp.room_id = ?`
+  )
+    .bind(params.roomId)
+    .all()
+
   if (bothSigned) {
     // 상태를 무조건 덮어쓰면, 그 사이에 성립한 전형 종료를 되돌릴 수 없는
     // 형태로 지운다(close_reason·closed_at 은 남고 상태만 signed 가 된다).
@@ -262,12 +275,7 @@ export async function onRequestPost({ env, data, params, request }) {
     // 교부 의무(근로기준법 제17조 제2항)를 회사의 수동 클릭에 맡기지 않는다.
     // 체결이 끝나는 순간, 근로자가 계약서를 열람할 수 있게 된 사실을 교부로
     // 기록한다. 회사가 버튼을 누르지 않아도 교부물과 그 기록이 존재한다.
-    const candidate = await env.DB.prepare(
-      `SELECT u.id, u.email FROM room_participants rp JOIN users u ON u.id = rp.user_id
-        WHERE rp.room_id = ? AND rp.role_in_room = 'candidate' LIMIT 1`
-    )
-      .bind(params.roomId)
-      .first()
+    const candidate = (members || []).find((m) => m.role_in_room === 'candidate')
     if (candidate) {
       await recordDelivery(env, params.roomId, {
         channel: 'in_app',
@@ -277,21 +285,20 @@ export async function onRequestPost({ env, data, params, request }) {
     }
   }
 
-  // 상대방에게 알림 (모두 서명 완료 시에는 양측 모두)
-  const { results: others } = await env.DB.prepare(
-    'SELECT user_id FROM room_participants WHERE room_id = ? AND user_id != ?'
+  // 상대방에게 알림 (모두 서명 완료 시에는 양측 모두).
+  // 서로 다른 사람에게 가는 알림이라 순서대로 기다릴 이유가 없다.
+  const others = (members || []).filter((m) => m.id !== data.user.id)
+  await Promise.all(
+    others.map((other) =>
+      notifyUser(env, other.id, {
+        type: bothSigned ? 'contract_signed' : 'signature',
+        message: bothSigned
+          ? '전자근로계약서 서명이 완료되었습니다. 계약서를 확인해보세요.'
+          : `${data.user.display_name}님이 계약서에 서명했습니다. 내 서명을 진행해주세요.`,
+        link: `/rooms/${params.roomId}/contract`,
+      })
+    )
   )
-    .bind(params.roomId, data.user.id)
-    .all()
-  for (const other of others) {
-    await notifyUser(env, other.user_id, {
-      type: bothSigned ? 'contract_signed' : 'signature',
-      message: bothSigned
-        ? '전자근로계약서 서명이 완료되었습니다. 계약서를 확인해보세요.'
-        : `${data.user.display_name}님이 계약서에 서명했습니다. 내 서명을 진행해주세요.`,
-      link: `/rooms/${params.roomId}/contract`,
-    })
-  }
 
   return jsonResponse({ ok: true, signerRole: participant.role_in_room, bothSigned })
 }
