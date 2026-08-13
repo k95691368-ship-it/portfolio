@@ -24,12 +24,6 @@ export default function LandingPage() {
           </button>
         </div>
 
-        {/* 서류합격 안내를 받은 지원자는 로그인하지 않는다. 코드로 들어온다. */}
-        <p className="landing-login">
-          서류 합격 안내를 받으셨나요? <Link to="/jobs">면접방 입장 코드로 들어가기 →</Link>
-          <span className="landing-login-hint">로그인 없이 코드만으로 들어옵니다.</span>
-        </p>
-
         {/* 증명서를 제시받은 제3자(근로감독관·법률 상담·은행)는 회사도 지원자도
             아니다. 그 사람에게도 들어올 문이 있어야 한다. */}
         <p className="landing-verify">

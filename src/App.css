@@ -3631,22 +3631,6 @@
   color: var(--text);
 }
 
-/* 계정을 받은 지원자가 들어오는 문.
-   첫 화면의 두 버튼은 '회사=로그인', '지원자=공고 보기'로 나뉘어 있어서,
-   서류합격해서 임시 비밀번호를 받은 사람은 로그인 길을 찾지 못했다. */
-.landing-login {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  margin: 18px 0 0;
-  font-size: 15px;
-}
-.landing-login-hint {
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
 /* 코드만으로 들어오는 면접방 입장.
    지원자가 실제로 머무는 화면(채용 공고)에 둔다. */
 .room-enter {
