@@ -165,13 +165,23 @@ describe('데모 데이터의 안전 조건', () => {
 describe('데모 안내와 실제 데모가 같은 것을 가리키는가', () => {
   const ROOM_TITLES = [DEMO_ROOM_PREVIOUS, DEMO_ROOM_SIGNED, DEMO_ROOM_PENDING].map((r) => r.title)
 
-  it('안내가 세 단계로 되어 있다', () => {
-    expect(DEMO_WALKTHROUGH).toHaveLength(3)
+  // 단계 수를 못으로 박으면 안내를 늘릴 때마다 테스트가 막는다. 지켜야 하는
+  // 것은 개수가 아니라 "1부터 빠짐없이 이어지는가"다.
+  it('안내가 1부터 빠짐없이 이어진다', () => {
+    expect(DEMO_WALKTHROUGH.length).toBeGreaterThanOrEqual(3)
+    expect(DEMO_WALKTHROUGH.map((s) => s.step)).toEqual(
+      DEMO_WALKTHROUGH.map((_, i) => i + 1)
+    )
     for (const s of DEMO_WALKTHROUGH) {
-      expect(typeof s.title).toBe('string')
-      expect(s.title.length).toBeGreaterThan(0)
-      expect(typeof s.body).toBe('string')
+      expect(s.title.trim()).not.toBe('')
+      expect(s.body.trim()).not.toBe('')
     }
+  })
+
+  // 이 서비스가 존재하는 이유부터 보여 줘야 한다. 안내가 법령 점검부터
+  // 시작하면 보는 사람은 이것을 '계약서 검사기'로 이해하고 나간다.
+  it('채용내정 취소 방지를 가장 먼저 안내한다', () => {
+    expect(DEMO_WALKTHROUGH[0].title).toContain('채용내정')
   })
 
   it('안내가 인용하는 방 이름이 실제로 심는 방 이름이다', () => {
