@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
-import { useAuth } from '../context/AuthContext.jsx'
 import { useChatPolling } from '../hooks/useChatPolling.js'
 import { formatKstTime } from '../lib/formatTime.js'
 import ChatMessageList from '../components/ChatMessageList.jsx'
@@ -17,6 +16,7 @@ import NegotiationLog from '../components/NegotiationLog.jsx'
 import PreContractReview from '../components/PreContractReview.jsx'
 import OfferWithdrawalModal from '../components/OfferWithdrawalModal.jsx'
 import { roomStatusInfo } from '../lib/roomStatus.js'
+import { formatInviteCode } from '../lib/inviteCode.js'
 
 // 전형을 왜 끝냈는지. 지원자에게는 사유마다 전혀 다른 의미다.
 // (서버의 _lib/roomLifecycle.js와 같은 목록)
@@ -35,7 +35,6 @@ const CLOSABLE_STATUSES = ['open', 'active', 'contract_pending']
 export default function RoomPage() {
   const { roomId } = useParams()
   const toast = useToast()
-  const { user } = useAuth()
   const [view, setView] = useState(null)
   const [error, setError] = useState('')
   const [analyzing, setAnalyzing] = useState(false)
@@ -237,7 +236,9 @@ export default function RoomPage() {
         </Link>
         <h1>{room.title}</h1>
         <p>참가자: {room.participants.map((p) => p.displayName).join(', ')}</p>
-        {room.myRole === 'company' && <p>초대코드: {room.inviteCode}</p>}
+        {room.myRole === 'company' && room.inviteCode && (
+          <p>면접방 입장 코드: {formatInviteCode(room.inviteCode)}</p>
+        )}
         <span className={`badge ${roomStatusInfo(room.status).badgeClass}`}>
           {roomStatusInfo(room.status).label}
         </span>
@@ -430,7 +431,11 @@ export default function RoomPage() {
             자동으로 이어집니다 — 계속 이 표시가 남으면 화면을 새로 고쳐주세요.
           </p>
         )}
-        <ChatMessageList messages={messages} participants={room.participants} />
+        <ChatMessageList
+          messages={messages}
+          participants={room.participants}
+          viewerId={room.viewer?.id}
+        />
         {room.archivedAt ? (
           <p className="notice">보관된 면접방입니다. 대화는 잠겨 있습니다.</p>
         ) : room.myRole === 'admin' ? (
@@ -483,7 +488,7 @@ export default function RoomPage() {
           record={view.interviewSummary}
           // 보관된 방에서는 서버가 409 로 막는다. 지난 요약을 읽는 것은 그대로
           // 두되, 새로 쓰는 버튼은 내린다.
-          canWrite={!room.archivedAt && !!(user?.isAdmin || user?.isRecruiter)}
+          canWrite={!room.archivedAt && room.myRole === 'company'}
           messageCount={messages.length}
           onChanged={loadView}
         />

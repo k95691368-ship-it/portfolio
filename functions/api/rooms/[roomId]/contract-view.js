@@ -38,8 +38,8 @@ import { findLanguage, SUPPORTED_LANGUAGES } from '../../../_lib/languages.js'
 // 요청마다 세션 인증까지 반복돼 한 페이지에 D1 조회가 스무 번 넘게 발생했다.
 // 여기서 한 번만 읽고 나눠서 돌려준다.
 export async function onRequestGet({ env, data, params, request }) {
-  if (!data.user && !data.roomAccess) return jsonError('로그인이 필요합니다.', 401)
-  const access = await getRoomAccess(env, params.roomId, data.user, data)
+  if (!data.user) return jsonError('로그인이 필요합니다.', 401)
+  const access = await getRoomAccess(env, params.roomId, data.user)
   if (!access) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
 
   const roomId = params.roomId
@@ -327,11 +327,19 @@ export async function onRequestGet({ env, data, params, request }) {
     room: {
       id: room.id,
       title: room.title,
-      inviteCode: room.invite_code,
+      // 코드는 회사에게만. 로그인 수단이 된 뒤로 이것은 비밀번호와 같다.
+      inviteCode: access.role_in_room === 'company' ? room.invite_code : null,
       status: room.status,
       // 보관되면 계약 조건 수정·서명·계약서 파일 저장이 잠긴다.
       archivedAt: room.archived_at ?? null,
       myRole: access.role_in_room,
+      // 이 방에서 나는 누구인가. 방마다 갈리므로 방이 알려 준다.
+      viewer: {
+        id: data.user.id,
+        displayName: data.user.display_name,
+        role: access.role_in_room,
+        authMethod: data.user.session_auth_method ?? 'password',
+      },
       participants: participantRows.map((p) => ({
         id: p.id,
         displayName: p.display_name,

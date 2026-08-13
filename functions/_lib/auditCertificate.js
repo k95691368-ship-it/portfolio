@@ -37,6 +37,20 @@ export function parseSerial(text) {
 const VERIFICATION_LABELS = {
   account_password: '계정 비밀번호로 인증된 세션',
   temp_password: '임시 비밀번호로 인증된 세션',
+  // 코드는 회사 담당자도 볼 수 있는 값이다. 그 세션에서 나온 서명을 비밀번호
+  // 확인이라고 부르면 증명서가 거짓이 된다. 무엇으로 들어왔는지 그대로 적어,
+  // 다투는 자리에서 두 가지가 구분되게 한다.
+  invite_code: '면접방 입장 코드로 인증된 세션 (계정 비밀번호 확인 없음)',
+}
+
+// 이 세션은 무엇으로 본인을 확인했는가.
+//
+// 세션에 적힌 로그인 수단이 먼저다. 코드로 들어왔는데 임시 비밀번호를 아직
+// 바꾸지 않은 계정이라고 해서 '임시 비밀번호로 확인'이라고 적으면, 실제로는
+// 아무도 확인하지 않은 것을 확인했다고 적는 셈이다.
+export function signerVerificationMethod(user) {
+  if (user?.session_auth_method === 'invite_code') return 'invite_code'
+  return user?.must_change_password ? 'temp_password' : 'account_password'
 }
 
 export function describeVerificationMethod(signature) {

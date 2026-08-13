@@ -40,11 +40,15 @@ export async function onRequestPost({ request, env }) {
     throw err
   }
 
-  const { token } = await createSession(env.DB, id)
+  // 회원가입에는 '로그인 유지' 선택 자체가 없어 언제나 30일이었다. 로그인
+  // 화면에는 있는 선택이다 — 같은 계정을 만드는 자리에서 한쪽만 강제로 유지되면
+  // PC방에서 가입한 사람이 창을 닫아도 세션이 남는다. 로그인 쪽과 맞춘다.
+  const persistent = body.remember !== false
+  const { token } = await createSession(env.DB, id, { persistent })
 
   return jsonResponse(
     { id, email, role, displayName, isAdmin: false, isRecruiter: false, isDeveloper: false, mustChangePassword: false },
     201,
-    { 'Set-Cookie': sessionCookieHeader(token) }
+    { 'Set-Cookie': sessionCookieHeader(token, { persistent }) }
   )
 }

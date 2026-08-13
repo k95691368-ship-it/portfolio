@@ -19,9 +19,7 @@ function fromBase64(str) {
   return Uint8Array.from(atob(str), (c) => c.charCodeAt(0))
 }
 
-// 방 출입증(roomAccess.js)도 같은 토큰 생성·해시를 쓴다. 두 벌로 두면
-// 한쪽만 고쳐지는 날이 온다.
-export function toBase64Url(bytes) {
+function toBase64Url(bytes) {
   return toBase64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
@@ -41,7 +39,7 @@ async function pbkdf2(password, saltBytes) {
   return new Uint8Array(derivedBits)
 }
 
-export async function sha256Hex(text) {
+async function sha256Hex(text) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
 }
@@ -82,6 +80,11 @@ export async function createSession(db, userId, options = {}) {
   // 명시하지 않으면 유지한다 — 예전 동작 그대로.
   const persistent = options.persistent !== false
   const ttl = persistent ? SESSION_TTL_SECONDS : SHORT_SESSION_TTL_SECONDS
+  // 어떻게 로그인했는가. 서명 기록의 본인확인 수단이 이 값에서 나온다.
+  // 명시하지 않으면 비밀번호로 본다(예전 세션과 같은 취급).
+  const authMethod = options.authMethod ?? 'password'
+  // 코드로 만든 세션은 그 방에서만 쓴다. 비밀번호 로그인은 null 이다.
+  const scopedRoomId = options.scopedRoomId ?? null
   const token = toBase64Url(crypto.getRandomValues(new Uint8Array(32)))
   const tokenHash = await sha256Hex(token)
   const expiresAt = new Date(Date.now() + ttl * 1000).toISOString()
@@ -95,8 +98,11 @@ export async function createSession(db, userId, options = {}) {
     .run()
     .catch(() => {})
   await db
-    .prepare('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)')
-    .bind(tokenHash, userId, expiresAt)
+    .prepare(
+      `INSERT INTO sessions (token_hash, user_id, expires_at, auth_method, scoped_room_id)
+       VALUES (?, ?, ?, ?, ?)`
+    )
+    .bind(tokenHash, userId, expiresAt, authMethod, scopedRoomId)
     .run()
   return { token, expiresAt }
 }
@@ -127,6 +133,58 @@ export function clearSessionCookieHeader() {
   return 'session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0'
 }
 
+// 면접방 코드로 만든 세션은 계정 세션과 다른 이름으로 담는다.
+//
+// 같은 이름이면 한쪽이 다른 쪽을 덮는다. 그러면 담당자가 자기 컴퓨터에서
+// 코드를 한 번 넣어 본 순간 회사 로그인이 사라지고, 반대로 회사 로그인이
+// 살아 있으면 코드로 들어온 사람이 회사 발화로 기록된다 — 둘 다 실제로
+// 일어났던 일이다.
+//
+// 두 개를 나란히 둔다. 어느 쪽으로 방에 들어가느냐로 신원이 갈리고,
+// 그 판정은 미들웨어 한 곳에서만 한다.
+export const ROOM_COOKIE = 'room_session'
+
+export function roomSessionCookieHeader(token) {
+  return `${ROOM_COOKIE}=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL_SECONDS}`
+}
+
+export function clearRoomSessionCookieHeader() {
+  return `${ROOM_COOKIE}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`
+}
+
+// 이 요청에 딸린 코드 세션이 이 방의 것인가.
+//
+// 발급된 방이 아니면 아무것도 돌려주지 않는다. 코드 하나로 다른 방이나
+// 대시보드까지 열리면 코드가 계정 비밀번호와 같아진다.
+export async function getRoomSessionUser(db, request, roomId) {
+  const token = parseCookie(request, ROOM_COOKIE)
+  if (!token || !roomId) return null
+  const tokenHash = await sha256Hex(token)
+  const row = await db
+    .prepare(
+      `SELECT users.*, sessions.created_at AS session_started_at,
+              sessions.expires_at AS session_expires_at,
+              sessions.auth_method AS session_auth_method,
+              sessions.scoped_room_id AS session_scoped_room_id FROM sessions
+       JOIN users ON users.id = sessions.user_id
+       WHERE sessions.token_hash = ? AND sessions.scoped_room_id = ?
+         AND datetime(sessions.expires_at) > datetime('now')`
+    )
+    .bind(tokenHash, roomId)
+    .first()
+  if (!row || row.is_suspended) return null
+  return row
+}
+
+// 경로에서 방 id 를 읽는다. /api/rooms/<id>/... 만 해당한다.
+//
+// /api/rooms/enter 는 아직 방이 정해지기 전이므로 걸리지 않아야 한다 —
+// 뒤에 무언가 더 붙은 경로만 방 안의 요청으로 본다.
+export function roomIdFromApiPath(pathname) {
+  const match = pathname.match(/^\/api\/rooms\/([^/]+)\/.+/)
+  return match ? decodeURIComponent(match[1]) : null
+}
+
 export async function getSessionUser(db, request) {
   const token = parseCookie(request, 'session')
   if (!token) return null
@@ -144,7 +202,8 @@ export async function getSessionUser(db, request) {
       // 만료 시각도 함께 읽는다. 이 값이 없으면 "미뤄야 하는가"를 알 수 없어
       // 매 요청마다 UPDATE 를 한 번씩 쏘게 된다 — 실제로 그러고 있었다.
       `SELECT users.*, sessions.created_at AS session_started_at,
-              sessions.expires_at AS session_expires_at FROM sessions
+              sessions.expires_at AS session_expires_at,
+              sessions.auth_method AS session_auth_method FROM sessions
        JOIN users ON users.id = sessions.user_id
        WHERE sessions.token_hash = ? AND datetime(sessions.expires_at) > datetime('now')`
     )

@@ -50,30 +50,10 @@ export async function getRoomParticipation(env, roomId, userId) {
 
 // 열람 권한: 참여자면 그 역할, 참여자가 아니어도 관리자면 'admin'(읽기 전용 열람).
 // 쓰기(메시지 전송, 분석, 서명 등)에는 사용하지 말 것 — 그건 getRoomParticipant로 참여자만 허용.
-//
-// 코드로 들어온 사람도 여기서 통과시킨다. 서류합격 안내 메일로 받은 입장
-// 코드는 그 방 하나를 열라고 회사가 건넨 것이므로, 그 방을 보는 것은 참여와
-// 같은 뜻이다. 다만 역할은 'candidate' 로 두되 계정이 아니라는 사실
-// (viaCode)을 함께 남긴다 — 서명처럼 신원이 필요한 자리에서 구분해야 한다.
-export async function getRoomAccess(env, roomId, user, data = null) {
-  if (user) {
-    const participant = await getRoomParticipant(env, roomId, user.id)
-    if (participant) return participant
-    if (user.is_admin) return { role_in_room: 'admin' }
-    return null
-  }
-  if (data?.roomAccess && data.roomAccess.roomId === roomId) {
-    return { role_in_room: 'candidate', viaCode: true }
-  }
+export async function getRoomAccess(env, roomId, user) {
+  if (!user) return null
+  const participant = await getRoomParticipant(env, roomId, user.id)
+  if (participant) return participant
+  if (user.is_admin) return { role_in_room: 'admin' }
   return null
-}
-
-// 코드로 들어온 사람이 이 방에서 대화할 수 있는가.
-//
-// 대화는 열어 둔다. 면접방은 이야기를 나누라고 만든 자리이고, 코드를 받은
-// 사람은 회사가 부른 사람이다. 서명은 열지 않는다 — 서명 기록은 "누가 무엇에
-// 동의했는가"를 증명하려고 만든 것인데 코드는 그것을 말해 주지 않는다.
-export function codeParticipant(data, roomId) {
-  if (!data?.roomAccess || data.roomAccess.roomId !== roomId) return null
-  return { role_in_room: 'candidate', viaCode: true }
 }

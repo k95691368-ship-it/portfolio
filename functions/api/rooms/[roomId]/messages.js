@@ -5,8 +5,8 @@ import { extractTermsFromMessage, selectNewEntries } from '../../../_lib/termsNe
 import { scanForOfferSignals } from '../../../_lib/jobOffer.js'
 
 export async function onRequestGet({ request, env, data, params }) {
-  if (!data.user && !data.roomAccess) return jsonError('로그인이 필요합니다.', 401)
-  const participant = await getRoomAccess(env, params.roomId, data.user, data)
+  if (!data.user) return jsonError('로그인이 필요합니다.', 401)
+  const participant = await getRoomAccess(env, params.roomId, data.user)
   if (!participant) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
 
   const url = new URL(request.url)
@@ -35,44 +35,22 @@ export async function onRequestGet({ request, env, data, params }) {
 }
 
 export async function onRequestPost({ request, env, data, params }) {
-  if (!data.user && !data.roomAccess) return jsonError('로그인이 필요합니다.', 401)
+  if (!data.user) return jsonError('로그인이 필요합니다.', 401)
 
-  // 코드로 들어온 사람도 대화할 수 있어야 한다.
+  // 보낸 사람은 언제나 data.user 다.
   //
-  // 면접방은 이야기를 나누라고 만든 자리다. 들어와서 읽기만 되고 한마디도 못
-  // 하면 들어온 뜻이 없다. 다만 계정이 없으므로 보낸 사람을 그 방의 지원자로
-  // 적는다 — 방에 지원자는 한 명뿐이고, 코드는 회사가 그 사람에게 건넨 것이다.
-  let room
-  let senderUserId
-  let senderName
-  if (data.user) {
-    // 참여 여부와 방 상태를 한 번에 읽는다. 둘 다 같은 방에 대한 것이고,
-    // 대화는 사람이 기다리는 화면이라 왕복 한 번이 그대로 체감된다.
-    room = await getRoomParticipation(env, params.roomId, data.user.id)
-    if (!room?.role_in_room) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
-    senderUserId = data.user.id
-    senderName = data.user.display_name
-  } else {
-    if (data.roomAccess.roomId !== params.roomId) {
-      return jsonError('이 면접방에 참여하지 않았습니다.', 403)
-    }
-    const [roomRow, candidate] = await Promise.all([
-      env.DB.prepare('SELECT id, title, status, archived_at FROM interview_rooms WHERE id = ?')
-        .bind(params.roomId)
-        .first(),
-      env.DB.prepare(
-        `SELECT u.id, u.display_name FROM room_participants rp JOIN users u ON u.id = rp.user_id
-          WHERE rp.room_id = ? AND rp.role_in_room = 'candidate' LIMIT 1`
-      )
-        .bind(params.roomId)
-        .first(),
-    ])
-    if (!roomRow) return jsonError('면접방을 찾을 수 없습니다.', 404)
-    if (!candidate) return jsonError('이 면접방에 지원자가 등록되어 있지 않습니다.', 409)
-    room = { ...roomRow, role_in_room: 'candidate' }
-    senderUserId = candidate.id
-    senderName = candidate.display_name
-  }
+  // 코드로 들어온 사람도 여기서는 그냥 그 방의 지원자 계정이다 — 미들웨어가
+  // 어느 문으로 들어왔는지 보고 이미 정해 놓았다. 예전에는 이 자리에서
+  // '계정이 없으면 방의 지원자를 찾아 대신 적는' 갈래가 따로 있었는데, 그것이
+  // 회사 계정으로 로그인한 브라우저에서 지원자의 말을 회사 발화로 저장한
+  // 원인이었다. 보내는 사람을 여기서 추측하지 않는다.
+  //
+  // 참여 여부와 방 상태를 한 번에 읽는다. 둘 다 같은 방에 대한 것이고,
+  // 대화는 사람이 기다리는 화면이라 왕복 한 번이 그대로 체감된다.
+  const room = await getRoomParticipation(env, params.roomId, data.user.id)
+  if (!room?.role_in_room) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
+  const senderUserId = data.user.id
+  const senderName = data.user.display_name
   const participant = { role_in_room: room.role_in_room }
 
   // 보관된 방에서는 대화도 멈춘다.

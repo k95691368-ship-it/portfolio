@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
-import { api } from '../api/client.js'
+import { api, markRoomDoor } from '../api/client.js'
 import DocumentManager from '../components/DocumentManager.jsx'
 import NotificationBell from '../components/NotificationBell.jsx'
 import MyApplications from '../components/MyApplications.jsx'
@@ -182,7 +182,11 @@ export default function DashboardPage() {
             const status = roomStatusInfo(room.status)
             return (
               <li key={room.id}>
-                <Link to={`/rooms/${room.id}`} className="room-link">
+                <Link
+                  to={`/rooms/${room.id}`}
+                  className="room-link"
+                  onClick={() => markRoomDoor(room.id, 'account')}
+                >
                   <div className="room-info">
                     <span className="room-title">{room.title}</span>
                     <span className="room-meta">

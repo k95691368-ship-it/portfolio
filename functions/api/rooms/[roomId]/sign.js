@@ -10,6 +10,7 @@ import { checkPeriodCompliance } from '../../../_lib/contractPeriod.js'
 import { checkProbationCompliance } from '../../../_lib/probation.js'
 import { contractFingerprint } from '../../../_lib/contractDocument.js'
 import { recordDelivery } from '../../../_lib/delivery.js'
+import { signerVerificationMethod } from '../../../_lib/auditCertificate.js'
 
 const MAX_DATA_URL_LENGTH = 2_000_000
 
@@ -192,7 +193,16 @@ export async function onRequestPost({ env, data, params, request }) {
       // "내가 서명하지 않았다"는 주장에 답할 수 없다.
       data.user.email ?? null,
       data.user.session_started_at ?? null,
-      data.user.must_change_password ? 'temp_password' : 'account_password',
+      // 무엇으로 본인을 확인했는가.
+      //
+      // 코드로 들어온 세션을 '계정 비밀번호로 확인된 서명'이라고 적으면 안 된다.
+      // 그 코드는 회사 담당자도 볼 수 있는 값이라(발급 화면·지원서 상세·재발송)
+      // 담당자가 근로자 서명을 대신 만들 수 있고, 그것을 비밀번호 확인이라고
+      // 부르면 이 앱이 만들려는 증명서 자체가 거짓이 된다.
+      //
+      // 막지는 않는다 — 코드로 서명까지 되는 것이 정해진 방향이다. 대신 무엇으로
+      // 들어왔는지를 그대로 남겨, 나중에 다투는 자리에서 구분되게 한다.
+      signerVerificationMethod(data.user),
       params.roomId,
       contract.updated_at ?? null
     )

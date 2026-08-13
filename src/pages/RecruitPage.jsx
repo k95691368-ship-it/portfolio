@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatKstDate } from '../lib/formatTime.js'
 import { Link } from 'react-router-dom'
-import { api } from '../api/client.js'
+import { api, markRoomDoor } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import NotificationBell from '../components/NotificationBell.jsx'
@@ -176,7 +176,12 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
                 </p>
                 {passResult.roomId && (
                   <p>
-                    <Link to={`/rooms/${passResult.roomId}`}>생성된 면접방으로 이동 →</Link>
+                    <Link
+                      to={`/rooms/${passResult.roomId}`}
+                      onClick={() => markRoomDoor(passResult.roomId, 'account')}
+                    >
+                      생성된 면접방으로 이동 →
+                    </Link>
                   </p>
                 )}
               </div>
@@ -334,7 +339,12 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
                   못한다). 그래도 진행해야 한다면 면접방에서 채용내정 취소 절차를 밟아야 합니다.
                 </p>
                 {detail.roomId && (
-                  <Link to={`/rooms/${detail.roomId}`}>연결된 면접방으로 이동 →</Link>
+                  <Link
+                    to={`/rooms/${detail.roomId}`}
+                    onClick={() => markRoomDoor(detail.roomId, 'account')}
+                  >
+                    연결된 면접방으로 이동 →
+                  </Link>
                 )}
               </div>
             )}
@@ -387,7 +397,11 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
                   <button type="button" onClick={handleSendCode} disabled={working}>
                     {working ? '보내는 중...' : '1차 서류합격 안내 · 입장 코드 메일 보내기'}
                   </button>
-                  <Link to={`/rooms/${detail.roomId}`} className="btn-nav">
+                  <Link
+                    to={`/rooms/${detail.roomId}`}
+                    className="btn-nav"
+                    onClick={() => markRoomDoor(detail.roomId, 'account')}
+                  >
                     연결된 면접방으로 이동 →
                   </Link>
                 </div>

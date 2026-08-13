@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { useAuth } from '../context/AuthContext.jsx'
 import { formatKstTime } from '../lib/formatTime.js'
 
 // 말풍선 옆에는 시:분만 둔다. 날짜까지 붙이면 줄이 길어져 대화가 밀린다.
@@ -24,8 +23,13 @@ const NEAR_BOTTOM_PX = 40
 // 있는 사람도 알 수 있게 한다.
 const ROLE_LABEL = { company: '회사', candidate: '구직자' }
 
-export default function ChatMessageList({ messages, participants }) {
-  const { user } = useAuth()
+// 내가 누구인지는 방이 알려 준다.
+//
+// 예전에는 전역 로그인 정보에서 가져왔다. 코드로 들어온 지원자는 계정 로그인이
+// 없어 그 값이 비어 있었고 — 그래서 이 화면이 통째로 죽었다 — 회사 계정이 함께
+// 켜져 있는 브라우저에서는 아예 다른 사람의 id 가 들어 있었다. 신원은 방마다
+// 갈리므로 방에서 받은 값을 쓴다.
+export default function ChatMessageList({ messages, participants, viewerId = null }) {
   const boxRef = useRef(null)
   const pinnedRef = useRef(true)
   const [hasNew, setHasNew] = useState(false)
@@ -75,7 +79,7 @@ export default function ChatMessageList({ messages, participants }) {
           return (
             <div
               key={m.id}
-              className={`chat-row chat-row-${side}${m.senderId === user.id ? ' mine' : ''}`}
+              className={`chat-row chat-row-${side}${m.senderId === viewerId ? ' mine' : ''}`}
             >
               <div className="chat-message">
                 <span className="chat-sender">

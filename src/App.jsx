@@ -56,10 +56,12 @@ function App() {
             <Route element={<ProtectedRoute />}>
               <Route path="/dashboard" element={<DashboardPage />} />
             </Route>
-            {/* 면접방과 계약서는 로그인 없이도 열린다.
-                서류합격 안내 메일로 받은 입장 코드로 들어온 지원자에게는
-                계정이 없다. 여기에 로그인 벽을 두면 코드로 들어와도 곧바로
-                로그인 화면으로 튕긴다 — 권한은 서버가 코드로 판정한다. */}
+            {/* 면접방과 계약서에는 계정 로그인 벽을 두지 않는다.
+                코드로 들어온 지원자의 신원은 계정 쿠키가 아니라 방 전용
+                쿠키에 들어 있다. 여기서 계정 로그인을 요구하면 코드로 들어와도
+                곧바로 로그인 화면으로 튕기고, 임시 비밀번호를 바꾸라는 화면으로
+                보내진다 — 지원자는 그 임시 비밀번호를 받은 적이 없으므로
+                막다른 길이다. 누가 무엇을 할 수 있는지는 서버가 판정한다. */}
             <Route path="/rooms/:roomId" element={<RoomPage />} />
             <Route path="/rooms/:roomId/contract" element={<ContractPage />} />
             <Route element={<ProtectedRoute requireRecruiter />}>

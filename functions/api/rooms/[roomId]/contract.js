@@ -13,9 +13,9 @@ import { revokeSignaturesOnChange } from '../../../_lib/signatureLock.js'
 
 export async function onRequestGet({ env, data, params }) {
   // 코드로 들어온 지원자도 자기 계약 조건은 볼 수 있어야 한다.
-  if (!data.user && !data.roomAccess) return jsonError('로그인이 필요합니다.', 401)
+  if (!data.user) return jsonError('로그인이 필요합니다.', 401)
 
-  const participant = await getRoomAccess(env, params.roomId, data.user, data)
+  const participant = await getRoomAccess(env, params.roomId, data.user)
   if (!participant) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
 
   const row = await env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?')

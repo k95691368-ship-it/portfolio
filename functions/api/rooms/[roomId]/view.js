@@ -20,13 +20,13 @@ const MESSAGE_LIMIT = 200
 export async function onRequestGet({ env, data, params }) {
   // 코드로 들어온 사람은 계정이 없다. 로그인을 요구하면 서류합격 안내를 받고
   // 코드로 들어온 지원자가 그대로 막힌다.
-  if (!data.user && !data.roomAccess) return jsonError('로그인이 필요합니다.', 401)
+  if (!data.user) return jsonError('로그인이 필요합니다.', 401)
 
   const roomId = params.roomId
   const room = await env.DB.prepare('SELECT * FROM interview_rooms WHERE id = ?').bind(roomId).first()
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
 
-  const access = await getRoomAccess(env, roomId, data.user, data)
+  const access = await getRoomAccess(env, roomId, data.user)
   if (!access) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
 
   const isCompany = access.role_in_room === 'company'
@@ -130,7 +130,12 @@ export async function onRequestGet({ env, data, params }) {
     room: {
       id: room.id,
       title: room.title,
-      inviteCode: room.invite_code,
+      // 입장 코드는 회사에게만 내려간다.
+      //
+      // 코드가 로그인 수단이 된 뒤로 이것은 비밀번호와 같다. 지금까지는 방을
+      // 여는 누구에게나 함께 보내고 화면에서만 가리고 있었다 — 개발자 도구를
+      // 열 필요도 없이 응답에 그대로 들어 있었다.
+      inviteCode: isCompany ? room.invite_code : null,
       status: room.status,
       closeReason: room.close_reason ?? null,
       // 보관은 status 를 덮지 않는다. 종료였는지 체결이었는지가 지워지면
@@ -138,6 +143,18 @@ export async function onRequestGet({ env, data, params }) {
       archivedAt: room.archived_at ?? null,
       archivedByName: room.archived_by_name ?? null,
       myRole: access.role_in_room,
+      // 이 방에서 나는 누구인가.
+      //
+      // 화면은 지금까지 전역 로그인 정보(user.id)로 내 말풍선을 골랐다. 코드로
+      // 들어온 사람은 계정 로그인이 없어 그 값이 비어 있고, 회사 계정이 함께
+      // 있는 브라우저에서는 아예 다른 사람의 id 가 들어 있다. 신원은 방마다
+      // 갈리므로 방이 직접 알려 준다.
+      viewer: {
+        id: data.user.id,
+        displayName: data.user.display_name,
+        role: access.role_in_room,
+        authMethod: data.user.session_auth_method ?? 'password',
+      },
       participants: participants.map((p) => ({
         id: p.id,
         displayName: p.display_name,

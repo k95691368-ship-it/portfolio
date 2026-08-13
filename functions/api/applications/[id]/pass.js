@@ -7,14 +7,7 @@ import { seedTermsFromApplication } from '../../../_lib/seedTerms.js'
 import { logAdminAction } from '../../../_lib/auditLog.js'
 import { isEmailConfigured, sendApplicationResultEmail } from '../../../_lib/email.js'
 import { notifyUser } from '../../../_lib/notify.js'
-
-function genInviteCode() {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // 헷갈리는 글자(0/O, 1/I) 제외
-  let code = ''
-  const bytes = crypto.getRandomValues(new Uint8Array(6))
-  for (const b of bytes) code += alphabet[b % alphabet.length]
-  return code
-}
+import { genInviteCode } from '../../../_lib/inviteCode.js'
 
 // 관리: 서류합격 처리 — 지원 이메일로 candidate 계정(임시 비밀번호) 생성 +
 // 면접방 자동 생성 후 채용자·지원자 착석. 기존 계정이 있으면 재사용.

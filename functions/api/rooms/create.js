@@ -1,13 +1,6 @@
 import { genId } from '../../_lib/db.js'
 import { jsonResponse, jsonError } from '../../_lib/http.js'
-
-function genInviteCode() {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // 헷갈리는 글자(0/O, 1/I) 제외
-  let code = ''
-  const bytes = crypto.getRandomValues(new Uint8Array(6))
-  for (const b of bytes) code += alphabet[b % alphabet.length]
-  return code
-}
+import { genInviteCode } from '../../_lib/inviteCode.js'
 
 export async function onRequestPost({ request, env, data }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)

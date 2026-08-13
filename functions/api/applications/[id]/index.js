@@ -64,7 +64,6 @@ export async function onRequestGet({ env, data, params }) {
         }
       })(),
       screenedAt: a.screened_at,
-      roomId: a.room_id ?? null,
       inviteCode: room?.invite_code ?? null,
       // 채용내정이 성립했으면 이 사람은 탈락시킬 수 없다.
       offer,
