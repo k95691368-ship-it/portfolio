@@ -57,6 +57,39 @@ describe('방 안의 요청인가', () => {
   })
 })
 
+describe('서류합격 안내 메일', () => {
+  it('입장 코드를 눈으로 읽을 수 있는 모양으로 담는다', async () => {
+    // 코드가 전해지지 않으면 지원자는 면접방에 못 들어오고, 그러면 계약도
+    // 서명도 시작되지 않는다. 메일 본문에 실제로 들어 있는지 본다.
+    const { sendApplicationResultEmail } = await import('../functions/_lib/email.js')
+    let captured = null
+    const env = {
+      MAILJET_API_KEY: 'k',
+      MAILJET_SECRET_KEY: 's',
+      FINAL_OFFER_FROM_EMAIL: 'no-reply@example.com',
+    }
+    const realFetch = globalThis.fetch
+    globalThis.fetch = async (_url, init) => {
+      captured = JSON.parse(init.body)
+      return new Response(JSON.stringify({ Messages: [{ Status: 'success' }] }), { status: 200 })
+    }
+    try {
+      await sendApplicationResultEmail(env, {
+        to: 'a@example.com',
+        applicantName: '지원자',
+        companyName: '회사',
+        result: 'passed',
+        inviteCode: 'AC3KM7PQ4RTV',
+      })
+    } finally {
+      globalThis.fetch = realFetch
+    }
+    const body = JSON.stringify(captured)
+    expect(body).toContain('AC3K-M7PQ-4RTV')
+    expect(body).toContain('입장 코드')
+  })
+})
+
 describe('서명의 본인확인 수단', () => {
   it('코드로 들어온 세션은 비밀번호 확인이라고 적지 않는다', () => {
     // 코드는 회사 담당자도 볼 수 있는 값이다. 그것을 비밀번호 확인이라고

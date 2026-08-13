@@ -1,3 +1,5 @@
+import { formatInviteCode } from './inviteCode.js'
+
 export function maskEmail(email) {
   const [local, domain] = String(email || '').split('@')
   if (!local || !domain) return ''
@@ -161,10 +163,11 @@ export async function sendApplicationResultEmail(
 
 ${companyName} 1차 서류 전형에 합격하셨습니다.
 
-면접방 입장 코드: ${inviteCode ?? '(담당자에게 문의)'}
+면접방 입장 코드: ${inviteCode ? formatInviteCode(inviteCode) : '(담당자에게 문의)'}
 
 채용 공고 화면에서 위 코드를 입력하시면 면접방에 들어오실 수 있습니다.
-로그인은 필요하지 않습니다.
+회원가입이나 로그인은 필요하지 않습니다.
+하이픈(-)은 붙여 넣으셔도 되고 빼고 입력하셔도 됩니다.
 
 축하드립니다. 감사합니다.`
     : `안녕하세요, ${applicantName}님.
