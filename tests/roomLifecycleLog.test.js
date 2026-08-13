@@ -16,6 +16,7 @@ describe('lifecycleEvents', () => {
       'closed',
       'employment_end_cleared',
       'employment_end_recorded',
+      'offer_confirmed_by_email',
       'offer_withdrawn',
       'reopened',
       'unarchived',
@@ -94,5 +95,22 @@ describe('보관 기록', () => {
     ])
     expect(events[0].event).toBe('면접방 보관 (대화·계약서 잠금)')
     expect(events[1].event).toBe('면접방 보관 해제')
+  })
+})
+
+// 최종합격 통보 메일이 나간 순간이 곧 채용내정 성립 시점이다.
+// 나중에 "언제 확정됐는가"를 다투는 자리에서 가장 먼저 읽히는 줄이다.
+describe('메일로 성립한 채용내정', () => {
+  it('무엇으로 확정됐는지가 이름에 남는다', () => {
+    const [e] = lifecycleEvents([
+      {
+        action: 'offer_confirmed_by_email',
+        actor_name: '박서준',
+        detail: '최종합격 이메일 발송 · 수신 a@b.com',
+        created_at: '2026-08-13 09:00:00',
+      },
+    ])
+    expect(e.event).toBe('최종합격 이메일 발송 — 채용내정 성립')
+    expect(e.detail).toContain('a@b.com')
   })
 })

@@ -1,4 +1,6 @@
 import { genId } from '../../../_lib/db.js'
+import { confirmHireByEmail } from '../../../_lib/offerFromEmail.js'
+import { logLifecycle } from '../../../_lib/roomLifecycleLog.js'
 import { blockedWhenArchived } from '../../../_lib/roomLifecycle.js'
 import { maskEmail, sendFinalOfferEmail, isEmailConfigured } from '../../../_lib/email.js'
 import { jsonError, jsonResponse } from '../../../_lib/http.js'
@@ -153,6 +155,7 @@ export async function onRequestPost({ request, env, data, params }) {
     return jsonError('최종합격 이메일 발송이 이미 진행 중입니다. 잠시 후 다시 시도해주세요.', 409)
   }
 
+  let sentDelivery = null
   try {
     await sendFinalOfferEmail(env, {
       to: candidate.email,
@@ -168,6 +171,8 @@ export async function onRequestPost({ request, env, data, params }) {
     )
       .bind(params.roomId)
       .run()
+    // 확정 근거에 발송 시각을 담는다. "언제 알렸는가"가 곧 성립 시점이다.
+    sentDelivery = await getDelivery(env, params.roomId)
   } catch (error) {
     const detail = String(error?.message || 'Unknown email error').slice(0, 500)
     console.error(`Final offer email failed for room ${params.roomId}:`, detail)
@@ -181,12 +186,76 @@ export async function onRequestPost({ request, env, data, params }) {
     return jsonError('이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.', 502)
   }
 
+  // 보낸 그 순간 채용내정이 확정된다.
+  //
+  // 이 앱이 존재하는 이유가 여기다. 채용내정은 회사가 "채용하겠다"는 뜻을
+  // 근로자에게 알린 때 성립한 것으로 다뤄지고, 최종합격 통보 메일이 그
+  // 알림의 가장 전형적인 형태다. 그런데 지금까지 메일을 보내도 확정으로 치지
+  // 않아서, 회사가 법적으로 가장 무거운 행동을 하고도 화면에는 "아직 확정 전"
+  // 이라고 떴다. 그 상태에서 전형을 종료하면 해고 경고도 서지 않는다 —
+  // 막으려던 사고가 정확히 그 자리에서 일어난다.
+  //
+  // 확정이 실패해도 메일 발송까지 되돌리지는 않는다. 이미 나간 메일은
+  // 되돌릴 수 없고, 나간 사실은 final_offer_emails 에 남아 있다.
+  const confirmation = await confirmHireByEmail(env, params.roomId, {
+    recipientEmail: candidate.email,
+    subject,
+    sentAt: sentDelivery?.sent_at ?? null,
+  }).catch((err) => {
+    console.error(`hire confirm by email failed (${params.roomId}):`, err)
+    return { confirmed: false, alreadyConfirmed: false }
+  })
+
+  if (confirmation.confirmed) {
+    // 확정되면 계약서를 쓸 차례다. 체결이 끝난 방은 되돌리지 않는다.
+    await env.DB.prepare(
+      `UPDATE interview_rooms SET status = 'contract_pending'
+        WHERE id = ? AND status IN ('open', 'active')`
+    )
+      .bind(params.roomId)
+      .run()
+
+    // 무엇이 성립했는지 이력에 남긴다. 나중에 "언제 확정됐는가"를 다투는
+    // 자리에서 읽히는 기록이다.
+    await logLifecycle(env, params.roomId, {
+      action: 'offer_confirmed_by_email',
+      actorName: data.user.display_name,
+      detail: confirmation.excerpt,
+    })
+  }
+
   await notifyUser(env, candidate.id, {
     type: 'final_offer',
     message: `${companyName}에서 최종 합격을 안내했습니다. 축하합니다!`,
     link: `/rooms/${params.roomId}`,
   })
 
+  // 알아야 하는 쪽은 보낸 사람이다.
+  //
+  // 이 시스템이 막으려는 사고는 지원자가 몰라서 생기는 것이 아니다. 담당자가
+  // "아직 최종 결재 전"이라고 생각한 채 탈락 처리를 누르는 데서 생긴다.
+  // 방금 보낸 메일이 무엇을 성립시켰는지, 그래서 이제 무엇을 할 수 없게
+  // 됐는지를 보낸 그 사람에게 알린다.
+  if (confirmation.confirmed) {
+    await notifyUser(env, data.user.id, {
+      type: 'offer_established',
+      message: `최종합격 이메일을 보냈습니다. 이 통보로 "${room.title}"의 채용내정이 성립했습니다 — 이제 이 지원자를 탈락 처리할 수 없습니다.`,
+      link: `/rooms/${params.roomId}`,
+    })
+  }
+
   const delivery = await getDelivery(env, params.roomId)
-  return jsonResponse({ ok: true, delivery: deliveryResponse(delivery) }, 201)
+  return jsonResponse(
+    {
+      ok: true,
+      delivery: deliveryResponse(delivery),
+      // 화면이 이 값을 보고 담당자에게 바로 알린다.
+      hireConfirmed: confirmation.confirmed || confirmation.alreadyConfirmed,
+      confirmedByThisEmail: confirmation.confirmed,
+      offerNotice: confirmation.confirmed
+        ? '이 메일 발송으로 채용내정이 성립했습니다. 이제 이 지원자는 탈락 처리할 수 없습니다.'
+        : null,
+    },
+    201
+  )
 }

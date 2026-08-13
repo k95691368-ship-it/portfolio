@@ -3605,3 +3605,28 @@
   font-size: 13px;
   line-height: 1.5;
 }
+
+/* 채용내정이 성립해 탈락 처리가 막힌 자리.
+   담당자가 누르기 전에 보여야 한다 — 누르고 나서 거절하는 것은 예방이 아니다. */
+.offer-block-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 16px 0;
+  padding: 16px 18px;
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius);
+  background: var(--danger-bg);
+}
+.offer-block-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--danger-text);
+}
+.offer-block-detail {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text);
+}

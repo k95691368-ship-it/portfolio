@@ -293,6 +293,31 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
               )}
             </div>
 
+            {/* 채용내정이 성립한 사람은 탈락시킬 수 없다.
+                담당자가 이것을 모른 채 누르는 것을 막는 것이 이 시스템의 목적이므로,
+                누르고 나서 거절하는 것이 아니라 누르기 전에 알린다. */}
+            {detail.offer?.established && (
+              <div className="offer-block-notice" role="alert">
+                <p className="offer-block-title">
+                  채용내정이 성립한 지원자입니다 — 탈락 처리할 수 없습니다.
+                </p>
+                {detail.offer.excerpt && (
+                  <blockquote className="offer-excerpt">
+                    <span className="offer-excerpt-label">성립 근거</span>
+                    {detail.offer.excerpt}
+                  </blockquote>
+                )}
+                <p className="offer-block-detail">
+                  최종합격을 통보한 뒤의 취소는 심사 결과를 바꾸는 일이 아니라 이미 성립한 근로계약을
+                  끊는 일이고, 해고로 다뤄집니다(근로기준법 제23조 제1항 — 정당한 이유 없이 해고하지
+                  못한다). 그래도 진행해야 한다면 면접방에서 채용내정 취소 절차를 밟아야 합니다.
+                </p>
+                {detail.roomId && (
+                  <Link to={`/rooms/${detail.roomId}`}>연결된 면접방으로 이동 →</Link>
+                )}
+              </div>
+            )}
+
             {detail.status === 'submitted' && (
               <div className="modal-actions">
                 {canPass ? (
@@ -302,8 +327,22 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
                 ) : (
                   <p className="notice">서류합격(계정·면접방 생성)은 회사 계정에서만 가능합니다.</p>
                 )}
-                <button type="button" className="btn-danger" onClick={handleReject} disabled={working}>
-                  불합격
+                {/* 버튼을 없애지 않고 그 자리에서 막는다.
+                    사라지면 담당자는 왜 없는지 모른 채 찾다가 다른 길을 찾는다.
+                    같은 자리에 그대로 두되, 무엇 때문에 못 누르는지를 버튼이
+                    직접 말하게 한다. */}
+                <button
+                  type="button"
+                  className="btn-danger"
+                  onClick={handleReject}
+                  disabled={working || !!detail.offer?.established}
+                  title={
+                    detail.offer?.established
+                      ? '채용내정이 성립해 탈락 처리할 수 없습니다. 취소는 해고 절차를 밟아야 합니다.'
+                      : undefined
+                  }
+                >
+                  {detail.offer?.established ? '채용내정 완료 — 탈락 불가' : '불합격'}
                 </button>
               </div>
             )}

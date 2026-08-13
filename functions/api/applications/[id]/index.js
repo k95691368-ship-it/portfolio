@@ -1,5 +1,6 @@
 import { jsonResponse } from '../../../_lib/http.js'
 import { requireManageableApplication, parseCareer } from '../../../_lib/applications.js'
+import { offerStatusForApplication } from '../../../_lib/offerFromEmail.js'
 
 // 관리: 지원서 상세 (경력·동의·첨부파일 포함).
 export async function onRequestGet({ env, data, params }) {
@@ -7,11 +8,20 @@ export async function onRequestGet({ env, data, params }) {
   if (access.error) return access.error
   const a = access.application
 
-  const { results: docs } = await env.DB.prepare(
-    `SELECT id, doc_type, filename, size_bytes FROM application_documents WHERE application_id = ?`
-  )
-    .bind(params.id)
-    .all()
+  // 첨부 목록과 채용내정 성립 여부를 함께 읽는다.
+  //
+  // 화면이 탈락 버튼을 내릴지 정하려면 이 값이 필요하다. 서버만 막고 화면은
+  // 그대로 두면, 담당자는 누를 수 있는 줄 알고 눌렀다가 거절당한다 — 막는
+  // 것이 목적이라면 누르기 전에 보여야 한다.
+  const [docsResult, offer] = await Promise.all([
+    env.DB.prepare(
+      `SELECT id, doc_type, filename, size_bytes FROM application_documents WHERE application_id = ?`
+    )
+      .bind(params.id)
+      .all(),
+    offerStatusForApplication(env, a),
+  ])
+  const docs = docsResult.results
 
   return jsonResponse({
     application: {
@@ -45,6 +55,9 @@ export async function onRequestGet({ env, data, params }) {
         }
       })(),
       screenedAt: a.screened_at,
+      roomId: a.room_id ?? null,
+      // 채용내정이 성립했으면 이 사람은 탈락시킬 수 없다.
+      offer,
       documents: docs.map((d) => ({
         id: d.id,
         docType: d.doc_type,
