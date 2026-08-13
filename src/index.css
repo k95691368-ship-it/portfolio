@@ -482,22 +482,23 @@ input[type='checkbox'] {
   font-weight: 600;
   line-height: 1.4;
   border: 1px solid transparent;
-  /* nowrap 이었다. 심각도 배지에는 한 문장짜리 제목이 들어가는데, 줄바꿈을
-     막아 두어 좁은 화면에서 그대로 상자를 넘어갔다. 서명 직전 경고가 화면
-     밖으로 밀려나면 그 경고는 없는 것과 같다.
+  /* 배지는 거의 전부 '일반'·'채용자'·'개발자'·'정상' 같은 짧은 라벨이다.
+     이런 것은 언제나 한 줄로 나와야 한다.
 
-     그런데 overflow-wrap: anywhere 를 함께 걸어 두었더니, 표의 좁은 칸에
-     들어간 짧은 라벨이 한 글자씩 쪼개져 세로로 쌓였다("일/반", "채/용/자").
-     한 문장을 감싸는 것과 한 낱말을 쪼개는 것은 다르다. 낱말 단위로만
-     넘긴다. */
+     한 번은 반대로 갔다가 되돌렸다. 심각도 배지가 좁은 화면에서 상자를
+     넘기에 줄바꿈을 열었는데, 그 규칙이 표의 좁은 칸에 들어간 짧은 라벨까지
+     낱자로 끊어 "개/발/자"로 세로로 쌓였다. 예외가 하나뿐인데 기본을 바꾼
+     것이 잘못이었다 — 기본은 한 줄, 감싸야 하는 것만 따로 연다. */
+  white-space: nowrap;
+}
+
+/* 한 문장이 들어가는 배지만 감싼다(심각도 배지). 감싸려면 flex·grid 자식의
+   자동 최소 크기도 함께 풀어야 실제로 줄이 바뀐다. */
+.badge-wrap {
   white-space: normal;
   overflow-wrap: break-word;
   word-break: keep-all;
   min-width: 0;
-}
-/* 짧은 라벨은 예전처럼 한 줄로. */
-.badge-nowrap {
-  white-space: nowrap;
 }
 .badge-neutral {
   background: var(--surface);
