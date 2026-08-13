@@ -39,7 +39,7 @@ import { findLanguage, SUPPORTED_LANGUAGES } from '../../../_lib/languages.js'
 // 여기서 한 번만 읽고 나눠서 돌려준다.
 export async function onRequestGet({ env, data, params, request }) {
   if (!data.user && !data.roomAccess) return jsonError('로그인이 필요합니다.', 401)
-  const access = await getRoomAccess(env, params.roomId, data.user)
+  const access = await getRoomAccess(env, params.roomId, data.user, data)
   if (!access) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
 
   const roomId = params.roomId
