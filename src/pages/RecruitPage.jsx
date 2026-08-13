@@ -95,6 +95,23 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
     }
   }
 
+  // 입장 코드를 지원자에게 보낸다.
+  //
+  // 서류합격 처리 때 한 번 자동으로 나가지만 그것뿐이었다. 메일이 막혀 있거나
+  // 지원자가 못 받았으면 다시 보낼 방법이 없었고, 코드가 전해지지 않으면
+  // 지원자는 면접방에 들어올 수 없다.
+  const handleSendCode = async () => {
+    setWorking(true)
+    try {
+      const result = await api.post(`/applications/${appId}/send-code`, {})
+      toast.success(`${result.sentTo} 로 면접방 입장 코드를 보냈습니다.`)
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setWorking(false)
+    }
+  }
+
   const handleReject = async () => {
     if (!window.confirm('불합격 처리하시겠습니까?')) return
     setWorking(true)
@@ -137,22 +154,26 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
                 <p>
                   <strong>{detail.applicantName}</strong>님을 서류합격 처리했습니다. 면접방이 생성되었습니다.
                 </p>
-                {passResult.account.tempPassword ? (
-                  <p>
-                    임시 비밀번호: <code>{passResult.account.tempPassword}</code>{' '}
-                    <button
-                      type="button"
-                      className="btn-sm"
-                      onClick={() => navigator.clipboard?.writeText(passResult.account.tempPassword)}
-                    >
-                      복사
-                    </button>
-                    <br />
-                    <em>이 비밀번호는 다시 표시되지 않습니다. 지원자에게 안전하게 전달하세요.</em>
-                  </p>
-                ) : (
-                  <p>이미 가입된 이메일이라 기존 계정으로 면접방에 연결했습니다.</p>
-                )}
+                {/* 지원자에게 건네야 하는 것은 비밀번호가 아니라 입장 코드다.
+                    지원자에게는 로그인할 이유도, 로그인 화면으로 가는 길도 없다.
+                    코드만 있으면 채용 공고 화면에서 바로 들어온다. */}
+                <p>
+                  면접방 입장 코드: <code>{passResult.inviteCode}</code>{' '}
+                  <button
+                    type="button"
+                    className="btn-sm"
+                    onClick={() => navigator.clipboard?.writeText(passResult.inviteCode)}
+                  >
+                    복사
+                  </button>
+                </p>
+                <p>
+                  <em>
+                    {passResult.emailStatus === 'sent'
+                      ? '합격 안내 메일에 이 코드를 함께 보냈습니다. 지원자는 채용 공고 화면에서 코드를 넣어 로그인 없이 들어옵니다.'
+                      : '메일이 나가지 않았습니다 — 이 코드를 지원자에게 직접 전달해주세요. 지원자는 채용 공고 화면에서 코드를 넣어 로그인 없이 들어옵니다.'}
+                  </em>
+                </p>
                 {passResult.roomId && (
                   <p>
                     <Link to={`/rooms/${passResult.roomId}`}>생성된 면접방으로 이동 →</Link>
@@ -347,9 +368,30 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
               </div>
             )}
             {detail.status === 'passed' && detail.roomId && !passResult && (
-              <p>
-                <Link to={`/rooms/${detail.roomId}`}>연결된 면접방으로 이동 →</Link>
-              </p>
+              <div className="invite-code-block">
+                {/* 코드가 전해지지 않으면 지원자는 면접방에 들어올 수 없다.
+                    언제든 다시 보고 다시 보낼 수 있어야 한다. */}
+                <p>
+                  면접방 입장 코드: <code>{detail.inviteCode || '-'}</code>{' '}
+                  {detail.inviteCode && (
+                    <button
+                      type="button"
+                      className="btn-sm"
+                      onClick={() => navigator.clipboard?.writeText(detail.inviteCode)}
+                    >
+                      복사
+                    </button>
+                  )}
+                </p>
+                <div className="modal-actions">
+                  <button type="button" onClick={handleSendCode} disabled={working}>
+                    {working ? '보내는 중...' : '1차 서류합격 안내 · 입장 코드 메일 보내기'}
+                  </button>
+                  <Link to={`/rooms/${detail.roomId}`} className="btn-nav">
+                    연결된 면접방으로 이동 →
+                  </Link>
+                </div>
+              </div>
             )}
           </>
         )}

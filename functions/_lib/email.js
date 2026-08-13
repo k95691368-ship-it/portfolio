@@ -140,16 +140,31 @@ export async function sendRoomInviteEmail(env, { to, subject, bodyText, companyN
 }
 
 // 서류 전형 결과(합격/불합격)를 지원자에게 안내.
-export async function sendApplicationResultEmail(env, { to, applicantName, companyName, result }) {
+export async function sendApplicationResultEmail(
+  env,
+  { to, applicantName, companyName, result, inviteCode }
+) {
   const passed = result === 'passed'
   const subject = passed
-    ? `[${companyName}] 서류 전형 합격 안내`
+    ? `[${companyName}] 1차 서류 전형 합격 안내 — 면접방 입장 코드`
     : `[${companyName}] 서류 전형 결과 안내`
+  // 합격 안내에 입장 코드를 함께 보낸다.
+  //
+  // 예전에는 "담당자가 별도로 안내하는 임시 비밀번호로 로그인하라"고 적었다.
+  // 그런데 로그인 화면으로 가는 길은 첫 화면의 '회사 · 채용 담당자 로그인'
+  // 하나뿐이라, 지원자는 그 버튼이 자기 것이 아니라고 여겨 누르지 않는다.
+  // 비밀번호도 담당자가 따로 전달해야 해서 그 자체가 또 한 단계였다.
+  //
+  // 코드를 이 메일에 바로 담으면 받은 사람이 그 자리에서 들어올 수 있다.
   const bodyText = passed
     ? `안녕하세요, ${applicantName}님.
 
-${companyName} 서류 전형에 합격하셨음을 안내드립니다.
-지원하신 이메일이 로그인 아이디가 되며, 담당자가 별도로 안내하는 임시 비밀번호로 로그인하신 뒤 면접 절차를 이어서 진행해 주세요.
+${companyName} 1차 서류 전형에 합격하셨습니다.
+
+면접방 입장 코드: ${inviteCode ?? '(담당자에게 문의)'}
+
+채용 공고 화면에서 위 코드를 입력하시면 면접방에 들어오실 수 있습니다.
+로그인은 필요하지 않습니다.
 
 축하드립니다. 감사합니다.`
     : `안녕하세요, ${applicantName}님.

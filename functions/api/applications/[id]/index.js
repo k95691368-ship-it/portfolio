@@ -21,6 +21,15 @@ export async function onRequestGet({ env, data, params }) {
       .all(),
     offerStatusForApplication(env, a),
   ])
+
+  // 서류합격한 지원자에게 건네야 하는 값이다. 담당자가 언제든 다시 보거나
+  // 다시 보낼 수 있어야 한다 — 코드가 전해지지 않으면 지원자는 면접방에
+  // 들어올 수 없고, 그러면 계약도 서명도 시작되지 않는다.
+  const room = a.room_id
+    ? await env.DB.prepare('SELECT invite_code FROM interview_rooms WHERE id = ?')
+        .bind(a.room_id)
+        .first()
+    : null
   const docs = docsResult.results
 
   return jsonResponse({
@@ -56,6 +65,7 @@ export async function onRequestGet({ env, data, params }) {
       })(),
       screenedAt: a.screened_at,
       roomId: a.room_id ?? null,
+      inviteCode: room?.invite_code ?? null,
       // 채용내정이 성립했으면 이 사람은 탈락시킬 수 없다.
       offer,
       documents: docs.map((d) => ({

@@ -1,4 +1,8 @@
 import {
+  getRoomAccess,
+  ROOM_ACCESS_COOKIE,
+} from '../_lib/roomAccess.js'
+import {
   getSessionUser,
   renewSessionIfStale,
   needsRenewal,
@@ -39,6 +43,14 @@ export async function onRequest(context) {
   }
 
   context.data.user = await getSessionUser(context.env.DB, request)
+
+  // 코드만으로 들어온 사람의 출입증. 계정과 별개다.
+  //
+  // 로그인한 사람에게는 굳이 확인하지 않는다 — 계정 권한이 더 넓고, 요청마다
+  // 조회를 하나 더 하는 것은 대화 화면처럼 자주 도는 곳에서 그대로 체감된다.
+  context.data.roomAccess = context.data.user
+    ? null
+    : await getRoomAccess(context.env.DB, parseCookie(request, ROOM_ACCESS_COOKIE))
 
   // 쓰고 있는 동안에는 로그인이 끝나지 않게 만료를 미룬다.
   //

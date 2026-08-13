@@ -174,6 +174,8 @@ export async function onRequestPost({ env, data, params }) {
         applicantName: application.applicant_name,
         companyName,
         result: 'passed',
+        // 지원자가 그 자리에서 들어올 수 있게 코드를 메일에 담는다.
+        inviteCode,
       })
       emailStatus = 'sent'
     } catch (err) {
@@ -188,12 +190,20 @@ export async function onRequestPost({ env, data, params }) {
       ok: true,
       status: 'passed',
       roomId,
+      // 지원자에게 건네야 하는 것은 이제 이 코드다.
+      //
+      // 예전에는 임시 비밀번호를 화면에 띄우고 담당자가 따로 전달하게 했다.
+      // 그런데 지원자에게는 로그인할 이유도, 로그인 화면으로 가는 길도 없다.
+      // 코드만 있으면 공고 화면에서 바로 들어온다.
+      inviteCode,
       emailStatus,
       emailError,
       account: {
         email: application.applicant_email,
         alreadyExisted,
-        tempPassword, // 신규 생성 시에만 값이 있으며, 이 응답에서 1회만 노출된다.
+        // 계정은 서명 기록의 신원으로 계속 필요하다. 다만 지원자에게 먼저
+        // 건네는 것은 비밀번호가 아니라 위 코드다.
+        tempPassword,
       },
     },
     201

@@ -18,13 +18,15 @@ import { maskEmail, isEmailConfigured } from '../../../_lib/email.js'
 const MESSAGE_LIMIT = 200
 
 export async function onRequestGet({ env, data, params }) {
-  if (!data.user) return jsonError('로그인이 필요합니다.', 401)
+  // 코드로 들어온 사람은 계정이 없다. 로그인을 요구하면 서류합격 안내를 받고
+  // 코드로 들어온 지원자가 그대로 막힌다.
+  if (!data.user && !data.roomAccess) return jsonError('로그인이 필요합니다.', 401)
 
   const roomId = params.roomId
   const room = await env.DB.prepare('SELECT * FROM interview_rooms WHERE id = ?').bind(roomId).first()
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
 
-  const access = await getRoomAccess(env, roomId, data.user)
+  const access = await getRoomAccess(env, roomId, data.user, data)
   if (!access) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
 
   const isCompany = access.role_in_room === 'company'

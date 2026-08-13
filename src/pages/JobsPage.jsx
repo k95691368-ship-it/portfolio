@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import RoomEnterForm from '../components/RoomEnterForm.jsx'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { describeDeadline } from '../lib/deadline.js'
@@ -28,6 +29,10 @@ export default function JobsPage() {
           <Link to="/application-status">지원 현황 조회 →</Link>
         </p>
       </header>
+
+      {/* 지원자가 실제로 머무는 곳이 여기다. 면접방으로 들어가는 길도 여기
+          있어야 한다 — 회사 로그인 화면 안에 두면 지원자는 찾지 못한다. */}
+      <RoomEnterForm />
 
       {error && <p className="error">{error}</p>}
       {loading ? (

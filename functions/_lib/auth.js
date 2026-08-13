@@ -19,7 +19,9 @@ function fromBase64(str) {
   return Uint8Array.from(atob(str), (c) => c.charCodeAt(0))
 }
 
-function toBase64Url(bytes) {
+// 방 출입증(roomAccess.js)도 같은 토큰 생성·해시를 쓴다. 두 벌로 두면
+// 한쪽만 고쳐지는 날이 온다.
+export function toBase64Url(bytes) {
   return toBase64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
@@ -39,7 +41,7 @@ async function pbkdf2(password, saltBytes) {
   return new Uint8Array(derivedBits)
 }
 
-async function sha256Hex(text) {
+export async function sha256Hex(text) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
 }

@@ -38,7 +38,7 @@ import { findLanguage, SUPPORTED_LANGUAGES } from '../../../_lib/languages.js'
 // 요청마다 세션 인증까지 반복돼 한 페이지에 D1 조회가 스무 번 넘게 발생했다.
 // 여기서 한 번만 읽고 나눠서 돌려준다.
 export async function onRequestGet({ env, data, params, request }) {
-  if (!data.user) return jsonError('로그인이 필요합니다.', 401)
+  if (!data.user && !data.roomAccess) return jsonError('로그인이 필요합니다.', 401)
   const access = await getRoomAccess(env, params.roomId, data.user)
   if (!access) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
 

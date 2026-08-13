@@ -55,9 +55,13 @@ function App() {
             </Route>
             <Route element={<ProtectedRoute />}>
               <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/rooms/:roomId" element={<RoomPage />} />
-              <Route path="/rooms/:roomId/contract" element={<ContractPage />} />
             </Route>
+            {/* 면접방과 계약서는 로그인 없이도 열린다.
+                서류합격 안내 메일로 받은 입장 코드로 들어온 지원자에게는
+                계정이 없다. 여기에 로그인 벽을 두면 코드로 들어와도 곧바로
+                로그인 화면으로 튕긴다 — 권한은 서버가 코드로 판정한다. */}
+            <Route path="/rooms/:roomId" element={<RoomPage />} />
+            <Route path="/rooms/:roomId/contract" element={<ContractPage />} />
             <Route element={<ProtectedRoute requireRecruiter />}>
               <Route path="/recruit" element={<RecruitPage />} />
             </Route>
