@@ -69,12 +69,20 @@ function ready() {
 export function trackPageView(pathname) {
   if (!ready()) return
   const page_path = redactPath(pathname)
-  window.gtag('event', 'page_view', {
+  const fields = {
     page_path,
-    // 주소창 그대로가 아니라 가린 주소로 보낸다. page_location 을 비워 두면
-    // 태그가 현재 주소를 스스로 채워 넣어, 가린 의미가 없어진다.
+    // 주소창 그대로가 아니라 가린 주소를 보낸다. 비워 두면 태그가 현재 주소를
+    // 스스로 채워 넣어 가린 의미가 없어진다.
     page_location: `${window.location.origin}${page_path}`,
     page_title: document.title,
-    send_to: MEASUREMENT_ID,
-  })
+  }
+
+  // 먼저 덮어쓰고 나서 보낸다.
+  //
+  // set 을 건너뛰고 event 에만 실으면, 이 한 건만 가려지고 GA4 가 스스로 보내는
+  // 나머지(세션 시작, 스크롤, 참여 시간)는 그때그때 주소 표시줄을 다시 읽어
+  // 싣는다. 실제로 확인해 보니 방 화면을 열었을 때 uuid 가 그 경로로 나갔다.
+  // set 은 이후 모든 신호에 적용되므로 여기서 한 번 덮어 둔다.
+  window.gtag('set', fields)
+  window.gtag('event', 'page_view', { ...fields, send_to: MEASUREMENT_ID })
 }

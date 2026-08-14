@@ -8,26 +8,53 @@
 
     <!-- Google tag (gtag.js) -->
     <!--
-      send_page_view 를 끈다.
+      이 사이트의 주소에는 사람을 여는 열쇠가 들어 있다. 면접방 id, 지원서 id,
+      증명서 발급번호, 그리고 지원 현황 접수번호다. 접수번호 하나면 남의 지원
+      내역이 열리고 발급번호 하나면 근로계약 증명서가 열린다. 애널리틱스
+      보고서는 주소를 목록으로 그대로 보여 주므로, 손대지 않으면 그 열쇠들이
+      구글 계정 화면에 줄줄이 쌓인다.
 
-      기본값으로 두면 태그가 첫 화면을 스스로 한 번 보내는데, 그때 보내는
-      주소는 브라우저의 주소 표시줄 그대로다. 이 사이트의 주소에는 면접방
-      id, 지원서 id, 증명서 발급번호, 지원 현황 접수번호가 들어간다. 접수번호는
-      그 자체로 남의 지원 내역을 열 수 있는 값이다 -- 그것을 구글로 보내면
-      안 된다.
+      send_page_view 를 끄는 것만으로는 모자란다 -- 실제로 확인해 보니 uuid 가
+      그대로 나갔다. 그것이 막는 것은 page_view 하나뿐이고, GA4 가 스스로 보내는
+      나머지 이벤트(세션 시작, 스크롤, 참여 시간 등)는 보낼 때마다 주소 표시줄을
+      다시 읽어 싣는다.
 
-      그래서 화면 이동은 React 쪽(src/lib/analytics.js)에서 id 를 가린 주소로
-      직접 보낸다. 첫 화면도 거기서 보낸다.
+      그래서 태그를 켜기 전에 주소를 먼저 덮어쓴다. 여기서 한 번 덮어 두면
+      이후 모든 신호가 이 값을 쓴다.
+
+      아래 가리기는 '무엇이든 id 처럼 생겼으면 가린다'는 안전망이다. 화면마다
+      붙는 정확한 이름표(/rooms/:roomId 같은)는 src/lib/analytics.js 가 화면을
+      옮길 때마다 다시 덮어쓴다. 둘이 어긋나도 이쪽이 더 많이 가리는 쪽이라
+      새지 않는다.
     -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-5B2GMXXSYZ"></script>
     <script>
       window.dataLayer = window.dataLayer || []
       function gtag() {
         dataLayer.push(arguments)
       }
+      ;(function () {
+        var safe =
+          location.pathname
+            .split('/')
+            .map(function (seg) {
+              // uuid 또는 숫자로만 된 토막은 id 로 본다.
+              return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(seg) ||
+                /^\d+$/.test(seg)
+                ? ':id'
+                : seg
+            })
+            .join('/') || '/'
+        // 물음표 뒤(접수번호·발급번호)는 통째로 버린다.
+        gtag('set', {
+          page_location: location.origin + safe,
+          page_path: safe,
+          page_title: document.title,
+        })
+      })()
       gtag('js', new Date())
       gtag('config', 'G-5B2GMXXSYZ', { send_page_view: false })
     </script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-5B2GMXXSYZ"></script>
   </head>
   <body>
     <div id="root"></div>
