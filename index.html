@@ -5,6 +5,29 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AI 채용 · 전자근로계약 플랫폼</title>
+
+    <!-- Google tag (gtag.js) -->
+    <!--
+      send_page_view 를 끈다.
+
+      기본값으로 두면 태그가 첫 화면을 스스로 한 번 보내는데, 그때 보내는
+      주소는 브라우저의 주소 표시줄 그대로다. 이 사이트의 주소에는 면접방
+      id, 지원서 id, 증명서 발급번호, 지원 현황 접수번호가 들어간다. 접수번호는
+      그 자체로 남의 지원 내역을 열 수 있는 값이다 -- 그것을 구글로 보내면
+      안 된다.
+
+      그래서 화면 이동은 React 쪽(src/lib/analytics.js)에서 id 를 가린 주소로
+      직접 보낸다. 첫 화면도 거기서 보낸다.
+    -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-5B2GMXXSYZ"></script>
+    <script>
+      window.dataLayer = window.dataLayer || []
+      function gtag() {
+        dataLayer.push(arguments)
+      }
+      gtag('js', new Date())
+      gtag('config', 'G-5B2GMXXSYZ', { send_page_view: false })
+    </script>
   </head>
   <body>
     <div id="root"></div>

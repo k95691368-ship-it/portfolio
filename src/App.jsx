@@ -4,6 +4,7 @@ import LandingPage from './pages/LandingPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import ThemeToggle from './components/ThemeToggle.jsx'
+import PageViewTracker from './components/PageViewTracker.jsx'
 import './App.css'
 
 // 첫 화면(랜딩·로그인)만 즉시 포함하고 나머지는 필요할 때 불러온다.
@@ -27,6 +28,8 @@ const Loading = <p>불러오는 중...</p>
 function App() {
   return (
     <>
+      {/* 화면이 바뀔 때마다 방문 기록을 보낸다(주소의 id 는 가린다). */}
+      <PageViewTracker />
       {/* 키보드로 들어온 사람이 매번 머리말을 지나치지 않아도 되게 한다. */}
       <a href="#main" className="skip-link">
         본문으로 건너뛰기
