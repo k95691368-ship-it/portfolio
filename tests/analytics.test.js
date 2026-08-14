@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { redactPath, trackPageView } from '../src/lib/analytics.js'
+import { redactPath, trackPageView, holdsPersonalData } from '../src/lib/analytics.js'
 
 describe('방문 기록의 주소 가리기', () => {
   it('면접방 id 를 내보내지 않는다', () => {
@@ -29,6 +29,42 @@ describe('방문 기록의 주소 가리기', () => {
       '/anything/:id/deep'
     )
     expect(redactPath('/anything/12345')).toBe('/anything/:id')
+  })
+})
+
+describe('녹화에서 가려야 하는 화면', () => {
+  it('사람의 개인정보가 뜨는 화면은 전부 가린다', () => {
+    // 클래리티는 화면을 그대로 저장한다. 기본 설정은 숫자와 이메일만 가리므로
+    // 이름·오간 대화·근로계약서 조건은 그냥 마이크로소프트로 넘어간다.
+    const sensitive = [
+      '/rooms/8f3a1c2e-4b5d-4e6f-8a9b-0c1d2e3f4a5b',
+      '/rooms/8f3a1c2e-4b5d-4e6f-8a9b-0c1d2e3f4a5b/contract',
+      '/jobs/8f3a1c2e-4b5d-4e6f-8a9b-0c1d2e3f4a5b/apply',
+      '/application-status',
+      '/verify',
+      '/dashboard',
+      '/recruit',
+      '/admin',
+    ]
+    for (const path of sensitive) {
+      expect(holdsPersonalData(path), path).toBe(true)
+    }
+  })
+
+  it('회사가 쓴 글만 있는 화면은 열어 둔다 — 다 가리면 볼 것이 없다', () => {
+    const open = ['/', '/login', '/signup', '/change-password', '/jobs', '/tech']
+    for (const path of open) {
+      expect(holdsPersonalData(path), path).toBe(false)
+    }
+    // 공고 상세는 회사가 쓴 글이다.
+    expect(holdsPersonalData('/jobs/8f3a1c2e-4b5d-4e6f-8a9b-0c1d2e3f4a5b')).toBe(false)
+  })
+
+  it('모르는 새 화면은 가리는 쪽으로 떨어진다', () => {
+    // 화면 하나 만들 때마다 목록을 기억할 것이라고 기대하지 않는다.
+    // 잊었을 때 새어 나가는 쪽이 아니라 가려지는 쪽이어야 한다.
+    expect(holdsPersonalData('/무언가-새로-만든-화면')).toBe(true)
+    expect(holdsPersonalData('/jobs/abc/def/ghi')).toBe(true)
   })
 })
 

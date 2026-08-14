@@ -67,6 +67,35 @@ export function redactPath(pathname) {
   )
 }
 
+// 이 화면에 사람의 개인정보가 뜨는가.
+//
+// 클래리티는 화면을 그대로 녹화한다. 기본 설정은 숫자와 이메일만 가리므로,
+// 이름과 오간 대화와 근로계약서 조건은 그대로 마이크로소프트로 넘어간다.
+// 녹화를 멈추는 API 는 없으므로, 가리는 것이 유일한 수단이다.
+//
+// 가려야 하는 화면을 세는 대신 "가리지 않아도 되는 화면"을 센다. 새 화면이
+// 생겼을 때 여기 적히지 않으면 가려지는 쪽으로 떨어져야 한다 -- 반대로 두면
+// 화면 하나 만들 때마다 이 목록을 기억해야 하고, 잊는 순간 새어 나간다.
+const PUBLIC_SCREENS = [
+  '/', // 첫 화면
+  '/login',
+  '/signup',
+  '/change-password',
+  '/jobs', // 공고 목록
+  '/tech', // 기술 설명
+]
+
+// 공고 상세는 회사가 쓴 글이지 지원자의 것이 아니다. 여기까지는 열어 둔다.
+// 다만 그 아래 /jobs/:id/apply 는 지원서 작성 화면이므로 가린다.
+const PUBLIC_PATTERNS = [/^\/jobs\/[^/]+$/]
+
+export function holdsPersonalData(pathname) {
+  const path = String(pathname || '/')
+  if (PUBLIC_SCREENS.includes(path)) return false
+  if (PUBLIC_PATTERNS.some((re) => re.test(path))) return false
+  return true
+}
+
 // 이 브라우저에서 태그가 살아 있는가.
 //
 // 광고 차단기가 gtag.js 를 막는 일이 흔하다. 그때 gtag 는 아예 없는 함수가

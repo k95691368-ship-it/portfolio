@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, useLocation } from 'react-router-dom'
+import { holdsPersonalData } from './lib/analytics.js'
 import LandingPage from './pages/LandingPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
@@ -26,6 +27,18 @@ const RecruitPage = lazy(() => import('./pages/RecruitPage.jsx'))
 const Loading = <p>불러오는 중...</p>
 
 function App() {
+  const { pathname } = useLocation()
+
+  // 개인정보가 뜨는 화면은 녹화에서 통째로 가린다.
+  //
+  // 클래리티는 화면을 그대로 저장하고, 기본 설정은 숫자와 이메일만 가린다.
+  // 이름·오간 대화·근로계약서 조건은 그냥 넘어간다. 녹화를 멈추는 API 가 없어
+  // 가리는 것이 유일한 수단이다.
+  //
+  // 효과 안이 아니라 그리는 자리에서 붙인다. 효과로 미루면 화면이 먼저 그려진
+  // 뒤에 표시가 붙어, 그 사이가 녹화될 수 있다.
+  const masked = holdsPersonalData(pathname)
+
   return (
     <>
       {/* 화면이 바뀔 때마다 방문 기록을 보낸다(주소의 id 는 가린다). */}
@@ -35,7 +48,7 @@ function App() {
         본문으로 건너뛰기
       </a>
       <ThemeToggle className="theme-toggle-fixed" />
-      <main id="main" tabIndex={-1}>
+      <main id="main" tabIndex={-1} {...(masked ? { 'data-clarity-mask': 'true' } : {})}>
         <Suspense fallback={Loading}>
           <Routes>
             <Route path="/" element={<LandingPage />} />

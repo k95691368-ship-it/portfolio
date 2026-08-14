@@ -55,6 +55,40 @@
       gtag('config', 'G-YLPE56VFG1', { send_page_view: false })
     </script>
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-YLPE56VFG1"></script>
+
+    <!-- Microsoft Clarity -->
+    <!--
+      클래리티는 화면을 그대로 녹화한다. 애널리틱스와는 무게가 다르다.
+      애널리틱스는 "어느 화면을 봤는가"를 세지만, 클래리티는 그 화면에 무엇이
+      적혀 있었는지를 통째로 저장한다.
+
+      이 사이트의 화면에는 지원자 이름·연락처, 오간 대화, 근로계약서 조건,
+      서명 이미지가 뜬다. 클래리티의 기본 설정(Balanced)은 숫자와 이메일만
+      가리므로, 이름과 대화와 계약 문구는 그대로 마이크로소프트로 넘어간다.
+
+      그래서 개인정보가 뜨는 화면은 src/App.jsx 에서 data-clarity-mask 로
+      통째로 가린다. 그 표시는 문서 설정보다 우선한다.
+
+      막지 못한 것 하나: 주소는 가릴 방법이 없다. 클래리티에는 녹화를 멈추거나
+      주소를 바꿔 보내는 API 가 없다(consent/identify/set/event/upgrade 뿐).
+      지원 현황과 증명서 확인은 ?code= ?serial= 로 조회값을 받으므로, 그 주소로
+      들어온 방문은 조회값이 녹화에 남는다. 클래리티 설정에서 마스킹 모드를
+      Strict 로 올려 두는 것을 함께 권한다.
+    -->
+    <script type="text/javascript">
+      ;(function (c, l, a, r, i, t, y) {
+        c[a] =
+          c[a] ||
+          function () {
+            ;(c[a].q = c[a].q || []).push(arguments)
+          }
+        t = l.createElement(r)
+        t.async = 1
+        t.src = 'https://www.clarity.ms/tag/' + i
+        y = l.getElementsByTagName(r)[0]
+        y.parentNode.insertBefore(t, y)
+      })(window, document, 'clarity', 'script', 'y288l28thj')
+    </script>
   </head>
   <body>
     <div id="root"></div>
