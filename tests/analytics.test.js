@@ -32,6 +32,29 @@ describe('방문 기록의 주소 가리기', () => {
   })
 })
 
+describe('측정 ID 는 한 곳에만 있다', () => {
+  it('index.html 말고 다른 곳에 ID 가 박혀 있지 않다', async () => {
+    // 계정을 세 번 갈아 끼우는 동안 ID 가 두 곳에 있었다. 한쪽만 고치면
+    // 태그는 새 계정으로 켜지는데 화면 이동 신호만 옛 계정으로 가고, 새 계정
+    // 화면에는 첫 화면 하나만 뜬다. 아무도 그것을 오류로 보지 않는다.
+    const { readFileSync, readdirSync, statSync } = await import('node:fs')
+    const { join } = await import('node:path')
+
+    const walk = (dir) =>
+      readdirSync(dir).flatMap((name) => {
+        const full = join(dir, name)
+        return statSync(full).isDirectory() ? walk(full) : [full]
+      })
+
+    const offenders = walk('src').filter((f) => /G-[A-Z0-9]{8,}/.test(readFileSync(f, 'utf-8')))
+    expect(offenders).toEqual([])
+
+    // 그리고 <head> 에는 실제로 있어야 한다 — 없으면 통계가 아예 안 잡힌다.
+    const html = readFileSync('index.html', 'utf-8')
+    expect(html).toMatch(/G-[A-Z0-9]{8,}/)
+  })
+})
+
 describe('실제로 보내는 값', () => {
   let sent
 
