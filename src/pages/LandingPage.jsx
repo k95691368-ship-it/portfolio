@@ -1,5 +1,4 @@
 import { Link, useNavigate } from 'react-router-dom'
-import DemoGuide from '../components/DemoGuide.jsx'
 
 export default function LandingPage() {
   const navigate = useNavigate()
@@ -31,7 +30,12 @@ export default function LandingPage() {
         </p>
       </div>
 
-      <DemoGuide />
+      {/* 예시안(데모) 안내를 여기서 뺐다.
+          예시 계정과 예시 방을 지웠고 다시 심지 않기로 했으므로, 이 칸은
+          /api/demo 를 물어보고 {"seeded":false} 를 받아 아무것도 그리지
+          않는다. 첫 화면마다 헛왕복이 한 번 늘고, 그 코드가 본 묶음에
+          실린다. 다시 예시안을 쓰게 되면 DemoGuide 를 되살리면 된다 --
+          파일은 남겨 뒀다. */}
 
       {/* 코드를 보러 온 사람에게는 화면보다 무엇을 어떻게 만들었는지가 먼저다. */}
       <Link to="/tech" className="landing-tech-link">
