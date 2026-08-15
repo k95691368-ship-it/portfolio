@@ -1,0 +1,25 @@
+# 다시 찾아온 사람이 같은 파일을 또 받지 않게 한다.
+#
+# 재 보니 모든 파일이 max-age=0, must-revalidate 로 나가고 있었다. 이름에
+# 내용 해시가 박힌 파일까지 그랬다 -- 두 번째 방문마다 파일 하나하나를
+# "이거 안 바뀌었죠?" 하고 되물은 뒤에야 화면이 뜬다. 물어보는 값은 작아도
+# 왕복 횟수는 그대로라, 연결이 느릴수록 그 왕복이 그대로 기다림이 된다.
+#
+# /assets/ 안의 파일은 이름에 해시가 있다. 내용이 바뀌면 이름이 바뀌므로
+# 옛 이름이 낡을 일이 없다. 1년을 주고 다시 묻지 않게 한다(immutable).
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# 아이콘은 이름이 고정이라 영구 캐시를 줄 수 없다. 바꾸면 반영이 안 된다.
+# 하루만 준다 -- 매 방문 되묻는 것은 막고, 바꿔도 하루면 퍼진다.
+/favicon.svg
+  Cache-Control: public, max-age=86400
+
+# index.html 은 절대 캐시하지 않는다.
+#
+# 이 파일이 어느 자산 파일을 부를지 적고 있다. 이것이 캐시되면 배포를 해도
+# 방문자는 옛 화면을 계속 본다 -- 고친 것이 안 고쳐진 것처럼 보이는 자리다.
+/
+  Cache-Control: public, max-age=0, must-revalidate
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate

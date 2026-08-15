@@ -54,7 +54,6 @@
       gtag('js', new Date())
       gtag('config', 'G-YLPE56VFG1', { send_page_view: false })
     </script>
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-YLPE56VFG1"></script>
 
     <!-- Microsoft Clarity -->
     <!--
@@ -76,18 +75,51 @@
       Strict 로 올려 두는 것을 함께 권한다.
     -->
     <script type="text/javascript">
-      ;(function (c, l, a, r, i, t, y) {
-        c[a] =
-          c[a] ||
-          function () {
-            ;(c[a].q = c[a].q || []).push(arguments)
+      window.clarity =
+        window.clarity ||
+        function () {
+          ;(window.clarity.q = window.clarity.q || []).push(arguments)
+        }
+    </script>
+
+    <!--
+      분석 도구 두 개를 화면이 다 뜬 뒤에 불러온다.
+
+      재 보니 이 둘이 첫 화면 292KB 중 195KB 였다. 우리 코드 전부(96KB)의 두
+      배다. async 를 붙여도 다운로드는 첫 화면 그리기와 같은 회선을 나눠 쓰므로,
+      느린 연결에서는 방문자가 그만큼 더 빈 화면을 본다. 방문 통계를 보자고
+      방문자를 기다리게 하는 셈이다.
+
+      늦게 불러도 기록은 잃지 않는다. 두 도구 모두 스크립트가 뜨기 전의 호출을
+      큐에 쌓아 두었다가(dataLayer 와 clarity.q) 뜨는 순간 한꺼번에 처리한다.
+      위에서 큐만 먼저 만들어 둔 이유가 이것이다.
+
+      load 뒤 한가한 틈을 노리되, 계속 바쁜 화면에서 영영 안 불러오는 일이
+      없도록 2초 뒤에는 그냥 부른다. requestIdleCallback 이 없는 브라우저
+      (사파리 일부)도 setTimeout 으로 떨어진다.
+    -->
+    <script>
+      ;(function () {
+        function load() {
+          var srcs = [
+            'https://www.googletagmanager.com/gtag/js?id=G-YLPE56VFG1',
+            'https://www.clarity.ms/tag/y288l28thj',
+          ]
+          for (var i = 0; i < srcs.length; i++) {
+            var s = document.createElement('script')
+            s.async = true
+            s.src = srcs[i]
+            document.head.appendChild(s)
           }
-        t = l.createElement(r)
-        t.async = 1
-        t.src = 'https://www.clarity.ms/tag/' + i
-        y = l.getElementsByTagName(r)[0]
-        y.parentNode.insertBefore(t, y)
-      })(window, document, 'clarity', 'script', 'y288l28thj')
+        }
+        function schedule() {
+          if (window.requestIdleCallback) window.requestIdleCallback(load, { timeout: 2000 })
+          else setTimeout(load, 1200)
+        }
+        // 이미 다 떴으면 기다릴 것이 없다.
+        if (document.readyState === 'complete') schedule()
+        else addEventListener('load', schedule, { once: true })
+      })()
     </script>
   </head>
   <body>
