@@ -10,10 +10,6 @@ export async function onRequestPost({ env, data, params }) {
   if (access.error) return access.error
   const application = access.application
 
-  if (application.status !== 'submitted') {
-    return jsonError('이미 심사가 완료된 지원서입니다.', 409)
-  }
-
   // 채용내정이 성립한 사람은 '탈락'시킬 수 없다.
   //
   // 이 시스템이 존재하는 이유가 여기다. 탈락은 채용내정이 서기 전의 개념이다.
@@ -37,6 +33,20 @@ export async function onRequestPost({ env, data, params }) {
       },
       409
     )
+  }
+
+  // 이미 심사가 끝난 지원서인지는 채용내정을 본 뒤에 본다.
+  //
+  // 순서가 반대였다. 서류합격은 상태를 'passed' 로 바꾸면서 같은 요청에서
+  // 면접방을 만든다. 그래서 방이 있는 지원서는 반드시 'passed' 이고, 위의
+  // 채용내정 차단은 이 검사에 가려 한 번도 도달하지 못했다 -- 이 시스템이
+  // 존재하는 이유인 그 문장이 죽은 코드였다.
+  //
+  // 막히는 결과는 같았지만 돌아가는 말이 달랐다. 담당자는 "이미 심사가
+  // 완료되었다"는 절차 안내를 받았고, 왜 이 사람만은 되돌릴 수 없는지는
+  // 듣지 못했다. 알려 주지 않으면 담당자는 다른 길을 찾는다.
+  if (application.status !== 'submitted') {
+    return jsonError('이미 심사가 완료된 지원서입니다.', 409)
   }
 
   const claim = await env.DB.prepare(

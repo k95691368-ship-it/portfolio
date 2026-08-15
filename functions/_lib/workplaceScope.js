@@ -19,7 +19,18 @@ export const SMALL_WORKPLACE_THRESHOLD = 5
 export const SIZE_DEPENDENT_LAWS = ['제53조', '제56조', '제60조']
 
 export function workplaceScope(terms) {
-  const raw = terms?.employeeCount
+  // 두 이름을 모두 읽는다.
+  //
+  // 이 함수는 카멜(employeeCount)만 읽고 있었다. 그런데 부르는 쪽이 갈린다 --
+  // 서명 검사는 rowToCamelTerms 를 거친 값을 넘기지만, 채용내정·해고 안내는
+  // DB 행을 그대로 넘긴다. 그래서 계약서에 상시 3명이라고 적어도 그 경로에서는
+  // 값이 없는 것으로 읽혀, 4명 이하 사업장에 "부당해고 구제신청을 할 수 있다"고
+  // 안내했다. 제23조도 제28조도 적용되지 않는 사업장에다 대고 한 말이다.
+  //
+  // 같은 종류의 사고가 이미 한 번 있었다. hireConfirmed / hire_confirmed 를
+  // 한쪽만 읽어 채용내정 판정이 통째로 꺼졌다(jobOffer.js 참고). 이름이 두
+  // 벌인 곳에서는 둘 다 읽는다.
+  const raw = terms?.employeeCount ?? terms?.employee_count
   const n = raw === '' || raw === null || raw === undefined ? NaN : Number(raw)
   if (!Number.isFinite(n) || n < 1) {
     // 모르면 근로자에게 유리한 쪽으로 본다. 다만 그것이 전제라는 사실을
