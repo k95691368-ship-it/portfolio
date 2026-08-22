@@ -1,5 +1,6 @@
 import { isEmailConfigured, sendNewMessageEmail } from './email.js'
 import { notifyUser } from './notify.js'
+import { pushToUser } from './webPush.js'
 
 // 새 메시지가 왔다는 것을 상대에게 어떻게 알리는가.
 //
@@ -113,11 +114,28 @@ export async function alertCandidate(env, { roomId, room, candidate, companyName
 //
 // 컴퓨터 알림은 브라우저가 띄우므로 서버가 할 일은 인앱 기록뿐이다. 화면이
 // 폴링으로 새 메시지를 받는 순간 알림을 띄운다.
-export async function alertCompany(env, { roomId, companyUserId, candidateName }) {
+export async function alertCompany(env, { roomId, roomTitle, companyUserId, candidateName }) {
   if (!companyUserId) return
+  const who = candidateName || '지원자'
+
   await notifyUser(env, companyUserId, {
     type: 'message',
-    message: `${candidateName || '지원자'}님이 새 메시지를 보냈습니다.`,
+    message: `${who}님이 새 메시지를 보냈습니다.`,
     link: `/rooms/${roomId}`,
+  })
+
+  // 창을 닫아 두었어도 도착하게 한다.
+  //
+  // 화면이 띄우는 알림은 그 화면이 살아 있어야 뜬다. 담당자가 퇴근했다
+  // 아침에 켜면, 밤사이 지원자가 남긴 말은 아무도 알려 주지 않는다. 협의가
+  // 멈추면 계약이 멈춘다.
+  //
+  // 본문은 싣지 않는다. 밀어 주는 알림은 잠금화면에도 뜨므로, 처우 조건이
+  // 오가는 대화를 그대로 실으면 옆 사람이 읽는다.
+  await pushToUser(env, companyUserId, {
+    title: roomTitle ? `${roomTitle} · 새 메시지` : '새 메시지',
+    body: `${who}님이 메시지를 보냈습니다.`,
+    tag: `room-${roomId}`,
+    url: `/rooms/${roomId}`,
   })
 }

@@ -9,3 +9,14 @@ database_id = "e2eef543-db5b-4de8-8038-845ae96ccb7b"
 [[r2_buckets]]
 binding = "DOCUMENTS"
 bucket_name = "portfolio"
+
+# 웹 푸시 값은 여기 적지 않는다.
+#
+# Pages 는 이 파일의 [vars] 를 읽지 않는다(pages_build_output_dir 로 설정한
+# 프로젝트가 아니다). 여기 적어 두면 적혀 있으니 됐다고 착각하는데, 실제로는
+# 서버에 도달하지 않아 알림이 조용히 꺼진다 -- 실제로 한 번 그랬다.
+#
+# 세 값 모두 `wrangler pages secret put` 으로 넣는다:
+#   VAPID_PUBLIC_KEY   브라우저가 구독할 때 쓰는 공개키 (감출 값은 아니다)
+#   VAPID_PRIVATE_KEY  푸시에 서명하는 개인키
+#   VAPID_SUBJECT      밀어 주는 서버가 연락할 주소 (mailto:)

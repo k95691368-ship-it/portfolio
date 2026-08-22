@@ -153,6 +153,7 @@ export async function onRequestPost({ request, env, data, params, waitUntil }) {
         .first()
       await alertCompany(env, {
         roomId: params.roomId,
+        roomTitle: room.title,
         companyUserId: company?.company_user_id,
         candidateName: data.user.display_name,
       })
