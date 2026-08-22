@@ -5,6 +5,9 @@ import { api } from '../api/client.js'
 // 화면을 보고 있지 않을 때는 아예 확인하지 않는다.
 const MAX_IDLE_MS = 15000
 const BACKOFF_AFTER = 6 // 이만큼 연속으로 새 메시지가 없으면 간격을 늘린다
+// 탭이 가려져 있을 때의 확인 간격. 알림만을 위한 조회라 자주 할 이유가 없고,
+// 배터리와 서버 양쪽에 부담이 된다.
+const HIDDEN_IDLE_MS = 20000
 
 // 이미 가진 것과 새로 받은 것을 id 기준으로 합친다.
 //
@@ -21,7 +24,9 @@ export function mergeById(existing, incoming) {
 // initialMessages: 면접방 화면이 한 번의 요청으로 이미 받아 둔 첫 묶음.
 // 이것이 올 때까지 기다렸다가 그다음부터 증분으로만 확인한다. 같은 대화를
 // 두 번 받지 않기 위해서다.
-export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null) {
+// options.onIncoming: 상대가 보낸 새 메시지가 도착했을 때 부른다(알림용).
+// options.pollWhenHidden: 탭이 가려져 있어도 느리게 계속 확인한다.
+export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null, options = {}) {
   const [messages, setMessages] = useState([])
   const [error, setError] = useState('')
   // 마지막으로 실제 새 내용을 확인한 시각. 실패가 이어질 때 "언제부터"를
@@ -33,6 +38,9 @@ export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null
   const emptyRunsRef = useRef(0)
   const timerRef = useRef(null)
   const seededRef = useRef(false)
+  // 콜백이 바뀔 때마다 폴링을 다시 걸면 타이머가 끊긴다. 최신 것만 들고 있는다.
+  const optsRef = useRef(options)
+  optsRef.current = options
 
   // 다른 면접방으로 옮기면 처음 상태로 되돌린다.
   useEffect(() => {
@@ -64,6 +72,13 @@ export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null
         // 내가 보낸 메시지는 화면에 먼저 붙여 두었으므로 다시 받아도 한 번만 남긴다.
         setMessages((prev) => mergeById(prev, data.messages))
         emptyRunsRef.current = 0
+        // 상대가 보낸 것만 알린다. 내가 방금 보낸 것이 되돌아온 것까지 알리면
+        // 내 말에 내가 알림을 받는다.
+        const viewerId = optsRef.current.viewerId
+        const fromOther = viewerId
+          ? data.messages.filter((m) => m.senderId !== viewerId)
+          : data.messages
+        if (fromOther.length > 0) optsRef.current.onIncoming?.(fromOther)
       } else {
         emptyRunsRef.current += 1
       }
@@ -93,9 +108,12 @@ export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null
     }
     const run = async () => {
       if (stopped) return
-      // 탭이 가려져 있으면 요청하지 않고 다음 기회를 기다린다.
-      if (document.visibilityState === 'visible') await poll()
-      if (!stopped) schedule(nextDelay())
+      const visible = document.visibilityState === 'visible'
+      // 탭이 가려져 있으면 원래는 아예 확인하지 않았다. 그러면 알림을 켜 둔
+      // 사람도 새 메시지를 영영 모른다 -- 알림이 필요한 순간이 바로 이때다.
+      // 알림을 켠 경우에만, 그리고 느린 간격으로 계속 확인한다.
+      if (visible || optsRef.current.pollWhenHidden) await poll()
+      if (!stopped) schedule(visible ? nextDelay() : HIDDEN_IDLE_MS)
     }
 
     // 다시 화면으로 돌아오면 즉시 최신 내용을 가져온다.

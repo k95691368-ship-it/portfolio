@@ -6,6 +6,7 @@ import { useChatPolling } from '../hooks/useChatPolling.js'
 import { formatKstTime } from '../lib/formatTime.js'
 import ChatMessageList from '../components/ChatMessageList.jsx'
 import ChatComposer from '../components/ChatComposer.jsx'
+import MessageAlertToggle from '../components/MessageAlertToggle.jsx'
 import RoomDocuments from '../components/RoomDocuments.jsx'
 import ContractFieldsForm from '../components/ContractFieldsForm.jsx'
 import FinalOfferEmailForm from '../components/FinalOfferEmailForm.jsx'
@@ -17,6 +18,7 @@ import PreContractReview from '../components/PreContractReview.jsx'
 import OfferWithdrawalModal from '../components/OfferWithdrawalModal.jsx'
 import { roomStatusInfo } from '../lib/roomStatus.js'
 import { formatInviteCode } from '../lib/inviteCode.js'
+import { alertNewMessages, alertsOn } from '../lib/desktopAlert.js'
 
 // 전형을 왜 끝냈는지. 지원자에게는 사유마다 전혀 다른 의미다.
 // (서버의 _lib/roomLifecycle.js와 같은 목록)
@@ -179,7 +181,18 @@ export default function RoomPage() {
     error: chatError,
     lastSyncedAt,
     sendMessage: postMessage,
-  } = useChatPolling(roomId, 2500, view?.messages ?? null)
+  } = useChatPolling(roomId, 2500, view?.messages ?? null, {
+    // 내가 보낸 것이 되돌아온 것까지 알리면 내 말에 내가 알림을 받는다.
+    viewerId: view?.room?.viewer?.id,
+    // 알림을 켠 사람만, 탭이 가려져 있어도 느리게 계속 확인한다. 알림이
+    // 필요한 순간이 바로 그때인데 원래는 그때 확인을 멈추고 있었다.
+    pollWhenHidden: view?.room?.myRole === 'company' && alertsOn(),
+    onIncoming: (fresh) =>
+      alertNewMessages(fresh, {
+        roomTitle: view?.room?.title,
+        onClick: () => window.location.assign(`/rooms/${roomId}`),
+      }),
+  })
 
   // 말하는 그 순간에 알려야 예방이다.
   //
@@ -424,6 +437,10 @@ export default function RoomPage() {
       )}
 
       <div className="chat-panel">
+        {/* 알림 스위치는 담당자에게만 보인다. 지원자는 코드로 한 번 들어왔다
+            나가는 사람이라 브라우저 알림이 닿을 자리가 없고, 그 사람에게 가는
+            알림은 메일이다 — 켜고 끌 것이 없다. */}
+        {room.myRole === 'company' && !room.archivedAt && <MessageAlertToggle />}
         {chatError && (
           <p className="chat-offline" role="status">
             새 메시지를 받지 못하고 있습니다.

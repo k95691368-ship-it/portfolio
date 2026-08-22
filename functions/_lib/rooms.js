@@ -39,7 +39,7 @@ export async function loadCompanyMessages(env, roomId) {
 // 참여하지 않았으면 role_in_room 이 NULL 로 온다. 방이 아예 없으면 행이 없다.
 export async function getRoomParticipation(env, roomId, userId) {
   return env.DB.prepare(
-    `SELECT r.id, r.title, r.status, r.archived_at, rp.role_in_room
+    `SELECT r.id, r.title, r.status, r.archived_at, r.last_message_email_at, rp.role_in_room
        FROM interview_rooms r
        LEFT JOIN room_participants rp ON rp.room_id = r.id AND rp.user_id = ?
       WHERE r.id = ?`

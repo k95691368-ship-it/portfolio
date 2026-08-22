@@ -3,6 +3,7 @@ import { blockedWhenArchived } from '../../../_lib/roomLifecycle.js'
 import { getRoomAccess, getRoomParticipation } from '../../../_lib/rooms.js'
 import { extractTermsFromMessage, selectNewEntries } from '../../../_lib/termsNegotiation.js'
 import { scanForOfferSignals } from '../../../_lib/jobOffer.js'
+import { alertCandidate, alertCompany } from '../../../_lib/messageAlert.js'
 
 export async function onRequestGet({ request, env, data, params }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
@@ -34,7 +35,7 @@ export async function onRequestGet({ request, env, data, params }) {
   })
 }
 
-export async function onRequestPost({ request, env, data, params }) {
+export async function onRequestPost({ request, env, data, params, waitUntil }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
 
   // 보낸 사람은 언제나 data.user 다.
@@ -118,6 +119,46 @@ export async function onRequestPost({ request, env, data, params }) {
   // 방금 보낸 한 건만 훑어 돌려준다. 이력 전체를 다시 읽을 필요가 없고,
   // 화면은 이 신호를 보고 그때만 상태를 다시 불러오면 된다.
   const signal = scanForOfferSignals([{ role_in_room: participant.role_in_room, body: text }])
+
+  // 상대에게 새 메시지가 왔다고 알린다.
+  //
+  // 두 사람이 이 화면을 쓰는 방식이 다르므로 수단도 다르다. 회사는 일하는 내내
+  // 이 사이트를 열어 두므로 컴퓨터 알림이 닿지만(화면 쪽에서 띄운다), 지원자는
+  // 코드로 한 번 들어왔다 나가면 그만이라 닿는 통로가 메일뿐이다.
+  //
+  // 응답을 붙잡아 두지 않는다. 알림 한 번 때문에 보내는 사람이 기다릴 이유가
+  // 없고, 실패해도 대화는 이미 저장된 뒤다 -- 알림을 위해 오간 말을 되돌리는
+  // 것이 훨씬 나쁘다.
+  const alerting = (async () => {
+    if (participant.role_in_room === 'company') {
+      const candidate = await env.DB.prepare(
+        `SELECT u.id, u.email, u.last_seen_at
+           FROM room_participants rp JOIN users u ON u.id = rp.user_id
+          WHERE rp.room_id = ? AND rp.role_in_room = 'candidate' LIMIT 1`
+      )
+        .bind(params.roomId)
+        .first()
+      await alertCandidate(env, {
+        roomId: params.roomId,
+        room,
+        candidate,
+        companyName: data.user.company_name || data.user.display_name,
+        body: text,
+      })
+    } else if (participant.role_in_room === 'candidate') {
+      const company = await env.DB.prepare(
+        'SELECT company_user_id FROM interview_rooms WHERE id = ?'
+      )
+        .bind(params.roomId)
+        .first()
+      await alertCompany(env, {
+        roomId: params.roomId,
+        companyUserId: company?.company_user_id,
+        candidateName: data.user.display_name,
+      })
+    }
+  })().catch((err) => console.error(`message alert failed (${params.roomId}):`, err))
+  if (waitUntil) waitUntil(alerting)
 
   return jsonResponse(
     {

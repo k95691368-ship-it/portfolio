@@ -17,7 +17,7 @@ import { maskEmail, isEmailConfigured } from '../../../_lib/email.js'
 // 기존의 가벼운 증분 조회를 그대로 쓴다.
 const MESSAGE_LIMIT = 200
 
-export async function onRequestGet({ env, data, params }) {
+export async function onRequestGet({ env, data, params, waitUntil }) {
   // 코드로 들어온 사람은 계정이 없다. 로그인을 요구하면 서류합격 안내를 받고
   // 코드로 들어온 지원자가 그대로 막힌다.
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
@@ -30,6 +30,22 @@ export async function onRequestGet({ env, data, params }) {
   if (!access) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
 
   const isCompany = access.role_in_room === 'company'
+
+  // 이 사람이 방을 열어 본 시각을 남긴다.
+  //
+  // 눈앞에서 대화하는 사람에게 "새 메시지가 도착했습니다" 메일을 보내는 것은
+  // 알림이 아니라 방해다. 방금까지 보고 있었는지를 이 값으로 안다.
+  //
+  // 로그인 시각으로는 알 수 없다 -- 로그인은 30일 유지되므로 한 달 전에
+  // 들어온 사람도 '로그인 중'이다.
+  //
+  // 응답을 붙잡지 않는다. 실패해도 이번 조회와는 상관없고, 최악이라도 메일이
+  // 한 통 더 갈 뿐이다.
+  const seen = env.DB.prepare("UPDATE users SET last_seen_at = datetime('now') WHERE id = ?")
+    .bind(data.user.id)
+    .run()
+    .catch(() => {})
+  if (waitUntil) waitUntil(seen)
 
   const [participantRows, termsRow, negotiationRows, messageRows, offerMessages, finalOffer] =
     await Promise.all([

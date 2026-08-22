@@ -188,6 +188,34 @@ ${companyName} 서류 전형에 지원해 주셔서 진심으로 감사드립니
   })
 }
 
+// 면접방에 새 메시지가 왔다는 안내.
+//
+// 지원자는 이 사이트를 열어 두고 살지 않는다. 코드로 한 번 들어왔다 나가면
+// 그만이고, 회사가 무언가 물어도 그 사람은 모른다. 대화가 멈추면 계약도
+// 멈춘다 -- 그 사람에게 닿는 유일한 통로가 지원할 때 적은 메일이다.
+//
+// 본문은 싣지 않는다. 처우 조건과 개인 사정이 오가는 대화라, 메일함에 그대로
+// 복사해 두면 지운 뒤에도 남는다. "왔다"는 사실과 들어올 길만 알린다.
+export async function sendNewMessageEmail(env, { to, companyName, roomTitle }) {
+  return sendBrandedEmail(env, {
+    to,
+    subject: `[${companyName || '회사'}] 면접방에 새 메시지가 도착했습니다`,
+    bodyText: `안녕하세요.
+
+${companyName || '회사'}에서 "${roomTitle || '면접방'}"에 새 메시지를 남겼습니다.
+
+채용 공고 화면에서 서류합격 안내 메일로 받으신 면접방 입장 코드를 넣으시면
+대화를 확인하실 수 있습니다. 회원가입이나 로그인은 필요하지 않습니다.
+
+내용은 이 메일에 담지 않았습니다. 면접방에서 확인해주세요.
+
+감사합니다.`,
+    companyName,
+    heading: 'NEW MESSAGE',
+    title: '새 메시지 도착',
+  })
+}
+
 // 서명 완료된 근로계약서 PDF를 첨부하여 지원자에게 발송.
 // pdfBase64 는 PDF 바이트의 base64 문자열.
 export async function sendSignedContractEmail(env, { to, companyName, pdfBase64, filename }) {
