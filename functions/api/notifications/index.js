@@ -25,6 +25,8 @@ export async function onRequestGet({ env, data }) {
       isRead: !!n.is_read,
       createdAt: n.created_at,
     })),
-    unreadCount: unread.count,
+    // COUNT 는 늘 한 줄을 준다고 여기고 바로 읽었는데, first() 가 null 을
+    // 돌려주면 여기서 터져 알림 목록 전체가 500 이 된다. 못 셌으면 0으로 둔다.
+    unreadCount: Number(unread?.count ?? 0),
   })
 }

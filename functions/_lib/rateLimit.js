@@ -19,7 +19,17 @@ export async function checkRateLimit(env, bucket, maxHits, windowSeconds) {
   const row = await env.DB.prepare('SELECT COUNT(*) AS count FROM rate_limit_hits WHERE bucket = ?')
     .bind(bucket)
     .first()
-  if (row.count >= maxHits) return 0
+  // 조회가 비어 올 수 있다는 것을 가정한다.
+  //
+  // COUNT 는 늘 한 줄을 준다고 여기고 row.count 를 바로 읽었는데, first() 가
+  // null 을 돌려주면 여기서 터진다. 그러면 시도 제한이 켜져 있는 경로 전체가
+  // 500 이 된다 -- 로그인, 지원, 지원 현황 조회, 증명서 확인이 한꺼번에.
+  //
+  // 막으라고 넣은 장치가 서비스를 멈추는 원인이 되면 안 된다. 세지 못했으면
+  // 0회로 보고 통과시킨다. 세지 못한 요청 하나를 더 받는 것이, 멀쩡한 사람을
+  // 전부 막는 것보다 낫다.
+  const used = Number(row?.count ?? 0)
+  if (used >= maxHits) return 0
 
   const inserted = await env.DB.prepare('INSERT INTO rate_limit_hits (bucket) VALUES (?)')
     .bind(bucket)

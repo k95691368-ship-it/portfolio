@@ -7,11 +7,26 @@
 // 없었으므로, 쿠키가 다른 두 사람의 요청이 같은 응답으로 묶일 여지도 남는다.
 //
 // 개인정보를 담은 응답은 저장하지 않는다고 명시한다.
+//
+// 보안 헤더도 함께 붙인다.
+//
+// 화면 파일에는 _headers 로 붙였지만 API 응답에는 아무것도 없었다. 그런데
+// 위험한 것이 실려 나가는 쪽은 이쪽이다 -- 계약 조건과 지원자 정보가 여기로
+// 나간다.
+//
+//   nosniff : 브라우저가 JSON 을 HTML 로 짐작해 해석하면, 응답에 실린 글자가
+//             화면에서 코드로 실행될 여지가 생긴다. 짐작하지 말라고 못박는다.
+//   DENY    : 이 응답을 액자에 넣지 못하게 한다.
+//   none    : 이 응답 안의 주소를 브라우저가 미리 열어 보지 않게 한다.
 const PRIVATE_HEADERS = {
   'Content-Type': 'application/json',
   'Cache-Control': 'no-store, no-cache, must-revalidate, private',
   Pragma: 'no-cache',
   Vary: 'Cookie',
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'no-referrer',
+  'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
 }
 
 export function jsonResponse(data, status = 200, extraHeaders = {}) {

@@ -1,5 +1,8 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { createHash } from 'node:crypto'
+import { readFileSync, writeFileSync, appendFileSync, existsSync } from 'node:fs'
+import { join } from 'node:path'
 
 // 첫 화면이 뜨기까지 브라우저가 몇 번 왕복하는가.
 //
@@ -136,8 +139,135 @@ function fastFirstPaint() {
   }
 }
 
+// 브라우저에게 "이 사이트에서는 이것만 허용한다"를 알려 준다.
+//
+// 지금은 아무 제한이 없다. 어떤 경로로든 스크립트가 한 줄 끼어들면 그것이
+// 그대로 돈다 -- 이 화면에는 지원자 개인정보와 근로계약 조건이 떠 있고,
+// 서명 버튼이 있다.
+//
+// 문제는 이 사이트가 인라인 스크립트를 쓴다는 것이다(화면 색 먼저 입히기,
+// 분석 도구 큐, 조각 미리 받기). 'unsafe-inline' 으로 열면 CSP 를 붙이나 마나다.
+// 그래서 빌드가 그 스크립트들의 해시를 계산해 그것만 허용한다 -- 한 글자라도
+// 바뀌면 해시가 달라져 자동으로 갱신되고, 끼어든 스크립트는 해시가 없어 막힌다.
+//
+// frame-ancestors 도 여기서 막는다. 계약서 화면을 보이지 않는 액자에 넣고 그
+// 위에 가짜 버튼을 얹으면, 누르는 사람은 다른 것을 누른 줄 알고 서명한다.
+const ANALYTICS = {
+  script: ['https://www.googletagmanager.com', 'https://www.clarity.ms', 'https://scripts.clarity.ms'],
+  connect: [
+    'https://www.google-analytics.com',
+    'https://analytics.google.com',
+    'https://*.google-analytics.com',
+    'https://*.clarity.ms',
+    'https://*.googletagmanager.com',
+  ],
+  img: ['https://www.google-analytics.com', 'https://*.google-analytics.com', 'https://*.clarity.ms'],
+}
+
+// 일부러 허용하지 않는 것: c.bing.com
+//
+// 클래리티가 켜지면 마이크로소프트의 광고 동기화 픽셀을 하나 더 부른다. 화면을
+// 어떻게 쓰는지 보려고 붙인 도구인데, 그 김에 방문자를 광고 쪽 식별자와 묶는
+// 일까지 한다. 이 사이트에는 지원자와 근로계약이 있다 -- 그 사람이 여기 왔다는
+// 사실을 광고 판에 넘길 이유가 없다.
+//
+// 막아도 클래리티의 녹화와 히트맵은 그대로 돈다. 콘솔에 차단 기록이 한 줄
+// 남는데, 그것은 고장이 아니라 이 정책이 일하고 있다는 표시다.
+
+function securityHeaders() {
+  return {
+    name: 'security-headers',
+    apply: 'build',
+    enforce: 'post',
+    writeBundle(options) {
+      const dir = options.dir || 'dist'
+      const htmlPath = join(dir, 'index.html')
+      if (!existsSync(htmlPath)) return
+      const html = readFileSync(htmlPath, 'utf-8')
+
+      // 인라인 스크립트의 해시. CSP 는 여는 태그와 닫는 태그 사이의 내용을
+      // 그대로(공백까지) 해시한다.
+      //
+      // 줄바꿈을 먼저 맞춘다. 이 저장소는 윈도우에서 쓰여 index.html 이
+      // CRLF 인데, HTML 파서는 읽으면서 그것을 LF 로 바꾼다. 그래서 파일
+      // 그대로 해시하면 브라우저가 계산하는 값과 달라지고, 내가 쓴 스크립트가
+      // 내가 건 CSP 에 막힌다 -- 실제로 그렇게 분석 도구가 통째로 죽었다.
+      //
+      // 빌드가 만들어 넣은 스크립트(LF)만 통과하고 손으로 쓴 넷이 전부 막혀
+      // 있었던 것이 단서였다.
+      const hashes = []
+      for (const m of html.matchAll(/<script(?![^>]*\ssrc=)[^>]*>([\s\S]*?)<\/script>/g)) {
+        const body = m[1].replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+        const h = createHash('sha256').update(body, 'utf-8').digest('base64')
+        hashes.push(`'sha256-${h}'`)
+      }
+
+      const csp = [
+        "default-src 'self'",
+        `script-src 'self' ${hashes.join(' ')} ${ANALYTICS.script.join(' ')}`,
+        // 스타일은 해시로 묶지 않는다. 리액트가 style 속성을 직접 붙이는 곳이
+        // 있어 막으면 화면이 깨지고, 스타일 주입은 스크립트 주입만큼 위험하지 않다.
+        "style-src 'self' 'unsafe-inline'",
+        `img-src 'self' data: blob: ${ANALYTICS.img.join(' ')}`,
+        "font-src 'self' data:",
+        `connect-src 'self' ${ANALYTICS.connect.join(' ')}`,
+        // 서비스워커는 우리 것만.
+        "worker-src 'self'",
+        // 액자에 넣지 못하게. 클릭재킹을 막는 자리다.
+        "frame-ancestors 'none'",
+        "frame-src 'none'",
+        // <base> 를 바꿔치기해 모든 상대 경로를 남의 서버로 돌리는 것을 막는다.
+        "base-uri 'self'",
+        // 폼이 남의 서버로 제출되지 못하게. 여기에는 개인정보가 실린다.
+        "form-action 'self'",
+        "object-src 'none'",
+        'upgrade-insecure-requests',
+      ].join('; ')
+
+      const headersPath = join(dir, '_headers')
+      const extra = [
+        '',
+        '# 아래는 빌드가 만든다(vite.config.js). 인라인 스크립트 해시가 들어가므로',
+        '# 손으로 고치면 다음 빌드에 덮어써진다.',
+        '/*',
+        `  Content-Security-Policy: ${csp}`,
+        // http 로 한 번이라도 가면 중간에서 가로챌 수 있다. 2년간 https 만 쓰게 한다.
+        '  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload',
+        '  X-Content-Type-Options: nosniff',
+        // CSP 를 못 읽는 낡은 브라우저를 위한 같은 뜻의 옛 헤더.
+        '  X-Frame-Options: DENY',
+        '  Referrer-Policy: strict-origin-when-cross-origin',
+        // 쓰지 않는 기능은 닫는다. 스크립트가 끼어들어도 카메라를 켤 수 없다.
+        '  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), interest-cohort=()',
+        // 우리 자산을 남의 사이트가 가져다 쓰지 못하게 한다. 재 보니 공짜다.
+        '  Cross-Origin-Resource-Policy: same-origin',
+        //
+        // Cross-Origin-Opener-Policy 는 일부러 붙이지 않는다.
+        //
+        // 붙여 보고 쟀더니 첫 그림이 84ms 에서 172ms 로 늘었다. 두 배다.
+        // same-origin 도, 더 느슨한 same-origin-allow-popups 도 똑같이 비쌌다
+        // (+60ms, +88ms). 브라우저가 탐색할 때마다 렌더러를 갈아 끼우기 때문이다.
+        //
+        // 그 값을 치르고 얻는 것은 '이 문서를 연 창이 우리를 조종하지 못하게'다.
+        // 그런데 이 사이트는 팝업을 열지도, 팝업으로 열리지도 않는다. 막으려는
+        // 일이 애초에 일어나지 않는 자리에 방문자 전원의 첫 화면을 두 배로
+        // 늦추는 값을 치를 이유가 없다.
+        //
+        // 나중에 팝업으로 무언가를 열게 되면 그때 다시 재 보고 판단한다.
+        // 재지 않고 "보안에 좋으니까" 다시 붙이지는 말 것.
+        // Pages 기본값이 화면 문서까지 아무나 읽어 가게 열어 둔다. 지운다.
+        '  ! Access-Control-Allow-Origin',
+        '',
+      ].join('\n')
+
+      if (existsSync(headersPath)) appendFileSync(headersPath, extra, 'utf-8')
+      else writeFileSync(headersPath, extra.trimStart(), 'utf-8')
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   base: '/',
-  plugins: [react(), fastFirstPaint()],
+  plugins: [react(), fastFirstPaint(), securityHeaders()],
 })
