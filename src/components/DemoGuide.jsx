@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 
 // 평가자용 체험 안내.
 //
@@ -15,8 +16,10 @@ import { useToast } from '../context/ToastContext.jsx'
 export default function DemoGuide() {
   const [demo, setDemo] = useState(null)
   const [open, setOpen] = useState(false)
+  const [starting, setStarting] = useState(null)
   const navigate = useNavigate()
   const toast = useToast()
+  const { startDemo } = useAuth()
 
   useEffect(() => {
     api
@@ -26,6 +29,20 @@ export default function DemoGuide() {
   }, [])
 
   if (!demo) return null
+
+  // 어느 쪽으로 들어갈지만 보낸다. 이메일은 서버가 코드에 박힌 목록에서
+  // 고른다 -- 화면이 보낸 주소로 로그인시키면 그 문은 남의 계정도 연다.
+  const begin = async (role, to) => {
+    setStarting(role)
+    try {
+      const user = await startDemo(role)
+      toast.success(`${user.displayName}님으로 체험을 시작합니다.`)
+      navigate(to)
+    } catch (err) {
+      toast.error(err.message)
+      setStarting(null)
+    }
+  }
 
   const copy = async (text, label) => {
     try {
@@ -66,9 +83,29 @@ export default function DemoGuide() {
         </div>
       </div>
 
-      <button type="button" className="btn-primary" onClick={() => navigate('/login')}>
-        체험 시작하기
-      </button>
+      {/* 계정과 비밀번호를 적어 두어도 대부분은 옮겨 적지 않고 그만둔다.
+          누르면 그 자리에서 로그인되어 바로 들어가게 한다. */}
+      <div className="demo-start">
+        <button
+          type="button"
+          className="btn-primary"
+          disabled={!!starting}
+          onClick={() => begin('company', '/dashboard')}
+        >
+          {starting === 'company' ? '들어가는 중...' : '회사로 체험 시작'}
+        </button>
+        <button
+          type="button"
+          className="btn-primary"
+          disabled={!!starting}
+          onClick={() => begin('candidate', '/dashboard')}
+        >
+          {starting === 'candidate' ? '들어가는 중...' : '지원자로 체험 시작'}
+        </button>
+      </div>
+      <p className="demo-start-note">
+        비밀번호를 옮겨 적지 않아도 됩니다. 창을 닫으면 체험 로그인은 끝납니다.
+      </p>
       <button type="button" className="btn-sm demo-toggle" onClick={() => setOpen((v) => !v)}>
         {open ? '순서 접기' : '무엇을 보게 되나요?'}
       </button>

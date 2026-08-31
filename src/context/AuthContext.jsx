@@ -81,6 +81,17 @@ export function AuthProvider({ children }) {
     return newUser
   }
 
+  // 체험 계정으로 바로 들어간다.
+  //
+  // 로그인과 같은 자리에 둔다. 화면이 따로 쿠키를 다루지 않고, 로그인 상태를
+  // 들고 있는 곳이 한 군데로 유지되어야 한다.
+  const startDemo = async (role) => {
+    const user = await api.post('/demo/login', { role })
+    setUser(user)
+    setConnectionError(null)
+    return user
+  }
+
   const logout = async () => {
     await api.post('/logout', {})
     setUser(null)
@@ -88,7 +99,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, connectionError, login, signup, logout, refresh }}
+      value={{ user, loading, connectionError, login, signup, startDemo, logout, refresh }}
     >
       {children}
     </AuthContext.Provider>

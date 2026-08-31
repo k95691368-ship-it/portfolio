@@ -1,10 +1,10 @@
-import { jsonResponse } from '../_lib/http.js'
+import { jsonResponse } from '../../_lib/http.js'
 import {
   DEMO_DOMAIN,
   DEMO_PASSWORD,
   DEMO_ACCOUNTS,
   DEMO_WALKTHROUGH,
-} from '../_lib/demoSeed.js'
+} from '../../_lib/demoSeed.js'
 
 // 공개: 체험용 데모가 살아 있는지와 그 접속 정보.
 //

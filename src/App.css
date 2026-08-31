@@ -995,6 +995,16 @@
   font-size: 13px;
   word-break: break-all;
 }
+.demo-start {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.demo-start-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
 .demo-toggle {
   align-self: flex-start;
 }

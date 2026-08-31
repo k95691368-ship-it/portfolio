@@ -147,6 +147,27 @@ describe(`배포 스모크 (${BASE})`, () => {
       }
     })
 
+    // 체험 시작은 비밀번호 없이 세션을 만들어 준다. 이 앱에서 가장 위험한
+    // 문이므로, 열 수 있는 대상이 체험 계정으로만 한정되는지 계속 확인한다.
+    it('체험 시작은 체험 계정만 연다', async () => {
+      const res = await call('/api/demo/login', {
+        method: 'POST',
+        body: JSON.stringify({ role: 'admin' }),
+      })
+      expect([400, 404, 429]).toContain(res.status)
+    })
+
+    it('화면이 보낸 이메일로는 체험 로그인을 시켜 주지 않는다', async () => {
+      const res = await call('/api/demo/login', {
+        method: 'POST',
+        body: JSON.stringify({ role: 'company', email: 'someone@real.example.com' }),
+      })
+      // 열리더라도 그것은 role 로 고른 체험 계정이어야 한다.
+      if (res.status === 200) {
+        expect(res.json?.email).toMatch(/@demo\.invalid$/)
+      }
+    })
+
     it('마감·미존재 공고에는 지원할 수 없다', async () => {
       const res = await call('/api/jobs/smoke-nonexistent/apply', { method: 'POST' })
       expect([400, 404, 429]).toContain(res.status)
