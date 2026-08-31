@@ -41,6 +41,10 @@ const PROTECTED = [
   ['GET', '/api/admin/users'],
   ['GET', '/api/admin/rooms'],
   ['GET', '/api/admin/audit-log'],
+  // 데모 초기화는 데이터를 지우고 다시 만든다. 이 문이 열려 있으면 아무나
+  // 운영 데이터를 건드릴 수 있다.
+  ['GET', '/api/admin/demo/reset'],
+  ['POST', '/api/admin/demo/reset'],
   ['POST', '/api/rooms/create'],
   ['POST', '/api/rooms/join'],
   ['GET', '/api/rooms/smoke-nonexistent/view'],
@@ -126,6 +130,21 @@ describe(`배포 스모크 (${BASE})`, () => {
       const res = await call('/api/verify-certificate?serial=abc')
       expect(res.status).toBe(400)
       expect(res.json?.error).toContain('AC-')
+    })
+
+    // 체험 안내는 공개가 목적이다. 다만 내려주는 계정이 데모 계정으로만
+    // 한정되는지는 계속 확인해야 한다 — 여기가 새면 사람의 계정이 나간다.
+    it('체험 안내는 데모 계정만 내려준다', async () => {
+      const res = await call('/api/demo')
+      expect(res.status).toBe(200)
+      if (res.json?.seeded) {
+        expect(Array.isArray(res.json.accounts)).toBe(true)
+        for (const a of res.json.accounts) {
+          expect(a.email.endsWith('@demo.invalid')).toBe(true)
+        }
+        // 비밀번호는 데모 계정의 것만 공개된다.
+        expect(typeof res.json.password).toBe('string')
+      }
     })
 
     it('마감·미존재 공고에는 지원할 수 없다', async () => {

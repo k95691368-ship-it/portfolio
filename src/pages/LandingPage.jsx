@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
+import DemoGuide from '../components/DemoGuide.jsx'
 
 export default function LandingPage() {
   const navigate = useNavigate()
@@ -29,6 +30,8 @@ export default function LandingPage() {
           계약 증명서를 제시받으셨나요? <Link to="/verify">발급번호로 진위 확인 →</Link>
         </p>
       </div>
+
+      <DemoGuide />
 
       {/* 코드를 보러 온 사람에게는 화면보다 무엇을 어떻게 만들었는지가 먼저다. */}
       <Link to="/tech" className="landing-tech-link">
