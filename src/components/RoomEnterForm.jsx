@@ -62,7 +62,7 @@ export default function RoomEnterForm() {
           <input
             value={code}
             onChange={(e) => setCode(formatInviteCode(e.target.value))}
-            placeholder="예: AC3K-M7PQ-4RTV"
+            placeholder="AC3K-M7PQ-4RTV"
             // 12자리에 하이픈 두 개. 메일에서 통째로 붙여 넣는 사람이 있다.
             maxLength={14}
             autoComplete="off"

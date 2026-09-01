@@ -61,9 +61,36 @@
   --shadow:
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 
+  /* 모서리.
+     기본이 알약(9999px)이었다. 알약 버튼은 눈에 띄지만 여러 개가 나란히
+     서면 전부 똑같이 떠 보여, 무엇이 주된 행동인지 사라진다. 실제로 첫
+     화면에 파란 알약이 둘 나란히 서 있었다.
+     면의 크기에 따라 모서리를 다르게 준다 -- 큰 면일수록 크게. */
+  --r-xs: 8px;
+  --r-sm: 10px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
   --radius: 16px;
   --radius-sm: 10px;
   --radius-full: 9999px;
+
+  /* 세로 리듬. 4의 배수로만 띄운다. 눈금이 하나면 화면끼리 간격이 어긋나지
+     않는다. */
+  --gap-1: 4px;
+  --gap-2: 8px;
+  --gap-3: 12px;
+  --gap-4: 16px;
+  --gap-5: 20px;
+  --gap-6: 24px;
+  --gap-8: 32px;
+  --gap-10: 40px;
+  /* 화면 좌우 여백. 모바일에서 이 값 하나로 모든 화면이 같은 선에 선다. */
+  --page-x: 20px;
+
+  /* 누를 수 있는 것의 높이. 손가락이 닿는 크기를 밑돌지 않게 한다. */
+  --tap: 48px;
+  --tap-lg: 56px;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
@@ -227,7 +254,13 @@ body {
   width: 1126px;
   max-width: 100%;
   margin: 0 auto;
-  text-align: center;
+  /* 사이트 전체를 가운데로 모으고 있었다.
+     제목 한 줄만 놓고 보면 그럴듯한데, 그 아래 설명과 목록까지 가운데로 오면
+     줄마다 시작점이 달라져 눈이 매번 줄 앞을 다시 찾아야 한다. 글이 길수록
+     심해진다 -- 이 앱에는 계약 조건과 법 조문 설명이 문단으로 들어간다.
+     그래서 화면마다 text-align: left 를 따로 적어 되돌리고 있었다.
+     기본을 왼쪽으로 두고, 가운데가 필요한 곳(빈 목록 안내, 토스트)만 지정한다. */
+  text-align: left;
   min-height: 100svh;
   display: flex;
   flex-direction: column;
@@ -296,23 +329,32 @@ h3 {
   color: var(--text-h);
 }
 
+/* 제목 크기를 줄였다.
+   56px 은 넓은 화면을 전제한 크기다. 휴대폰에서 열면 "어떤 목적으로 방문하셨
+   / 나요?" 처럼 낱말 가운데가 잘려 두 줄이 됐다. 크게 쓴다고 잘 읽히는 것이
+   아니라, 한 줄에 들어가야 읽힌다.
+   자간을 음수로 당기고 굵기를 올려, 작아져도 제목으로 보이게 한다. */
 h1 {
-  font-size: 56px;
-  line-height: 1.15;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.6px;
+  margin: 0 0 var(--gap-2);
+  word-break: keep-all;
+  @media (min-width: 768px) {
+    font-size: 34px;
+    letter-spacing: -0.9px;
   }
 }
 h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.4px;
+  margin: 0 0 var(--gap-2);
+  word-break: keep-all;
+  @media (min-width: 768px) {
+    font-size: 21px;
   }
 }
 h3 {
@@ -344,28 +386,38 @@ code {
   background: var(--code-bg);
 }
 
+/* 버튼.
+   알약 모양(9999px)에 테두리를 두르고 있었다. 알약은 하나 있을 때는 시원한데
+   여럿이 나란히 서면 전부 똑같이 도드라져, 무엇이 주된 행동인지 사라진다.
+   모서리를 12px 로 낮추고 테두리를 없앤다 -- 면과 글자색만으로 층을 나눈다.
+
+   높이는 손가락에 맞춘다. 예전에는 세로 여백만 9px 이라 실제 높이가 38px
+   안팎이었고, 휴대폰에서 옆 버튼이 함께 눌리기 쉬웠다. */
 button {
   appearance: none;
   font: inherit;
+  font-size: 15px;
   font-weight: 600;
+  letter-spacing: -0.2px;
   cursor: pointer;
-  border: 1px solid var(--btn-border);
-  border-radius: var(--radius-full);
-  padding: 9px 19px;
+  border: 0;
+  border-radius: var(--r-md);
+  min-height: var(--tap);
+  padding: 0 18px;
   color: var(--text-h);
-  background: var(--btn-face);
+  background: var(--surface);
   transition:
     background 0.15s ease,
-    border-color 0.15s ease,
-    transform 0.1s ease,
-    box-shadow 0.15s ease,
+    color 0.15s ease,
+    transform 0.12s ease,
     opacity 0.15s ease;
 }
 button:hover:not(:disabled) {
   background: var(--btn-face-hover);
 }
+/* 눌린 느낌은 크기로만 준다. 색까지 함께 바꾸면 화면이 번쩍인다. */
 button:active:not(:disabled) {
-  transform: scale(0.97);
+  transform: scale(0.98);
 }
 button:disabled {
   opacity: 0.5;
@@ -380,17 +432,21 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
+/* 주된 행동. 한 화면에 하나만 둔다.
+   그림자를 걷어냈다. 파란 면 자체가 이미 충분히 앞으로 나와 있어, 그림자는
+   경계를 흐리기만 한다. */
 .btn-primary {
   background: var(--accent);
   color: var(--on-accent);
-  box-shadow: var(--shadow-sm);
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
 }
+/* 되돌릴 수 없는 행동. 옅은 면에 붉은 글자로 두어, 실수로 먼저 눈에 들어오지
+   않게 한다. 정말 누를 때만 붉은 면으로 바뀐다. */
 .btn-danger {
   background: var(--danger-bg);
-  color: var(--danger);
+  color: var(--danger-text);
 }
 .btn-danger:hover:not(:disabled) {
   background: var(--danger);
@@ -398,13 +454,17 @@ textarea:focus-visible {
 }
 .btn-ghost {
   background: transparent;
+  color: var(--text);
 }
 .btn-ghost:hover:not(:disabled) {
   background: var(--surface);
 }
+/* 곁들이는 행동. 목록 안이나 카드 구석에 놓인다. */
 .btn-sm {
-  padding: 6px 14px;
-  font-size: 13px;
+  min-height: 38px;
+  padding: 0 12px;
+  font-size: 14px;
+  border-radius: var(--r-xs);
 }
 
 /* 헤더 내비게이션용 버튼형 링크 (주 버튼과 경쟁하지 않도록 보조 스타일) */
@@ -414,42 +474,75 @@ textarea:focus-visible {
 .btn-nav {
   display: inline-flex;
   align-items: center;
-  padding: 9px 19px;
-  border: 1px solid var(--btn-border);
-  border-radius: var(--radius-full);
-  background: var(--bg);
-  color: var(--accent);
-  font-size: 15px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--r-xs);
+  background: var(--surface);
+  color: var(--text-h);
+  font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease;
+  transition: background 0.15s ease;
 }
 .btn-nav:hover {
-  background: var(--btn-face);
+  background: var(--btn-face-hover);
   text-decoration: none;
 }
+/* 화면 아래에 놓이는 주된 행동. 폭을 꽉 채우고 키를 키운다 -- 손가락이
+   어디를 눌러도 닿게. */
 .btn-block {
+  width: 100%;
+  min-height: var(--tap-lg);
+  font-size: 16px;
+  border-radius: var(--r-md);
+}
+/* 버튼을 세로로 쌓는 자리. 주된 것 하나, 그 아래 보조. */
+.btn-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-2);
   width: 100%;
 }
 
+/* 입력칸.
+   테두리를 그려 칸을 표시하는 대신 옅은 면을 깐다. 테두리가 여럿 늘어서면
+   화면이 격자처럼 보이는데, 이 앱의 계약서 화면에는 입력칸이 열 개 넘게
+   이어진다. 면으로 하면 그 줄이 사라진다.
+   글자는 16px 로 둔다 -- 이보다 작으면 아이폰이 입력할 때 화면을 확대한다. */
 input,
 select,
 textarea {
   font: inherit;
-  padding: 12px 16px;
+  font-size: 16px;
+  min-height: 52px;
+  padding: 14px 16px;
+  /* 테두리를 항상 둔다.
+     면만으로 칸을 표시했더니, 같은 회색 카드 안에 들어간 순간 경계가 사라져
+     "어디에 쓰는지" 보이지 않았다. 채용 공고 등록 화면에서는 라벨만 떠 있고
+     칸이 통째로 사라진 것처럼 보였다.
+     담는 면이 무엇이든 칸이 보이려면 테두리가 있어야 한다. */
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-md);
   background: var(--bg);
   color: var(--text-h);
   transition:
     border-color 0.15s ease,
+    background 0.15s ease,
     box-shadow 0.15s ease;
 }
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+}
+textarea {
+  line-height: 1.6;
+}
+/* 지금 어디에 쓰고 있는지. 면을 흰색으로 되돌리고 테두리를 세운다. */
 input:focus,
 select:focus,
 textarea:focus {
+  background: var(--bg);
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-bg);
 }

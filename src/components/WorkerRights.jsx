@@ -4,6 +4,8 @@
 // 근로자는 그 문장에서 아무것도 알 수 없다. 며칠이 언제 생기는지, 내가 퇴직금
 // 대상인지, 연장근로 한 시간에 얼마를 받아야 하는지는 계약서에 적힌 값만으로
 // 전부 계산되는데 아무도 계산해 주지 않았다.
+import Fold from './Fold.jsx'
+
 const won = (n) => `${Number(n || 0).toLocaleString('ko-KR')}원`
 
 export default function WorkerRights({ rights }) {
@@ -11,9 +13,17 @@ export default function WorkerRights({ rights }) {
   const { annualLeave, severance, overtime } = rights
   if (!annualLeave?.known && !severance?.known && !overtime?.known) return null
 
+  // 닫힌 줄에 무엇이 들었는지 적는다. "내 권리 ›" 만 있으면 안 연다.
+  const hint = [
+    annualLeave?.known ? '연차' : null,
+    severance?.known ? '퇴직금' : null,
+    overtime?.known ? '연장·야간수당' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
   return (
-    <section className="worker-rights">
-      <h2>내 권리</h2>
+    <Fold className="worker-rights" title="내 권리" hint={hint}>
       <p className="rights-note">
         계약서에 적힌 값으로 계산한 것입니다. 실제 출근일수와 계속근로 여부에 따라 달라질 수 있습니다.
       </p>
@@ -84,6 +94,6 @@ export default function WorkerRights({ rights }) {
           {overtime.caveat && <p className="rights-caveat">{overtime.caveat}</p>}
         </div>
       )}
-    </section>
+    </Fold>
   )
 }

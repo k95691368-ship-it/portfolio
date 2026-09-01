@@ -9,6 +9,7 @@ import AuditCertificate from '../components/AuditCertificate.jsx'
 import WageComposition from '../components/WageComposition.jsx'
 import WorkerRights from '../components/WorkerRights.jsx'
 import SeverityBadge from '../components/SeverityBadge.jsx'
+import Fold from '../components/Fold.jsx'
 import { EMPTY_FORM, formFromTerms } from '../lib/contractForm.js'
 import { formatKst } from '../lib/formatTime.js'
 import { IDENTITY_FIELDS, TERM_FIELDS, SOCIAL_INSURANCE_FIELDS } from '../lib/contractTemplate.js'
@@ -65,8 +66,11 @@ function ContractTranslations({
   if (!canTranslate && translations.length === 0) return null
 
   return (
-    <section className="contract-translation">
-      <h2>외국어 계약서</h2>
+    <Fold
+      className="contract-translation"
+      title="외국어 계약서"
+      hint={translations.length > 0 ? `${translations.length}개 언어` : '아직 번역 없음'}
+    >
       <p className="translation-note">
         법적 효력은 한국어 원본에 있으며, 번역본은 근로자가 내용을 정확히 이해하도록 돕기 위한
         참고본입니다.
@@ -137,7 +141,7 @@ function ContractTranslations({
           ))}
         </div>
       )}
-    </section>
+    </Fold>
   )
 }
 
@@ -226,9 +230,19 @@ function ContractLifecycle({
   const showPicker = canLink && linkableRooms.length > 0
   if (!continuity?.linked && !retention?.known && !showPicker && !canRecordEnd) return null
 
+  // 닫힌 줄에 적을 말. 이어진 계약 건수와 종료 기록 여부가 안 적히면 접힌 채로
+  // 영영 안 열린다 — 계속근로기간은 퇴직금이 걸린 값이다.
+  const hint =
+    [
+      continuity?.linked ? `이어진 계약 ${continuity.count}건` : null,
+      employmentEnd?.endedAt ? '근로관계 종료 기록됨' : null,
+      retention?.known ? retention.label : null,
+    ]
+      .filter(Boolean)
+      .join(' · ') || '이어진 계약 없음'
+
   return (
-    <section className="contract-lifecycle">
-      <h2>계약 이력과 보존</h2>
+    <Fold className="contract-lifecycle" title="계약 이력과 보존" hint={hint}>
 
       {continuity?.linked && (
         <>
@@ -315,7 +329,7 @@ function ContractLifecycle({
         onClear={onClearEnd}
         busy={busy}
       />
-    </section>
+    </Fold>
   )
 }
 
@@ -323,13 +337,15 @@ function ContractPeriod({ period }) {
   if (!period?.known) return null
 
   return (
-    <section className="contract-period">
-      <div className="period-head">
-        <h2>계약 기간</h2>
+    <Fold
+      className="contract-period"
+      title="계약 기간"
+      badge={
         <span className={`badge ${PERIOD_BADGE[period.status] || 'badge-neutral'}`}>
           {period.label}
         </span>
-      </div>
+      }
+    >
 
       {period.openEnded ? (
         <p className="period-detail">
@@ -360,7 +376,7 @@ function ContractPeriod({ period }) {
           )}
         </>
       )}
-    </section>
+    </Fold>
   )
 }
 const REQUEST_STATUS = {
@@ -398,8 +414,18 @@ function ChangeRequests({ requests, myRole, canRequest, canRespond, onCreate, on
   const resolved = requests.filter((r) => r.status !== 'pending')
 
   return (
-    <section className="change-requests">
-      <h2>계약 조건 수정 요청</h2>
+    <Fold
+      className="change-requests"
+      title="계약 조건 수정 요청"
+      hint={
+        pending.length > 0
+          ? `검토 중 ${pending.length}건`
+          : resolved.length > 0
+            ? `답한 것 ${resolved.length}건`
+            : '아직 없음'
+      }
+      defaultOpen={pending.length > 0}
+    >
 
       {pending.length === 0 && resolved.length === 0 && (
         <p className="notice">
@@ -504,7 +530,7 @@ function ChangeRequests({ requests, myRole, canRequest, canRespond, onCreate, on
           </button>
         </form>
       )}
-    </section>
+    </Fold>
   )
 }
 
@@ -1304,13 +1330,16 @@ export default function ContractPage() {
       />
 
       {canEdit && (user.isAdmin || user.isRecruiter) && (
-        <section className="ai-draft">
-          <h2>AI 계약서 문장 자동 작성</h2>
+        <Fold
+          className="ai-draft"
+          title="AI 계약서 문장 자동 작성"
+          hint={aiDocument ? '작성해 둠' : '아직 안 만듦'}
+        >
           <p>위에 입력한 조건을 바탕으로 표준근로계약서 형식의 계약서 문장을 AI가 작성합니다.</p>
           <button type="button" onClick={handleDraftDocument} disabled={drafting}>
             {drafting ? 'AI가 계약서를 작성하는 중...' : aiDocument ? 'AI 계약서 다시 작성하기' : 'AI로 계약서 작성하기'}
           </button>
-        </section>
+        </Fold>
       )}
 
       {/* 근로자가 자기 계약을 이해하도록 돕는다. 서명 전에 보이는 것이 중요하므로
@@ -1322,9 +1351,10 @@ export default function ContractPage() {
       {/* 공고를 보고 지원한 사람은 그 조건을 전제로 결정했다. 계약서에서 조건이
           나빠졌는지 값으로 대조해 알린다 (채용절차법 제4조 제3항). */}
       {postingComparison?.comparable && (
-        <section className="posting-compare">
-          <div className="period-head">
-            <h2>공고와 대조</h2>
+        <Fold
+          className="posting-compare"
+          title="공고와 대조"
+          badge={
             <span
               className={`badge ${postingComparison.issues.length === 0 ? 'badge-success' : postingComparison.hasUnfavorable ? 'badge-danger' : 'badge-warning'}`}
             >
@@ -1332,7 +1362,11 @@ export default function ContractPage() {
                 ? '공고와 일치'
                 : `다른 항목 ${postingComparison.issues.length}건`}
             </span>
-          </div>
+          }
+          // 공고보다 나빠진 조건은 접어 두면 안 된다. 그 사람은 공고를 보고
+          // 지원했고, 달라진 것을 모른 채 서명하면 되돌릴 방법이 없다.
+          defaultOpen={postingComparison.issues.length > 0}
+        >
           <p className="period-detail">
             지원한 공고: {postingComparison.postingTitle}
           </p>
@@ -1358,21 +1392,26 @@ export default function ContractPage() {
               ))}
             </ul>
           )}
-        </section>
+        </Fold>
       )}
 
       {/* 교부 의무(근로기준법 제17조 제2항)는 사업주에게 있고 위반은 벌금
           대상이다. 이행 여부와 근로자가 실제로 확인했는지를 함께 보여 준다. */}
       {deliveryState && (
-        <section className="contract-delivery">
-          <div className="period-head">
-            <h2>계약서 교부</h2>
+        <Fold
+          className="contract-delivery"
+          title="계약서 교부"
+          badge={
             <span
               className={`badge ${deliveryState.viewed ? 'badge-success' : deliveryState.delivered ? 'badge-accent' : 'badge-warning'}`}
             >
               {deliveryState.label}
             </span>
-          </div>
+          }
+          // 교부는 근로기준법 제17조 제2항의 의무고 위반은 벌금 대상이다.
+          // 아직 안 보낸 상태를 접어 두면 안 한 채로 잊는다.
+          defaultOpen={!deliveryState.delivered}
+        >
           <p className={deliveryState.delivered ? 'period-detail' : 'period-alert'}>
             {deliveryState.detail}
           </p>
@@ -1388,7 +1427,7 @@ export default function ContractPage() {
               ))}
             </ul>
           )}
-        </section>
+        </Fold>
       )}
 
       <ContractPeriod period={period} />
@@ -1610,8 +1649,11 @@ export default function ContractPage() {
       />
 
       {history.length > 0 && (
-        <section className="contract-history">
-          <h2>수정 이력 ({historyTotal || history.length})</h2>
+        <Fold
+          className="contract-history"
+          title="수정 이력"
+          hint={`${historyTotal || history.length}건`}
+        >
           {historyTotal > history.length && (
             <p className="notice">
               최근 {history.length}건만 표시합니다. 법령 점검과 증명서는 전체 {historyTotal}건을 모두
@@ -1637,7 +1679,7 @@ export default function ContractPage() {
               </li>
             ))}
           </ul>
-        </section>
+        </Fold>
       )}
 
       <button type="button" onClick={handleExportPdf} disabled={exporting}>

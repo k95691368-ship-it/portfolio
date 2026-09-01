@@ -25,9 +25,13 @@ export default function JobsPage() {
         </Link>
         <h1>채용 공고</h1>
         <p>
-          관심 있는 공고에 로그인 없이 바로 지원할 수 있습니다. ·{' '}
-          <Link to="/application-status">지원 현황 조회 →</Link>
+          관심 있는 공고에 로그인 없이 바로 지원할 수 있습니다.
         </p>
+        {/* 문장 안에 두었더니 좁은 화면에서 "지 / 원 현황 조회" 로 낱말
+            가운데가 잘렸다. 줄로 떼어 낸다. */}
+        <Link to="/application-status" className="header-link">
+          지원 현황 조회 →
+        </Link>
       </header>
 
       {/* 지원자가 실제로 머무는 곳이 여기다. 면접방으로 들어가는 길도 여기

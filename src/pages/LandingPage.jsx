@@ -12,15 +12,23 @@ export default function LandingPage() {
         <p className="landing-sub">회사와 지원자, 각자에게 맞는 화면으로 안내해 드립니다.</p>
 
         <div className="landing-choices">
-          <button type="button" className="btn-primary landing-choice" onClick={() => navigate('/login')}>
-            <span className="landing-choice-title">회사</span>
-            <span className="landing-choice-desc">채용 담당자 로그인 · 공고 등록 · 면접방 · 근로계약</span>
-          </button>
-          <button type="button" className="btn-primary landing-choice" onClick={() => navigate('/jobs')}>
-            <span className="landing-choice-title">지원자</span>
-            <span className="landing-choice-desc">
-              채용 공고 보기 · 지원하기 · 면접방 입장
+          {/* 파란 면 두 개가 나란히 서 있었다. 둘 다 "지금 눌러라"라고 말하니
+              어느 쪽도 그렇게 읽히지 않는다. 고르는 자리는 목록으로 둔다. */}
+          <button type="button" className="landing-choice" onClick={() => navigate('/login')}>
+            <span className="landing-choice-body">
+              <span className="landing-choice-title">회사</span>
+              <span className="landing-choice-desc">
+                채용 담당자 로그인 · 공고 등록 · 면접방 · 근로계약
+              </span>
             </span>
+            <span className="landing-choice-arrow" aria-hidden="true">›</span>
+          </button>
+          <button type="button" className="landing-choice" onClick={() => navigate('/jobs')}>
+            <span className="landing-choice-body">
+              <span className="landing-choice-title">지원자</span>
+              <span className="landing-choice-desc">채용 공고 보기 · 지원하기 · 면접방 입장</span>
+            </span>
+            <span className="landing-choice-arrow" aria-hidden="true">›</span>
           </button>
         </div>
 

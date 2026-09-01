@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import Fold from './Fold.jsx'
 
 // 근로자를 위한 계약 해설.
 //
@@ -17,21 +17,25 @@ const TONE_CLASS = {
 }
 
 export default function ContractExplainer({ explanation, myRole }) {
-  const [open, setOpen] = useState(myRole === 'candidate')
   if (!explanation) return null
 
   const forWorker = myRole === 'candidate'
 
   return (
-    <section className="contract-explainer">
-      <div className="period-head">
-        <h2>{forWorker ? '내 계약 해설' : '근로자에게 보이는 계약 해설'}</h2>
+    // 자기 계약 해설은 근로자에게 열어 둔 채로 시작한다. 회사 쪽에는 "근로자가
+    // 무엇을 보는지" 확인용이라 접어 둔다.
+    <Fold
+      className="contract-explainer"
+      title={forWorker ? '내 계약 해설' : '근로자에게 보이는 계약 해설'}
+      badge={
         <span
           className={`badge ${explanation.cautionCount === 0 ? 'badge-success' : 'badge-warning'}`}
         >
           {explanation.cautionCount === 0 ? '확인할 항목 없음' : `확인 ${explanation.cautionCount}건`}
         </span>
-      </div>
+      }
+      defaultOpen={forWorker}
+    >
 
       <p className={explanation.cautionCount === 0 ? 'period-detail' : 'period-alert'}>
         {explanation.summary}
@@ -44,35 +48,23 @@ export default function ContractExplainer({ explanation, myRole }) {
         </p>
       )}
 
-      <button
-        type="button"
-        className="btn-sm"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-controls="contract-explainer-body"
-      >
-        {open ? '접기' : '자세히 보기'}
-      </button>
-
-      {open && (
-        <div className="explain-body" id="contract-explainer-body">
-          {explanation.sections.map((section) => (
-            <div className="explain-section" key={section.title}>
-              <h3>{section.title}</h3>
-              <ul>
-                {section.lines.map((l, i) => (
-                  <li key={i} className={TONE_CLASS[l.tone] || 'explain-info'}>
-                    {l.label && <span className="explain-label">{l.label}</span>}
-                    <span className="explain-value">{l.value}</span>
-                    {/* 왜 그런 숫자가 나왔는지 근거를 함께 보여 준다 */}
-                    {l.note && <span className="explain-reason">{l.note}</span>}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
+      <div className="explain-body">
+        {explanation.sections.map((section) => (
+          <div className="explain-section" key={section.title}>
+            <h3>{section.title}</h3>
+            <ul>
+              {section.lines.map((l, i) => (
+                <li key={i} className={TONE_CLASS[l.tone] || 'explain-info'}>
+                  {l.label && <span className="explain-label">{l.label}</span>}
+                  <span className="explain-value">{l.value}</span>
+                  {/* 왜 그런 숫자가 나왔는지 근거를 함께 보여 준다 */}
+                  {l.note && <span className="explain-reason">{l.note}</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </Fold>
   )
 }

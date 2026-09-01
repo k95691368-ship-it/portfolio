@@ -17,6 +17,9 @@ export default function DemoGuide() {
   const [demo, setDemo] = useState(null)
   const [open, setOpen] = useState(false)
   const [starting, setStarting] = useState(null)
+  // 계정과 비밀번호는 평소에 접어 둔다. 버튼으로 들어갈 수 있게 된 뒤로
+  // 직접 입력해 보려는 사람만 필요한 값이다.
+  const [showKeys, setShowKeys] = useState(false)
   const navigate = useNavigate()
   const toast = useToast()
   const { startDemo } = useAuth()
@@ -64,25 +67,6 @@ export default function DemoGuide() {
         데이터는 시연용 예시입니다.
       </p>
 
-      <div className="demo-credentials">
-        {demo.accounts.map((a) => (
-          <div className="demo-credential" key={a.email}>
-            <span className="demo-role">{a.role === 'company' ? '회사' : '지원자'}</span>
-            <code>{a.email}</code>
-            <button type="button" className="btn-sm" onClick={() => copy(a.email, '아이디')}>
-              복사
-            </button>
-          </div>
-        ))}
-        <div className="demo-credential">
-          <span className="demo-role">비밀번호</span>
-          <code>{demo.password}</code>
-          <button type="button" className="btn-sm" onClick={() => copy(demo.password, '비밀번호')}>
-            복사
-          </button>
-        </div>
-      </div>
-
       {/* 계정과 비밀번호를 적어 두어도 대부분은 옮겨 적지 않고 그만둔다.
           누르면 그 자리에서 로그인되어 바로 들어가게 한다. */}
       <div className="demo-start">
@@ -106,6 +90,36 @@ export default function DemoGuide() {
       <p className="demo-start-note">
         비밀번호를 옮겨 적지 않아도 됩니다. 창을 닫으면 체험 로그인은 끝납니다.
       </p>
+
+      <button
+        type="button"
+        className="demo-credentials-toggle"
+        onClick={() => setShowKeys((v) => !v)}
+        aria-expanded={showKeys}
+      >
+        {showKeys ? '계정 정보 접기' : '직접 로그인할 계정 보기'}
+      </button>
+      {showKeys && (
+      <div className="demo-credentials">
+        {demo.accounts.map((a) => (
+          <div className="demo-credential" key={a.email}>
+            <span className="demo-role">{a.role === 'company' ? '회사' : '지원자'}</span>
+            <code>{a.email}</code>
+            <button type="button" className="btn-sm" onClick={() => copy(a.email, '아이디')}>
+              복사
+            </button>
+          </div>
+        ))}
+        <div className="demo-credential">
+          <span className="demo-role">비밀번호</span>
+          <code>{demo.password}</code>
+          <button type="button" className="btn-sm" onClick={() => copy(demo.password, '비밀번호')}>
+            복사
+          </button>
+        </div>
+      </div>
+      )}
+
       <button type="button" className="btn-sm demo-toggle" onClick={() => setOpen((v) => !v)}>
         {open ? '순서 접기' : '무엇을 보게 되나요?'}
       </button>
