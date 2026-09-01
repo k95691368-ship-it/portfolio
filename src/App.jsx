@@ -5,6 +5,7 @@ import LandingPage from './pages/LandingPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import ThemeToggle from './components/ThemeToggle.jsx'
+import BrandLogo from './components/BrandLogo.jsx'
 import PageViewTracker from './components/PageViewTracker.jsx'
 import './App.css'
 
@@ -47,7 +48,16 @@ function App() {
       <a href="#main" className="skip-link">
         본문으로 건너뛰기
       </a>
-      <ThemeToggle className="theme-toggle-fixed" />
+      {/* 어느 화면에 있든 왼쪽 위에 표지가 있다.
+          면접방이나 계약서 화면에 코드로 바로 들어온 사람은 자기가 어느
+          서비스에 있는지 알 방법이 없었다.
+
+          화면 색 버튼도 여기로 들인다. 오른쪽 아래에 동그라미로 떠 있어
+          맨 밑의 버튼을 가리고 있었다. */}
+      <header className="app-bar">
+        <BrandLogo />
+        <ThemeToggle />
+      </header>
       <main id="main" tabIndex={-1} {...(masked ? { 'data-clarity-mask': 'true' } : {})}>
         <Suspense fallback={Loading}>
           <Routes>

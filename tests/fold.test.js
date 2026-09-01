@@ -47,7 +47,7 @@ describe('접힌 줄이 무엇이 들었는지 말하는가', () => {
 
   it('접는 자리를 실제로 찾았다', () => {
     // 이 검사가 헛돌지 않게 개수를 못 박는다. 접기를 걷어내면 여기서 걸린다.
-    expect(all.length).toBeGreaterThanOrEqual(9)
+    expect(all.length).toBeGreaterThanOrEqual(10)
   })
 
   it('모든 접힌 줄에 개수나 상태가 적혀 있다', () => {
@@ -74,14 +74,29 @@ describe('접힌 줄이 무엇이 들었는지 말하는가', () => {
 describe('접으면 안 되는 것을 안 접었는가', () => {
   const page = read('src', 'pages', 'ContractPage.jsx')
 
-  // 서명하러 온 사람이 하는 일은 둘뿐이다 — 조건을 보고, 서명한다.
-  // 이 둘이 접히면 화면을 열었을 때 할 일이 안 보인다.
+  // 서명은 이 화면에 온 이유다. 접히면 화면을 열었을 때 할 일이 안 보인다.
   it('서명 자리는 펼쳐져 있다', () => {
     expect(page).toContain('<section className="signature-section">')
   })
 
-  it('계약 조건 자리는 펼쳐져 있다', () => {
-    expect(page).toContain('<section className="contract-form">')
+  // 조건 폼은 채우는 사람에게만 펼친다. 지원자에게는 스물두 칸이 전부 잠긴
+  // 입력칸이고, 같은 값이 화면 맨 아래 계약서 본문에 계약서 모양으로 또 있다.
+  it('조건을 채우는 사람에게는 조건 폼이 펼쳐져 있다', () => {
+    const form = foldTags(page).find((t) => t.includes('className="contract-form"'))
+    expect(form).toBeTruthy()
+    expect(form).toMatch(/defaultOpen={canEdit}/)
+  })
+
+  it('닫힌 줄이 몇 칸 남았는지 말한다', () => {
+    // "계약 조건 확인" 만 있으면 다 채웠는지 열어 봐야 안다.
+    const form = foldTags(page).find((t) => t.includes('className="contract-form"'))
+    expect(form).toContain('filledFieldCount')
+    expect(form).toContain('TOTAL_FIELD_COUNT')
+  })
+
+  it('총 칸 수를 손으로 적어 두지 않았다', () => {
+    // 22 라고 박아 두면 항목이 늘어도 22 라고 말한다.
+    expect(page).toContain('const TOTAL_FIELD_COUNT = IDENTITY_FIELDS.length + TERM_FIELDS.length')
   })
 })
 

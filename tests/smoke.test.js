@@ -41,6 +41,8 @@ const PROTECTED = [
   ['GET', '/api/admin/users'],
   ['GET', '/api/admin/rooms'],
   ['GET', '/api/admin/audit-log'],
+  // 근로계약서 저장소. 계약서 목록은 관리자만 볼 수 있어야 한다.
+  ['GET', '/api/admin/contracts'],
   // 데모 초기화는 데이터를 지우고 다시 만든다. 이 문이 열려 있으면 아무나
   // 운영 데이터를 건드릴 수 있다.
   ['GET', '/api/admin/demo/reset'],

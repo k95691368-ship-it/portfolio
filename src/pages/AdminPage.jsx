@@ -49,20 +49,24 @@ export default function AdminPage() {
 
   const [auditLog, setAuditLog] = useState([])
   // 목록이 상한에 걸려 잘렸으면 제목의 개수가 전체인 것처럼 보이지 않게 알린다.
-  const [caps, setCaps] = useState({ users: null, rooms: null })
+  const [contracts, setContracts] = useState([])
+  const [caps, setCaps] = useState({ users: null, rooms: null, contracts: null })
 
   const loadAll = useCallback(async () => {
-    const [usersData, roomsData, auditData] = await Promise.all([
+    const [usersData, roomsData, auditData, contractData] = await Promise.all([
       api.get('/admin/users'),
       api.get('/admin/rooms'),
       api.get('/admin/audit-log'),
+      api.get('/admin/contracts'),
     ])
     setUsers(usersData.users)
     setRooms(roomsData.rooms)
     setAuditLog(auditData.entries)
+    setContracts(contractData.contracts)
     setCaps({
       users: usersData.truncated ? usersData.limit : null,
       rooms: roomsData.truncated ? roomsData.limit : null,
+      contracts: contractData.truncated ? contractData.limit : null,
     })
   }, [])
 
@@ -404,6 +408,71 @@ export default function AdminPage() {
         </tbody>
       </table>
       </div>
+
+      {/* 근로계약서 저장소.
+          지금까지 체결된 계약서를 보려면 면접방을 하나씩 열어야 했다. 방은
+          채용이 진행되는 자리라 끝난 계약을 찾는 데에는 맞지 않는다.
+          근로기준법 제42조는 근로관계가 끝난 날부터 3년간 계약서를 보존하라고
+          하는데, 그러려면 무엇이 어디 있는지 한눈에 볼 자리가 있어야 한다. */}
+      <h2>근로계약서 저장소 ({contracts.length})</h2>
+      <p className="section-lead">
+        서명이 끝나 파일로 저장된 근로계약서입니다. 보존 기간은 근로관계가 끝난 날부터
+        3년입니다(근로기준법 제42조).
+      </p>
+      {caps.contracts && (
+        <p className="notice">계약서가 많아 최근 {caps.contracts}건만 불러왔습니다.</p>
+      )}
+      {contracts.length === 0 ? (
+        <p className="notice">아직 저장된 근로계약서가 없습니다.</p>
+      ) : (
+        <div className="table-scroll">
+          <table className="admin-table">
+            <caption className="sr-only">
+              저장된 근로계약서 {contracts.length}건의 당사자와 보존 정보
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">근로자</th>
+                <th scope="col">사업체</th>
+                <th scope="col">계약 기간</th>
+                <th scope="col">서명</th>
+                <th scope="col">보존 기산</th>
+                <th scope="col">증명서</th>
+                <th scope="col">파일</th>
+              </tr>
+            </thead>
+            <tbody>
+              {contracts.map((c) => (
+                <tr key={c.id}>
+                  <th scope="row">{c.employeeName || '—'}</th>
+                  <td>{c.employerName || '—'}</td>
+                  <td>
+                    {c.contractStartDate || '—'}
+                    {c.contractEndDate ? ` ~ ${c.contractEndDate}` : ' ~ 기간의 정함 없음'}
+                  </td>
+                  <td>
+                    {/* 양쪽이 다 서명했는가. 한쪽만이면 계약이 아직 성립하지
+                        않은 상태로 파일만 남아 있는 것이다. */}
+                    <span className={`badge ${c.signatureCount >= 2 ? 'badge-success' : 'badge-warning'}`}>
+                      {c.signatureCount >= 2 ? '양측 완료' : `${c.signatureCount}/2`}
+                    </span>
+                  </td>
+                  <td>{c.employmentEndedAt || '재직 중'}</td>
+                  <td>{c.certificateSerial || '—'}</td>
+                  <td>
+                    <a
+                      className="btn-sm"
+                      href={`/api/rooms/${c.roomId}/signed-contract-file`}
+                    >
+                      내려받기
+                    </a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <h2>면접방 ({rooms.length})</h2>
       {caps.rooms && (

@@ -1,5 +1,41 @@
 /* Shared page shell */
 
+/* 화면 맨 위 줄. 표지와 화면 색 버튼만 둔다.
+   여기에 메뉴를 더 넣지 않는다 -- 이 앱은 회사·지원자·관리자가 서로 다른
+   화면을 쓰고, 공통으로 갈 곳이 사실상 없다. 억지로 채운 메뉴는 누르면
+   권한이 없다는 말만 돌려준다. */
+.app-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-3);
+  padding: var(--gap-3) var(--page-x);
+  max-width: 1126px;
+  width: 100%;
+  margin: 0 auto;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-2);
+  color: var(--text-h);
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  border-radius: var(--r-xs);
+}
+.brand:hover {
+  text-decoration: none;
+  opacity: 0.75;
+}
+.brand-mark {
+  flex: none;
+  color: var(--accent);
+}
+.brand-name {
+  font-size: 16px;
+}
+
+
 .auth-page,
 .dashboard-page,
 .room-page,
@@ -846,6 +882,25 @@
   font-weight: 600;
   flex: 1;
   min-width: 160px;
+}
+
+/* 구획 제목 아래 붙는 한 줄 설명. */
+.section-lead {
+  margin: 0 0 var(--gap-3);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+/* 표 안의 내려받기는 링크지만 버튼처럼 눌린다. */
+.admin-table a.btn-sm {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-h);
+  white-space: nowrap;
+}
+.admin-table a.btn-sm:hover {
+  background: var(--btn-face-hover);
+  text-decoration: none;
 }
 
 .table-scroll {

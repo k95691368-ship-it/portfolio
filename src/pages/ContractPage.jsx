@@ -145,6 +145,10 @@ function ContractTranslations({
   )
 }
 
+// 접힌 줄에 "18/22칸 채움" 이라고 적기 위한 총 칸 수. 항목을 늘리면 여기도
+// 저절로 따라간다 -- 손으로 22를 적어 두면 항목이 늘어도 22라고 말한다.
+const TOTAL_FIELD_COUNT = IDENTITY_FIELDS.length + TERM_FIELDS.length
+
 const PERIOD_BADGE = {
   open_ended: 'badge-accent',
   scheduled: 'badge-neutral',
@@ -860,6 +864,11 @@ export default function ContractPage() {
   const mySignature = signatures.find((s) => s.role === myRole)
   const otherSignature = signatures.find((s) => s.role === otherRole)
   const canEdit = !isSigned && !frozen && myRole === 'company'
+  // 빈 칸이 몇 개 남았는지. 접어 두면 "다 채웠나"를 열어 봐야 알 수 있으므로
+  // 닫힌 줄에 적는다.
+  const filledFieldCount = [...IDENTITY_FIELDS, ...TERM_FIELDS].filter(
+    (f) => String(form[f.key] ?? '').trim() !== '',
+  ).length
 
   const handleSave = async () => {
     setSaving(true)
@@ -1215,8 +1224,15 @@ export default function ContractPage() {
       )}
       {isSigned && <p className="signed-banner">양측 서명이 완료되었습니다.</p>}
 
-      <section className="contract-form">
-        <h2>{myRole === 'company' ? '계약 조건 입력/수정' : '계약 조건 확인'}</h2>
+      {/* 지원자에게는 이 스물두 칸이 전부 잠긴 입력칸이다. 같은 값이 화면 맨
+          아래 계약서 본문에 제대로 된 계약서 모양으로 또 있으므로, 읽기만 하는
+          사람에게는 접어 둔다. 채우는 사람에게는 펼쳐 둔다. */}
+      <Fold
+        className="contract-form"
+        title={myRole === 'company' ? '계약 조건 입력/수정' : '계약 조건 확인'}
+        hint={`${filledFieldCount}/${TOTAL_FIELD_COUNT}칸 채움`}
+        defaultOpen={canEdit}
+      >
         {myRole !== 'company' && !isSigned && (
           <p className="notice">계약 조건은 회사(고용) 측만 작성·수정할 수 있습니다. 내용을 확인한 뒤 서명해주세요.</p>
         )}
@@ -1320,7 +1336,7 @@ export default function ContractPage() {
             {saving ? '저장 중...' : '저장'}
           </button>
         )}
-      </section>
+      </Fold>
 
       <WageComposition
         items={form.wageItems}

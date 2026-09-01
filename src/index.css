@@ -312,13 +312,12 @@ body {
 .theme-toggle:hover:not(:disabled) {
   background: var(--border);
 }
+/* 화면 색 버튼은 이제 맨 위 줄에 있다.
+   오른쪽 아래에 동그라미로 떠 있어서 화면 맨 밑의 버튼을 가렸다. 실제로
+   첫 화면의 '기술 구현 보러가기' 위에 겹쳐 있었다.
+   이 클래스는 아직 부르는 곳이 있을 수 있어 남기되, 떠 있지는 않게 한다. */
 .theme-toggle-fixed {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 50;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border);
+  position: static;
 }
 
 h1,
