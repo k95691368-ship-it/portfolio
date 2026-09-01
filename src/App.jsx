@@ -5,7 +5,6 @@ import { useAuth } from './context/AuthContext.jsx'
 import LandingPage from './pages/LandingPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
-import ThemeToggle from './components/ThemeToggle.jsx'
 import BrandLogo from './components/BrandLogo.jsx'
 import PageViewTracker from './components/PageViewTracker.jsx'
 import DmDock from './components/DmDock.jsx'
@@ -83,7 +82,6 @@ function App() {
               관리자 패널
             </Link>
           )}
-          <ThemeToggle />
         </div>
       </header>
       <main id="main" tabIndex={-1} {...(masked ? { 'data-clarity-mask': 'true' } : {})}>

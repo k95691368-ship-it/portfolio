@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useDm } from '../context/DmContext.jsx'
+import ThemeToggle from './ThemeToggle.jsx'
 
 function shortTime(value) {
   if (!value) return ''
@@ -130,7 +131,15 @@ function DmWindow({ partner, onClose }) {
   )
 }
 
-// 오른쪽 아래에 붙는 쪽지함. 로그인한 사람에게만 보인다.
+// 오른쪽 아래에 떠 있는 도구 모음.
+//
+// 쪽지함과 화면 색 버튼이 함께 산다. 화면 색 버튼은 머리말에 있었는데, 거기는
+// 표지와 관리자 문이 서는 자리라 성격이 다른 것이 섞여 있었다. 이제 둘 다
+// 오른쪽 아래 한 자리에 모인다.
+//
+// 화면 색 버튼은 로그인하지 않아도 있어야 하므로, 쪽지함이 비어 있어도 이
+// 칸 자체는 그린다. 그리고 쪽지 버튼 바로 위에 붙인다 -- 대화창 위에 두면
+// 창을 열 때마다 버튼이 위로 밀려 자리가 바뀐다.
 export default function DmDock() {
   const { user } = useAuth()
   const { threads, unreadTotal, open, listOpen, alerts, openDm, closeDm, toggleList, dismissAlert } =
@@ -143,10 +152,9 @@ export default function DmDock() {
     return () => timers.forEach(clearTimeout)
   }, [alerts, dismissAlert])
 
-  if (!user) return null
-
   return (
     <div className="dm-dock">
+      {user && (
       <div className="dm-alerts" role="status" aria-live="polite">
         {alerts.map((a) => (
           <button
@@ -165,10 +173,11 @@ export default function DmDock() {
           </button>
         ))}
       </div>
+      )}
 
-      {open && <DmWindow partner={open} onClose={closeDm} />}
+      {user && open && <DmWindow partner={open} onClose={closeDm} />}
 
-      {listOpen && !open && (
+      {user && listOpen && !open && (
         <section className="dm-window dm-list-window" aria-label="쪽지함">
           <header className="dm-window-head">
             <span className="dm-window-title">쪽지함</span>
@@ -204,6 +213,10 @@ export default function DmDock() {
         </section>
       )}
 
+      {/* 화면 색 버튼. 쪽지 버튼 바로 위에 붙어 자리가 바뀌지 않는다. */}
+      <ThemeToggle className="dock-theme" />
+
+      {user && (
       <button
         type="button"
         className="dm-launcher"
@@ -219,6 +232,7 @@ export default function DmDock() {
           </span>
         )}
       </button>
+      )}
     </div>
   )
 }

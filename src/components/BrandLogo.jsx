@@ -20,8 +20,8 @@ export default function BrandLogo({ to = '/jobs' }) {
       <svg
         className="brand-mark"
         viewBox="0 0 28 28"
-        width="28"
-        height="28"
+        width="36"
+        height="36"
         aria-hidden="true"
         focusable="false"
       >

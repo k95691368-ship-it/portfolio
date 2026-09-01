@@ -44,9 +44,6 @@ export default function LandingPage() {
               <path d="M5 27h22M8 27V8l8-3 8 3v19M12 12h2m4 0h2m-8 5h2m4 0h2m-4 10v-5h2v5" />
             </ChoiceIcon>
             <span className="landing-choice-title">회사</span>
-            <span className="landing-choice-go">
-              들어가기 <span className="landing-choice-arrow" aria-hidden="true">›</span>
-            </span>
           </button>
           <button type="button" className="landing-choice" onClick={() => navigate('/jobs')}>
             <ChoiceIcon>
@@ -54,9 +51,6 @@ export default function LandingPage() {
               <path d="M6.5 27a9.5 9.5 0 0 1 19 0" />
             </ChoiceIcon>
             <span className="landing-choice-title">지원자</span>
-            <span className="landing-choice-go">
-              들어가기 <span className="landing-choice-arrow" aria-hidden="true">›</span>
-            </span>
           </button>
         </div>
 

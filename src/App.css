@@ -54,6 +54,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--gap-2);
+  /* 화면 끝에서 조금 띄운다. 머리말 여백만으로는 모서리에 바짝 붙어 보였다. */
+  margin-left: var(--gap-3);
   color: var(--text-h);
   font-weight: 700;
   letter-spacing: -0.3px;
@@ -68,7 +70,7 @@
   color: var(--accent);
 }
 .brand-name {
-  font-size: 16px;
+  font-size: 19px;
   /* 이름이 두 줄로 접히면 머리말 높이가 늘어나 아래 화면이 통째로 밀린다.
      '통합 채용 플랫폼' 처럼 사이에 공백이 있는 이름에서 실제로 접힌다. */
   white-space: nowrap;
@@ -1105,6 +1107,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--gap-2);
+  /* 칸을 가운데로 모았으므로 그 위의 제목도 같은 축에 세운다.
+     제목만 왼쪽에 남으면 화면에 축이 둘 생겨 한쪽으로 쏠려 보인다. */
+  text-align: center;
 }
 .landing-eyebrow {
   color: var(--accent);
@@ -1115,8 +1120,9 @@
 /* 문장 안에 링크를 넣으면 좁은 화면에서 "지 / 원 현황 조회" 처럼 낱말
    가운데가 잘린다. 링크를 줄로 떼어 낸다. */
 .landing-verify {
-  margin-top: 24px;
-  font-size: 13px;
+  margin-top: 28px;
+  font-size: 16px;
+  text-align: center;
   color: var(--text-muted);
 }
 
@@ -1298,7 +1304,11 @@
 .landing-choice {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  /* 고르는 칸이라 안의 것들을 가운데로 모은다. 왼쪽에 붙여 두면 읽는
+     글이 되고, 가운데에 모으면 고르는 것이 된다. */
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   gap: var(--gap-3);
   width: 100%;
   /* 두 칸의 높이를 맞춘다. 내용이 달라도 카드가 어긋나 보이지 않게. */
@@ -1308,42 +1318,26 @@
   padding: var(--gap-5) var(--gap-5);
   border: 0;
   border-radius: var(--r-lg);
-  background: var(--surface);
+  background: var(--surface-strong);
   color: var(--text-h);
-  text-align: left;
 }
 .landing-choice:hover:not(:disabled) {
   background: var(--btn-face-hover);
 }
-/* 이름 대신 먼저 읽히는 그림. 강조색이 아니라 흐린 색으로 둔다 --
-   그림이 눌러야 할 곳처럼 보이면 정작 '들어가기'가 묻힌다. */
+/* 이름 대신 먼저 읽히는 그림.
+   '들어가기' 줄을 걷어낸 뒤로 칸 안에 강조색이 하나도 남지 않았다. 그림에
+   강조색을 주어, 이 칸이 눌러서 들어가는 곳이라는 것을 색으로 알린다. */
 .landing-choice-icon {
   flex: none;
   width: 44px;
   height: 44px;
-  color: var(--text-muted);
+  color: var(--accent);
 }
 .landing-choice-title {
   font-size: 23px;
   font-weight: 700;
   letter-spacing: -0.5px;
   line-height: 1.2;
-}
-/* 누르는 것이라는 표시. 설명이 짧은 쪽도 이 줄은 바닥에 붙어, 두 카드의
-   같은 자리에서 같은 말이 보인다. */
-.landing-choice-go {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: auto;
-  color: var(--accent);
-  font-size: 15px;
-  font-weight: 600;
-}
-.landing-choice-arrow {
-  flex: none;
-  font-size: 17px;
-  line-height: 1;
 }
 
 @media (max-width: 380px) {
@@ -1367,21 +1361,37 @@
    폭을 지킬 이유도 여기서는 없다. */
 @media (min-width: 768px) {
   .landing-page {
-    max-width: 760px;
+    max-width: 800px;
   }
   .landing-choice {
-    gap: var(--gap-4);
-    padding: var(--gap-8) var(--gap-6);
+    gap: var(--gap-5);
+    padding: var(--gap-10) var(--gap-8);
   }
   .landing-choice-icon {
-    width: 52px;
-    height: 52px;
+    width: 60px;
+    height: 60px;
   }
   .landing-choice-title {
-    font-size: 27px;
+    font-size: 30px;
   }
-  .landing-choice-go {
-    font-size: 16px;
+}
+
+/* 화면이 더 넓으면 한 번 더 키운다. 큰 화면에서 칸이 가운데에 작게 모여
+   있으면 양옆이 통째로 비어 보인다. */
+@media (min-width: 1100px) {
+  .landing-page {
+    max-width: 880px;
+  }
+  .landing-choice {
+    gap: var(--gap-6);
+    padding: var(--gap-8) var(--gap-10);
+  }
+  .landing-choice-icon {
+    width: 68px;
+    height: 68px;
+  }
+  .landing-choice-title {
+    font-size: 34px;
   }
 }
 
@@ -3283,8 +3293,8 @@
    가장 크고 도드라져, 위의 체험 버튼과 무엇이 먼저인지 다투었다. 이건
    곁들이는 길이므로 글자 크기의 링크로 물린다. */
 .landing-tech-link {
-  align-self: flex-start;
-  font-size: 14px;
+  align-self: center;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text-muted);
   background: transparent;
@@ -4179,13 +4189,31 @@
   pointer-events: auto;
 }
 
+/* 오른쪽 아래에 선 화면 색 버튼.
+   머리말에 있을 때는 줄 안에 섞여 있었지만 여기서는 홀로 떠 있으므로,
+   뒤 화면과 구분되도록 면과 그림자를 준다. */
+.dock-theme {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+}
+.dock-theme:hover:not(:disabled) {
+  background: var(--surface);
+}
+
 .dm-launcher {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   position: relative;
-  min-height: 44px;
-  padding: 0 16px;
+  min-height: 52px;
+  padding: 0 20px;
   border-radius: 999px;
   background: var(--accent);
   color: #fff;
@@ -4193,28 +4221,30 @@
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
 }
 .dm-launcher-text {
-  font-size: 14px;
+  font-size: 15px;
 }
 .dm-launcher-badge {
   position: absolute;
   top: -4px;
   right: -4px;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
   border-radius: 999px;
   background: var(--danger-text, #d92d20);
   color: #fff;
-  font-size: 11px;
-  line-height: 20px;
+  font-size: 12px;
+  line-height: 22px;
   text-align: center;
 }
 
 .dm-window {
   display: flex;
   flex-direction: column;
-  width: min(340px, calc(100vw - 32px));
-  max-height: min(60vh, 460px);
+  /* 대화하는 칸이라 좁으면 한 줄이 여러 줄로 쪼개져 읽기 어렵다.
+     화면이 허락하는 만큼 넓게 잡되, 좁은 화면에서는 여백만 남기고 채운다. */
+  width: min(400px, calc(100vw - 24px));
+  max-height: min(72vh, 620px);
   border-radius: var(--r-lg);
   background: var(--bg);
   border: 1px solid var(--border);
@@ -4226,22 +4256,22 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--gap-2);
-  padding: 10px 12px;
+  padding: 12px 14px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
 .dm-window-title {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 15px;
   word-break: keep-all;
 }
 .dm-icon-btn {
-  min-height: 32px;
-  min-width: 32px;
+  min-height: 36px;
+  min-width: 36px;
   padding: 0;
   background: transparent;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 15px;
 }
 .dm-window-body {
   flex: 1;
@@ -4275,11 +4305,11 @@
   align-items: flex-end;
 }
 .dm-bubble {
-  padding: 8px 11px;
+  padding: 10px 13px;
   border-radius: var(--r-md);
   background: var(--surface);
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 15px;
+  line-height: 1.55;
   /* 줄바꿈은 쓴 사람이 넣은 대로 남기고, 붙여 쓴 긴 줄은 잘라 넘긴다. */
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -4290,7 +4320,7 @@
   color: #fff;
 }
 .dm-bubble-time {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 
@@ -4303,9 +4333,9 @@
 }
 .dm-compose textarea {
   flex: 1;
-  min-height: 44px;
-  max-height: 96px;
-  padding: 9px 10px;
+  min-height: 52px;
+  max-height: 132px;
+  padding: 11px 12px;
   resize: none;
   font-size: 16px; /* 16px 아래면 iOS 가 입력할 때 화면을 확대한다 */
   line-height: 1.4;
@@ -4344,7 +4374,7 @@
 }
 .dm-thread-name {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 15px;
   word-break: keep-all;
 }
 .dm-thread-time {
@@ -4353,7 +4383,7 @@
   color: var(--muted);
 }
 .dm-thread-last {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
   /* 마지막 한 줄만 보인다. 길면 잘라 준다. */
   display: -webkit-box;
@@ -4387,13 +4417,13 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  max-width: min(320px, calc(100vw - 32px));
-  padding: 11px 13px;
+  max-width: min(380px, calc(100vw - 24px));
+  padding: 13px 15px;
   border-radius: var(--r-md);
   background: var(--bg);
   border: 1px solid var(--border);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
-  font-size: 13px;
+  font-size: 14px;
   text-align: left;
   word-break: keep-all;
 }
@@ -4421,11 +4451,25 @@
 }
 
 @media (max-width: 480px) {
+  /* 좁은 화면에서는 표지를 키우지 않는다. 키우면 그 오른쪽의 버튼들이
+     밀려 한 줄에 들어가지 못한다. */
+  .brand-name {
+    font-size: 16px;
+  }
+  .brand-mark {
+    width: 28px;
+    height: 28px;
+  }
+  .brand {
+    margin-left: 0;
+  }
   .dm-dock {
     right: 12px;
     bottom: 12px;
   }
   .dm-window {
-    max-height: 58vh;
+    /* 좁은 화면에서는 뒤 화면이 조금은 보여야 한다 -- 전부 덮으면 창이
+       아니라 화면이 바뀐 것으로 읽히고, 닫는 법을 찾게 된다. */
+    max-height: 68vh;
   }
 }
