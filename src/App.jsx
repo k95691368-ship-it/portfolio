@@ -10,6 +10,7 @@ import BrandLogo from './components/BrandLogo.jsx'
 import PageViewTracker from './components/PageViewTracker.jsx'
 import DmDock from './components/DmDock.jsx'
 import DmLink from './components/DmLink.jsx'
+import DemoMenu from './components/DemoMenu.jsx'
 import './App.css'
 
 // 첫 화면(랜딩·로그인)만 즉시 포함하고 나머지는 필요할 때 불러온다.
@@ -61,13 +62,19 @@ function App() {
       <header className="app-bar">
         <BrandLogo />
         <div className="app-bar-right">
+          {/* 평가자용 체험. 접어 두고 올리거나 누르면 펴진다. */}
+          <DemoMenu />
           {/* 관리자만 보이는 문. 관리자 패널로 가려면 대시보드를 거쳐야 했는데,
               면접방이나 계약서 화면에서는 그 길이 아예 보이지 않았다.
 
               없는 사람에게는 그리지 않는다. 눌러도 막히는 버튼을 보여 주면
               "여기 뭔가 있는데 나는 못 들어간다"는 것만 알려 주는 셈이고,
-              누가 관리자인지도 화면 밖으로 새어 나간다. */}
-          {user?.isAdmin && (
+              누가 관리자인지도 화면 밖으로 새어 나간다.
+
+              첫 화면에서도 그리지 않는다. 거기는 "당신은 회사인가 지원자인가"를
+              묻는 자리라, 그 물음과 상관없는 문이 함께 서 있으면 고르는 일이
+              흐려진다. 관리자는 어느 화면으로든 들어간 뒤에 이 문을 만난다. */}
+          {user?.isAdmin && pathname !== '/' && (
             <Link
               to="/admin"
               className="app-bar-link"

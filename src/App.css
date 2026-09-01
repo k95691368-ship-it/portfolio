@@ -20,6 +20,12 @@
   display: flex;
   align-items: center;
   gap: var(--gap-2);
+  /* 펼쳐지는 칸의 기준이 된다.
+     체험 칸을 버튼 기준으로 붙였더니 좁은 화면에서 왼쪽이 잘렸다 -- 버튼의
+     오른쪽은 화면의 오른쪽이 아니라 그 오른쪽에 있는 것들만큼 안쪽이라,
+     칸이 화면 폭만 해지면 왼쪽으로 넘친다. 머리말 오른쪽 묶음을 기준으로
+     삼으면 칸의 오른쪽이 곧 화면의 여백 자리가 된다. */
+  position: relative;
   /* 이름이 긴 표지에 밀려 이 덩이가 줄어들면 안 된다. 줄어들면 관리자
      문 글자가 먼저 잘린다. */
   flex: 0 0 auto;
@@ -1106,11 +1112,6 @@
   font-size: 14px;
   letter-spacing: 0.2px;
 }
-.landing-sub {
-  color: var(--text-muted);
-  font-size: 15px;
-  margin-bottom: 20px;
-}
 /* 문장 안에 링크를 넣으면 좁은 화면에서 "지 / 원 현황 조회" 처럼 낱말
    가운데가 잘린다. 링크를 줄로 떼어 낸다. */
 .landing-verify {
@@ -1124,31 +1125,70 @@
    파란 면에 파란 테두리를 둘렀더니, 첫 화면에서 가장 눈에 띄는 것이 안내
    상자가 되었다. 정작 눌러야 하는 것은 그 안의 버튼인데 상자가 그것을
    가렸다. 면은 회색으로 물리고 강조는 버튼에만 남긴다. */
-.demo-guide {
+/* 평가자용 체험. 머리말 오른쪽에 버튼 하나로 접어 둔다.
+   첫 화면 한가운데를 차지하고 있었는데, 안내는 길수록 안 읽히고 정작 눌러야
+   할 두 갈래(회사·지원자)를 아래로 밀어냈다. */
+.demo-menu {
+  flex: 0 0 auto;
+}
+.demo-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: var(--r-xs);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.demo-menu-caret {
+  font-size: 12px;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+.demo-menu-caret.open {
+  transform: rotate(180deg);
+}
+/* 펼친 칸. 버튼 아래에 오른쪽을 맞춰 붙인다.
+   화면이 좁으면 폭을 화면에 맞춰 줄여, 왼쪽으로 넘쳐 잘리지 않게 한다. */
+.demo-menu-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 70;
   display: flex;
   flex-direction: column;
-  gap: var(--gap-4);
   align-items: flex-start;
-  width: 100%;
-  margin: 0;
-  padding: var(--gap-6) var(--gap-5);
-  border: 0;
+  gap: var(--gap-3);
+  /* 화면 양쪽 여백(--page-x 20px)을 뺀 만큼까지만 넓어진다. */
+  width: min(340px, calc(100vw - 40px));
+  /* 순서 안내까지 펼치면 화면보다 길어진다. 칸 안에서 굴린다. */
+  max-height: min(70vh, 540px);
+  overflow-y: auto;
+  padding: var(--gap-5) var(--gap-4);
+  border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  background: var(--surface);
+  background: var(--bg);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  text-align: left;
 }
-.demo-guide-head {
+.demo-menu-head {
   display: flex;
   align-items: center;
   gap: 10px;
 }
-.demo-guide-head h2 {
-  margin: 0;
-  font-size: 20px;
+.demo-menu-head strong {
+  font-size: 17px;
 }
-.demo-guide-lead {
-  font-size: 14px;
+.demo-menu-lead {
+  margin: 0;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--text);
+  word-break: keep-all;
 }
 /* 계정과 비밀번호는 접어 둔다.
    버튼 한 번으로 들어갈 수 있게 된 뒤로, 이 값들은 평소에 필요 없다.
@@ -1161,19 +1201,7 @@
   width: 100%;
   padding: var(--gap-3) 0 0;
 }
-.demo-credentials-toggle {
-  width: 100%;
-  text-align: left;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 13px;
-  min-height: 36px;
-  padding: 0;
-}
-.demo-credentials-toggle:hover:not(:disabled) {
-  background: transparent;
-  color: var(--text);
-}
+
 .demo-credential {
   display: flex;
   align-items: center;
@@ -1194,39 +1222,41 @@
 /* 버튼을 세로로 쌓고 폭을 채운다.
    가로로 늘어놓으면 글자 길이에 따라 너비가 제각각이라, 어느 쪽이 주된
    행동인지 크기로 읽히지 않는다. */
-.demo-start {
+.demo-menu-start {
   display: flex;
   flex-direction: column;
   gap: var(--gap-2);
   width: 100%;
 }
-.demo-start button {
+.demo-menu-start button {
   width: 100%;
-  min-height: var(--tap-lg);
-  font-size: 16px;
+  min-height: var(--tap);
+  font-size: 15px;
 }
 /* 두 번째 버튼은 보조다. 같은 파랑이 둘이면 고르기 어렵다. */
-.demo-start button + button {
+.demo-menu-start button + button {
   background: var(--surface);
   color: var(--accent);
 }
-.demo-start button + button:hover:not(:disabled) {
+.demo-menu-start button + button:hover:not(:disabled) {
   background: var(--btn-face-hover);
 }
-.demo-start-note {
-  margin: 8px 0 0;
+.demo-menu-note {
+  margin: 0;
   font-size: 12px;
   color: var(--text-muted);
 }
-.demo-toggle {
+/* 더 볼 사람만 펴는 줄. 버튼처럼 보이면 이 칸에 버튼이 넷이 된다. */
+.demo-menu-toggle {
   align-self: flex-start;
+  min-height: 34px;
+  padding: 0;
   background: transparent;
   color: var(--text-muted);
   font-size: 13px;
-  min-height: 36px;
-  padding: 0;
+  text-align: left;
 }
-.demo-toggle:hover:not(:disabled) {
+.demo-menu-toggle:hover:not(:disabled) {
   background: transparent;
   color: var(--text);
 }
@@ -1252,19 +1282,30 @@
    파란 면 두 개가 나란히 서 있었다. 둘 다 "지금 눌러라"라고 말하니 어느
    쪽도 그렇게 읽히지 않는다. 목록의 줄로 바꾼다 -- 고르는 것이지 실행하는
    것이 아니다. 오른쪽 화살표로 "누르면 넘어간다"만 알린다. */
+/* 회사와 지원자를 나란히 놓는다.
+   위아래로 쌓으면 먼저 오는 쪽이 기본값처럼 읽힌다. 여기서 묻는 것은
+   순서가 아니라 둘 중 누구인가이므로, 같은 크기로 나란히 둔다.
+
+   좁은 화면에서도 두 열을 유지한다. 한 열로 접으면 다시 위아래가 되어
+   물어보는 것 자체가 달라진다. 대신 글자 크기와 여백을 폭에 맞춰 줄인다. */
 .landing-choices {
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-2);
-  margin-top: var(--gap-2);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gap-3);
+  /* 설명 줄이 있던 자리의 여백을 여기서 대신 만든다. */
+  margin-top: var(--gap-5);
 }
 .landing-choice {
   display: flex;
-  align-items: center;
-  gap: var(--gap-4);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--gap-3);
   width: 100%;
-  min-height: 76px;
-  padding: var(--gap-5);
+  /* 두 칸의 높이를 맞춘다. 내용이 달라도 카드가 어긋나 보이지 않게. */
+  height: 100%;
+  /* 최소 높이를 두지 않는다. 두었더니 그림과 이름이 작아 가운데가 텅 비었다.
+     내용이 칸의 높이를 정하게 하고, 대신 그 내용을 키운다. */
+  padding: var(--gap-5) var(--gap-5);
   border: 0;
   border-radius: var(--r-lg);
   background: var(--surface);
@@ -1274,30 +1315,74 @@
 .landing-choice:hover:not(:disabled) {
   background: var(--btn-face-hover);
 }
-.landing-choice-body {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  flex: 1;
-  min-width: 0;
+/* 이름 대신 먼저 읽히는 그림. 강조색이 아니라 흐린 색으로 둔다 --
+   그림이 눌러야 할 곳처럼 보이면 정작 '들어가기'가 묻힌다. */
+.landing-choice-icon {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  color: var(--text-muted);
 }
 .landing-choice-title {
-  font-size: 17px;
+  font-size: 23px;
   font-weight: 700;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
 }
-.landing-choice-desc {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-muted);
-  line-height: 1.5;
+/* 누르는 것이라는 표시. 설명이 짧은 쪽도 이 줄은 바닥에 붙어, 두 카드의
+   같은 자리에서 같은 말이 보인다. */
+.landing-choice-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: auto;
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 600;
 }
-/* 넘어간다는 표시. 글자가 아니라 방향으로 알린다. */
 .landing-choice-arrow {
   flex: none;
-  color: var(--text-muted);
-  font-size: 18px;
+  font-size: 17px;
   line-height: 1;
+}
+
+@media (max-width: 380px) {
+  /* 아주 좁은 화면. 두 열은 유지하되 숨 쉴 자리를 남긴다. */
+  .landing-choice {
+    padding: var(--gap-4);
+  }
+  .landing-choice-icon {
+    width: 36px;
+    height: 36px;
+  }
+  .landing-choice-title {
+    font-size: 20px;
+  }
+}
+
+/* 넓은 화면에서는 본문 폭을 넓힌다.
+   설명 줄을 걷어내고 나니 좁은 폭 안에서 칸이 작아 보였고, 양옆은 통째로
+   비어 있었다. 고르는 자리라 칸이 클수록 눌러야 할 것으로 읽힌다.
+   글줄이 길어지는 화면이 아니라 칸 둘이 나란히 서는 화면이므로, 읽기 좋은
+   폭을 지킬 이유도 여기서는 없다. */
+@media (min-width: 768px) {
+  .landing-page {
+    max-width: 760px;
+  }
+  .landing-choice {
+    gap: var(--gap-4);
+    padding: var(--gap-8) var(--gap-6);
+  }
+  .landing-choice-icon {
+    width: 52px;
+    height: 52px;
+  }
+  .landing-choice-title {
+    font-size: 27px;
+  }
+  .landing-choice-go {
+    font-size: 16px;
+  }
 }
 
 /* 공고 목록 */
