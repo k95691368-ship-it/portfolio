@@ -14,6 +14,36 @@
   width: 100%;
   margin: 0 auto;
 }
+/* 관리자 문과 화면 색 버튼을 한 덩이로 오른쪽에 둔다.
+   표지는 왼쪽에 홀로 남아, 눌러서 채용 공고로 가는 자리 하나만 지킨다. */
+.app-bar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-2);
+  /* 이름이 긴 표지에 밀려 이 덩이가 줄어들면 안 된다. 줄어들면 관리자
+     문 글자가 먼저 잘린다. */
+  flex: 0 0 auto;
+}
+.app-bar-link {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: var(--r-xs);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  word-break: keep-all;
+}
+.app-bar-link[aria-current='page'] {
+  /* 지금 그 화면에 있다는 표시. 색만 바꾸면 색을 못 가리는 사람에게는
+     아무 차이가 없어서, aria-current 로도 함께 알린다. */
+  background: var(--accent);
+  color: #fff;
+}
 .brand {
   display: inline-flex;
   align-items: center;
@@ -33,6 +63,9 @@
 }
 .brand-name {
   font-size: 16px;
+  /* 이름이 두 줄로 접히면 머리말 높이가 늘어나 아래 화면이 통째로 밀린다.
+     '통합 채용 플랫폼' 처럼 사이에 공백이 있는 이름에서 실제로 접힌다. */
+  white-space: nowrap;
 }
 
 

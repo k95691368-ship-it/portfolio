@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react'
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { Routes, Route, Link, useLocation } from 'react-router-dom'
 import { holdsPersonalData } from './lib/analytics.js'
+import { useAuth } from './context/AuthContext.jsx'
 import LandingPage from './pages/LandingPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
@@ -31,6 +32,7 @@ const Loading = <p>불러오는 중...</p>
 
 function App() {
   const { pathname } = useLocation()
+  const { user } = useAuth()
 
   // 개인정보가 뜨는 화면은 녹화에서 통째로 가린다.
   //
@@ -58,7 +60,24 @@ function App() {
           맨 밑의 버튼을 가리고 있었다. */}
       <header className="app-bar">
         <BrandLogo />
-        <ThemeToggle />
+        <div className="app-bar-right">
+          {/* 관리자만 보이는 문. 관리자 패널로 가려면 대시보드를 거쳐야 했는데,
+              면접방이나 계약서 화면에서는 그 길이 아예 보이지 않았다.
+
+              없는 사람에게는 그리지 않는다. 눌러도 막히는 버튼을 보여 주면
+              "여기 뭔가 있는데 나는 못 들어간다"는 것만 알려 주는 셈이고,
+              누가 관리자인지도 화면 밖으로 새어 나간다. */}
+          {user?.isAdmin && (
+            <Link
+              to="/admin"
+              className="app-bar-link"
+              aria-current={pathname === '/admin' ? 'page' : undefined}
+            >
+              관리자 패널
+            </Link>
+          )}
+          <ThemeToggle />
+        </div>
       </header>
       <main id="main" tabIndex={-1} {...(masked ? { 'data-clarity-mask': 'true' } : {})}>
         <Suspense fallback={Loading}>

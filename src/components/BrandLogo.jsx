@@ -57,7 +57,7 @@ export default function BrandLogo({ to = '/jobs' }) {
           fill="none"
         />
       </svg>
-      <span className="brand-name">전자근로계약</span>
+      <span className="brand-name">통합 채용 플랫폼</span>
     </Link>
   )
 }
