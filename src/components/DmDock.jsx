@@ -155,7 +155,12 @@ export default function DmDock() {
             className="dm-alert"
             onClick={() => openDm(a.partner)}
           >
-            <strong>{a.partner.displayName}</strong>님이 쪽지를 보냈습니다.
+            {/* 이름과 조사를 한 덩이로 묶는다. 풀어 두면 <strong> 이 자체로
+                한 칸을 차지해 flex 간격이 그 사이에 들어가고, "박서준 님이"
+                처럼 이름과 조사가 벌어진다. */}
+            <span className="dm-alert-text">
+              <strong>{a.partner.displayName}</strong>님이 쪽지를 보냈습니다.
+            </span>
             <span className="dm-alert-cta">열기</span>
           </button>
         ))}

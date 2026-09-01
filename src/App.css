@@ -4279,6 +4279,9 @@
   text-align: left;
   word-break: keep-all;
 }
+.dm-alert-text {
+  flex: 1 1 auto;
+}
 .dm-alert-cta {
   flex: 0 0 auto;
   color: var(--accent);
