@@ -9,6 +9,7 @@ import { findMissingFields, checkLegalCompliance } from '../../../_lib/contractC
 import { checkPeriodCompliance } from '../../../_lib/contractPeriod.js'
 import { checkProbationCompliance } from '../../../_lib/probation.js'
 import { contractFingerprint } from '../../../_lib/contractDocument.js'
+import { archiveContractQuietly } from '../../../_lib/contractArchive.js'
 import { recordDelivery } from '../../../_lib/delivery.js'
 import { signerVerificationMethod } from '../../../_lib/auditCertificate.js'
 
@@ -317,6 +318,20 @@ export async function onRequestPost({ env, data, params, request }) {
         recipientUserId: candidate.id,
         recipientAddress: candidate.email,
       })
+    }
+
+    // 보존도 회사의 수동 클릭에 맡기지 않는다.
+    //
+    // 지금까지 계약서 파일은 담당자가 계약서 화면에서 버튼을 눌러야만
+    // 생겼다. 아무도 누르지 않으면 아무것도 남지 않는다 -- 저장소가 비어
+    // 있었던 이유가 그것이다. 체결이 끝나는 이 자리에서 서버가 정본을 만들어
+    // 방 바깥에 보관한다(근로기준법 제42조).
+    //
+    // 실패해도 서명은 성립시킨다. 보관이 안 됐다고 이미 양측이 서명한 계약을
+    // 되돌릴 수는 없다. 빠진 것은 관리자 화면에서 다시 보관할 수 있다.
+    const archived = await archiveContractQuietly(env, params.roomId)
+    if (!archived.ok) {
+      console.error(`contract archive missed (${params.roomId}): ${archived.reason}`)
     }
   }
 

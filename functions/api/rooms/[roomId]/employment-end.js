@@ -4,6 +4,7 @@ import { getRoomParticipant } from '../../../_lib/rooms.js'
 import { notifyUser } from '../../../_lib/notify.js'
 import { logLifecycle } from '../../../_lib/roomLifecycleLog.js'
 import { parseContractDate } from '../../../_lib/contractPeriod.js'
+import { retentionUntil } from '../../../_lib/contractArchive.js'
 import { koreanToday } from '../../../_lib/koreanTime.js'
 
 // 근로관계가 실제로 끝난 날을 기록한다.
@@ -81,6 +82,20 @@ export async function onRequestPost({ request, env, data, params }) {
     .bind(params.roomId, endedOn, reason || null, data.user.id)
     .run()
 
+  // 보관소의 보존 시계도 함께 맞춘다.
+  //
+  // 보존 기산일은 근로관계가 끝난 날이다(시행령 제22조 제2항). 보관소가
+  // 그 날짜를 모르면 만료일을 계산할 수 없어, 3년이 지난 계약서도 영영
+  // "재직 중" 으로 남는다.
+  await env.DB.prepare(
+    `UPDATE contract_archive
+        SET employment_ended_at = ?, retention_until = ?, updated_at = datetime('now')
+      WHERE room_id = ?`
+  )
+    .bind(endedOn, retentionUntil(endedOn), params.roomId)
+    .run()
+    .catch((err) => console.error('archive retention update failed:', err))
+
   const candidate = await env.DB.prepare(
     "SELECT user_id FROM room_participants WHERE room_id = ? AND role_in_room = 'candidate'"
   )
@@ -132,6 +147,17 @@ export async function onRequestDelete({ env, data, params }) {
   )
     .bind(params.roomId)
     .run()
+
+  // 지운 것도 보관소에 그대로 반영한다. 한쪽만 지우면 보존 만료일이
+  // 실제 기산일과 어긋난 채로 남는다.
+  await env.DB.prepare(
+    `UPDATE contract_archive
+        SET employment_ended_at = NULL, retention_until = NULL, updated_at = datetime('now')
+      WHERE room_id = ?`
+  )
+    .bind(params.roomId)
+    .run()
+    .catch((err) => console.error('archive retention clear failed:', err))
 
   await logLifecycle(env, params.roomId, {
     action: 'employment_end_cleared',

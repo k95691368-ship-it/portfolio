@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useDm } from '../context/DmContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import { roomStatusInfo } from '../lib/roomStatus.js'
@@ -29,6 +30,7 @@ const AUDIT_ACTION_LABELS = {
 
 export default function AdminPage() {
   const { user } = useAuth()
+  const { openDm } = useDm()
   const toast = useToast()
   const [users, setUsers] = useState([])
   const [rooms, setRooms] = useState([])
@@ -50,6 +52,9 @@ export default function AdminPage() {
   const [auditLog, setAuditLog] = useState([])
   // 목록이 상한에 걸려 잘렸으면 제목의 개수가 전체인 것처럼 보이지 않게 알린다.
   const [contracts, setContracts] = useState([])
+  // 아직 보관되지 않은 체결 계약. 이 기능을 붙이기 전에 체결된 것들이다.
+  const [pendingContracts, setPendingContracts] = useState(0)
+  const [archiving, setArchiving] = useState(false)
   const [caps, setCaps] = useState({ users: null, rooms: null, contracts: null })
 
   const loadAll = useCallback(async () => {
@@ -63,6 +68,7 @@ export default function AdminPage() {
     setRooms(roomsData.rooms)
     setAuditLog(auditData.entries)
     setContracts(contractData.contracts)
+    setPendingContracts(contractData.pendingCount || 0)
     setCaps({
       users: usersData.truncated ? usersData.limit : null,
       rooms: roomsData.truncated ? roomsData.limit : null,
@@ -75,6 +81,26 @@ export default function AdminPage() {
       .catch((err) => toast.error(err.message))
       .finally(() => setLoading(false))
   }, [loadAll, toast])
+
+  // 빠진 계약서를 지금 보관한다.
+  const archivePending = async () => {
+    setArchiving(true)
+    try {
+      const res = await api.post('/admin/contracts', {})
+      // 실패한 건을 조용히 넘기지 않는다. 보존 의무가 있는 계약서가
+      // 밖에 남아 있다는 뜻이라, 몇 건인지 말해야 한다.
+      if (res.failed?.length > 0) {
+        toast.error(`${res.stored}건 보관, ${res.failed.length}건 실패했습니다.`)
+      } else {
+        toast.success(`${res.stored}건을 보관했습니다.`)
+      }
+      await loadAll()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setArchiving(false)
+    }
+  }
 
   const dismissRevealed = (id) =>
     setRevealed((prev) => {
@@ -320,7 +346,29 @@ export default function AdminPage() {
               <th scope="row" className="cell-rowhead">
                 {u.email}
               </th>
-              <td>{u.displayName}</td>
+              <td>
+                {/* 이름을 누르면 그 사람에게 쪽지를 보낸다.
+                    본인에게는 보낼 수 없으므로 그때는 그냥 이름만 적는다. */}
+                {u.id === user?.id ? (
+                  u.displayName
+                ) : (
+                  <button
+                    type="button"
+                    className="dm-name-btn"
+                    onClick={() =>
+                      openDm({
+                        id: u.id,
+                        displayName: u.displayName,
+                        companyName: u.companyName || null,
+                        role: u.role,
+                      })
+                    }
+                    title={`${u.displayName}님에게 쪽지 보내기`}
+                  >
+                    {u.displayName}
+                  </button>
+                )}
+              </td>
               <td>{u.companyName || '-'}</td>
               <td>{u.role === 'company' ? '회사' : '구직자'}</td>
               <td>
@@ -409,26 +457,37 @@ export default function AdminPage() {
       </table>
       </div>
 
-      {/* 근로계약서 저장소.
-          지금까지 체결된 계약서를 보려면 면접방을 하나씩 열어야 했다. 방은
-          채용이 진행되는 자리라 끝난 계약을 찾는 데에는 맞지 않는다.
-          근로기준법 제42조는 근로관계가 끝난 날부터 3년간 계약서를 보존하라고
-          하는데, 그러려면 무엇이 어디 있는지 한눈에 볼 자리가 있어야 한다. */}
+      {/* 근로계약서 영구 보관소.
+          체결된 계약서는 면접방에 매달려 있었다. 방을 지우면 조건도 서명도
+          증명서도 함께 사라졌는데, 근로기준법 제42조가 보존하라는 것은 방이
+          아니라 계약서다. 이제 체결되는 순간 서버가 정본을 만들어 방 바깥에
+          보관하고, 방이 지워져도 여기 남는다. */}
       <h2>근로계약서 저장소 ({contracts.length})</h2>
       <p className="section-lead">
-        서명이 끝나 파일로 저장된 근로계약서입니다. 보존 기간은 근로관계가 끝난 날부터
-        3년입니다(근로기준법 제42조).
+        양측 서명이 끝나는 순간 서버가 정본을 만들어 보관합니다. 면접방을 삭제해도 이곳의
+        계약서는 삭제되지 않습니다. 보존 기간은 근로관계가 끝난 날부터 3년입니다(근로기준법
+        제42조, 같은 법 시행령 제22조 제2항).
       </p>
       {caps.contracts && (
         <p className="notice">계약서가 많아 최근 {caps.contracts}건만 불러왔습니다.</p>
       )}
+      {pendingContracts > 0 && (
+        // 이 기능을 붙이기 전에 체결된 계약은 자동 보관에 걸리지 않았다.
+        // 그것도 보존 대상이므로 눌러서 마저 채운다.
+        <p className="notice">
+          아직 보관되지 않은 체결 계약이 {pendingContracts}건 있습니다.{' '}
+          <button type="button" className="btn-sm" onClick={archivePending} disabled={archiving}>
+            {archiving ? '보관하는 중...' : '지금 보관하기'}
+          </button>
+        </p>
+      )}
       {contracts.length === 0 ? (
-        <p className="notice">아직 저장된 근로계약서가 없습니다.</p>
+        <p className="notice">아직 보관된 근로계약서가 없습니다.</p>
       ) : (
         <div className="table-scroll">
           <table className="admin-table">
             <caption className="sr-only">
-              저장된 근로계약서 {contracts.length}건의 당사자와 보존 정보
+              보관된 근로계약서 {contracts.length}건의 당사자와 보존 정보
             </caption>
             <thead>
               <tr>
@@ -437,8 +496,10 @@ export default function AdminPage() {
                 <th scope="col">계약 기간</th>
                 <th scope="col">서명</th>
                 <th scope="col">보존 기산</th>
+                <th scope="col">보존 만료</th>
+                <th scope="col">원본 방</th>
                 <th scope="col">증명서</th>
-                <th scope="col">파일</th>
+                <th scope="col">정본</th>
               </tr>
             </thead>
             <tbody>
@@ -458,12 +519,21 @@ export default function AdminPage() {
                     </span>
                   </td>
                   <td>{c.employmentEndedAt || '재직 중'}</td>
+                  <td>{c.retentionUntil || '재직 중'}</td>
+                  <td>
+                    {/* 방이 지워졌다는 것은 숨길 사실이 아니다. 계약서가 왜
+                        방 없이 혼자 있는지 여기서 답한다. */}
+                    {c.roomDeleted ? (
+                      <span className="badge badge-neutral">삭제됨</span>
+                    ) : (
+                      <Link className="btn-sm" to={`/rooms/${c.roomId}/contract`}>
+                        열기
+                      </Link>
+                    )}
+                  </td>
                   <td>{c.certificateSerial || '—'}</td>
                   <td>
-                    <a
-                      className="btn-sm"
-                      href={`/api/rooms/${c.roomId}/signed-contract-file`}
-                    >
+                    <a className="btn-sm" href={`/api/admin/contracts/${c.id}/file`}>
                       내려받기
                     </a>
                   </td>

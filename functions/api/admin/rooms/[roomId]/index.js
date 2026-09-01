@@ -34,12 +34,30 @@ export async function onRequestDelete({ request, env, data, params }) {
   const acknowledged = body?.acknowledgeRetention === true
   if (hold.held && !acknowledged) {
     return jsonError(
-      `보존 의무가 남아 있는 계약서입니다. ${hold.reason} 그래도 삭제하려면 보존 의무를 확인했음을 함께 보내주세요.`,
+      `보존 의무가 남아 있는 계약서입니다. ${hold.reason} 체결된 근로계약서 정본은 영구 보관소에 남아 삭제되지 않습니다. 그래도 이 면접방(대화·지원서 연결)을 지우려면 보존 의무를 확인했음을 함께 보내주세요.`,
       409
     )
   }
 
-  // 보관된 서명 계약서 PDF가 있으면 R2 객체도 함께 정리
+  // 영구 보관소는 건드리지 않는다.
+  //
+  // 보존 의무의 대상은 '면접방' 이 아니라 '계약서' 다. 방은 대화하던 자리일
+  // 뿐이고, 그 자리를 치웠다고 해서 맺은 계약이 없던 일이 되지는 않는다
+  // (근로기준법 제42조). contract_archive 는 방을 외래키로 참조하지 않으므로
+  // 아래 삭제가 이 표에 닿지 않는다 -- 참조했다면 함께 지우거나(보관이 아니다)
+  // 삭제가 실패하거나(방을 못 지운다) 둘 중 하나였을 것이다.
+  //
+  // 방이 사라졌다는 사실만 적어 둔다. 나중에 "이 계약서는 왜 방이 없는가" 에
+  // 답할 수 있어야 한다.
+  await env.DB.prepare(
+    "UPDATE contract_archive SET source_deleted_at = datetime('now'), updated_at = datetime('now') WHERE room_id = ?"
+  )
+    .bind(params.roomId)
+    .run()
+    .catch((err) => console.error('archive stamp failed:', err))
+
+  // 회사가 올린 PDF 사본만 정리한다. 영구 보관소의 정본은 다른 자리
+  // (archive/ 로 시작하는 키)에 있고 여기서 지우지 않는다.
   const signedContract = await env.DB.prepare(
     'SELECT r2_key FROM signed_contracts WHERE room_id = ?'
   )

@@ -4040,3 +4040,271 @@
   flex-direction: column;
   gap: 12px;
 }
+
+/* ── 쪽지함 (오른쪽 아래) ───────────────────────────────────────────────
+   화면 위에 떠 있는 것이라 본문을 가릴 수 있다. 그래서 접혀 있을 때는
+   버튼 하나만 남기고, 펼쳐도 화면 높이의 절반을 넘기지 않는다. */
+.dm-dock {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--gap-2);
+  /* 창이 없는 자리는 뒤 화면을 그대로 쓰게 둔다. 이걸 빼면 접혀 있을 때도
+     오른쪽 아래 사각형 전체가 클릭을 먹는다. */
+  pointer-events: none;
+}
+.dm-dock > * {
+  pointer-events: auto;
+}
+
+.dm-launcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+.dm-launcher-text {
+  font-size: 14px;
+}
+.dm-launcher-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--danger-text, #d92d20);
+  color: #fff;
+  font-size: 11px;
+  line-height: 20px;
+  text-align: center;
+}
+
+.dm-window {
+  display: flex;
+  flex-direction: column;
+  width: min(340px, calc(100vw - 32px));
+  max-height: min(60vh, 460px);
+  border-radius: var(--r-lg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+.dm-window-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-2);
+  padding: 10px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.dm-window-title {
+  font-weight: 600;
+  font-size: 14px;
+  word-break: keep-all;
+}
+.dm-icon-btn {
+  min-height: 32px;
+  min-width: 32px;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+}
+.dm-window-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dm-hint,
+.dm-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  word-break: keep-all;
+}
+.dm-error {
+  color: var(--error-text, #d92d20);
+  padding: 0 12px 8px;
+}
+
+.dm-bubble-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  max-width: 85%;
+}
+.dm-bubble-row.mine {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+.dm-bubble {
+  padding: 8px 11px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font-size: 14px;
+  line-height: 1.5;
+  /* 줄바꿈은 쓴 사람이 넣은 대로 남기고, 붙여 쓴 긴 줄은 잘라 넘긴다. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+.dm-bubble-row.mine .dm-bubble {
+  background: var(--accent);
+  color: #fff;
+}
+.dm-bubble-time {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.dm-compose {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+}
+.dm-compose textarea {
+  flex: 1;
+  min-height: 44px;
+  max-height: 96px;
+  padding: 9px 10px;
+  resize: none;
+  font-size: 16px; /* 16px 아래면 iOS 가 입력할 때 화면을 확대한다 */
+  line-height: 1.4;
+}
+.dm-compose .btn-sm {
+  flex: 0 0 auto;
+}
+
+.dm-list-window .dm-window-body {
+  padding: 6px;
+  gap: 2px;
+}
+.dm-thread-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.dm-thread {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 10px;
+  text-align: left;
+  background: transparent;
+  border-radius: var(--r-sm);
+}
+.dm-thread:hover {
+  background: var(--surface);
+}
+.dm-thread-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.dm-thread-name {
+  font-weight: 600;
+  font-size: 14px;
+  word-break: keep-all;
+}
+.dm-thread-time {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--muted);
+}
+.dm-thread-last {
+  font-size: 13px;
+  color: var(--muted);
+  /* 마지막 한 줄만 보인다. 길면 잘라 준다. */
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.dm-thread-badge {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--danger-text, #d92d20);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* 도착 알림. 오른쪽 아래에 쌓였다가 스스로 사라진다. */
+.dm-alerts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.dm-alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(320px, calc(100vw - 32px));
+  padding: 11px 13px;
+  border-radius: var(--r-md);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  font-size: 13px;
+  text-align: left;
+  word-break: keep-all;
+}
+.dm-alert-cta {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* 관리자 패널에서 이름을 누르면 쪽지창이 열린다. 표 안이라 버튼처럼
+   보이면 줄이 어지러워지므로 글자만 남기고 밑줄로 알린다. */
+.dm-name-btn {
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  word-break: keep-all;
+}
+
+@media (max-width: 480px) {
+  .dm-dock {
+    right: 12px;
+    bottom: 12px;
+  }
+  .dm-window {
+    max-height: 58vh;
+  }
+}

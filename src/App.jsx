@@ -7,6 +7,8 @@ import ProtectedRoute from './components/ProtectedRoute.jsx'
 import ThemeToggle from './components/ThemeToggle.jsx'
 import BrandLogo from './components/BrandLogo.jsx'
 import PageViewTracker from './components/PageViewTracker.jsx'
+import DmDock from './components/DmDock.jsx'
+import DmLink from './components/DmLink.jsx'
 import './App.css'
 
 // 첫 화면(랜딩·로그인)만 즉시 포함하고 나머지는 필요할 때 불러온다.
@@ -75,6 +77,9 @@ function App() {
             <Route path="/verify" element={<VerifyCertificatePage />} />
             {/* 코드를 보러 온 사람에게 무엇을 어떻게 만들었는지 설명하는 화면 */}
             <Route path="/tech" element={<TechPage />} />
+            {/* 알림을 눌러 들어오는 자리. 쪽지창은 화면이 아니라 오른쪽 아래에
+                떠 있는 것이라, 여기서는 그 창을 열고 원래 있던 곳으로 돌린다. */}
+            <Route path="/dm/:partnerId" element={<DmLink />} />
 
             <Route element={<ProtectedRoute allowMustChangePassword />}>
               <Route path="/change-password" element={<ChangePasswordPage />} />
@@ -99,6 +104,8 @@ function App() {
           </Routes>
         </Suspense>
       </main>
+      {/* 오른쪽 아래 쪽지함. 로그인하지 않았으면 스스로 아무것도 그리지 않는다. */}
+      <DmDock />
     </>
   )
 }
