@@ -35,8 +35,10 @@ describe('RealtimeKit 면접 전용 UI 설정', () => {
     const { designTokens, styles } = INTERVIEW_MEETING_CONFIG
 
     expect(designTokens.googleFont).toBeUndefined()
-    expect(designTokens.fontFamily).toContain('-apple-system')
+    expect(designTokens.fontFamily.startsWith('-apple-system, BlinkMacSystemFont')).toBe(true)
     expect(designTokens.fontFamily).toContain('SF Pro Text')
+    expect(designTokens.fontFamily).toContain('Apple SD Gothic Neo')
+    expect(designTokens.fontFamily).toContain('Malgun Gothic')
     expect(designTokens.theme).toBe('darkest')
     expect(designTokens.borderRadius).toBe('extra-rounded')
     expect(designTokens.colors.background[1000]).toBe('#000000')

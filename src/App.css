@@ -4053,7 +4053,7 @@
   width: 100%;
   /* 코드는 눈으로 짚어 가며 친다. 고정폭으로 두어 자리가 흔들리지 않게 한다.
      자간까지 벌리면 열두 자리가 좁은 화면에서 넘쳐 잘린다. */
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-apple-mono);
   letter-spacing: 0.5px;
 }
 .room-enter-form button {

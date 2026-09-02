@@ -3,7 +3,8 @@
  *
  * 기능과 화면 문구는 바꾸지 않는다. 장식은 한 단계만 쓰고, 회색 계층과
  * 파란 상호작용 색, 여백, 타이포그래피로 화면의 구조를 드러낸다.
- * 저장·출력되는 계약서 정본(.contract-print)은 아래에서 기존 값을 고정한다.
+ * 저장·출력되는 계약서 정본(.contract-print)은 구조와 인쇄 규칙을 유지하되,
+ * 화면과 같은 Apple 시스템 글꼴 토큰을 사용한다.
  */
 
 :root,
@@ -141,13 +142,13 @@ html {
 body {
   min-width: 320px;
   background: var(--bg);
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
-    Pretendard, 'Pretendard Variable', 'Apple SD Gothic Neo', 'Noto Sans KR',
-    'Segoe UI', sans-serif;
+  font-family: var(--font-apple);
   font-size: 16px;
   line-height: 1.55;
   letter-spacing: -0.012em;
+  font-kerning: normal;
+  font-optical-sizing: auto;
+  font-variant-ligatures: common-ligatures contextual;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -1042,11 +1043,11 @@ code {
   color: var(--text-h);
 }
 
-/* Preserve the existing statutory document appearance and typography. */
+/* 법정 문서의 구조와 인쇄 모양은 유지하고 글꼴만 전역 토큰과 맞춘다. */
 .contract-print {
   --border: #e5e8eb;
   --radius: 16px;
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-apple);
 }
 
 .contract-print .print-title {

@@ -125,7 +125,7 @@ export function createInterviewMeetingConfig() {
     ...config.designTokens,
     spacingBase: 4,
     fontFamily:
-      '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif',
+      '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Segoe UI", Arial, sans-serif',
     borderWidth: 'thin',
     borderRadius: 'extra-rounded',
     theme: 'darkest',

@@ -487,10 +487,10 @@
   overflow: auto;
   background: var(--interview-bg);
   color: var(--interview-text);
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
-    Pretendard, 'Pretendard Variable', 'Apple SD Gothic Neo', 'Noto Sans KR',
-    'Segoe UI', sans-serif;
+  font-family: var(--font-apple);
+  font-kerning: normal;
+  font-optical-sizing: auto;
+  font-variant-ligatures: common-ligatures contextual;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -512,7 +512,7 @@
 }
 
 .interview-page--meeting {
-  --rtk-font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Pretendard, 'Apple SD Gothic Neo', sans-serif;
+  --rtk-font-family: var(--font-apple);
   --rtk-colors-brand-300: 100 175 255;
   --rtk-colors-brand-400: 41 151 255;
   --rtk-colors-brand-500: 0 113 227;

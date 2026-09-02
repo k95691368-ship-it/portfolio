@@ -95,9 +95,19 @@
   --tap: 48px;
   --tap-lg: 56px;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  /* Apple 기기에서는 운영체제의 San Francisco를 그대로 사용한다. 웹폰트를
+     내려받지 않으므로 글자가 늦게 바뀌지 않고, 다른 운영체제에서는 한글을
+     온전히 지원하는 로컬 글꼴로만 자연스럽게 내려간다. */
+  --font-apple:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
+    'Helvetica Neue', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic',
+    'Segoe UI', Arial, sans-serif;
+  --font-apple-mono:
+    'SFMono-Regular', 'SF Mono', ui-monospace, Menlo, Monaco, Consolas,
+    'Liberation Mono', monospace;
+  --sans: var(--font-apple);
+  --heading: var(--font-apple);
+  --mono: var(--font-apple-mono);
 
   font: 18px/145% var(--sans);
   letter-spacing: 0.18px;
