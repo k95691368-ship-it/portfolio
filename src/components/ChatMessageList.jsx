@@ -72,7 +72,13 @@ export default function ChatMessageList({ messages, participants, viewerId = nul
 
   return (
     <div className="chat-message-wrap">
-      <div className="chat-message-list" ref={boxRef}>
+      <div
+        className="chat-message-list"
+        ref={boxRef}
+        role="log"
+        aria-live="polite"
+        aria-relevant="additions"
+      >
         {messages.map((m) => {
           const role = roleOf(m.senderId)
           const side = role === 'company' ? 'right' : 'left'

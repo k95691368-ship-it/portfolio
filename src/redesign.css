@@ -1,0 +1,1368 @@
+/*
+ * 2026 visual system
+ *
+ * 화면의 원래 문구와 흐름은 그대로 두고 색, 간격, 글자 위계, 반응형만
+ * 정리한다. 계약서 정본(.contract-print)은 법정 양식이므로 건드리지 않는다.
+ */
+
+:root,
+:root[data-theme='light'] {
+  --text: #4d5653;
+  --text-h: #1f2724;
+  --text-muted: #68716e;
+  --bg: #f4f4f1;
+  --surface: #f8f8f6;
+  --surface-strong: #eceeeb;
+  --panel: #ffffff;
+  --border: #d8dcd8;
+  --border-strong: #b9c0bb;
+  --code-bg: #eef0ed;
+  --btn-face: #f2f3f1;
+  --btn-face-hover: #e8ebe8;
+  --btn-border: #a9b1ac;
+  --accent: #275568;
+  --accent-hover: #1d4354;
+  --accent-bg: #e7f0f3;
+  --accent-border: #adc5cf;
+  --on-accent: #ffffff;
+  --danger: #b83a43;
+  --danger-text: #a42b35;
+  --danger-bg: #f9e9ea;
+  --danger-border: #e6b3b7;
+  --success: #25704d;
+  --success-text: #1f6846;
+  --success-bg: #e7f2eb;
+  --success-border: #b5d3c0;
+  --warning: #9a651d;
+  --warning-text: #835314;
+  --warning-bg: #f8efdf;
+  --warning-border: #dfc69e;
+  --overlay: rgba(19, 27, 24, 0.56);
+  --shadow-sm: 0 1px 2px rgba(24, 34, 30, 0.06);
+  --shadow: 0 18px 48px rgba(24, 34, 30, 0.14);
+  --r-xs: 5px;
+  --r-sm: 7px;
+  --r-md: 8px;
+  --r-lg: 10px;
+  --r-xl: 12px;
+  --radius: 10px;
+  --radius-sm: 7px;
+  --tap: 44px;
+  --tap-lg: 48px;
+  --page-x: clamp(18px, 4vw, 48px);
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --text: #c2c9c5;
+  --text-h: #f1f3f1;
+  --text-muted: #9ba49f;
+  --bg: #171b19;
+  --surface: #202522;
+  --surface-strong: #29302c;
+  --panel: #1c211e;
+  --border: #363d39;
+  --border-strong: #59625d;
+  --code-bg: #262c29;
+  --btn-face: #282e2b;
+  --btn-face-hover: #323a36;
+  --btn-border: #66706a;
+  --accent: #8cb8c8;
+  --accent-hover: #a9ceda;
+  --accent-bg: #20373f;
+  --accent-border: #466b79;
+  --on-accent: #10252d;
+  --danger: #ed7780;
+  --danger-text: #f08c94;
+  --danger-bg: #3b2528;
+  --danger-border: #76444a;
+  --success: #7bc59d;
+  --success-text: #8bd2aa;
+  --success-bg: #20382c;
+  --success-border: #426c54;
+  --warning: #e1b56f;
+  --warning-text: #e8c181;
+  --warning-bg: #3b3122;
+  --warning-border: #77603b;
+  --overlay: rgba(0, 0, 0, 0.72);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28);
+  --shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --text: #c2c9c5;
+    --text-h: #f1f3f1;
+    --text-muted: #9ba49f;
+    --bg: #171b19;
+    --surface: #202522;
+    --surface-strong: #29302c;
+    --panel: #1c211e;
+    --border: #363d39;
+    --border-strong: #59625d;
+    --code-bg: #262c29;
+    --btn-face: #282e2b;
+    --btn-face-hover: #323a36;
+    --btn-border: #66706a;
+    --accent: #8cb8c8;
+    --accent-hover: #a9ceda;
+    --accent-bg: #20373f;
+    --accent-border: #466b79;
+    --on-accent: #10252d;
+    --danger: #ed7780;
+    --danger-text: #f08c94;
+    --danger-bg: #3b2528;
+    --danger-border: #76444a;
+    --success: #7bc59d;
+    --success-text: #8bd2aa;
+    --success-bg: #20382c;
+    --success-border: #426c54;
+    --warning: #e1b56f;
+    --warning-text: #e8c181;
+    --warning-bg: #3b3122;
+    --warning-border: #77603b;
+    --overlay: rgba(0, 0, 0, 0.72);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28);
+    --shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+  }
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  min-width: 320px;
+  background: var(--bg);
+  font-family:
+    Pretendard, 'Pretendard Variable', 'Noto Sans KR', 'Apple SD Gothic Neo',
+    'Segoe UI', sans-serif;
+  line-height: 1.6;
+}
+
+#root {
+  width: 100%;
+  max-width: none;
+  background: var(--bg);
+}
+
+#main {
+  min-width: 0;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.035em;
+}
+
+h1 {
+  font-size: clamp(28px, 4vw, 40px);
+  line-height: 1.22;
+}
+
+h2 {
+  font-size: clamp(19px, 2.2vw, 24px);
+  line-height: 1.35;
+}
+
+h3 {
+  line-height: 1.45;
+}
+
+a,
+button,
+input,
+select,
+textarea {
+  transition:
+    color 120ms ease,
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+button {
+  min-height: var(--tap);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  box-shadow: none;
+}
+
+button:active:not(:disabled) {
+  transform: none;
+}
+
+.btn-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.btn-primary:hover:not(:disabled) {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+}
+
+.btn-ghost,
+.btn-nav,
+.back-link,
+.app-bar-link,
+.theme-toggle,
+.notif-bell,
+.demo-menu-trigger {
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  color: var(--text-h);
+}
+
+.btn-ghost:hover:not(:disabled),
+.btn-nav:hover,
+.back-link:hover,
+.app-bar-link:hover,
+.theme-toggle:hover:not(:disabled),
+.notif-bell:hover:not(:disabled),
+.demo-menu-trigger:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface);
+}
+
+.btn-danger {
+  border: 1px solid var(--danger-border);
+  border-radius: var(--r-sm);
+}
+
+input,
+select,
+textarea {
+  min-height: 48px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  box-shadow: none;
+}
+
+input:hover:not(:disabled),
+select:hover:not(:disabled),
+textarea:hover:not(:disabled) {
+  border-color: var(--text-muted);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent);
+  background: var(--panel);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+code {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.badge {
+  border-radius: 4px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* 상단 */
+
+.app-bar {
+  position: sticky;
+  top: 0;
+  z-index: 80;
+  width: 100%;
+  max-width: none;
+  min-height: 62px;
+  margin: 0;
+  padding: 10px max(var(--page-x), calc((100vw - 1180px) / 2));
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.brand {
+  gap: 10px;
+  margin: 0;
+  color: var(--text-h);
+}
+
+.brand:hover {
+  opacity: 1;
+}
+
+.brand-mark {
+  width: 30px;
+  height: 30px;
+  color: var(--accent);
+}
+
+.brand-name {
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+}
+
+.app-bar-right {
+  gap: 8px;
+}
+
+.app-bar-link,
+.demo-menu-trigger {
+  min-height: 38px;
+}
+
+.demo-menu-panel,
+.notif-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+/* 페이지 공통 */
+
+.auth-page,
+.dashboard-page,
+.room-page,
+.contract-page,
+.admin-page,
+.jobs-page,
+.job-detail-page,
+.apply-page,
+.status-page,
+.verify-page,
+.tech-page,
+.recruit-page {
+  width: min(100%, 1180px);
+  margin: 0 auto;
+  padding: clamp(30px, 5vw, 64px) var(--page-x) 88px;
+  gap: 28px;
+}
+
+.page-header,
+.dashboard-header {
+  gap: 10px;
+  padding: 0 0 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.page-header p {
+  max-width: 720px;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.page-header .back-link {
+  order: -1;
+  width: fit-content;
+  min-height: 36px;
+  margin-bottom: 12px;
+  padding: 0 11px;
+  font-size: 13px;
+}
+
+.header-actions {
+  gap: 7px;
+}
+
+.header-actions > button,
+.header-actions > a {
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+}
+
+.error,
+.notice,
+.signed-banner,
+.hire-confirmed-banner,
+.save-message {
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: var(--r-sm);
+  background: var(--panel);
+}
+
+.error {
+  border-left-color: var(--danger);
+}
+
+.notice {
+  border-left-color: var(--border-strong);
+}
+
+.signed-banner,
+.save-message {
+  border-left-color: var(--success);
+}
+
+.hire-confirmed-banner {
+  border-left-color: var(--accent);
+}
+
+/* 첫 화면 */
+
+.landing-page {
+  width: min(100%, 760px);
+  min-height: calc(100svh - 63px);
+  margin: 0 auto;
+  padding: clamp(48px, 10vh, 104px) var(--page-x) 48px;
+  justify-content: flex-start;
+  gap: 22px;
+}
+
+.landing-hero {
+  width: 100%;
+  padding: clamp(28px, 6vw, 52px);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  background: var(--panel);
+  text-align: left;
+}
+
+.landing-eyebrow {
+  margin: 0 0 12px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+}
+
+.landing-hero h1 {
+  max-width: 560px;
+  margin-bottom: clamp(30px, 5vw, 44px);
+  font-size: clamp(30px, 5.2vw, 46px);
+}
+
+.landing-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+  max-width: none;
+}
+
+.landing-choice {
+  min-height: 138px;
+  padding: 24px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  color: var(--text-h);
+  align-items: flex-start;
+  justify-content: space-between;
+  text-align: left;
+}
+
+.landing-choice:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--panel);
+  color: var(--accent);
+}
+
+.landing-choice-icon {
+  width: 34px;
+  height: 34px;
+  color: currentColor;
+}
+
+.landing-choice-title {
+  font-size: 20px;
+  font-weight: 750;
+}
+
+.landing-verify {
+  margin: 22px 0 0;
+  text-align: right;
+}
+
+.landing-verify a,
+.landing-tech-link {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.landing-tech-link {
+  align-self: flex-end;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* 인증 */
+
+.auth-page {
+  width: min(100%, 500px);
+  padding-top: clamp(48px, 9vh, 96px);
+}
+
+.auth-page > h1 {
+  margin-bottom: 2px;
+}
+
+.auth-page > form {
+  gap: 17px;
+  margin: 0;
+  padding: clamp(22px, 5vw, 32px);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+}
+
+.auth-page form > .btn-primary {
+  min-height: 48px;
+  margin-top: 6px;
+}
+
+.auth-page > p {
+  margin: -8px 0 0;
+  text-align: center;
+}
+
+.remember-me {
+  padding: 2px 0;
+}
+
+/* 대시보드와 목록 */
+
+.dashboard-page {
+  max-width: 1080px;
+}
+
+.dashboard-page > p:first-of-type {
+  margin-top: -14px;
+  color: var(--text-muted);
+}
+
+.dashboard-page > form,
+.document-manager,
+.my-applications {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+}
+
+.dashboard-page > form {
+  padding: 22px;
+}
+
+.dashboard-page > h2 {
+  margin-top: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.room-list {
+  gap: 0;
+  border-top: 1px solid var(--border);
+}
+
+.room-list > li {
+  border-bottom: 1px solid var(--border);
+}
+
+.room-link {
+  min-height: 78px;
+  padding: 17px 4px;
+  border-radius: 0;
+  background: transparent;
+}
+
+.room-link:hover {
+  background: var(--surface);
+}
+
+.room-title {
+  font-weight: 700;
+}
+
+.room-meta {
+  line-height: 1.5;
+}
+
+.jobs-page,
+.job-detail-page,
+.status-page,
+.verify-page {
+  max-width: 940px;
+}
+
+.job-list {
+  gap: 0;
+  border-top: 1px solid var(--border);
+}
+
+.job-list > li {
+  border-bottom: 1px solid var(--border);
+}
+
+.job-card {
+  min-height: 112px;
+  padding: 22px 6px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.job-card:hover {
+  padding-left: 14px;
+  background: var(--surface);
+}
+
+.job-card-title {
+  font-size: 19px;
+  font-weight: 750;
+}
+
+.job-card-title::after {
+  color: var(--text-muted);
+}
+
+.job-detail-body,
+.status-card,
+.verify-result,
+.room-enter,
+.lookup-code-box,
+.apply-done {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  box-shadow: none;
+}
+
+.job-detail-body {
+  padding: clamp(22px, 5vw, 38px);
+  line-height: 1.8;
+}
+
+.job-detail-actions {
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.room-enter {
+  padding: 20px;
+}
+
+.status-form,
+.verify-form {
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+}
+
+.status-card,
+.verify-result {
+  padding: clamp(22px, 5vw, 34px);
+}
+
+/* 지원서 */
+
+.apply-page {
+  max-width: 880px;
+}
+
+.apply-form {
+  gap: 24px;
+}
+
+.apply-section,
+.career-entry,
+.consent-item {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  box-shadow: none;
+}
+
+.apply-section {
+  padding: clamp(20px, 4vw, 30px);
+}
+
+.apply-section > h2 {
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.career-entry,
+.consent-item {
+  padding: 18px;
+}
+
+.file-field {
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+
+.consent-all {
+  border-radius: var(--r-sm);
+}
+
+/* 채용·관리 */
+
+.recruit-page,
+.admin-page {
+  max-width: 1180px;
+}
+
+.recruit-section,
+.admin-create-account,
+.application-block,
+.applicant-compare,
+.final-offer-email,
+.room-invite-email,
+.interview-summary,
+.offer-watch,
+.negotiation-log,
+.pre-contract-review,
+.worker-rights,
+.contract-explainer,
+.audit-certificate {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  box-shadow: none;
+}
+
+.recruit-section,
+.admin-create-account {
+  padding: clamp(20px, 4vw, 30px);
+}
+
+.recruit-section > h2,
+.admin-create-account > h2 {
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.posting-form,
+.form-grid {
+  gap: 16px;
+}
+
+.posting-conditions {
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+
+.filter-row {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+
+.table-scroll {
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  box-shadow: none;
+}
+
+.admin-table {
+  border-collapse: collapse;
+  background: var(--panel);
+}
+
+.admin-table th {
+  background: var(--surface);
+  color: var(--text-h);
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+
+.admin-table th,
+.admin-table td {
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-table tbody tr:hover {
+  background: var(--surface);
+}
+
+.temp-password-banner {
+  border: 1px solid var(--warning-border);
+  border-radius: var(--r-sm);
+  background: var(--warning-bg);
+}
+
+.application-modal {
+  gap: 20px;
+}
+
+.application-block {
+  padding: 20px;
+}
+
+/* 면접방 */
+
+.room-page {
+  max-width: 1000px;
+}
+
+.chat-panel,
+.room-documents,
+.room-archive,
+.room-closed,
+.room-archived,
+.ai-analysis,
+.dismissal-warning {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  box-shadow: none;
+}
+
+.chat-panel,
+.room-documents,
+.room-archive,
+.room-closed,
+.room-archived {
+  padding: clamp(18px, 4vw, 26px);
+}
+
+.chat-message-list {
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+
+.chat-message {
+  max-width: min(78%, 610px);
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel);
+  box-shadow: none;
+}
+
+.chat-row-right .chat-message {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--text-h);
+}
+
+.chat-composer {
+  gap: 9px;
+  padding-top: 14px;
+}
+
+.chat-composer input {
+  min-width: 0;
+}
+
+.history-list,
+.negotiation-entries {
+  border-top: 1px solid var(--border);
+}
+
+.history-entry,
+.negotiation-entries > li {
+  border-bottom: 1px solid var(--border);
+}
+
+/* 계약 편집 영역. 인쇄 정본은 아래 선택자에 포함하지 않는다. */
+
+.contract-page {
+  max-width: 1080px;
+}
+
+/* 저장·교부되는 정본은 기존 법정 양식의 시각값을 그대로 고정한다. */
+.contract-print {
+  --border: #e5e8eb;
+  --radius: 16px;
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+}
+
+.contract-form,
+.contract-fields,
+.signature-status-row,
+.contract-history,
+.contract-delivery,
+.translation-panel,
+.change-requests,
+.wage-composition,
+.rights-block,
+.review-block,
+.summary-block {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  box-shadow: none;
+}
+
+.contract-form,
+.contract-fields,
+.contract-history,
+.contract-delivery,
+.translation-panel,
+.change-requests,
+.wage-composition,
+.rights-block,
+.review-block,
+.summary-block {
+  padding: clamp(18px, 4vw, 26px);
+}
+
+.contract-form fieldset {
+  padding: 20px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.contract-form fieldset:first-of-type {
+  border-top: 0;
+}
+
+.contract-fields table {
+  border: 1px solid var(--border);
+}
+
+.contract-fields th {
+  background: var(--surface);
+}
+
+.signature-status-row {
+  overflow: hidden;
+}
+
+.signature-status-row > div {
+  padding: 18px;
+  border-color: var(--border);
+}
+
+.translation-tabs {
+  border-bottom: 1px solid var(--border);
+}
+
+.translation-tabs button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+}
+
+.translation-tabs button[aria-selected='true'],
+.translation-tabs button.active {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+/* 기술 구현 */
+
+.tech-page {
+  max-width: 1080px;
+}
+
+.tech-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.tech-tab {
+  min-height: 96px;
+  padding: 18px 22px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--panel);
+  text-align: left;
+}
+
+.tech-tab:last-child {
+  border-right: 0;
+}
+
+.tech-tab:hover {
+  background: var(--surface);
+}
+
+.tech-tab.active {
+  background: var(--accent-bg);
+  color: var(--accent);
+  box-shadow: inset 0 -3px 0 var(--accent);
+}
+
+.tech-tab-title {
+  font-size: 17px;
+  font-weight: 750;
+}
+
+.tech-tab-desc {
+  margin-top: 5px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tech-panel {
+  padding: clamp(22px, 5vw, 40px);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+}
+
+.tech-lead {
+  max-width: 800px;
+  padding: 0 0 24px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.tech-steps {
+  margin-top: 4px;
+}
+
+.tech-steps li {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 18px;
+  padding: 26px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.tech-steps li:last-child {
+  border-bottom: 0;
+}
+
+.tech-steps li.accent {
+  background: transparent;
+}
+
+.tech-step-num,
+.tech-steps li.accent .tech-step-num {
+  width: 40px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font: 700 13px/28px var(--mono);
+  text-align: center;
+}
+
+.tech-steps li.accent .tech-step-num {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.tech-step-body h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.tech-step-body p,
+.tech-step-detail {
+  max-width: 790px;
+  line-height: 1.8;
+}
+
+.tech-step-detail {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-left: 2px solid var(--border-strong);
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.tech-group {
+  margin-top: 34px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.tech-group > h3 {
+  margin: 0 0 12px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--text-h);
+  font-size: 18px;
+}
+
+.tech-list {
+  border-top: 0;
+}
+
+.tech-item {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.32fr) minmax(0, 1fr);
+  gap: 28px;
+  padding: 19px 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tech-item dt {
+  color: var(--text-h);
+  font-weight: 700;
+}
+
+.tech-item dd {
+  color: var(--text);
+  line-height: 1.75;
+}
+
+.tech-foot {
+  padding: 20px 0 0;
+  border-top: 1px solid var(--border);
+}
+
+/* 오버레이와 고정 UI */
+
+.modal-overlay {
+  padding: 24px;
+  background: var(--overlay);
+}
+
+.modal-content {
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.modal-actions {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.toast {
+  border: 1px solid var(--toast-border);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow);
+}
+
+.dm-launcher {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  color: var(--text-h);
+  box-shadow: var(--shadow-sm);
+}
+
+.dm-window {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.dm-window-head {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.dm-bubble {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.dm-bubble-row.mine .dm-bubble {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--text-h);
+}
+
+.dm-thread {
+  border-bottom: 1px solid var(--border);
+}
+
+/* 모바일 */
+
+@media (max-width: 720px) {
+  :root {
+    --page-x: 18px;
+  }
+
+  .app-bar {
+    min-height: 58px;
+    padding: 9px var(--page-x);
+  }
+
+  .brand-mark {
+    width: 27px;
+    height: 27px;
+  }
+
+  .brand-name {
+    font-size: 14px;
+  }
+
+  .auth-page,
+  .dashboard-page,
+  .room-page,
+  .contract-page,
+  .admin-page,
+  .jobs-page,
+  .job-detail-page,
+  .apply-page,
+  .status-page,
+  .verify-page,
+  .tech-page,
+  .recruit-page {
+    padding: 30px var(--page-x) 64px;
+    gap: 22px;
+  }
+
+  .landing-page {
+    min-height: calc(100svh - 59px);
+    padding: 34px var(--page-x);
+  }
+
+  .landing-hero {
+    padding: 26px 20px;
+  }
+
+  .landing-hero h1 {
+    margin-bottom: 26px;
+    font-size: 30px;
+  }
+
+  .landing-choice {
+    min-height: 116px;
+    padding: 18px;
+  }
+
+  .landing-choice-title {
+    font-size: 18px;
+  }
+
+  .dashboard-header {
+    align-items: flex-start;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .dashboard-page > form {
+    align-items: stretch;
+    padding: 18px;
+  }
+
+  .dashboard-page > form label,
+  .dashboard-page > form button {
+    width: 100%;
+  }
+
+  .status-form,
+  .verify-form {
+    flex-direction: column;
+  }
+
+  .status-form button,
+  .verify-form button {
+    width: 100%;
+  }
+
+  .tech-tab {
+    min-height: 88px;
+    padding: 14px;
+  }
+
+  .tech-tab-title {
+    font-size: 15px;
+  }
+
+  .tech-tab-desc {
+    font-size: 12px;
+  }
+
+  .tech-panel {
+    padding: 22px 18px;
+  }
+
+  .tech-steps li {
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 12px;
+    padding: 22px 0;
+  }
+
+  .tech-step-num,
+  .tech-steps li.accent .tech-step-num {
+    width: 36px;
+  }
+
+  .tech-item {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding: 17px 2px;
+  }
+
+  .chat-message {
+    max-width: 90%;
+  }
+
+  .modal-overlay {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 440px) {
+  .brand-name {
+    display: none;
+  }
+
+  .landing-choices {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-choice {
+    min-height: 94px;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .tech-tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .tech-tab {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tech-tab:last-child {
+    border-bottom: 0;
+  }
+
+  .room-link {
+    align-items: flex-start;
+    gap: 10px;
+  }
+}
+
+@media print {
+  .app-bar,
+  .dm-dock,
+  .toast-viewport,
+  .skip-link {
+    display: none !important;
+  }
+}

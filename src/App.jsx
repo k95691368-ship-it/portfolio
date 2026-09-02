@@ -11,6 +11,7 @@ import DmDock from './components/DmDock.jsx'
 import DmLink from './components/DmLink.jsx'
 import DemoMenu from './components/DemoMenu.jsx'
 import './App.css'
+import './redesign.css'
 
 // 첫 화면(랜딩·로그인)만 즉시 포함하고 나머지는 필요할 때 불러온다.
 // 공고를 보러 온 방문자가 대시보드·면접방·관리자 화면까지 받을 이유가 없다.

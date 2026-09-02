@@ -642,7 +642,7 @@ export default function RecruitPage() {
         ) : postings.length === 0 ? (
           <p className="notice">등록된 공고가 없습니다.</p>
         ) : (
-          <div className="table-scroll">
+          <div className="table-scroll" tabIndex={0}>
             <table className="admin-table">
               <caption className="sr-only">내가 등록한 채용 공고 {postings.length}건</caption>
               <thead>
@@ -748,7 +748,7 @@ export default function RecruitPage() {
             {filteredApps.length === 0 ? (
               <p className="notice">조건에 맞는 지원서가 없습니다.</p>
             ) : (
-              <div className="table-scroll">
+              <div className="table-scroll" tabIndex={0}>
                 <table className="admin-table">
                   <caption className="sr-only">
                     조건에 맞는 지원서 {filteredApps.length}건

@@ -325,7 +325,7 @@ export default function AdminPage() {
       {caps.users && (
         <p className="notice">계정이 많아 최근 {caps.users}건만 불러왔습니다.</p>
       )}
-      <div className="table-scroll">
+      <div className="table-scroll" tabIndex={0}>
       <table className="admin-table">
         <caption className="sr-only">등록된 사용자 {users.length}명의 권한과 상태</caption>
         <thead>
@@ -484,7 +484,7 @@ export default function AdminPage() {
       {contracts.length === 0 ? (
         <p className="notice">아직 보관된 근로계약서가 없습니다.</p>
       ) : (
-        <div className="table-scroll">
+        <div className="table-scroll" tabIndex={0}>
           <table className="admin-table">
             <caption className="sr-only">
               보관된 근로계약서 {contracts.length}건의 당사자와 보존 정보
@@ -548,7 +548,7 @@ export default function AdminPage() {
       {caps.rooms && (
         <p className="notice">면접방이 많아 최근 {caps.rooms}건만 불러왔습니다.</p>
       )}
-      <div className="table-scroll">
+      <div className="table-scroll" tabIndex={0}>
       <table className="admin-table">
         <caption className="sr-only">모든 면접방 {rooms.length}개의 참여자와 진행 상태</caption>
         <thead>
@@ -599,7 +599,7 @@ export default function AdminPage() {
       </div>
 
       <h2>감사 로그 (최근 {auditLog.length}건)</h2>
-      <div className="table-scroll">
+      <div className="table-scroll" tabIndex={0}>
       <table className="admin-table">
         <caption className="sr-only">
           관리자 작업 기록 최근 {auditLog.length}건 — 언제 누가 무엇을 했는지

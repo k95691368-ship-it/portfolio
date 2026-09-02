@@ -90,7 +90,13 @@ function DmWindow({ partner, onClose }) {
           ✕
         </button>
       </header>
-      <div className="dm-window-body" ref={bodyRef}>
+      <div
+        className="dm-window-body"
+        ref={bodyRef}
+        role="log"
+        aria-live="polite"
+        aria-relevant="additions"
+      >
         {loading && <p className="dm-hint">불러오는 중...</p>}
         {!loading && messages.length === 0 && !error && (
           <p className="dm-hint">아직 주고받은 쪽지가 없습니다.</p>

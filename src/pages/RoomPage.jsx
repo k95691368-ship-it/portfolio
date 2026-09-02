@@ -232,7 +232,7 @@ export default function RoomPage() {
     }
   }
 
-  if (error) return <p className="error">{error}</p>
+  if (error) return <p className="error" role="alert">{error}</p>
   if (!view) return <p>불러오는 중...</p>
 
   const room = view.room

@@ -178,7 +178,7 @@ export default function ApplyPage() {
   if (loadError) {
     return (
       <div className="apply-page">
-        <p className="error">{loadError}</p>
+        <p className="error" role="alert">{loadError}</p>
         <p>
           <Link to="/jobs">← 채용 공고 목록으로</Link>
         </p>
@@ -363,30 +363,34 @@ export default function ApplyPage() {
         <section className="apply-section">
           <h2>제출서류</h2>
           <div className="file-field">
-            <span className="file-field-label">
+            <span className="file-field-label" id="resume-upload-help">
               이력서 / 경력기술서 <span className="consent-required" aria-hidden="true">*</span>{' '}
               <em>PDF, DOC, DOCX, HWP · 10MB 이하</em>
             </span>
-            <label className="upload-button">
+            <label className="upload-button" htmlFor="resume-upload">
               {resume ? resume.name : '파일 업로드'}
               <input
+                id="resume-upload"
                 type="file"
                 className="sr-only"
                 accept=".pdf,.doc,.docx,.hwp,.hwpx"
+                aria-describedby="resume-upload-help"
                 onChange={pickFile(setResume)}
               />
             </label>
           </div>
           <div className="file-field">
-            <span className="file-field-label">
+            <span className="file-field-label" id="portfolio-upload-help">
               포트폴리오 <em>선택 · PDF, DOC, DOCX, HWP · 10MB 이하</em>
             </span>
-            <label className="upload-button">
+            <label className="upload-button" htmlFor="portfolio-upload">
               {portfolio ? portfolio.name : '파일 업로드'}
               <input
+                id="portfolio-upload"
                 type="file"
                 className="sr-only"
                 accept=".pdf,.doc,.docx,.hwp,.hwpx"
+                aria-describedby="portfolio-upload-help"
                 onChange={pickFile(setPortfolio)}
               />
             </label>

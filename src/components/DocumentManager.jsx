@@ -53,6 +53,7 @@ export default function DocumentManager() {
       <h2>내 서류</h2>
       {DOC_TYPES.map((type) => {
         const doc = docFor(type)
+        const inputId = `document-upload-${type}`
         return (
           <div key={type} className="document-row">
             <span className="document-label">{LABELS[type]}</span>
@@ -68,9 +69,10 @@ export default function DocumentManager() {
             ) : (
               <span>업로드된 파일 없음</span>
             )}
-            <label className="upload-button">
+            <label className="upload-button" htmlFor={inputId}>
               {uploading === type ? '업로드 중...' : '파일 선택'}
               <input
+                id={inputId}
                 type="file"
                 className="sr-only"
                 accept=".pdf,.doc,.docx,.hwp,.hwpx"

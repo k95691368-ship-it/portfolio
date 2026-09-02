@@ -38,7 +38,7 @@ export default function JobsPage() {
           있어야 한다 — 회사 로그인 화면 안에 두면 지원자는 찾지 못한다. */}
       <RoomEnterForm />
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
       {loading ? (
         <p>불러오는 중...</p>
       ) : postings.length === 0 ? (

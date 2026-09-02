@@ -31,7 +31,7 @@ export default function ChatComposer({ onSend }) {
       <button type="submit" className="btn-primary btn-sm" disabled={sending}>
         전송
       </button>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
     </form>
   )
 }

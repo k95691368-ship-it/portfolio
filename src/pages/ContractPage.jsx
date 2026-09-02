@@ -1175,7 +1175,7 @@ export default function ContractPage() {
   })()
 
   if (loading) return <p>불러오는 중...</p>
-  if (error && !room) return <p className="error">{error}</p>
+  if (error && !room) return <p className="error" role="alert">{error}</p>
 
   return (
     <div className="contract-page">
