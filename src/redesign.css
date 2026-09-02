@@ -890,6 +890,15 @@ code {
   font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
 }
 
+.contract-print .print-title {
+  line-height: 1.4;
+}
+
+.contract-print h3 {
+  line-height: 1.45;
+  letter-spacing: -0.16px;
+}
+
 .contract-form,
 .contract-fields,
 .signature-status-row,
