@@ -125,7 +125,7 @@ export function createInterviewMeetingConfig() {
     ...config.designTokens,
     spacingBase: 4,
     fontFamily:
-      '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Segoe UI", Arial, sans-serif',
+      '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Apple SD Gothic Neo", "Pretendard Variable", Pretendard, "Helvetica Neue", "Noto Sans KR", "Malgun Gothic", "Segoe UI", Arial, sans-serif',
     borderWidth: 'thin',
     borderRadius: 'extra-rounded',
     theme: 'darkest',
@@ -152,8 +152,8 @@ export function createInterviewMeetingConfig() {
       warning: '#FFD60A',
     },
   }
-  // System fonts are local. Keeping the default `googleFont: Inter` would make
-  // the SDK fetch a second typeface and undermine both privacy and the design.
+  // The document already loads Pretendard from this deployment. Keeping the
+  // default `googleFont: Inter` would fetch a second typeface from a third party.
   delete config.designTokens.googleFont
 
   config.styles = {

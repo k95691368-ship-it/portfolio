@@ -31,13 +31,14 @@ describe('RealtimeKit 면접 전용 UI 설정', () => {
     expect(second.root['div#controlbar-center']).not.toContain('test-only-control')
   })
 
-  it('Apple 계열의 시스템 글꼴과 절제된 다크 토큰을 쓴다', () => {
+  it('Apple 시스템 글꼴과 Windows용 번들 글꼴을 같은 우선순위로 쓴다', () => {
     const { designTokens, styles } = INTERVIEW_MEETING_CONFIG
 
     expect(designTokens.googleFont).toBeUndefined()
     expect(designTokens.fontFamily.startsWith('-apple-system, BlinkMacSystemFont')).toBe(true)
     expect(designTokens.fontFamily).toContain('SF Pro Text')
     expect(designTokens.fontFamily).toContain('Apple SD Gothic Neo')
+    expect(designTokens.fontFamily).toContain('Pretendard Variable')
     expect(designTokens.fontFamily).toContain('Malgun Gothic')
     expect(designTokens.theme).toBe('darkest')
     expect(designTokens.borderRadius).toBe('extra-rounded')

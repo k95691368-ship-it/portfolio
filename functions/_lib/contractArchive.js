@@ -72,7 +72,8 @@ export function renderContractDocument(snapshot) {
 <style>
   /* 글꼴은 이름만 적는다. 파일을 싣지 않아도 어느 컴퓨터에서든 한글이 나온다. */
   body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
-         "Helvetica Neue", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic",
+         "Apple SD Gothic Neo", "Pretendard Variable", Pretendard, "Helvetica Neue",
+         "Noto Sans KR", "Malgun Gothic",
          "맑은 고딕", "Segoe UI", Arial, sans-serif;
          max-width: 760px; margin: 0 auto; padding: 32px 24px; color: #111; line-height: 1.7; }
   h1 { font-size: 24px; text-align: center; margin: 0 0 4px; }
