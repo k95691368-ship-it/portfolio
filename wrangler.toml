@@ -10,6 +10,10 @@ database_id = "e2eef543-db5b-4de8-8038-845ae96ccb7b"
 binding = "DOCUMENTS"
 bucket_name = "portfolio"
 
+[[r2_buckets]]
+binding = "INTERVIEW_RECORDINGS"
+bucket_name = "portfolio-interview-recordings"
+
 # 웹 푸시 값은 여기 적지 않는다.
 #
 # Pages 는 이 파일의 [vars] 를 읽지 않는다(pages_build_output_dir 로 설정한

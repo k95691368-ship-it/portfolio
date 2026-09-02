@@ -37,12 +37,13 @@ export function roomDoorFor(roomId) {
   return saved && saved.roomId === roomId ? saved.door : null
 }
 
-// 이 요청이 코드로 들어간 그 방에 대한 것인가.
-function codeIdentityHeader(path) {
+// 이 요청이 어느 문으로 들어간 그 방에 대한 것인가.
+function roomIdentityHeader(path) {
   const match = path.match(/^\/rooms\/([^/]+)\/.+/)
   if (!match) return null
-  return roomDoorFor(decodeURIComponent(match[1])) === 'code'
-    ? { 'X-Room-Identity': 'code' }
+  const door = roomDoorFor(decodeURIComponent(match[1]))
+  return door === 'code' || door === 'account'
+    ? { 'X-Room-Identity': door }
     : null
 }
 
@@ -68,7 +69,7 @@ async function request(path, options = {}) {
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...codeIdentityHeader(path),
+      ...roomIdentityHeader(path),
       ...(options.headers || {}),
     },
     ...options,
@@ -82,7 +83,7 @@ async function upload(path, formData) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     credentials: 'include',
-    headers: { ...codeIdentityHeader(path) },
+    headers: { ...roomIdentityHeader(path) },
     body: formData,
   })
   const data = await res.json().catch(() => null)
@@ -93,6 +94,7 @@ async function upload(path, formData) {
 export const api = {
   get: (path) => request(path),
   post: (path, body) => request(path, { method: 'POST', body: JSON.stringify(body) }),
+  put: (path, body) => request(path, { method: 'PUT', body: JSON.stringify(body) }),
   patch: (path, body) => request(path, { method: 'PATCH', body: JSON.stringify(body) }),
   // DELETE에도 본문을 실을 수 있어야 한다 — 보존 의무처럼 "알고도 지운다"는
   // 확인을 서버가 받아야 하는 경우가 있다.

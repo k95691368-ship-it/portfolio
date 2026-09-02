@@ -7,6 +7,11 @@ describe('방문 기록의 주소 가리기', () => {
     expect(redactPath('/rooms/8f3a1c2e-4b5d-4e6f-8a9b-0c1d2e3f4a5b/contract')).toBe(
       '/rooms/:roomId/contract'
     )
+    expect(
+      redactPath(
+        '/rooms/8f3a1c2e-4b5d-4e6f-8a9b-0c1d2e3f4a5b/interview/1c3a1c2e-4b5d-4e6f-8a9b-0c1d2e3f4a5b'
+      )
+    ).toBe('/rooms/:roomId/interview/:sessionId')
   })
 
   it('공고·지원서 id 를 내보내지 않는다', () => {
@@ -39,6 +44,7 @@ describe('녹화에서 가려야 하는 화면', () => {
     const sensitive = [
       '/rooms/8f3a1c2e-4b5d-4e6f-8a9b-0c1d2e3f4a5b',
       '/rooms/8f3a1c2e-4b5d-4e6f-8a9b-0c1d2e3f4a5b/contract',
+      '/rooms/8f3a1c2e-4b5d-4e6f-8a9b-0c1d2e3f4a5b/interview/1c3a1c2e-4b5d-4e6f-8a9b-0c1d2e3f4a5b',
       '/jobs/8f3a1c2e-4b5d-4e6f-8a9b-0c1d2e3f4a5b/apply',
       '/application-status',
       '/verify',

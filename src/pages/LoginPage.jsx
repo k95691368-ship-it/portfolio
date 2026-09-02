@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
+import { loginDestination, requiresFreshDocument } from '../lib/loginDestination.js'
 
 export default function LoginPage() {
   const { login } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
+  const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   // 기본은 유지. 지금까지의 동작이 그랬고, 매번 다시 로그인하게 만드는 것은
@@ -19,7 +21,17 @@ export default function LoginPage() {
     setSubmitting(true)
     try {
       await login(email, password, remember)
-      navigate('/dashboard')
+      // 등록된 면접관이 받은 직접 링크에서 로그인한 경우에만 그 세션으로
+      // 돌아간다. 임의의 외부 주소를 next에 넣어 로그인 뒤 넘기는 경로는
+      // 만들지 않는다.
+      const destination = loginDestination(location.search)
+      if (requiresFreshDocument(destination)) {
+        // 로그인 화면에서 이미 로드된 분석 스크립트를 통화 화면까지 살려 두지
+        // 않는다. 새 문서로 들어가면 index.html의 면접 경로 차단이 적용된다.
+        window.location.assign(destination)
+        return
+      }
+      navigate(destination)
     } catch (err) {
       toast.error(err.message)
     } finally {

@@ -48,6 +48,7 @@ function looksLikeId(segment) {
 // 알려진 화면은 이름을 정해 두고, 그 밖의 것은 id 로 보이는 토막만 :id 로
 // 바꾼다. 새 화면이 생겨도 여기를 고치지 않아 id 가 새는 일이 없게 한다.
 const KNOWN = [
+  [/^\/rooms\/[^/]+\/interview\/[^/]+$/, '/rooms/:roomId/interview/:sessionId'],
   [/^\/rooms\/[^/]+\/contract$/, '/rooms/:roomId/contract'],
   [/^\/rooms\/[^/]+$/, '/rooms/:roomId'],
   [/^\/jobs\/[^/]+\/apply$/, '/jobs/:id/apply'],

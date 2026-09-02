@@ -69,15 +69,29 @@ export async function onRequestPost({ request, env, data, params }) {
 
   // 그 사이에 서명이 끝났으면 닫지 않는다.
   const claimed = await env.DB.prepare(
-    `UPDATE interview_rooms
+      `UPDATE interview_rooms
         SET status = 'closed', closed_at = datetime('now'), close_reason = ?
-      WHERE id = ? AND status IN ('open', 'active', 'contract_pending')`
+      WHERE id = ? AND status IN ('open', 'active', 'contract_pending')
+        AND NOT EXISTS (
+          SELECT 1 FROM interview_sessions video_session
+           WHERE video_session.room_id = interview_rooms.id
+             AND video_session.status IN ('scheduled','waiting','live')
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM interview_recordings video_recording
+          JOIN interview_sessions video_session ON video_session.id = video_recording.session_id
+           WHERE video_session.room_id = interview_rooms.id
+             AND video_recording.status IN ('starting','recording','paused','stopping','processing')
+        )`
   )
     .bind(reason.text, params.roomId)
     .run()
 
   if (claimed.meta.changes === 0) {
-    return jsonError('그 사이에 상태가 바뀌었습니다. 화면을 새로 고쳐 확인해주세요.', 409)
+    return jsonError(
+      '진행 중이거나 예정된 화상 면접이 있거나 방 상태가 바뀌었습니다. 화상 면접을 먼저 취소·종료한 뒤 다시 시도해주세요.',
+      409
+    )
   }
 
   // 채용절차법 제10조는 구직자에게 채용 여부를 알리도록 한다. 상태만 바꾸고

@@ -39,8 +39,9 @@ const ROUTE_PAGES = [
   ['/admin', 'AdminPage.jsx'],
   ['/signup', 'SignupPage.jsx'],
   ['/change-password', 'ChangePasswordPage.jsx'],
-  // 아래 셋은 주소에 id 가 붙는다. 앞부분만 맞으면 된다.
+  // 아래 넷은 주소에 id 가 붙는다. 앞부분만 맞으면 된다.
   ['/rooms/', 'RoomPage.jsx'],
+  ['/rooms/:interview', 'InterviewPage.jsx'],
   ['/rooms/:contract', 'ContractPage.jsx'],
   ['/jobs/:apply', 'ApplyPage.jsx'],
   ['/jobs/:detail', 'JobDetailPage.jsx'],
@@ -120,7 +121,11 @@ function fastFirstPaint() {
   var p = location.pathname
   var files =
     p.indexOf('/rooms/') === 0
-      ? (p.slice(-9) === '/contract' ? M['/rooms/:contract'] : M['/rooms/'])
+      ? (p.indexOf('/interview/') !== -1
+          ? M['/rooms/:interview']
+          : p.slice(-9) === '/contract'
+            ? M['/rooms/:contract']
+            : M['/rooms/'])
       : p.indexOf('/jobs/') === 0
         ? (p.slice(-6) === '/apply' ? M['/jobs/:apply'] : M['/jobs/:detail'])
         : M[p]
@@ -164,6 +169,28 @@ const ANALYTICS = {
   img: ['https://www.google-analytics.com', 'https://*.google-analytics.com', 'https://*.clarity.ms'],
 }
 
+// RealtimeKit 브라우저 SDK가 직접 닿는 곳. 관리 API 토큰은 서버에서만 쓰고,
+// 화면에는 참가자용 단기 토큰만 내려간다. 와일드카드 하나로 열지 않고 공식
+// 허용 목록의 서비스별 주소만 적는다.
+const REALTIMEKIT = {
+  connect: [
+    'https://api.realtime.cloudflare.com',
+    'https://api-silos.realtime.cloudflare.com',
+    'https://da-collector.realtime.cloudflare.com',
+    'https://location.realtime.cloudflare.com',
+    'https://r2.cloudflarestorage.com',
+    'https://*.r2.cloudflarestorage.com',
+    'https://socket-edge.realtime.cloudflare.com',
+    'wss://socket-edge.realtime.cloudflare.com',
+    'https://rtk-assets.realtime.cloudflare.com',
+    'https://rtk-uploads.realtime.cloudflare.com',
+  ],
+  asset: [
+    'https://rtk-assets.realtime.cloudflare.com',
+    'https://rtk-uploads.realtime.cloudflare.com',
+  ],
+}
+
 // 일부러 허용하지 않는 것: c.bing.com
 //
 // 클래리티가 켜지면 마이크로소프트의 광고 동기화 픽셀을 하나 더 부른다. 화면을
@@ -202,7 +229,7 @@ function securityHeaders() {
         hashes.push(`'sha256-${h}'`)
       }
 
-      const csp = [
+      const baseCsp = [
         "default-src 'self'",
         `script-src 'self' ${hashes.join(' ')} ${ANALYTICS.script.join(' ')}`,
         // 스타일은 해시로 묶지 않는다. 리액트가 style 속성을 직접 붙이는 곳이
@@ -211,7 +238,7 @@ function securityHeaders() {
         `img-src 'self' data: blob: ${ANALYTICS.img.join(' ')}`,
         "font-src 'self' data:",
         `connect-src 'self' ${ANALYTICS.connect.join(' ')}`,
-        // 서비스워커는 우리 것만.
+        // 일반 화면의 서비스워커는 우리 것만 허용한다.
         "worker-src 'self'",
         // 액자에 넣지 못하게. 클릭재킹을 막는 자리다.
         "frame-ancestors 'none'",
@@ -224,21 +251,40 @@ function securityHeaders() {
         'upgrade-insecure-requests',
       ].join('; ')
 
+      const interviewCsp = [
+        "default-src 'self'",
+        // 면접 문서는 분석 스크립트를 로드하지 않는다. RTK SDK도 번들 안에 있다.
+        `script-src 'self' ${hashes.join(' ')}`,
+        "style-src 'self' 'unsafe-inline'",
+        `img-src 'self' data: blob: ${REALTIMEKIT.asset.join(' ')}`,
+        "font-src 'self' data:",
+        `connect-src 'self' ${REALTIMEKIT.connect.join(' ')}`,
+        `media-src 'self' blob: ${REALTIMEKIT.asset.join(' ')}`,
+        // RealtimeKit은 오디오 처리용 blob worker를 만들 수 있다.
+        "worker-src 'self' blob:",
+        "frame-ancestors 'none'",
+        "frame-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "object-src 'none'",
+        'upgrade-insecure-requests',
+      ].join('; ')
+
       const headersPath = join(dir, '_headers')
       const extra = [
         '',
         '# 아래는 빌드가 만든다(vite.config.js). 인라인 스크립트 해시가 들어가므로',
         '# 손으로 고치면 다음 빌드에 덮어써진다.',
         '/*',
-        `  Content-Security-Policy: ${csp}`,
+        `  Content-Security-Policy: ${baseCsp}`,
         // http 로 한 번이라도 가면 중간에서 가로챌 수 있다. 2년간 https 만 쓰게 한다.
         '  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload',
         '  X-Content-Type-Options: nosniff',
         // CSP 를 못 읽는 낡은 브라우저를 위한 같은 뜻의 옛 헤더.
         '  X-Frame-Options: DENY',
         '  Referrer-Policy: strict-origin-when-cross-origin',
-        // 쓰지 않는 기능은 닫는다. 스크립트가 끼어들어도 카메라를 켤 수 없다.
-        '  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), interest-cohort=()',
+        // 일반 지원서·계약 화면에서는 장치 권한을 닫는다.
+        '  Permissions-Policy: camera=(), microphone=(), display-capture=(), speaker-selection=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), interest-cohort=()',
         // 우리 자산을 남의 사이트가 가져다 쓰지 못하게 한다. 재 보니 공짜다.
         '  Cross-Origin-Resource-Policy: same-origin',
         //
@@ -257,6 +303,14 @@ function securityHeaders() {
         // 재지 않고 "보안에 좋으니까" 다시 붙이지는 말 것.
         // Pages 기본값이 화면 문서까지 아무나 읽어 가게 열어 둔다. 지운다.
         '  ! Access-Control-Allow-Origin',
+        '',
+        // Cloudflare Pages는 겹치는 규칙의 같은 헤더를 쉼표로 합친다. 면접
+        // 문서에서는 전역 값을 먼저 떼고, 통화에 필요한 권한만 다시 붙인다.
+        '/rooms/:roomId/interview/*',
+        '  ! Content-Security-Policy',
+        `  Content-Security-Policy: ${interviewCsp}`,
+        '  ! Permissions-Policy',
+        '  Permissions-Policy: camera=(self), microphone=(self), display-capture=(self), speaker-selection=(self), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), interest-cohort=()',
         '',
       ].join('\n')
 

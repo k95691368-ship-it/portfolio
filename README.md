@@ -25,6 +25,7 @@
   → 로그인 없이 지원 (접수번호 발급)
   → 서류 심사 · 지원자 비교
   → 면접방 대화
+  → 화상 면접 (녹화 동의 · 공개 대화 · 면접관 협의)
   → 계약 조건 작성
   → 서명 전 법령 점검      ← 위반 시 서명 차단
   → 전자서명 (문서 지문 결합)
@@ -57,7 +58,7 @@
 - **데이터** D1 (SQLite) · R2 (첨부 파일)
 - **화면** React 19 · Vite
 - **인증** PBKDF2-SHA256, 세션 토큰은 해시로만 저장
-- **테스트** 단위 386건 · 배포 환경 점검 67건
+- **테스트** 단위 테스트 · 배포 환경 읽기 점검 · 운영 전 과정 검증
 
 ## 직접 실행하려면
 
@@ -74,6 +75,24 @@ npx wrangler pages secret put CLAUDE_API_KEY --project-name=portfolio
 ```
 
 법령 점검 · 전자서명 · 교부 · 증명서는 API 키 없이도 동작합니다.
+
+## 화상 면접 운영 설정
+
+화상 면접은 Cloudflare RealtimeKit과 전용 R2 버킷을 사용합니다. Pages 프로젝트에는 다음 환경 변수와 비밀값을 설정해야 합니다.
+
+- 환경 변수: `CLOUDFLARE_ACCOUNT_ID`, `REALTIMEKIT_APP_ID`, `REALTIMEKIT_HOST_PRESET`, `REALTIMEKIT_INTERVIEWER_PRESET`, `REALTIMEKIT_CANDIDATE_PRESET`, `REALTIMEKIT_OBSERVER_PRESET`, `REALTIMEKIT_DIRECT_R2_PATH=interviews`
+- 비밀값: `REALTIMEKIT_API_TOKEN`
+- R2 바인딩: `INTERVIEW_RECORDINGS` → `portfolio-interview-recordings`
+
+RealtimeKit의 Recording Storage는 같은 버킷과 `interviews` 경로를 사용해야 합니다. R2에는 `interviews/` 접두사 기준 30일 만료 수명 주기를 둡니다. 운영 webhook 주소는 `/webhooks/realtimekit`이며 회의 시작·종료, 참가자 입장·퇴장, 녹화 상태 변경 이벤트를 구독합니다.
+
+역할별 preset은 다음 경계를 지킵니다.
+
+- 진행자만 녹화 제어와 연결된 회의 생성·이동 권한을 갖습니다.
+- 진행자와 등록된 면접관만 1:1 비공개 글 대화를 주고받습니다. 파일 전송은 끕니다.
+- 지원자와 참관자는 비공개 대화 및 연결된 회의 이동 권한을 갖지 않습니다.
+- RealtimeKit 자체 공개 대화, 직접 녹화, 라이브스트림은 전 역할에서 끕니다. 공개 대화는 이 서비스의 면접 기록에만 저장합니다.
+- 녹화 필수 일정은 동의 응답을 서버에 기록한 뒤에만 입장 토큰을 발급합니다. 거부한 참가자는 기존 공급자 참가자도 폐기되어 입장할 수 없습니다.
 
 ## 스크립트
 

@@ -1,27 +1,72 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
+import {
+  InterviewAccessError,
+  getInterviewSessionAccess,
+} from '../../../_lib/interviews.js'
 import { blockedWhenArchived } from '../../../_lib/roomLifecycle.js'
 import { getRoomAccess, getRoomParticipation } from '../../../_lib/rooms.js'
 import { extractTermsFromMessage, selectNewEntries } from '../../../_lib/termsNegotiation.js'
 import { scanForOfferSignals } from '../../../_lib/jobOffer.js'
 import { alertCandidate, alertCompany } from '../../../_lib/messageAlert.js'
 
+function sessionRoleAsRoomRole(role) {
+  if (role === 'host' || role === 'interviewer') return 'company'
+  if (role === 'candidate') return 'candidate'
+  return null
+}
+
+async function getSessionMessageAccess(env, roomId, sessionId, user) {
+  let access
+  try {
+    access = await getInterviewSessionAccess(env, roomId, sessionId, user, {
+      allowAdminRead: false,
+      allowRoomParticipant: false,
+    })
+  } catch (error) {
+    if (error instanceof InterviewAccessError) return { error }
+    throw error
+  }
+  const roleInRoom = sessionRoleAsRoomRole(access.videoRole)
+  if (!roleInRoom) {
+    return {
+      error: new InterviewAccessError('이 화상 면접의 공개 채팅을 사용할 수 없습니다.', 403),
+    }
+  }
+  return { access, roleInRoom }
+}
+
 export async function onRequestGet({ request, env, data, params }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
-  const participant = await getRoomAccess(env, params.roomId, data.user)
-  if (!participant) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
-
   const url = new URL(request.url)
   const after = Number(url.searchParams.get('after') || 0)
+  const interviewSessionId = url.searchParams.get('interviewSessionId')?.trim() || null
+
+  if (interviewSessionId) {
+    const sessionAccess = await getSessionMessageAccess(
+      env,
+      params.roomId,
+      interviewSessionId,
+      data.user
+    )
+    if (sessionAccess.error) {
+      return jsonError(sessionAccess.error.message, sessionAccess.error.status)
+    }
+  } else {
+    const participant = await getRoomAccess(env, params.roomId, data.user)
+    if (!participant) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
+  }
 
   const { results } = await env.DB.prepare(
-    `SELECT m.id, m.sender_user_id, m.body, m.created_at, u.display_name AS sender_name
+    `SELECT m.id, m.sender_user_id, m.body, m.created_at, m.interview_session_id,
+            u.display_name AS sender_name
      FROM chat_messages m
      JOIN users u ON u.id = m.sender_user_id
      WHERE m.room_id = ? AND m.id > ?
+       AND (? IS NULL OR m.interview_session_id = ?)
      ORDER BY m.id ASC
      LIMIT 200`
   )
-    .bind(params.roomId, after)
+    .bind(params.roomId, after, interviewSessionId, interviewSessionId)
     .all()
 
   return jsonResponse({
@@ -31,12 +76,32 @@ export async function onRequestGet({ request, env, data, params }) {
       senderName: m.sender_name,
       body: m.body,
       createdAt: m.created_at,
+      interviewSessionId: m.interview_session_id ?? null,
     })),
   })
 }
 
 export async function onRequestPost({ request, env, data, params, waitUntil }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
+
+  const body = await request.json().catch(() => null)
+  const querySessionId = new URL(request.url).searchParams.get('interviewSessionId')?.trim() || null
+  if (
+    body &&
+    Object.hasOwn(body, 'interviewSessionId') &&
+    typeof body.interviewSessionId !== 'string'
+  ) {
+    return jsonError('화상 면접 세션 정보를 확인해주세요.', 400)
+  }
+  const interviewSessionId = body?.interviewSessionId?.trim() || null
+  // POST의 권한과 저장 scope는 body 한 곳을 정본으로 삼는다. query만 붙은
+  // 요청을 일반 방 메시지로 잘못 저장하거나 서로 다른 두 세션을 섞지 않는다.
+  if (querySessionId && !interviewSessionId) {
+    return jsonError('화상 면접 채팅은 body에 interviewSessionId를 포함해야 합니다.', 400)
+  }
+  if (querySessionId && querySessionId !== interviewSessionId) {
+    return jsonError('query와 body의 화상 면접 세션이 일치하지 않습니다.', 400)
+  }
 
   // 보낸 사람은 언제나 data.user 다.
   //
@@ -48,11 +113,28 @@ export async function onRequestPost({ request, env, data, params, waitUntil }) {
   //
   // 참여 여부와 방 상태를 한 번에 읽는다. 둘 다 같은 방에 대한 것이고,
   // 대화는 사람이 기다리는 화면이라 왕복 한 번이 그대로 체감된다.
-  const room = await getRoomParticipation(env, params.roomId, data.user.id)
-  if (!room?.role_in_room) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
+  let room
+  let roleInRoom
+  if (interviewSessionId) {
+    const sessionAccess = await getSessionMessageAccess(
+      env,
+      params.roomId,
+      interviewSessionId,
+      data.user
+    )
+    if (sessionAccess.error) {
+      return jsonError(sessionAccess.error.message, sessionAccess.error.status)
+    }
+    room = sessionAccess.access.room
+    roleInRoom = sessionAccess.roleInRoom
+  } else {
+    room = await getRoomParticipation(env, params.roomId, data.user.id)
+    if (!room?.role_in_room) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
+    roleInRoom = room.role_in_room
+  }
   const senderUserId = data.user.id
   const senderName = data.user.display_name
-  const participant = { role_in_room: room.role_in_room }
+  const participant = { role_in_room: roleInRoom }
 
   // 보관된 방에서는 대화도 멈춘다.
   //
@@ -61,7 +143,6 @@ export async function onRequestPost({ request, env, data, params, waitUntil }) {
   const archived = blockedWhenArchived(room, 'message')
   if (archived) return jsonError(archived, 409)
 
-  const body = await request.json().catch(() => null)
   const text = body?.body?.trim()
   if (!text) return jsonError('메시지 내용을 입력해주세요.', 400)
   if (text.length > 2000) return jsonError('메시지가 너무 깁니다.', 400)
@@ -82,9 +163,10 @@ export async function onRequestPost({ request, env, data, params, waitUntil }) {
 
   const [result, previousRows] = await Promise.all([
     env.DB.prepare(
-      'INSERT INTO chat_messages (room_id, sender_user_id, body) VALUES (?, ?, ?) RETURNING id, created_at'
+      `INSERT INTO chat_messages (room_id, sender_user_id, body, interview_session_id)
+       VALUES (?, ?, ?, ?) RETURNING id, created_at`
     )
-      .bind(params.roomId, senderUserId, text)
+      .bind(params.roomId, senderUserId, text, interviewSessionId)
       .first(),
     extracted.length === 0
       ? null
@@ -168,6 +250,7 @@ export async function onRequestPost({ request, env, data, params, waitUntil }) {
       senderName,
       body: text,
       createdAt: result.created_at,
+      interviewSessionId,
       // 화면이 상태를 다시 불러와야 하는지 판단할 근거. 아무 일도 없었으면
       // 둘 다 비어 있고, 화면은 아무것도 더 하지 않는다.
       offerSignal: { strong: signal.strong, weak: signal.weak },

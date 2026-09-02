@@ -21,6 +21,21 @@ export function mergeById(existing, incoming) {
   return [...existing, ...fresh].sort((a, b) => a.id - b.id)
 }
 
+export function roomMessagesPath(roomId, { after, interviewSessionId } = {}) {
+  const params = new URLSearchParams()
+  if (after !== undefined) params.set('after', String(after))
+  if (interviewSessionId) params.set('interviewSessionId', String(interviewSessionId))
+  const query = params.toString()
+  return `/rooms/${roomId}/messages${query ? `?${query}` : ''}`
+}
+
+export function roomMessageBody(body, interviewSessionId = '') {
+  return {
+    body,
+    ...(interviewSessionId ? { interviewSessionId } : {}),
+  }
+}
+
 // initialMessages: 면접방 화면이 한 번의 요청으로 이미 받아 둔 첫 묶음.
 // 이것이 올 때까지 기다렸다가 그다음부터 증분으로만 확인한다. 같은 대화를
 // 두 번 받지 않기 위해서다.
@@ -41,6 +56,7 @@ export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null
   // 콜백이 바뀔 때마다 폴링을 다시 걸면 타이머가 끊긴다. 최신 것만 들고 있는다.
   const optsRef = useRef(options)
   optsRef.current = options
+  const interviewSessionId = options.interviewSessionId ?? ''
 
   // 다른 면접방으로 옮기면 처음 상태로 되돌린다.
   useEffect(() => {
@@ -49,7 +65,7 @@ export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null
     emptyRunsRef.current = 0
     setMessages([])
     setReady(false)
-  }, [roomId])
+  }, [interviewSessionId, roomId])
 
   // 첫 묶음은 화면이 받아 온 것을 그대로 쓴다. 한 번만 받는다.
   useEffect(() => {
@@ -60,13 +76,18 @@ export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null
       setMessages(initialMessages)
     }
     setReady(true)
-  }, [initialMessages])
+  }, [initialMessages, interviewSessionId, roomId])
 
   const poll = useCallback(async () => {
     if (fetchingRef.current) return
     fetchingRef.current = true
     try {
-      const data = await api.get(`/rooms/${roomId}/messages?after=${lastIdRef.current}`)
+      const data = await api.get(
+        roomMessagesPath(roomId, {
+          after: lastIdRef.current,
+          interviewSessionId,
+        })
+      )
       if (data.messages.length > 0) {
         lastIdRef.current = data.messages[data.messages.length - 1].id
         // 내가 보낸 메시지는 화면에 먼저 붙여 두었으므로 다시 받아도 한 번만 남긴다.
@@ -89,7 +110,7 @@ export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null
     } finally {
       fetchingRef.current = false
     }
-  }, [roomId])
+  }, [interviewSessionId, roomId])
 
   useEffect(() => {
     if (!ready) return undefined
@@ -136,7 +157,10 @@ export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null
 
   const sendMessage = useCallback(
     async (body) => {
-      const message = await api.post(`/rooms/${roomId}/messages`, { body })
+      const message = await api.post(
+        roomMessagesPath(roomId, { interviewSessionId }),
+        roomMessageBody(body, interviewSessionId)
+      )
       // 수신 커서(lastIdRef)는 폴링이 실제로 받아 온 것만 반영해야 한다.
       //
       // 예전에는 여기서 커서를 내 메시지 id로 앞당겼다. 그러면 상대가 방금
@@ -149,7 +173,7 @@ export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null
       // 읽히는 표현, 새로 기록된 처우 조건)를 보고 상태를 다시 불러온다.
       return message
     },
-    [roomId]
+    [interviewSessionId, roomId]
   )
 
   return { messages, error, lastSyncedAt, sendMessage }

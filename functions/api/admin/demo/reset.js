@@ -24,6 +24,13 @@ import {
   DEMO_MESSAGES,
   demoSignatureDataUrl,
 } from '../../../_lib/demoSeed.js'
+import {
+  InterviewDeletionError,
+  acquireInterviewRoomDeletionLocks,
+  inspectInterviewRoomDeletion,
+  prepareInterviewRoomDeletion,
+  releaseInterviewRoomDeletionLocks,
+} from '../../../_lib/interviewDeletion.js'
 
 // 평가자용 체험 데모를 처음 상태로 만든다.
 //
@@ -104,6 +111,29 @@ async function wipeDemo(env) {
     .all()
   const postingIds = postings.map((p) => p.id)
 
+  let deletionLock = null
+  try {
+    await inspectInterviewRoomDeletion(env, roomIds)
+    deletionLock = await acquireInterviewRoomDeletionLocks(
+      env,
+      roomIds,
+      crypto.randomUUID()
+    )
+    await prepareInterviewRoomDeletion(env, roomIds)
+  } catch (error) {
+    if (deletionLock) {
+      await releaseInterviewRoomDeletionLocks(env, deletionLock).catch((releaseError) => {
+        console.error('Demo interview deletion lock release failed:', releaseError)
+      })
+    }
+    if (error instanceof InterviewDeletionError) {
+      return { blocked: error.message, status: error.status }
+    }
+    throw error
+  }
+
+  try {
+
   // R2 객체는 키를 잃기 전에 지운다. 데모는 파일을 올리지 않지만, 누군가
   // 데모 계정으로 지원서를 넣었을 수 있다.
   if (postingIds.length > 0) {
@@ -123,6 +153,7 @@ async function wipeDemo(env) {
       .bind(...roomIds)
       .all()
     await Promise.allSettled(pdfs.map((p) => env.DOCUMENTS.delete(p.r2_key)))
+
   }
   if (userIds.length > 0) {
     const { results: userDocs } = await env.DB.prepare(
@@ -149,6 +180,55 @@ async function wipeDemo(env) {
       : null
 
   const statements = [
+    // 화상 면접은 세션과 녹화 아래에 외래키가 여러 겹이다. 아래쪽부터 지운다.
+    roomIds.length > 0
+      ? env.DB.prepare(
+          `DELETE FROM recording_access_logs
+            WHERE recording_id IN (
+              SELECT r.id FROM interview_recordings r
+              JOIN interview_sessions s ON s.id = r.session_id
+              WHERE s.room_id IN (${roomIds.map(() => '?').join(',')})
+            )`
+        ).bind(...roomIds)
+      : null,
+    roomIds.length > 0
+      ? env.DB.prepare(
+          `DELETE FROM interview_events
+            WHERE session_id IN (
+              SELECT id FROM interview_sessions
+              WHERE room_id IN (${roomIds.map(() => '?').join(',')})
+            )`
+        ).bind(...roomIds)
+      : null,
+    roomIds.length > 0
+      ? env.DB.prepare(
+          `DELETE FROM interview_recording_consents
+            WHERE session_id IN (
+              SELECT id FROM interview_sessions
+              WHERE room_id IN (${roomIds.map(() => '?').join(',')})
+            )`
+        ).bind(...roomIds)
+      : null,
+    roomIds.length > 0
+      ? env.DB.prepare(
+          `DELETE FROM interview_recordings
+            WHERE session_id IN (
+              SELECT id FROM interview_sessions
+              WHERE room_id IN (${roomIds.map(() => '?').join(',')})
+            )`
+        ).bind(...roomIds)
+      : null,
+    roomIds.length > 0
+      ? env.DB.prepare(
+          `DELETE FROM interview_session_members
+            WHERE session_id IN (
+              SELECT id FROM interview_sessions
+              WHERE room_id IN (${roomIds.map(() => '?').join(',')})
+            )`
+        ).bind(...roomIds)
+      : null,
+    inRooms('interview_sessions'),
+    inRooms('room_access_sessions'),
     inRooms('audit_certificates'),
     inRooms('contract_deliveries'),
     inRooms('signature_revocations'),
@@ -222,8 +302,16 @@ async function wipeDemo(env) {
     inUsers('DELETE FROM users WHERE id IN (__IN__)'),
   ].filter(Boolean)
 
-  if (statements.length > 0) await env.DB.batch(statements)
-  return { users: userIds.length, rooms: roomIds.length, postings: postingIds.length }
+    if (statements.length > 0) await env.DB.batch(statements)
+    return { users: userIds.length, rooms: roomIds.length, postings: postingIds.length }
+  } catch (error) {
+    if (deletionLock) {
+      await releaseInterviewRoomDeletionLocks(env, deletionLock).catch((releaseError) => {
+        console.error('Demo interview deletion lock release failed:', releaseError)
+      })
+    }
+    throw error
+  }
 }
 
 async function seedDemo(env) {
@@ -537,7 +625,7 @@ async function issueDemoCertificate(env, roomId, issuerName) {
 export async function onRequestPost({ env, data }) {
   const removed = await wipeDemo(env)
   // 지울 수 없는 것이 섞여 있으면 아무것도 지우지 않은 상태로 멈춘다.
-  if (removed.blocked) return jsonError(removed.blocked, 409)
+  if (removed.blocked) return jsonError(removed.blocked, removed.status || 409)
 
   const seeded = await seedDemo(env)
   const certificate = await issueDemoCertificate(env, seeded.roomIds.signed, DEMO_ACCOUNTS[0].displayName)

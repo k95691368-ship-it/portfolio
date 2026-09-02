@@ -98,6 +98,13 @@ describe('종료와 보관의 차이', () => {
     expect(blockedWhenFrozen(room({ status: 'closed' }), 'message')).toBeNull()
   })
 
+  it('종료되거나 보관된 방에서는 화상 면접 생성·입장·녹화를 막는다', () => {
+    for (const action of ['create_interview', 'edit_interview', 'join_interview', 'start_recording']) {
+      expect(blockedWhenFrozen(room({ status: 'closed' }), action)).toBeTruthy()
+      expect(blockedWhenFrozen(room({ archived_at: '2026-08-12 09:00:00' }), action)).toBeTruthy()
+    }
+  })
+
   it('보관된 방에서는 막는다', () => {
     expect(blockedWhenFrozen(room({ archived_at: '2026-08-12 09:00:00' }), 'message')).toBeTruthy()
   })

@@ -1,6 +1,10 @@
 import { jsonResponse, jsonError } from '../../../../_lib/http.js'
 import { deleteAllUserSessions } from '../../../../_lib/auth.js'
 import { logAdminAction } from '../../../../_lib/auditLog.js'
+import {
+  InterviewUserAccessError,
+  revokeActiveInterviewAccessForUser,
+} from '../../../../_lib/interviewUserAccess.js'
 
 export async function onRequestPatch({ request, env, data, params }) {
   if (params.id === data.user.id) {
@@ -27,21 +31,49 @@ export async function onRequestPatch({ request, env, data, params }) {
 
   const setClauses = []
   const values = []
-  if (hasSuspended) {
+  const suspending = hasSuspended && body.isSuspended
+  let revocationError = null
+  if (suspending) {
+    // 새 app token 발급을 먼저 끊는다. 공급자 정리가 실패해도 계정을 다시
+    // 활성화해 경합을 열지 않고, 오류 응답으로 운영 재시도를 요구한다.
+    const clauses = ['is_suspended = 1']
+    const initialValues = []
+    if (hasRecruiter) {
+      clauses.push('is_recruiter = ?')
+      initialValues.push(body.isRecruiter ? 1 : 0)
+    }
+    await env.DB.prepare(`UPDATE users SET ${clauses.join(', ')} WHERE id = ?`)
+      .bind(...initialValues, params.id)
+      .run()
+    const cleanup = await Promise.allSettled([
+      deleteAllUserSessions(env.DB, params.id),
+      revokeActiveInterviewAccessForUser(env, params.id),
+    ])
+    const cleanupFailures = cleanup
+      .filter((result) => result.status === 'rejected')
+      .map((result) => result.reason)
+    if (cleanupFailures.length) {
+      const interviewFailure = cleanupFailures.find(
+        (error) => error instanceof InterviewUserAccessError
+      )
+      revocationError = new InterviewUserAccessError(
+        `${cleanupFailures.length}개 계정 접근 정리 작업을 완료하지 못했습니다. 계정 정지는 유지됩니다.`,
+        interviewFailure?.status || 500
+      )
+    }
+  } else if (hasSuspended) {
     setClauses.push('is_suspended = ?')
     values.push(body.isSuspended ? 1 : 0)
   }
-  if (hasRecruiter) {
+  if (hasRecruiter && !suspending) {
     setClauses.push('is_recruiter = ?')
     values.push(body.isRecruiter ? 1 : 0)
   }
 
-  await env.DB.prepare(`UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`)
-    .bind(...values, params.id)
-    .run()
-
-  if (hasSuspended && body.isSuspended) {
-    await deleteAllUserSessions(env.DB, params.id)
+  if (setClauses.length > 0) {
+    await env.DB.prepare(`UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`)
+      .bind(...values, params.id)
+      .run()
   }
 
   if (hasSuspended) {
@@ -49,7 +81,7 @@ export async function onRequestPatch({ request, env, data, params }) {
       actorId: data.user.id,
       action: body.isSuspended ? 'suspend_user' : 'unsuspend_user',
       targetUserId: params.id,
-      detail: `email=${target.email}`,
+      detail: `email=${target.email}${revocationError ? ' · 화상 연결 정리 재시도 필요' : ''}`,
     })
   }
   if (hasRecruiter) {
@@ -59,6 +91,22 @@ export async function onRequestPatch({ request, env, data, params }) {
       targetUserId: params.id,
       detail: `email=${target.email}`,
     })
+  }
+
+  if (revocationError) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: revocationError.message,
+        accessRevocationPending: true,
+        user: {
+          id: params.id,
+          isSuspended: true,
+          ...(hasRecruiter ? { isRecruiter: body.isRecruiter } : {}),
+        },
+      },
+      revocationError.status
+    )
   }
 
   return jsonResponse({
@@ -88,7 +136,15 @@ export async function onRequestDelete({ env, data, params }) {
   }
 
   const participation = await env.DB.prepare(
-    'SELECT COUNT(*) AS count FROM room_participants WHERE user_id = ?'
+    `SELECT COUNT(*) AS count
+       FROM (
+         SELECT room_id FROM room_participants WHERE user_id = ?1
+         UNION
+         SELECT s.room_id
+           FROM interview_session_members m
+           JOIN interview_sessions s ON s.id = m.session_id
+          WHERE m.user_id = ?1
+       )`
   )
     .bind(params.id)
     .first()

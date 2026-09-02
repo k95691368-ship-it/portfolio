@@ -16,6 +16,7 @@ import OfferWatch from '../components/OfferWatch.jsx'
 import NegotiationLog from '../components/NegotiationLog.jsx'
 import PreContractReview from '../components/PreContractReview.jsx'
 import OfferWithdrawalModal from '../components/OfferWithdrawalModal.jsx'
+import InterviewSessionPanel from '../features/interview/InterviewSessionPanel.jsx'
 import { roomStatusInfo } from '../lib/roomStatus.js'
 import { formatInviteCode } from '../lib/inviteCode.js'
 import { alertNewMessages, alertsOn } from '../lib/desktopAlert.js'
@@ -291,6 +292,13 @@ export default function RoomPage() {
           )}
         </div>
       )}
+
+      <InterviewSessionPanel
+        roomId={roomId}
+        roomTitle={room.title}
+        myRole={room.myRole}
+        disabled={!!room.archivedAt || room.status === 'closed'}
+      />
 
       {/* 종료 기능은 서버에만 있고 화면에는 없었다. 부를 수 없는 기능은
           없는 기능이다. */}

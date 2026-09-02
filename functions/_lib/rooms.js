@@ -18,10 +18,22 @@ const OFFER_SCAN_LIMIT = 500
 
 export async function loadCompanyMessages(env, roomId) {
   const { results } = await env.DB.prepare(
-    `SELECT m.body, m.created_at, rp.role_in_room
+    `SELECT m.body, m.created_at, 'company' AS role_in_room
        FROM chat_messages m
-       JOIN room_participants rp ON rp.room_id = m.room_id AND rp.user_id = m.sender_user_id
-      WHERE m.room_id = ? AND rp.role_in_room = 'company'
+       LEFT JOIN room_participants rp
+         ON rp.room_id = m.room_id AND rp.user_id = m.sender_user_id
+      WHERE m.room_id = ?
+        AND (
+          rp.role_in_room = 'company'
+          OR EXISTS (
+            SELECT 1
+              FROM interview_session_members ism
+              JOIN interview_sessions video_session ON video_session.id = ism.session_id
+             WHERE video_session.room_id = m.room_id
+               AND ism.user_id = m.sender_user_id
+               AND ism.role IN ('host','interviewer')
+          )
+        )
       ORDER BY m.id ASC
       LIMIT ?`
   )

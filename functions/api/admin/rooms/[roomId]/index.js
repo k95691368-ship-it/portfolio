@@ -2,6 +2,13 @@ import { jsonResponse, jsonError } from '../../../../_lib/http.js'
 import { logAdminAction } from '../../../../_lib/auditLog.js'
 import { rowToCamelTerms } from '../../../../_lib/contract.js'
 import { describeRetention, describeRetentionHold } from '../../../../_lib/contractPeriod.js'
+import {
+  InterviewDeletionError,
+  acquireInterviewRoomDeletionLocks,
+  inspectInterviewRoomDeletion,
+  prepareInterviewRoomDeletion,
+  releaseInterviewRoomDeletionLocks,
+} from '../../../../_lib/interviewDeletion.js'
 
 export async function onRequestDelete({ request, env, data, params }) {
   const room = await env.DB.prepare('SELECT id, title, status FROM interview_rooms WHERE id = ?')
@@ -37,6 +44,30 @@ export async function onRequestDelete({ request, env, data, params }) {
       `보존 의무가 남아 있는 계약서입니다. ${hold.reason} 체결된 근로계약서 정본은 영구 보관소에 남아 삭제되지 않습니다. 그래도 이 면접방(대화·지원서 연결)을 지우려면 보존 의무를 확인했음을 함께 보내주세요.`,
       409
     )
+  }
+
+  // 화상 면접 정리 가능 여부와 R2 삭제를 첫 mutation보다 먼저 확정한다.
+  // 이 검사가 뒤에 있으면 차단 응답인데도 계약 보관 기록이나 PDF가 먼저
+  // 변경되는 부분 삭제가 발생할 수 있다.
+  let deletionLock = null
+  try {
+    // 첫 검사는 mutation 없이 현재 상태를 확인한다. 이어 D1 잠금을 잡고 다시
+    // 검사하므로, 검사와 삭제 사이에 시작된 세션도 놓치지 않는다.
+    await inspectInterviewRoomDeletion(env, [params.roomId])
+    deletionLock = await acquireInterviewRoomDeletionLocks(
+      env,
+      [params.roomId],
+      crypto.randomUUID()
+    )
+    await prepareInterviewRoomDeletion(env, [params.roomId])
+  } catch (error) {
+    if (deletionLock) {
+      await releaseInterviewRoomDeletionLocks(env, deletionLock).catch((releaseError) => {
+        console.error(`Interview room deletion lock release failed (${params.roomId}):`, releaseError)
+      })
+    }
+    if (error instanceof InterviewDeletionError) return jsonError(error.message, error.status)
+    throw error
   }
 
   // 영구 보관소는 건드리지 않는다.
@@ -89,6 +120,32 @@ export async function onRequestDelete({ request, env, data, params }) {
       env.DB.prepare("DELETE FROM notifications WHERE link LIKE ?").bind(`/rooms/${params.roomId}%`),
       // 이 방을 이전 계약으로 삼은 갱신 계약이 있으면 연결부터 끊어야 한다.
       env.DB.prepare('UPDATE contract_terms SET previous_room_id = NULL WHERE previous_room_id = ?').bind(params.roomId),
+      // 화상 면접 표는 세션 아래에 여러 단계로 매달린다. 가장 아래의 열람
+      // 기록부터 지워야 D1 외래키 검사에 걸리지 않는다.
+      env.DB.prepare(
+        `DELETE FROM recording_access_logs
+          WHERE recording_id IN (
+            SELECT r.id FROM interview_recordings r
+            JOIN interview_sessions s ON s.id = r.session_id
+            WHERE s.room_id = ?
+          )`
+      ).bind(params.roomId),
+      env.DB.prepare(
+        'DELETE FROM interview_events WHERE session_id IN (SELECT id FROM interview_sessions WHERE room_id = ?)'
+      ).bind(params.roomId),
+      env.DB.prepare(
+        'DELETE FROM interview_recording_consents WHERE session_id IN (SELECT id FROM interview_sessions WHERE room_id = ?)'
+      ).bind(params.roomId),
+      env.DB.prepare(
+        'DELETE FROM interview_recordings WHERE session_id IN (SELECT id FROM interview_sessions WHERE room_id = ?)'
+      ).bind(params.roomId),
+      env.DB.prepare(
+        'DELETE FROM interview_session_members WHERE session_id IN (SELECT id FROM interview_sessions WHERE room_id = ?)'
+      ).bind(params.roomId),
+      env.DB.prepare('DELETE FROM interview_sessions WHERE room_id = ?').bind(params.roomId),
+      // 0050의 옛 코드 입장 세션도 방을 참조한다. 지금은 발급하지 않지만
+      // 남아 있는 기록 하나만으로도 방 삭제가 실패할 수 있다.
+      env.DB.prepare('DELETE FROM room_access_sessions WHERE room_id = ?').bind(params.roomId),
       env.DB.prepare('DELETE FROM contract_edit_history WHERE room_id = ?').bind(params.roomId),
       // 처우 협의 이력(0047)도 방을 외래키로 참조한다.
       env.DB.prepare('DELETE FROM negotiation_log WHERE room_id = ?').bind(params.roomId),
@@ -101,6 +158,11 @@ export async function onRequestDelete({ request, env, data, params }) {
     ])
   } catch (err) {
     console.error(`Room delete failed (${params.roomId}):`, err)
+    if (deletionLock) {
+      await releaseInterviewRoomDeletionLocks(env, deletionLock).catch((releaseError) => {
+        console.error(`Interview room deletion lock release failed (${params.roomId}):`, releaseError)
+      })
+    }
     return jsonError('면접방 삭제 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', 500)
   }
 

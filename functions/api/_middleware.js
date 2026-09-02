@@ -35,6 +35,7 @@ function crossSite(request) {
 
 export async function onRequest(context) {
   const { request } = context
+  const requestUrl = new URL(request.url)
 
   if (STATE_CHANGING.has(request.method) && crossSite(request)) {
     return jsonError('다른 사이트에서 보낸 요청은 처리하지 않습니다.', 403)
@@ -69,10 +70,23 @@ export async function onRequest(context) {
   //
   // 여기서 정해진 값이 곧 data.user 다. 이 아래 어느 코드도 신원을 다시
   // 판단하지 않는다 — 판정이 여러 층에 흩어졌던 것이 지난번 사고의 원인이다.
-  const roomId = roomIdFromApiPath(new URL(request.url).pathname)
-  const wantsCodeIdentity = request.headers.get('X-Room-Identity') === 'code'
+  const roomId = roomIdFromApiPath(requestUrl.pathname)
+  const isRecordingFileGet =
+    request.method === 'GET' &&
+    /^\/api\/rooms\/[^/]+\/interviews\/[^/]+\/recordings\/[^/]+\/file\/?$/.test(
+      requestUrl.pathname
+    )
+  // <video>/<a>는 사용자 정의 헤더를 붙일 수 없다. 비밀값이 아닌 selector를
+  // 녹화 파일 GET 한 경로에서만 받되, 실제 신원 전환은 아래 room_session
+  // 검증이 성공할 때만 일어난다. 다른 GET에 ?identity=code를 붙여도 무시한다.
+  const wantsCodeIdentity =
+    request.headers.get('X-Room-Identity') === 'code' ||
+    (isRecordingFileGet && requestUrl.searchParams.get('identity') === 'code')
+  const wantsAccountIdentity =
+    request.headers.get('X-Room-Identity') === 'account' ||
+    (isRecordingFileGet && requestUrl.searchParams.get('identity') === 'account')
   let viaRoomCookie = false
-  if (roomId && (wantsCodeIdentity || !context.data.user)) {
+  if (roomId && !wantsAccountIdentity && (wantsCodeIdentity || !context.data.user)) {
     try {
       const roomUser = await getRoomSessionUser(context.env.DB, request, roomId)
       if (roomUser) {

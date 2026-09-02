@@ -165,6 +165,11 @@
     <script>
       ;(function () {
         function load() {
+          // 화상 면접에서는 화면 마스킹만으로 충분하지 않다. 장치 상태와 참가자
+          // 영상이 생기기 전에 분석 스크립트 자체를 싣지 않는다. 면접방에서 이
+          // 주소로 올 때는 전체 문서 이동을 사용하므로 이미 로드된 Clarity도
+          // 함께 종료된다.
+          if (/^\/rooms\/[^/]+\/interview\/[^/]+\/?$/.test(location.pathname)) return
           var srcs = [
             'https://www.googletagmanager.com/gtag/js?id=G-YLPE56VFG1',
             'https://www.clarity.ms/tag/y288l28thj',

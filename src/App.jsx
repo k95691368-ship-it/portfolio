@@ -19,6 +19,7 @@ const SignupPage = lazy(() => import('./pages/SignupPage.jsx'))
 const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage.jsx'))
 const DashboardPage = lazy(() => import('./pages/DashboardPage.jsx'))
 const RoomPage = lazy(() => import('./pages/RoomPage.jsx'))
+const InterviewPage = lazy(() => import('./pages/InterviewPage.jsx'))
 const JobsPage = lazy(() => import('./pages/JobsPage.jsx'))
 const JobDetailPage = lazy(() => import('./pages/JobDetailPage.jsx'))
 const ApplyPage = lazy(() => import('./pages/ApplyPage.jsx'))
@@ -34,6 +35,7 @@ const Loading = <p>불러오는 중...</p>
 function App() {
   const { pathname } = useLocation()
   const { user } = useAuth()
+  const isInterview = /^\/rooms\/[^/]+\/interview\/[^/]+\/?$/.test(pathname)
 
   // 개인정보가 뜨는 화면은 녹화에서 통째로 가린다.
   //
@@ -48,20 +50,23 @@ function App() {
   return (
     <>
       {/* 화면이 바뀔 때마다 방문 기록을 보낸다(주소의 id 는 가린다). */}
-      <PageViewTracker />
+      {!isInterview && <PageViewTracker />}
       {/* 키보드로 들어온 사람이 매번 머리말을 지나치지 않아도 되게 한다. */}
-      <a href="#main" className="skip-link">
-        본문으로 건너뛰기
-      </a>
+      {!isInterview && (
+        <a href="#main" className="skip-link">
+          본문으로 건너뛰기
+        </a>
+      )}
       {/* 어느 화면에 있든 왼쪽 위에 표지가 있다.
           면접방이나 계약서 화면에 코드로 바로 들어온 사람은 자기가 어느
           서비스에 있는지 알 방법이 없었다.
 
           화면 색 버튼도 여기로 들인다. 오른쪽 아래에 동그라미로 떠 있어
           맨 밑의 버튼을 가리고 있었다. */}
-      <header className="app-bar">
-        <BrandLogo />
-        <div className="app-bar-right">
+      {!isInterview && (
+        <header className="app-bar">
+          <BrandLogo />
+          <div className="app-bar-right">
           {/* 평가자용 체험. 접어 두고 올리거나 누르면 펴진다. */}
           <DemoMenu />
           {/* 관리자만 보이는 문. 관리자 패널로 가려면 대시보드를 거쳐야 했는데,
@@ -83,9 +88,15 @@ function App() {
               관리자 패널
             </Link>
           )}
-        </div>
-      </header>
-      <main id="main" tabIndex={-1} {...(masked ? { 'data-clarity-mask': 'true' } : {})}>
+          </div>
+        </header>
+      )}
+      <main
+        id="main"
+        tabIndex={-1}
+        className={isInterview ? 'interview-app-main' : undefined}
+        {...(masked ? { 'data-clarity-mask': 'true' } : {})}
+      >
         <Suspense fallback={Loading}>
           <Routes>
             <Route path="/" element={<LandingPage />} />
@@ -119,6 +130,7 @@ function App() {
                 보내진다 — 지원자는 그 임시 비밀번호를 받은 적이 없으므로
                 막다른 길이다. 누가 무엇을 할 수 있는지는 서버가 판정한다. */}
             <Route path="/rooms/:roomId" element={<RoomPage />} />
+            <Route path="/rooms/:roomId/interview/:sessionId" element={<InterviewPage />} />
             <Route path="/rooms/:roomId/contract" element={<ContractPage />} />
             <Route element={<ProtectedRoute requireRecruiter />}>
               <Route path="/recruit" element={<RecruitPage />} />
@@ -130,7 +142,7 @@ function App() {
         </Suspense>
       </main>
       {/* 오른쪽 아래 쪽지함. 로그인하지 않았으면 스스로 아무것도 그리지 않는다. */}
-      <DmDock />
+      {!isInterview && <DmDock />}
     </>
   )
 }

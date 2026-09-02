@@ -76,6 +76,10 @@ const BLOCKED_WHEN_CLOSED = {
   analyze: '종료된 전형에서는 채용 조건을 다시 정리할 수 없습니다.',
   respond_change_request: '종료된 전형에서는 수정 요청에 응답할 수 없습니다.',
   link_previous: '종료된 전형의 이전 계약 연결은 변경할 수 없습니다.',
+  create_interview: '종료된 전형에서는 새 화상 면접을 만들 수 없습니다.',
+  edit_interview: '종료된 전형의 화상 면접 일정을 변경할 수 없습니다.',
+  join_interview: '종료된 전형의 화상 면접에는 입장할 수 없습니다.',
+  start_recording: '종료된 전형에서는 화상 면접을 녹화할 수 없습니다.',
 }
 
 // 종료돼도 계속할 수 있는 것.
@@ -160,6 +164,10 @@ const BLOCKED_WHEN_ARCHIVED = {
   invite_email: '보관된 면접방에서는 초대 이메일을 보낼 수 없습니다.',
   interview_summary: '보관된 면접방에서는 면접 요약을 새로 쓸 수 없습니다.',
   join: '보관된 면접방에는 참여할 수 없습니다. 회사에 문의해주세요.',
+  create_interview: '보관된 면접방에서는 새 화상 면접을 만들 수 없습니다.',
+  edit_interview: '보관된 면접방의 화상 면접 일정을 변경할 수 없습니다.',
+  join_interview: '보관된 면접방의 화상 면접에는 입장할 수 없습니다.',
+  start_recording: '보관된 면접방에서는 화상 면접을 녹화할 수 없습니다.',
 }
 
 export function blockedWhenArchived(room, action) {

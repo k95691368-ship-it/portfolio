@@ -58,14 +58,28 @@ export async function onRequestPost({ request, env, data, params }) {
 
   // 그 사이 다른 사람이 먼저 보관했으면 두 번 적지 않는다.
   const claimed = await env.DB.prepare(
-    `UPDATE interview_rooms
+      `UPDATE interview_rooms
         SET archived_at = datetime('now'), archived_by_name = ?
-      WHERE id = ? AND archived_at IS NULL`
+      WHERE id = ? AND archived_at IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM interview_sessions video_session
+           WHERE video_session.room_id = interview_rooms.id
+             AND video_session.status IN ('scheduled','waiting','live')
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM interview_recordings video_recording
+          JOIN interview_sessions video_session ON video_session.id = video_recording.session_id
+           WHERE video_session.room_id = interview_rooms.id
+             AND video_recording.status IN ('starting','recording','paused','stopping','processing')
+        )`
   )
     .bind(data.user.display_name ?? null, params.roomId)
     .run()
   if (claimed.meta.changes === 0) {
-    return jsonError('그 사이 상태가 바뀌었습니다. 화면을 새로 고쳐 확인해주세요.', 409)
+    return jsonError(
+      '진행 중이거나 예정된 화상 면접이 있거나 방 상태가 바뀌었습니다. 화상 면접을 먼저 취소·종료한 뒤 다시 시도해주세요.',
+      409
+    )
   }
 
   // 이력 남기기와 상대 찾기는 서로를 기다릴 이유가 없다.
