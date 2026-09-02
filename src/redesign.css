@@ -145,7 +145,7 @@ body {
   font-family: var(--font-apple);
   font-size: 16px;
   line-height: 1.55;
-  letter-spacing: -0.012em;
+  letter-spacing: 0;
   font-kerning: normal;
   font-optical-sizing: auto;
   font-variant-ligatures: common-ligatures contextual;
@@ -167,23 +167,23 @@ h1,
 h2,
 h3 {
   color: var(--text-h);
-  letter-spacing: -0.032em;
+  letter-spacing: 0;
 }
 
 h1 {
   font-size: clamp(30px, 4vw, 42px);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.14;
 }
 
 h2 {
   font-size: clamp(21px, 2.4vw, 28px);
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.23;
 }
 
 h3 {
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -494,14 +494,17 @@ code {
   color: var(--text-muted);
   font-size: 13px;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  line-height: 1.4;
+  letter-spacing: 0;
 }
 
 .landing-hero h1 {
   max-width: 600px;
   margin: 0 auto clamp(34px, 6vw, 52px);
   font-size: clamp(34px, 5.4vw, 48px);
-  line-height: 1.12;
+  font-weight: 600;
+  line-height: 1.0835;
+  letter-spacing: 0;
 }
 
 .landing-choices {
@@ -540,7 +543,9 @@ code {
 
 .landing-choice-title {
   font-size: 19px;
-  font-weight: 650;
+  font-weight: 600;
+  line-height: 1.263;
+  letter-spacing: 0;
 }
 
 .landing-verify {
@@ -553,6 +558,7 @@ code {
   color: var(--accent);
   font-size: 14px;
   font-weight: 500;
+  letter-spacing: 0;
 }
 
 .landing-tech-link {
@@ -1443,4 +1449,10 @@ code {
   .skip-link {
     display: none !important;
   }
+}
+
+/* Apple의 한국어 UI처럼 자간은 글꼴 자체의 폭을 그대로 쓴다. 이전 화면별
+   음수 자간이 남아 새 글꼴도 굵고 뭉쳐 보이던 문제를 전역에서 막는다. */
+html:lang(ko) :where(#root) :where(h1, h2, h3, h4, p, a, button, label, span, li, dt, dd, th, td) {
+  letter-spacing: 0;
 }

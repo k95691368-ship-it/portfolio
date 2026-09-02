@@ -95,12 +95,12 @@
   --tap: 48px;
   --tap-lg: 56px;
 
-  /* Apple 기기에서는 운영체제의 San Francisco를 그대로 사용한다. 해당 글꼴이
-     없는 Windows·Android에서는 함께 배포하는 Pretendard Variable을 사용해
-     운영체제에 따라 다시 맑은 고딕 등으로 보이는 차이를 없앤다. */
+  /* 브라우저의 system-ui가 한글 한 글자마다 운영체제 글꼴을 먼저 고르는 일을
+     막기 위해 배포한 가변 글꼴을 첫 순서에 둔다. Apple 시스템 글꼴은 파일을
+     받을 수 없는 경우의 다음 선택으로 남긴다. */
   --font-apple:
-    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
-    'Apple SD Gothic Neo', 'Pretendard Variable', Pretendard, 'Helvetica Neue',
+    'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
+    'SF Pro Text', 'SF Pro Display', 'Apple SD Gothic Neo', 'Helvetica Neue',
     'Noto Sans KR', 'Malgun Gothic', 'Segoe UI', Arial, sans-serif;
   --font-apple-mono:
     'SFMono-Regular', 'SF Mono', ui-monospace, Menlo, Monaco, Consolas,
@@ -110,7 +110,7 @@
   --mono: var(--font-apple-mono);
 
   font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
+  letter-spacing: 0;
   color-scheme: light;
   color: var(--text);
   background: var(--bg);
@@ -347,24 +347,23 @@ h3 {
    56px 은 넓은 화면을 전제한 크기다. 휴대폰에서 열면 "어떤 목적으로 방문하셨
    / 나요?" 처럼 낱말 가운데가 잘려 두 줄이 됐다. 크게 쓴다고 잘 읽히는 것이
    아니라, 한 줄에 들어가야 읽힌다.
-   자간을 음수로 당기고 굵기를 올려, 작아져도 제목으로 보이게 한다. */
+   자간으로 억지로 당기지 않고 Semibold 굵기로 제목의 위계를 만든다. */
 h1 {
   font-size: 26px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.35;
-  letter-spacing: -0.6px;
+  letter-spacing: 0;
   margin: 0 0 var(--gap-2);
   word-break: keep-all;
   @media (min-width: 768px) {
     font-size: 34px;
-    letter-spacing: -0.9px;
   }
 }
 h2 {
   font-size: 19px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.4;
-  letter-spacing: -0.4px;
+  letter-spacing: 0;
   margin: 0 0 var(--gap-2);
   word-break: keep-all;
   @media (min-width: 768px) {
@@ -373,7 +372,7 @@ h2 {
 }
 h3 {
   font-size: 16px;
-  letter-spacing: -0.16px;
+  letter-spacing: 0;
   margin: 20px 0 4px;
 }
 p {

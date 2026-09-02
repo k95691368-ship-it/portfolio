@@ -1433,3 +1433,9 @@
     animation-duration: 1.8s;
   }
 }
+
+/* 면접 전용 CSS가 전역 스타일보다 늦게 로드돼도 한국어 글자를 다시 조이지
+   않는다. 영상 화면과 동의 화면도 사이트와 같은 글꼴 폭을 유지한다. */
+html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, li, dt, dd, th, td) {
+  letter-spacing: 0;
+}

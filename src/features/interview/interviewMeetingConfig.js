@@ -125,7 +125,7 @@ export function createInterviewMeetingConfig() {
     ...config.designTokens,
     spacingBase: 4,
     fontFamily:
-      '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Apple SD Gothic Neo", "Pretendard Variable", Pretendard, "Helvetica Neue", "Noto Sans KR", "Malgun Gothic", "Segoe UI", Arial, sans-serif',
+      '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Apple SD Gothic Neo", "Helvetica Neue", "Noto Sans KR", "Malgun Gothic", "Segoe UI", Arial, sans-serif',
     borderWidth: 'thin',
     borderRadius: 'extra-rounded',
     theme: 'darkest',

@@ -26,7 +26,7 @@ describe('전역 UI 글꼴', () => {
     expect(fontCss).toContain('unicode-range:')
   })
 
-  it('Apple 시스템 글꼴 다음에 번들 글꼴을 두고 OFL 원문을 함께 배포한다', () => {
+  it('번들 글꼴을 시스템 글꼴보다 먼저 두고 OFL 원문을 함께 배포한다', () => {
     const css = read('src', 'index.css')
     const apple = css.indexOf('-apple-system')
     const pretendard = css.indexOf("'Pretendard Variable'")
@@ -34,9 +34,22 @@ describe('전역 UI 글꼴', () => {
     const license = read('public', 'licenses', 'Pretendard-OFL-1.1.txt')
 
     expect(apple).toBeGreaterThan(-1)
-    expect(pretendard).toBeGreaterThan(apple)
-    expect(windowsFallback).toBeGreaterThan(pretendard)
+    expect(pretendard).toBeGreaterThan(-1)
+    expect(apple).toBeGreaterThan(pretendard)
+    expect(windowsFallback).toBeGreaterThan(apple)
     expect(license).toContain('SIL OPEN FONT LICENSE Version 1.1')
     expect(license).toContain("Reserved Font Name 'Pretendard'")
+  })
+
+  it('한국어 랜딩 제목은 Apple식 Semibold와 기본 자간을 사용한다', () => {
+    const css = read('src', 'redesign.css')
+    const heading = css.match(/\.landing-hero h1\s*\{([^}]*)\}/)?.[1] ?? ''
+    const choice = css.match(/\.landing-choice-title\s*\{([^}]*)\}/)?.[1] ?? ''
+
+    expect(heading).toContain('font-weight: 600')
+    expect(heading).toContain('line-height: 1.0835')
+    expect(heading).toContain('letter-spacing: 0')
+    expect(choice).toContain('font-weight: 600')
+    expect(choice).toContain('letter-spacing: 0')
   })
 })

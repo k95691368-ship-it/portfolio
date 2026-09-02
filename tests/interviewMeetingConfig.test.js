@@ -35,7 +35,7 @@ describe('RealtimeKit 면접 전용 UI 설정', () => {
     const { designTokens, styles } = INTERVIEW_MEETING_CONFIG
 
     expect(designTokens.googleFont).toBeUndefined()
-    expect(designTokens.fontFamily.startsWith('-apple-system, BlinkMacSystemFont')).toBe(true)
+    expect(designTokens.fontFamily.startsWith('"Pretendard Variable", Pretendard')).toBe(true)
     expect(designTokens.fontFamily).toContain('SF Pro Text')
     expect(designTokens.fontFamily).toContain('Apple SD Gothic Neo')
     expect(designTokens.fontFamily).toContain('Pretendard Variable')

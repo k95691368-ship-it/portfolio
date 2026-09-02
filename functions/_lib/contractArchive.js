@@ -71,8 +71,8 @@ export function renderContractDocument(snapshot) {
 <title>표준근로계약서 — ${esc(terms.employeeName || '')}</title>
 <style>
   /* 글꼴은 이름만 적는다. 파일을 싣지 않아도 어느 컴퓨터에서든 한글이 나온다. */
-  body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
-         "Apple SD Gothic Neo", "Pretendard Variable", Pretendard, "Helvetica Neue",
+  body { font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+         "SF Pro Text", "SF Pro Display", "Apple SD Gothic Neo", "Helvetica Neue",
          "Noto Sans KR", "Malgun Gothic",
          "맑은 고딕", "Segoe UI", Arial, sans-serif;
          max-width: 760px; margin: 0 auto; padding: 32px 24px; color: #111; line-height: 1.7; }
