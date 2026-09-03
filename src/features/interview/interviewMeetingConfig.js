@@ -125,7 +125,7 @@ export function createInterviewMeetingConfig() {
     ...config.designTokens,
     spacingBase: 4,
     fontFamily:
-      '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Apple SD Gothic Neo", "Helvetica Neue", "Noto Sans KR", "Malgun Gothic", "Segoe UI", Arial, sans-serif',
+      '"SUIT Variable", SUIT, -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Apple SD Gothic Neo", "Helvetica Neue", "Noto Sans KR", "Malgun Gothic", "Segoe UI", Arial, sans-serif',
     borderWidth: 'thin',
     borderRadius: 'extra-rounded',
     theme: 'darkest',
@@ -152,7 +152,7 @@ export function createInterviewMeetingConfig() {
       warning: '#FFD60A',
     },
   }
-  // The document already loads Pretendard from this deployment. Keeping the
+  // The document already loads SUIT from this deployment. Keeping the
   // default `googleFont: Inter` would fetch a second typeface from a third party.
   delete config.designTokens.googleFont
 

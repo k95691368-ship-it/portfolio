@@ -95,11 +95,11 @@
   --tap: 48px;
   --tap-lg: 56px;
 
-  /* 브라우저의 system-ui가 한글 한 글자마다 운영체제 글꼴을 먼저 고르는 일을
-     막기 위해 배포한 가변 글꼴을 첫 순서에 둔다. Apple 시스템 글꼴은 파일을
-     받을 수 없는 경우의 다음 선택으로 남긴다. */
+  /* Apple SD Gothic Neo와 비슷한 글자 밀도를 목표로 설계된 SUIT를
+     주 서체로 쓴다. 현대 한글 11,172자를 모두 담은 가변 파일을
+     직접 배포해 Windows와 Apple 기기에서 같은 자형으로 보인다. */
   --font-apple:
-    'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
+    'SUIT Variable', SUIT, -apple-system, BlinkMacSystemFont,
     'SF Pro Text', 'SF Pro Display', 'Apple SD Gothic Neo', 'Helvetica Neue',
     'Noto Sans KR', 'Malgun Gothic', 'Segoe UI', Arial, sans-serif;
   --font-apple-mono:

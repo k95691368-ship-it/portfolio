@@ -36,7 +36,7 @@ function buildBrandedEmailHtml({
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>${titleHtml}</title>
   </head>
-  <body style="margin:0;background:#f5f6f8;font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display','Apple SD Gothic Neo','Helvetica Neue','Noto Sans KR','Malgun Gothic','Segoe UI',Arial,sans-serif;color:#20242a;">
+  <body style="margin:0;background:#f5f6f8;font-family:'SUIT Variable',SUIT,-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display','Apple SD Gothic Neo','Helvetica Neue','Noto Sans KR','Malgun Gothic','Segoe UI',Arial,sans-serif;color:#20242a;">
     <div style="max-width:640px;margin:0 auto;padding:32px 20px;">
       <div style="background:#ffffff;border:1px solid #e2e5e9;border-radius:12px;padding:32px;">
         <div style="font-size:13px;font-weight:700;color:#3569d4;margin-bottom:18px;">${headingHtml}</div>

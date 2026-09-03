@@ -1,0 +1,10 @@
+/* SUIT 공식 가변 서체를 자체 호스팅한다. 공식 CSS에 없는
+   font-display를 지정해 느린 네트워크에서도 글자가 빈 칸으로 남지 않게 한다. */
+@font-face {
+  font-family: 'SUIT Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@sun-typeface/suit/fonts/variable/woff2/SUIT-Variable.woff2')
+    format('woff2-variations');
+}
