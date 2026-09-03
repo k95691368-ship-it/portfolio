@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useDm } from '../context/DmContext.jsx'
-import ThemeToggle from './ThemeToggle.jsx'
 
 function shortTime(value) {
   if (!value) return ''
@@ -219,9 +218,6 @@ export default function DmDock() {
         </section>
       )}
 
-      {/* 화면 색 버튼. 쪽지 버튼 바로 위에 붙어 자리가 바뀌지 않는다. */}
-      <ThemeToggle className="dock-theme" />
-
       {user && (
       <button
         type="button"
@@ -230,7 +226,9 @@ export default function DmDock() {
         aria-label={unreadTotal > 0 ? `쪽지함, 안 읽음 ${unreadTotal}개` : '쪽지함'}
         aria-expanded={listOpen || !!open}
       >
-        <span aria-hidden="true">💬</span>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+          <path d="M5.5 18.5 4 21l3.5-1.25A9 9 0 1 0 5.5 18.5Z" />
+        </svg>
         <span className="dm-launcher-text">쪽지</span>
         {unreadTotal > 0 && (
           <span className="dm-launcher-badge" aria-hidden="true">

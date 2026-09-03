@@ -34,13 +34,9 @@ export default function JobsPage() {
         </Link>
       </header>
 
-      {/* 지원자가 실제로 머무는 곳이 여기다. 면접방으로 들어가는 길도 여기
-          있어야 한다 — 회사 로그인 화면 안에 두면 지원자는 찾지 못한다. */}
-      <RoomEnterForm />
-
       {error && <p className="error" role="alert">{error}</p>}
       {loading ? (
-        <p>불러오는 중...</p>
+        <p className="notice">불러오는 중...</p>
       ) : postings.length === 0 ? (
         <p className="notice">현재 모집 중인 공고가 없습니다.</p>
       ) : (
@@ -68,6 +64,10 @@ export default function JobsPage() {
           })}
         </ul>
       )}
+
+      {/* 공고 탐색이 이 화면의 첫 번째 목적이다. 초대 코드를 받은 지원자의
+          면접방 입구는 목록 다음의 독립된 보조 영역으로 유지한다. */}
+      <RoomEnterForm />
     </div>
   )
 }

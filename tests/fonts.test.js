@@ -43,15 +43,17 @@ describe('전역 UI 글꼴', () => {
     expect(license).toContain('Reserved Font Name SUIT')
   })
 
-  it('한국어 랜딩 제목은 Apple식 Semibold와 기본 자간을 사용한다', () => {
+  it('한국어 랜딩 제목과 CTA는 Apple식 타이포그래피 위계를 사용한다', () => {
     const css = read('src', 'redesign.css')
     const heading = css.match(/\.landing-hero h1\s*\{([^}]*)\}/)?.[1] ?? ''
-    const choice = css.match(/\.landing-choice-title\s*\{([^}]*)\}/)?.[1] ?? ''
+    const choice = css.match(/\.landing-choice\s*\{([^}]*)\}/)?.[1] ?? ''
 
     expect(heading).toContain('font-weight: 600')
-    expect(heading).toContain('line-height: 1.0835')
+    expect(heading).toContain('font-size: 56px')
+    expect(heading).toContain('line-height: 1.17857')
     expect(heading).toContain('letter-spacing: 0')
-    expect(choice).toContain('font-weight: 600')
-    expect(choice).toContain('letter-spacing: 0')
+    expect(choice).toContain('font-size: 17px')
+    expect(choice).toContain('font-weight: 400')
+    expect(choice).toContain('line-height: 1.17647')
   })
 })

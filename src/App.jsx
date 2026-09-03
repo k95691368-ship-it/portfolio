@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react'
-import { Routes, Route, Link, useLocation } from 'react-router-dom'
+import { Routes, Route, Link, NavLink, useLocation } from 'react-router-dom'
 import { holdsPersonalData } from './lib/analytics.js'
 import { useAuth } from './context/AuthContext.jsx'
 import LandingPage from './pages/LandingPage.jsx'
@@ -10,6 +10,7 @@ import PageViewTracker from './components/PageViewTracker.jsx'
 import DmDock from './components/DmDock.jsx'
 import DmLink from './components/DmLink.jsx'
 import DemoMenu from './components/DemoMenu.jsx'
+import ThemeToggle from './components/ThemeToggle.jsx'
 import './App.css'
 import './redesign.css'
 
@@ -30,7 +31,12 @@ const ContractPage = lazy(() => import('./pages/ContractPage.jsx'))
 const AdminPage = lazy(() => import('./pages/AdminPage.jsx'))
 const RecruitPage = lazy(() => import('./pages/RecruitPage.jsx'))
 
-const Loading = <p>불러오는 중...</p>
+const Loading = (
+  <div className="route-loading" role="status">
+    <span className="route-loading-indicator" aria-hidden="true" />
+    <span>불러오는 중...</span>
+  </div>
+)
 
 function App() {
   const { pathname } = useLocation()
@@ -66,6 +72,15 @@ function App() {
       {!isInterview && (
         <header className="app-bar">
           <BrandLogo />
+          <nav className="global-nav" aria-label="주요 메뉴">
+            <NavLink to="/jobs">채용 공고</NavLink>
+            <NavLink to="/application-status">지원 현황</NavLink>
+            <NavLink to="/verify">증명서 확인</NavLink>
+            <NavLink to="/tech">기술 구현</NavLink>
+            <NavLink to={user ? '/dashboard' : '/login'}>
+              {user ? '대시보드' : '회사 로그인'}
+            </NavLink>
+          </nav>
           <div className="app-bar-right">
           {/* 평가자용 체험. 접어 두고 올리거나 누르면 펴진다. */}
           <DemoMenu />
@@ -88,6 +103,27 @@ function App() {
               관리자 패널
             </Link>
           )}
+          <ThemeToggle className="app-bar-theme" />
+          <details className="mobile-nav">
+            <summary aria-label="메뉴">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                <path className="mobile-nav-line mobile-nav-line--top" d="M5 9h14" />
+                <path className="mobile-nav-line mobile-nav-line--bottom" d="M5 15h14" />
+              </svg>
+            </summary>
+            <nav
+              aria-label="모바일 주요 메뉴"
+              onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}
+            >
+              <NavLink to="/jobs">채용 공고</NavLink>
+              <NavLink to="/application-status">지원 현황</NavLink>
+              <NavLink to="/verify">증명서 확인</NavLink>
+              <NavLink to="/tech">기술 구현</NavLink>
+              <NavLink to={user ? '/dashboard' : '/login'}>
+                {user ? '대시보드' : '회사 로그인'}
+              </NavLink>
+            </nav>
+          </details>
           </div>
         </header>
       )}

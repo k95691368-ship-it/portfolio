@@ -480,6 +480,8 @@
   --interview-muted: #6e6e73;
   --interview-line: #d2d2d7;
   --interview-blue: #0071e3;
+  --interview-action: #0071e3;
+  --interview-action-hover: #0077ed;
   position: fixed;
   inset: 0;
   z-index: 10000;
@@ -1438,4 +1440,442 @@
    않는다. 영상 화면과 동의 화면도 사이트와 같은 글꼴 폭을 유지한다. */
 html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, li, dt, dd, th, td) {
   letter-spacing: 0;
+}
+
+/*
+ * Apple 웹의 시각 원칙을 면접 흐름에 맞춘 최종 표면 레이어다. 동의,
+ * 녹화, 장치 설정, 대화와 전체 화면의 DOM 계약은 건드리지 않고 색,
+ * 위계와 터치 영역만 정리한다.
+ */
+.interview-session-panel,
+.interview-page {
+  --interview-ui-blue: #0071e3;
+  --interview-ui-blue-hover: #0077ed;
+  --interview-ui-text: #1d1d1f;
+  --interview-ui-muted: #6e6e73;
+  --interview-ui-line: #d2d2d7;
+  --interview-ui-fill: #f5f5f7;
+  --interview-ui-panel: #ffffff;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.interview-session-panel {
+  border-color: var(--border);
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: none;
+}
+
+.interview-session-panel :where(h2, h3, h4, strong, button, a) {
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.interview-session-panel__eyebrow,
+.interview-session-card__meta,
+.interview-recording-result__heading span,
+.interview-member-manager__heading span,
+.interview-member-form > label {
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.interview-session-panel__heading h2 {
+  font-size: clamp(24px, 2.4vw, 28px);
+  line-height: 1.18;
+  letter-spacing: 0;
+}
+
+.interview-session-card,
+.interview-session-form {
+  border: 0;
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: none;
+}
+
+.interview-member-list {
+  gap: 0;
+  border-block: 1px solid var(--border);
+}
+
+.interview-member-list li {
+  min-height: 52px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.interview-member-list li + li {
+  border-top: 1px solid var(--border);
+}
+
+.interview-member-form input,
+.interview-session-form input[type='text'],
+.interview-session-form input:not([type]),
+.interview-session-form input[type='datetime-local'] {
+  min-height: 44px;
+  border-color: var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: none;
+}
+
+.interview-recording-option {
+  border-color: var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: none;
+}
+
+.interview-enter-link,
+.interview-recording-retry button,
+.interview-member-manager__heading button,
+.interview-member-list button,
+.interview-member-form button,
+.interview-session-form__actions button,
+.interview-primary-button {
+  min-height: 44px;
+  font-weight: 600;
+  letter-spacing: 0;
+  box-shadow: none;
+}
+
+.interview-enter-link,
+.interview-member-form button,
+.interview-session-form__actions .interview-primary-button,
+.interview-primary-button {
+  border-color: var(--interview-ui-blue);
+  background: var(--interview-ui-blue);
+  color: #ffffff;
+}
+
+.interview-enter-link:hover,
+.interview-member-form button:hover:not(:disabled),
+.interview-session-form__actions .interview-primary-button:hover:not(:disabled),
+.interview-primary-button:hover:not(:disabled) {
+  border-color: var(--interview-ui-blue-hover);
+  background: var(--interview-ui-blue-hover);
+  color: #ffffff;
+}
+
+.interview-page {
+  --interview-bg: #f5f5f7;
+  --interview-card: #ffffff;
+  --interview-text: #1d1d1f;
+  --interview-muted: #6e6e73;
+  --interview-line: #d2d2d7;
+  --interview-blue: #0071e3;
+  background: var(--interview-bg);
+  color: var(--interview-text);
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] .interview-page:not(.interview-page--meeting) {
+  --interview-bg: #000000;
+  --interview-card: #000000;
+  --interview-text: #f5f5f7;
+  --interview-muted: #a1a1a6;
+  --interview-line: #424245;
+  --interview-blue: #2997ff;
+  --interview-action: #0071e3;
+  --interview-action-hover: #0077ed;
+  --interview-ui-blue: #0071e3;
+  --interview-ui-blue-hover: #0077ed;
+  --interview-ui-text: #f5f5f7;
+  --interview-ui-muted: #a1a1a6;
+  --interview-ui-line: #424245;
+  --interview-ui-fill: #1d1d1f;
+  --interview-ui-panel: #000000;
+  color-scheme: dark;
+}
+
+.interview-state-screen,
+.interview-consent-layout {
+  background: var(--interview-card);
+}
+
+.interview-state-card,
+.interview-consent-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.interview-state-card {
+  width: min(100%, 620px);
+}
+
+.interview-state-symbol {
+  background: var(--interview-ui-fill);
+  color: var(--interview-ui-muted);
+  font-weight: 600;
+}
+
+.interview-state-card h1,
+.interview-meeting-failure h2,
+.interview-consent-card h1 {
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.interview-state-card h1,
+.interview-meeting-failure h2 {
+  font-size: clamp(32px, 5vw, 48px);
+  line-height: 1.08;
+}
+
+.interview-consent-card h1 {
+  font-size: clamp(36px, 5vw, 56px);
+  line-height: 1.08;
+}
+
+.interview-state-card__copy,
+.interview-consent-lead {
+  color: var(--interview-muted);
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1.47;
+}
+
+.interview-consent-card__mark {
+  background: var(--interview-ui-fill);
+}
+
+.interview-consent-eyebrow,
+.interview-consent-details dt {
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.interview-consent-details > div {
+  border-color: var(--interview-line);
+}
+
+.interview-primary-link,
+.interview-consent-actions button,
+.interview-state-card button {
+  min-height: 44px;
+  font-weight: 600;
+  letter-spacing: 0;
+  box-shadow: none;
+}
+
+.interview-consent-actions button:not(.interview-primary-button) {
+  border-color: var(--interview-blue);
+  background: transparent;
+  color: var(--interview-blue);
+}
+
+.interview-primary-link,
+.interview-consent-actions .interview-primary-button,
+.interview-state-card .interview-primary-button {
+  border-color: var(--interview-action);
+  background: var(--interview-action);
+  color: #ffffff;
+}
+
+.interview-primary-link:hover,
+.interview-consent-actions .interview-primary-button:hover:not(:disabled),
+.interview-state-card .interview-primary-button:hover:not(:disabled) {
+  border-color: var(--interview-action-hover);
+  background: var(--interview-action-hover);
+  color: #ffffff;
+}
+
+.interview-page--meeting {
+  --interview-ui-blue: #0071e3;
+  --interview-ui-blue-hover: #0077ed;
+  --interview-ui-text: #f5f5f7;
+  --interview-ui-muted: #a1a1a6;
+  --interview-ui-line: #424245;
+  --interview-ui-fill: #1d1d1f;
+  --interview-ui-panel: #000000;
+  background: #000000;
+  color: #f5f5f7;
+  color-scheme: dark;
+}
+
+.interview-live-header,
+.interview-recording-bar,
+.interview-meeting-stage,
+.interview-workspace,
+.interview-meeting-loading,
+.interview-meeting-failure {
+  background: #000000;
+  box-shadow: none;
+}
+
+.interview-live-header {
+  min-height: 60px;
+  border-color: #2c2c2e;
+}
+
+.interview-live-header__back {
+  width: 44px;
+  height: 44px;
+  background: #1d1d1f;
+  font-weight: 400;
+}
+
+.interview-live-header__back:hover {
+  background: #2c2c2e;
+}
+
+.interview-live-header__title strong,
+.interview-conversation-panel__header strong,
+.interview-recording-bar__label strong {
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.interview-conversation-toggle,
+.interview-huddle-control > button,
+.interview-recording-actions button {
+  min-height: 44px;
+  border-color: #424245;
+  background: #1d1d1f;
+  font-weight: 600;
+  letter-spacing: 0;
+  box-shadow: none;
+}
+
+.interview-conversation-toggle:hover:not(:disabled),
+.interview-huddle-control > button:hover:not(:disabled),
+.interview-conversation-toggle.is-active,
+.interview-recording-actions button:hover:not(:disabled) {
+  border-color: #6e6e73;
+  background: #2c2c2e;
+}
+
+.interview-recording-bar {
+  min-height: 58px;
+  border-color: #2c2c2e;
+}
+
+.interview-recording-bar.is-live {
+  background: #000000;
+}
+
+.interview-recording-actions button.is-danger {
+  border-color: #ff453a;
+  background: transparent;
+  color: #ff6961;
+}
+
+.interview-huddle-control > p,
+.interview-recording-bar__error,
+.interview-offline-banner,
+.interview-connection-warning {
+  box-shadow: none;
+}
+
+.interview-conversation-panel {
+  border-color: #2c2c2e;
+  background: #1d1d1f;
+  box-shadow: none;
+}
+
+.interview-conversation-panel__header {
+  border-color: #2c2c2e;
+}
+
+.interview-conversation-panel__header button {
+  width: 44px;
+  height: 44px;
+  background: transparent;
+}
+
+.interview-conversation-panel__header button:hover {
+  background: #2c2c2e;
+}
+
+.interview-conversation-tabs {
+  border: 1px solid #424245;
+  border-radius: 10px;
+  background: transparent;
+}
+
+.interview-conversation-tabs button {
+  min-height: 44px;
+  border-radius: 8px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.interview-conversation-tabs button[aria-selected='true'] {
+  background: #2c2c2e;
+}
+
+.interview-conversation-message p {
+  border: 0;
+  border-radius: 16px;
+  background: #2c2c2e;
+  box-shadow: none;
+}
+
+.interview-conversation-message.is-mine p {
+  border: 0;
+  border-radius: 16px;
+  background: var(--interview-ui-blue);
+}
+
+.interview-conversation-composer {
+  border-color: #2c2c2e;
+}
+
+.interview-conversation-composer textarea {
+  min-height: 48px;
+  border-color: #424245;
+  border-radius: 12px;
+  background: #000000;
+  box-shadow: none;
+}
+
+.interview-conversation-composer textarea:focus {
+  border-color: var(--interview-ui-blue);
+  outline: 2px solid color-mix(in srgb, var(--interview-ui-blue) 38%, transparent);
+  outline-offset: 1px;
+  box-shadow: none;
+}
+
+.interview-conversation-composer button {
+  min-height: 44px;
+  background: var(--interview-ui-blue);
+  font-weight: 600;
+  letter-spacing: 0;
+  box-shadow: none;
+}
+
+.interview-conversation-note {
+  margin: 0;
+  padding: 0 16px 13px;
+  color: #a1a1a6;
+  font-size: 11px;
+}
+
+@media (max-width: 720px) {
+  .interview-conversation-panel {
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .interview-session-panel *,
+  .interview-session-panel *::before,
+  .interview-session-panel *::after,
+  .interview-page *,
+  .interview-page *::before,
+  .interview-page *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .interview-spinner {
+    animation: none;
+  }
 }
