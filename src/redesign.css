@@ -1,69 +1,5 @@
-/*
- * Apple의 공개 웹 레이아웃 원칙을 이 서비스 구조에 맞춰 다시 구성한다.
- * 제품 자산이나 문구를 복제하지 않고, 크기·간격·계층·상호작용만 따른다.
- */
-
-:root,
-:root[data-theme='dark'] {
-  color-scheme: dark;
-  --text-h: #f5f5f7;
-  --text: #f5f5f7;
-  --text-muted: #a1a1a6;
-  --muted: var(--text-muted);
-  --bg: #000000;
-  --surface: #1d1d1f;
-  --surface-strong: #2c2c2e;
-  --panel: #1d1d1f;
-  --border: #424245;
-  --border-strong: #86868b;
-  --code-bg: #2c2c2e;
-  --btn-face: #2c2c2e;
-  --btn-face-hover: #3a3a3c;
-  --btn-border: #424245;
-  --accent: #2997ff;
-  --accent-hover: #40a9ff;
-  --action-bg: #0071e3;
-  --action-hover: #0076df;
-  --accent-bg: #0b2742;
-  --accent-border: #1768a8;
-  --on-accent: #ffffff;
-  --danger: #ff6961;
-  --danger-text: #ff817a;
-  --danger-bg: #351818;
-  --danger-border: #743431;
-  --success: #63c174;
-  --success-text: #78d087;
-  --success-bg: #17301e;
-  --success-border: #386a43;
-  --warning: #e8ad4a;
-  --warning-text: #f1bc63;
-  --warning-bg: #352817;
-  --warning-border: #72572f;
-  --overlay: rgba(0, 0, 0, 0.76);
-  --nav-bg: rgba(22, 22, 23, 0.82);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28);
-  --shadow: 0 20px 64px rgba(0, 0, 0, 0.64);
-  --nav-h: 44px;
-  --nav-max: 1024px;
-  --content-max: 980px;
-  --wide-max: 1200px;
-  --gutter: 22px;
-  --tile-gap: 12px;
-  --r-xs: 8px;
-  --r-sm: 10px;
-  --r-md: 12px;
-  --r-lg: 18px;
-  --r-xl: 22px;
-  --radius: 18px;
-  --radius-sm: 10px;
-  --tap: 44px;
-  --tap-lg: 50px;
-  --page-x: var(--gutter);
-  --motion-fast: 120ms;
-  --motion-ui: 240ms;
-  --motion-panel: 320ms;
-  --ease-ui: cubic-bezier(0.4, 0, 0.6, 1);
-}
+/* apple-DESIGN.md를 블랙 테마에 적용한다.
+ * 색·간격·서체 토큰은 index.css에서 한 번만 정의한다. */
 
 html {
   min-width: 320px;
@@ -77,10 +13,10 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-apple);
-  font-size: 17px;
+  font-size: 1.0625rem;
   font-weight: 400;
-  line-height: 1.58824;
-  letter-spacing: 0;
+  line-height: 1.47;
+  letter-spacing: -0.022em;
   font-kerning: normal;
   font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
@@ -116,12 +52,12 @@ h3,
 h4 {
   color: var(--text-h);
   font-weight: 600;
-  letter-spacing: 0;
+  letter-spacing: -0.01em;
 }
 
 h1 {
-  font-size: clamp(40px, 5vw, 56px);
-  line-height: 1.17857;
+  font-size: clamp(2.5rem, 5vw, 3.5rem);
+  line-height: 1.1;
 }
 
 h2 {
@@ -167,17 +103,20 @@ textarea {
 button {
   min-height: var(--tap);
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--r-sm);
   background: var(--btn-face);
   box-shadow: none;
   color: var(--text-h);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0;
+  font-size: 0.875rem;
+  font-weight: 400;
+  letter-spacing: -0.016em;
 }
 
-button:active:not(:disabled) {
-  opacity: 0.72;
+button:active:not(:disabled),
+.landing-choice:active,
+.btn-primary:active,
+.btn-nav:active {
+  transform: scale(0.95);
 }
 
 button:disabled {
@@ -186,19 +125,21 @@ button:disabled {
 }
 
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline: 2px solid #0071e3;
+  outline: 2px solid var(--primary-focus);
   outline-offset: 3px;
 }
 
 .btn-primary,
 .btn-nav {
   min-height: var(--tap);
-  padding: 9px 16px;
+  padding: 11px 22px;
   border: 1px solid var(--action-bg);
   border-radius: 999px;
   background: var(--action-bg);
-  color: #ffffff;
-  line-height: 1.28571;
+  color: var(--on-accent);
+  font-size: 1.0625rem;
+  font-weight: 400;
+  line-height: 1.24;
 }
 
 .btn-primary:hover:not(:disabled),
@@ -271,7 +212,9 @@ input:focus,
 select:focus,
 textarea:focus {
   border-color: var(--accent-hover);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 15%, transparent);
+  box-shadow: none;
+  outline: 2px solid var(--primary-focus);
+  outline-offset: 2px;
 }
 
 code {
@@ -305,8 +248,7 @@ code {
   padding: 0 max(var(--gutter), calc((100vw - var(--nav-max)) / 2));
   border: 0;
   background: var(--nav-bg);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  backdrop-filter: saturate(180%) blur(20px);
+  gap: 24px;
 }
 
 .brand {
@@ -339,13 +281,10 @@ code {
 }
 
 .global-nav {
-  position: absolute;
-  left: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: clamp(18px, 2.6vw, 32px);
-  transform: translateX(-50%);
   white-space: nowrap;
 }
 
@@ -485,32 +424,31 @@ code {
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 580px;
-  padding: 48px var(--gutter) 56px;
+  min-height: min(680px, calc(100svh - var(--nav-h) - 112px));
+  padding: var(--section-space) var(--gutter);
   border: 0;
   border-radius: 0;
-  background: var(--panel);
+  background: var(--bg);
   text-align: center;
-  overflow: clip;
 }
 
 .landing-eyebrow {
-  margin: 0 0 6px;
+  margin: 24px 0 0;
   color: var(--text-muted);
-  font-size: 21px;
+  font-size: 1.3125rem;
   font-weight: 400;
   line-height: 1.28571;
   letter-spacing: 0;
 }
 
 .landing-hero h1 {
-  max-width: 880px;
+  max-width: var(--content-max);
   margin: 0;
   color: var(--text-h);
-  font-size: 56px;
+  font-size: 3.5rem;
   font-weight: 600;
-  line-height: 1.17857;
-  letter-spacing: 0;
+  line-height: 1.07;
+  letter-spacing: -0.01em;
   word-break: keep-all;
 }
 
@@ -520,14 +458,17 @@ code {
   justify-content: center;
   width: auto;
   max-width: none;
-  margin-top: 20px;
-  gap: 14px;
+  margin-top: 32px;
+  gap: 16px;
 }
 
 .landing-choice {
-  min-width: 96px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 112px;
   min-height: 44px;
-  padding: 12px 22px;
+  padding: 11px 22px;
   border-radius: 999px;
   font-size: 17px;
   font-weight: 400;
@@ -562,8 +503,11 @@ code {
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 17px;
-  margin-top: 17px;
+  gap: 32px;
+  margin: 0;
+  padding: 32px var(--gutter);
+  border-radius: 0;
+  background: var(--surface-low);
 }
 
 .landing-actions a {
@@ -592,8 +536,8 @@ code {
 .recruit-page {
   width: min(100%, var(--content-max));
   margin: 0 auto;
-  padding: 72px var(--gutter) 120px;
-  gap: 40px;
+  padding: var(--section-space) var(--gutter) 96px;
+  gap: 48px;
   text-align: left;
 }
 
@@ -669,8 +613,8 @@ code {
 
 .header-actions > button,
 .header-actions > a {
-  min-height: 36px;
-  padding: 8px 14px;
+  min-height: var(--tap);
+  padding: 8px 16px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: transparent;
@@ -811,7 +755,7 @@ code {
 .employment-end,
 .offer-watch,
 .room-close {
-  padding: clamp(22px, 3vw, 32px);
+  padding: var(--gap-6);
   border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
   border-radius: var(--r-lg);
   background: var(--panel);
@@ -1231,7 +1175,7 @@ tbody tr:hover {
 
 .chat-message {
   border: 0;
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   box-shadow: none;
 }
 
@@ -1315,6 +1259,11 @@ tbody tr:hover {
 }
 
 .tech-tabs {
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: saturate(180%) blur(20px);
+  position: sticky;
+  top: var(--nav-h);
+  z-index: 20;
   display: flex;
   align-items: stretch;
   gap: 28px;
@@ -1326,12 +1275,12 @@ tbody tr:hover {
   background: transparent;
 }
 
-.tech-tab {
+ .tech-tab {
   display: grid;
   flex: 1;
   gap: 4px;
-  min-height: 72px;
-  padding: 0 0 14px;
+  min-height: 52px;
+  padding: 12px 0;
   border: 0;
   border-bottom: 2px solid transparent;
   border-radius: 0;
@@ -1392,7 +1341,7 @@ tbody tr:hover {
   grid-template-columns: 80px minmax(0, 1fr);
   gap: 24px;
   margin: 0;
-  padding: 42px 0;
+  padding: var(--section-space) 0;
   border: 0;
   border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
   border-radius: 0;
@@ -1400,7 +1349,7 @@ tbody tr:hover {
 }
 
 .tech-steps li.accent {
-  border-color: color-mix(in srgb, var(--accent) 58%, transparent);
+  border-color: var(--border);
   background: transparent;
 }
 
@@ -1418,7 +1367,7 @@ tbody tr:hover {
 }
 
 .tech-steps li.accent .tech-step-num {
-  color: var(--accent);
+  color: var(--text-muted);
 }
 
 .tech-step-body h3 {
@@ -1432,7 +1381,7 @@ tbody tr:hover {
   margin: 0;
   color: var(--text);
   font-size: 17px;
-  line-height: 1.58824;
+  line-height: 1.47;
 }
 
 .tech-step-detail {
@@ -1535,26 +1484,20 @@ tbody tr:hover {
 }
 
 .dm-bubble {
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   box-shadow: none;
-}
-
-@media (hover: hover) {
-  .landing-choice:hover:not(:disabled) {
-    transform: translateY(-1px);
-  }
 }
 
 @media (max-width: 1068px) {
   .landing-hero {
-    min-height: 570px;
-    padding: 54px var(--gutter) 61px;
+    min-height: 520px;
+    padding: var(--section-space) var(--gutter);
   }
 
   .landing-hero h1 {
     max-width: 760px;
-    font-size: 48px;
-    line-height: 1.18;
+    font-size: 2.5rem;
+    line-height: 1.1;
   }
 
   .landing-eyebrow {
@@ -1675,38 +1618,38 @@ tbody tr:hover {
   }
 
   .landing-hero {
-    min-height: 500px;
-    padding: 39px var(--gutter) 43px;
+    min-height: 440px;
+    padding: 48px var(--gutter);
   }
 
   .landing-eyebrow {
-    margin-bottom: 4px;
-    font-size: 19px;
+    margin-top: 24px;
+    font-size: 17px;
     line-height: 1.31579;
   }
 
   .landing-hero h1 {
     max-width: 420px;
-    font-size: 32px;
-    line-height: 1.17813;
+    font-size: 2.125rem;
+    line-height: 1.1;
   }
 
   .landing-choices {
-    margin-top: 16px;
-    gap: 10px;
+    margin-top: 24px;
+    gap: 12px;
   }
 
   .landing-choice {
     min-width: 88px;
     min-height: 44px;
-    padding: 10px 18px;
-    font-size: 14px;
+    padding: 11px 22px;
+    font-size: 17px;
     line-height: 1.28571;
   }
 
   .landing-actions {
-    gap: 14px;
-    margin-top: 11px;
+    gap: 24px;
+    margin-top: 0;
   }
 
   .landing-actions a {
@@ -1799,12 +1742,11 @@ tbody tr:hover {
   }
 
   .landing-choices {
-    flex-direction: column;
-    width: min(100%, 260px);
+    flex-wrap: wrap;
   }
 
-  .landing-choice {
-    width: 100%;
+  .landing-hero h1 {
+    font-size: 1.75rem;
   }
 
   .landing-actions {
@@ -1882,7 +1824,63 @@ tbody tr:hover {
   }
 }
 
-/* 한글 UI와 문서 캡처는 글꼴 고유 폭을 그대로 사용한다. */
-:where(:lang(ko), .landing-page, .app-bar, .contract-print) {
+/* 인쇄 문서의 기존 줄바꿈과 서명 위치는 고정한다. */
+.contract-print {
   letter-spacing: 0;
+}
+
+
+/* 동일한 메뉴·카드 규칙을 공개 화면과 관리 화면에 함께 적용한다. */
+.landing-hero h1 span { display: block; }
+.landing-choice:hover { text-decoration: none; }
+.job-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--gap-6);
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+.job-list > li {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+.job-list > li:last-child { border-bottom: 1px solid var(--border); }
+.job-list .job-card {
+  height: 100%;
+  min-height: 176px;
+  align-content: start;
+  gap: var(--gap-3);
+  border-radius: var(--r-lg);
+}
+.job-card-title { position: relative; padding-right: 24px; }
+.job-card-title::after { color: var(--accent); }
+input[type='search'] { border-radius: var(--radius-full); }
+.tech-page .tech-step-detail { font-size: 1rem; color: var(--text-muted); }
+.tech-group { padding-bottom: var(--gap-8); }
+.tech-tab.active { border-bottom-color: var(--accent); }
+.tech-tab-desc { font-size: 0.875rem; line-height: 1.47; }
+.tech-item dd { font-size: 1.0625rem; line-height: 1.47; }
+.modal-content, .application-modal, .dm-window, .demo-menu-panel, .notif-panel {
+  box-shadow: none;
+}
+@media (max-width: 1068px) {
+  .global-nav { gap: 20px; }
+  .brand-name { display: none; }
+}
+@media (max-width: 833px) {
+  .brand-name { display: inline; }
+}
+@media (max-width: 640px) {
+  .job-list { grid-template-columns: 1fr; }
+  .tech-tabs { gap: 16px; }
+  .tech-tab-desc { display: none; }
+  .tech-tab { min-height: 52px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  button:active:not(:disabled), .landing-choice:active, .btn-primary:active, .btn-nav:active {
+    transform: none;
+  }
 }

@@ -28,7 +28,7 @@ describe('전역 UI 글꼴', () => {
     expect(existsSync(suitFont)).toBe(true)
   })
 
-  it('번들 글꼴을 시스템 글꼴보다 먼저 두고 OFL 원문을 함께 배포한다', () => {
+  it('Apple에서는 시스템 서체, Windows에서는 번들 한글 서체를 먼저 쓴다', () => {
     const css = read('src', 'index.css')
     const apple = css.indexOf('-apple-system')
     const suit = css.indexOf("'SUIT Variable'")
@@ -37,8 +37,8 @@ describe('전역 UI 글꼴', () => {
 
     expect(apple).toBeGreaterThan(-1)
     expect(suit).toBeGreaterThan(-1)
-    expect(apple).toBeGreaterThan(suit)
-    expect(windowsFallback).toBeGreaterThan(apple)
+    expect(suit).toBeGreaterThan(apple)
+    expect(windowsFallback).toBeGreaterThan(suit)
     expect(license).toContain('SIL OPEN FONT LICENSE Version 1.1')
     expect(license).toContain('Reserved Font Name SUIT')
   })
@@ -49,9 +49,9 @@ describe('전역 UI 글꼴', () => {
     const choice = css.match(/\.landing-choice\s*\{([^}]*)\}/)?.[1] ?? ''
 
     expect(heading).toContain('font-weight: 600')
-    expect(heading).toContain('font-size: 56px')
-    expect(heading).toContain('line-height: 1.17857')
-    expect(heading).toContain('letter-spacing: 0')
+    expect(heading).toContain('font-size: 3.5rem')
+    expect(heading).toContain('line-height: 1.07')
+    expect(heading).toContain('letter-spacing: -0.01em')
     expect(choice).toContain('font-size: 17px')
     expect(choice).toContain('font-weight: 400')
     expect(choice).toContain('line-height: 1.17647')

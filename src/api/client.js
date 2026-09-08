@@ -160,16 +160,14 @@ function toUserError(res, data) {
   return error
 }
 
-async function request(path, options = {}) {
+const pendingReads = new Map()
+let writeGeneration = 0
+
+async function performRequest(path, options, headers) {
   const res = await fetch(`${API_BASE}${path}`, {
-    credentials: 'omit',
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeaders(path),
-      ...roomIdentityHeader(path),
-      ...(options.headers || {}),
-    },
     ...options,
+    credentials: 'omit',
+    headers,
   })
   const data = await res.json().catch(() => null)
   if (!res.ok) throw toUserError(res, data)
@@ -177,13 +175,36 @@ async function request(path, options = {}) {
   return data
 }
 
+function request(path, options = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...authHeaders(path),
+    ...roomIdentityHeader(path),
+    ...(options.headers || {}),
+  }
+  if ((options.method || 'GET') !== 'GET') {
+    writeGeneration += 1
+    return performRequest(path, options, headers).finally(() => { writeGeneration += 1 })
+  }
+  // 진행 중인 동일 조회만 공유한다. 인증·방 신원·쓰기 전후를 구별하며
+  // 완료 응답은 저장하지 않아 다음 조회가 오래된 내용을 받지 않는다.
+  const key = JSON.stringify([writeGeneration, path, headers])
+  if (pendingReads.has(key)) return pendingReads.get(key)
+  const pending = performRequest(path, options, headers).finally(() => {
+    if (pendingReads.get(key) === pending) pendingReads.delete(key)
+  })
+  pendingReads.set(key, pending)
+  return pending
+}
+
 async function upload(path, formData) {
+  writeGeneration += 1
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     credentials: 'omit',
     headers: { ...authHeaders(path), ...roomIdentityHeader(path) },
     body: formData,
-  })
+  }).finally(() => { writeGeneration += 1 })
   const data = await res.json().catch(() => null)
   if (!res.ok) throw toUserError(res, data)
   acceptAuthResponse(path, data)

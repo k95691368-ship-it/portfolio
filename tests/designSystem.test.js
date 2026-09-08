@@ -15,7 +15,7 @@ describe('Apple식 UI 구조', () => {
     expect(page).toContain('landing-choice--candidate')
     expect(page).toContain('landing-actions')
     expect(page).not.toContain('ChoiceIcon')
-    expect(hero).toContain('min-height: 580px')
+    expect(hero).toContain('100svh - var(--nav-h)')
     expect(hero).toContain('border-radius: 0')
   })
 
@@ -33,7 +33,7 @@ describe('Apple식 UI 구조', () => {
     const css = read('src', 'redesign.css')
 
     expect(css).not.toMatch(/(?:linear|radial)-gradient/)
-    expect(css).toContain('--action-bg: #0071e3')
+    expect(read('src', 'index.css')).toContain('--primary: #0066cc')
     expect(css).toContain('.chat-row-right .chat-message')
     expect(css).toContain('.dm-bubble-row.mine .dm-bubble')
   })

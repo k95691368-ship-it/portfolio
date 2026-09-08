@@ -7,7 +7,6 @@ import LoginPage from './pages/LoginPage.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import BrandLogo from './components/BrandLogo.jsx'
 import PageViewTracker from './components/PageViewTracker.jsx'
-import DmDock from './components/DmDock.jsx'
 import DmLink from './components/DmLink.jsx'
 import DemoMenu from './components/DemoMenu.jsx'
 import './App.css'
@@ -16,6 +15,7 @@ import './redesign.css'
 // 첫 화면(랜딩·로그인)만 즉시 포함하고 나머지는 필요할 때 불러온다.
 // 공고를 보러 온 방문자가 대시보드·면접방·관리자 화면까지 받을 이유가 없다.
 const SignupPage = lazy(() => import('./pages/SignupPage.jsx'))
+const DmDock = lazy(() => import('./components/DmDock.jsx'))
 const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage.jsx'))
 const DashboardPage = lazy(() => import('./pages/DashboardPage.jsx'))
 const RoomPage = lazy(() => import('./pages/RoomPage.jsx'))
@@ -175,7 +175,7 @@ function App() {
         </Suspense>
       </main>
       {/* 오른쪽 아래 쪽지함. 로그인하지 않았으면 스스로 아무것도 그리지 않는다. */}
-      {!isInterview && <DmDock />}
+      {!isInterview && user && <Suspense fallback={null}><DmDock /></Suspense>}
     </>
   )
 }

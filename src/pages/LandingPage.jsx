@@ -1,34 +1,30 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 
 export default function LandingPage() {
-  const navigate = useNavigate()
-
   return (
     <div className="landing-page">
-      <div className="landing-hero">
-        <p className="landing-eyebrow">AI 채용 · 전자근로계약</p>
-        <h1>어떤 목적으로 방문하셨나요?</h1>
+      <section className="landing-hero" aria-labelledby="landing-title">
+        <h1 id="landing-title"><span>AI 채용.</span><span>전자근로계약.</span></h1>
+        <p className="landing-eyebrow">어떤 목적으로 방문하셨나요?</p>
         <div className="landing-choices" aria-label="방문 목적 선택">
-          <button
-            type="button"
+          <Link
+            to="/login"
             className="landing-choice landing-choice--company"
-            onClick={() => navigate('/login')}
           >
             회사
-          </button>
-          <button
-            type="button"
+          </Link>
+          <Link
+            to="/jobs"
             className="landing-choice landing-choice--candidate"
-            onClick={() => navigate('/jobs')}
           >
             지원자
-          </button>
+          </Link>
         </div>
-        <div className="landing-actions">
+      </section>
+      <nav className="landing-actions" aria-label="추가 메뉴">
           <Link to="/verify">증명서 진위 확인 →</Link>
           <Link to="/tech">기술 구현 보러가기 →</Link>
-        </div>
-      </div>
+      </nav>
     </div>
   )
 }

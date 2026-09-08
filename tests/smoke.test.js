@@ -14,9 +14,20 @@
 import { describe, expect, it } from 'vitest'
 
 const BASE = process.env.SMOKE_URL || 'https://portfolio-epa.pages.dev'
+const API_BASE = process.env.SMOKE_API_URL || 'https://obumqkwkvnemkyaahjbn.supabase.co/functions/v1/api'
+const PUBLIC_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_zmTib9W6f8wfKt-p_mBuVw_XxCe2EwR'
 
 async function call(path, options = {}) {
-  const res = await fetch(`${BASE}${path}`, options)
+  const res = await fetch(`${API_BASE}${path.replace(/^\/api(?=\/|$)/, '')}`, {
+    ...options,
+    headers: {
+      apikey: PUBLIC_KEY,
+      Origin: new URL(BASE).origin,
+      'X-App-Request': '1',
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  })
   const text = await res.text()
   let json = null
   try {
@@ -173,7 +184,16 @@ describe(`배포 스모크 (${BASE})`, () => {
       })
       // 열리더라도 그것은 role 로 고른 체험 계정이어야 한다.
       if (res.status === 200) {
-        expect(res.json?.email).toMatch(/@demo\.invalid$/)
+        try {
+          expect(res.json?.email).toMatch(/@demo\.invalid$/)
+        } finally {
+          if (res.json?.sessionToken) {
+            await call('/api/logout', {
+              method: 'POST',
+              headers: { 'X-App-Authorization': `Bearer ${res.json.sessionToken}` },
+            })
+          }
+        }
       }
     })
 

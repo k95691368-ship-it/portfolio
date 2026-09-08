@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api/client.js'
 import { useAuth } from './AuthContext.jsx'
 
@@ -88,18 +88,20 @@ export function DmProvider({ children }) {
     setAlerts((prev) => prev.filter((a) => a.partner.id !== partner.id))
   }, [])
 
-  const value = {
+  const closeDm = useCallback(() => setOpen(null), [])
+  const toggleList = useCallback(() => setListOpen((v) => !v), [])
+  const value = useMemo(() => ({
     threads,
     unreadTotal,
     open,
     listOpen,
     alerts,
     openDm,
-    closeDm: useCallback(() => setOpen(null), []),
-    toggleList: useCallback(() => setListOpen((v) => !v), []),
+    closeDm,
+    toggleList,
     dismissAlert,
     refresh,
-  }
+  }), [threads, unreadTotal, open, listOpen, alerts, openDm, closeDm, toggleList, dismissAlert, refresh])
 
   return <DmContext.Provider value={value}>{children}</DmContext.Provider>
 }

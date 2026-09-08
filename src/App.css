@@ -4,76 +4,41 @@
    여기에 메뉴를 더 넣지 않는다 -- 이 앱은 회사·지원자·관리자가 서로 다른
    화면을 쓰고, 공통으로 갈 곳이 사실상 없다. 억지로 채운 메뉴는 누르면
    권한이 없다는 말만 돌려준다. */
-.app-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--gap-3);
-  padding: var(--gap-3) var(--page-x);
-  max-width: 1126px;
-  width: 100%;
-  margin: 0 auto;
-}
 /* 관리자 문과 화면 색 버튼을 한 덩이로 오른쪽에 둔다.
    표지는 왼쪽에 홀로 남아, 눌러서 채용 공고로 가는 자리 하나만 지킨다. */
 .app-bar-right {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-2);
   /* 펼쳐지는 칸의 기준이 된다.
      체험 칸을 버튼 기준으로 붙였더니 좁은 화면에서 왼쪽이 잘렸다 -- 버튼의
      오른쪽은 화면의 오른쪽이 아니라 그 오른쪽에 있는 것들만큼 안쪽이라,
      칸이 화면 폭만 해지면 왼쪽으로 넘친다. 머리말 오른쪽 묶음을 기준으로
      삼으면 칸의 오른쪽이 곧 화면의 여백 자리가 된다. */
-  position: relative;
   /* 이름이 긴 표지에 밀려 이 덩이가 줄어들면 안 된다. 줄어들면 관리자
      문 글자가 먼저 잘린다. */
-  flex: 0 0 auto;
 }
 .app-bar-link {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   height: 34px;
-  padding: 0 12px;
-  border-radius: var(--r-xs);
-  background: var(--surface);
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
   text-decoration: none;
   word-break: keep-all;
 }
 .app-bar-link[aria-current='page'] {
   /* 지금 그 화면에 있다는 표시. 색만 바꾸면 색을 못 가리는 사람에게는
      아무 차이가 없어서, aria-current 로도 함께 알린다. */
-  background: var(--accent);
-  color: #fff;
 }
 .brand {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--gap-2);
   /* 화면 끝에서 조금 띄운다. 머리말 여백만으로는 모서리에 바짝 붙어 보였다. */
   margin-left: var(--gap-3);
-  color: var(--text-h);
   font-weight: 700;
   letter-spacing: -0.3px;
-  border-radius: var(--r-xs);
-}
-.brand:hover {
-  text-decoration: none;
-  opacity: 0.75;
 }
 .brand-mark {
   flex: none;
-  color: var(--accent);
 }
 .brand-name {
-  font-size: 19px;
   /* 이름이 두 줄로 접히면 머리말 높이가 늘어나 아래 화면이 통째로 밀린다.
      '통합 채용 플랫폼' 처럼 사이에 공백이 있는 이름에서 실제로 접힌다. */
-  white-space: nowrap;
 }
 
 
@@ -85,9 +50,6 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  padding: 40px 48px;
-  text-align: left;
   @media (max-width: 640px) {
     padding: 24px 20px;
   }
@@ -97,9 +59,7 @@
    아래에 선을 그어 본문과 나누고 있었다. 선을 쓰면 화면마다 가로줄이 하나씩
    생겨 답답해진다. 여백으로 나눈다 -- 줄보다 빈 곳이 더 분명하게 나눈다. */
 .page-header {
-  display: flex;
   flex-direction: column;
-  gap: var(--gap-1);
   padding-bottom: var(--gap-2);
   border-bottom: 0;
 }
@@ -110,21 +70,9 @@
 .page-header > .header-actions {
   align-self: flex-start;
 }
-.page-header h1 {
-  margin: 4px 0 0;
-}
 /* 머리말 아래 붙는 곁길. 문장에 섞지 않고 한 줄로 둔다. */
 .header-link {
-  align-self: flex-start;
-  margin-top: var(--gap-1);
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--accent);
   white-space: nowrap;
-}
-.page-header p {
-  color: var(--text-muted);
-  font-size: 14px;
 }
 /* 돌아가는 길은 버튼이어야 한다.
    글자에 밑줄도 테두리도 없이 색만 흐려 두면, 그것이 눌리는 것인지 그냥
@@ -134,63 +82,25 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  align-self: flex-start;
-  min-height: 40px;
-  padding: 0 12px;
-  border: 0;
   border-radius: var(--r-xs);
   /* 이동 버튼들과 같은 면. 돌아가기·대시보드·채용 관리·알림이 화면마다
      다른 회색이면, 같은 성격의 버튼이라는 것이 읽히지 않는다. */
-  background: var(--surface);
-  color: var(--text-h);
-  font-size: 14px;
-  font-weight: 600;
   white-space: nowrap;
   transition: background 0.15s ease;
 }
 .back-link:hover {
-  background: var(--btn-face-hover);
   text-decoration: none;
 }
 
 .dashboard-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--gap-3);
   flex-wrap: wrap;
   padding-bottom: var(--gap-2);
   border-bottom: 0;
-}
-.dashboard-header h1 {
-  margin: 0;
 }
 /* 머리말의 이동 버튼들.
    종 모양 하나, 회색 버튼 하나, 맨 글자 하나가 한 줄에 섞여 있었다. 셋 다
    같은 성격(다른 곳으로 간다)인데 모양이 셋이면, 무엇이 눌리는 것인지
    매번 다시 판단해야 한다. 같은 면·같은 높이로 맞춘다. */
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-2);
-  flex-wrap: wrap;
-}
-.header-actions > button,
-.header-actions > a {
-  min-height: 40px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: var(--r-xs);
-  background: var(--surface);
-  color: var(--text-h);
-  font-size: 14px;
-  font-weight: 600;
-}
-.header-actions > button:hover:not(:disabled),
-.header-actions > a:hover {
-  background: var(--btn-face-hover);
-  text-decoration: none;
-}
 
 /* Status banners */
 
@@ -202,29 +112,7 @@
 .signed-banner,
 .hire-confirmed-banner,
 .save-message {
-  padding: var(--gap-3) var(--gap-4);
-  border-radius: var(--r-md);
-  font-size: 14px;
-  line-height: 1.6;
   font-weight: 500;
-  border: 0;
-}
-.error {
-  background: var(--danger-bg);
-  color: var(--danger-text);
-}
-.notice {
-  background: var(--surface);
-  color: var(--text);
-}
-.signed-banner,
-.save-message {
-  background: var(--success-bg);
-  color: var(--success-text);
-}
-.hire-confirmed-banner {
-  background: var(--accent-bg);
-  color: var(--accent);
 }
 
 /* Final offer email */
@@ -233,10 +121,6 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 24px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
 }
 .final-offer-email h2 {
   margin: 0;
@@ -247,9 +131,7 @@
   font-size: 14px;
 }
 .final-offer-form {
-  display: flex;
   flex-direction: column;
-  gap: 14px;
 }
 .final-offer-form label {
   display: flex;
@@ -276,12 +158,9 @@
    어긋났다. 상자를 걷고 왼쪽에 세운다. */
 .auth-page {
   max-width: 400px;
-  width: 100%;
-  margin: 0 auto;
   /* 세로 가운데로 두었더니 휴대폰에서 화면 위쪽 3분의 1이 통째로 비었다.
      첫 글자를 찾으려면 눈을 아래로 내려야 한다. 위에서 시작한다. */
   justify-content: flex-start;
-  padding: var(--gap-10) var(--page-x) var(--gap-10);
 }
 .auth-page form {
   display: flex;
@@ -314,8 +193,6 @@
 }
 .auth-page > p {
   margin-top: 4px;
-  font-size: 14px;
-  color: var(--text-muted);
 }
 
 /* Dashboard */
@@ -325,10 +202,6 @@
   align-items: flex-end;
   gap: 12px;
   flex-wrap: wrap;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 20px;
 }
 .dashboard-page > form label {
   display: flex;
@@ -341,28 +214,11 @@
 }
 
 .room-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
   flex-direction: column;
-  gap: 8px;
 }
 .room-link {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: var(--gap-3);
-  padding: var(--gap-4) var(--gap-5);
-  border: 0;
-  border-radius: var(--r-lg);
-  background: var(--surface);
-  color: inherit;
   transition: background 0.15s ease;
-}
-.room-link:hover {
-  background: var(--btn-face-hover);
-  text-decoration: none;
 }
 .room-info {
   display: flex;
@@ -370,13 +226,7 @@
   gap: 4px;
   min-width: 0;
 }
-.room-title {
-  font-weight: 600;
-  color: var(--text-h);
-}
 .room-meta {
-  font-size: 13px;
-  color: var(--text-muted);
   font-weight: 400;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -397,10 +247,6 @@
 .chat-panel {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
-  overflow: hidden;
 }
 .chat-message-list {
   display: flex;
@@ -430,12 +276,9 @@
 .chat-message {
   min-width: 0;
   background: var(--surface);
-  border-radius: 16px 16px 16px 4px;
   padding: 10px 14px;
 }
 .chat-row-right .chat-message {
-  background: var(--accent);
-  color: var(--on-accent);
   border-radius: 16px 16px 4px 16px;
 }
 /* 시각은 말풍선 바깥 아래쪽에 붙인다. 안에 넣으면 문장과 섞여 읽기 나쁘다. */
@@ -478,7 +321,6 @@
   display: flex;
   gap: 8px;
   padding: 16px;
-  border-top: 1px solid var(--border);
 }
 .chat-composer input {
   flex: 1;
@@ -491,26 +333,15 @@
 .contract-history,
 .document-manager,
 .room-documents {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 24px;
-  background: var(--bg);
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
 .history-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
   flex-direction: column;
-  gap: 12px;
 }
 .history-entry {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
   padding: 12px 16px;
 }
 .history-meta {
@@ -557,12 +388,8 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
 }
 .room-documents li {
-  padding: 10px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
   font-size: 14px;
 }
 
@@ -572,9 +399,6 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
 }
 .document-label {
   font-weight: 600;
@@ -612,9 +436,6 @@
 /* Contract form */
 
 .contract-form fieldset {
-  border: none;
-  padding: 0;
-  margin: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -632,14 +453,11 @@
 }
 
 .checkbox-label {
-  flex-direction: row;
-  align-items: center;
   font-weight: 500;
 }
 
 .custom-term-row {
   display: flex;
-  gap: 8px;
   align-items: center;
   flex-wrap: wrap;
 }
@@ -660,9 +478,6 @@
 .signature-status-row > div {
   flex: 1;
   min-width: 140px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
   text-align: center;
 }
 .signature-status-row p:first-child {
@@ -685,15 +500,12 @@
 .contract-print {
   text-align: center;
   padding: 32px;
-  background: #fff;
-  color: #000;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   /* 전역 자간(0.18px)이 걸려 있으면 html2canvas 는 글자를 하나씩 따로 그린다.
      한글·라틴은 조금 어긋나는 정도지만, 태국어·크메르어·미얀마어처럼 글자가
      서로 붙어 모양이 결정되는 문자는 낱자로 흩어져 읽을 수 없게 된다.
      외국어 계약서를 PDF 로 내보내는 사람에게는 문서가 없는 것과 같다. */
-  letter-spacing: normal;
 }
 
 .contract-print h1,
@@ -852,7 +664,6 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: var(--overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -866,10 +677,6 @@
    내려도 따라오지 않는다. 채용내정 취소 확인창이 그렇게 되면 이 서비스가
    막으려는 바로 그 순간에 아무것도 할 수 없다 — 진행도 취소도. */
 .modal-content {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
   padding: 24px;
   width: 500px;
   max-width: 100%;
@@ -881,15 +688,9 @@
 .signature-canvas {
   width: 100%;
   height: 200px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: #fff;
-  touch-action: none;
 }
 
 .modal-actions {
-  display: flex;
-  gap: 8px;
   margin-top: 16px;
   justify-content: flex-end;
 }
@@ -901,10 +702,6 @@
 }
 
 .admin-create-account {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 24px;
-  background: var(--bg);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -947,8 +744,6 @@
 .table-scroll {
   overflow-x: auto;
   margin-top: 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
 }
 
 .admin-table {
@@ -985,7 +780,6 @@
   position: relative;
 }
 .table-scroll::after {
-  content: '';
   position: absolute;
   top: 1px;
   right: 1px;
@@ -1072,11 +866,6 @@
 .apply-page,
 .recruit-page {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  padding: 40px 48px;
-  text-align: left;
 }
 @media (max-width: 640px) {
   .jobs-page,
@@ -1094,28 +883,11 @@
    찾아야 한다. 글은 왼쪽에서 시작한다. */
 .landing-page {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-8);
-  padding: var(--gap-8) var(--page-x) var(--gap-10);
-  max-width: 560px;
-  width: 100%;
-  margin: 0 auto;
 }
 .landing-hero {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
   gap: var(--gap-2);
   /* 칸을 가운데로 모았으므로 그 위의 제목도 같은 축에 세운다.
      제목만 왼쪽에 남으면 화면에 축이 둘 생겨 한쪽으로 쏠려 보인다. */
-  text-align: center;
-}
-.landing-eyebrow {
-  color: var(--accent);
-  font-weight: 700;
-  font-size: 14px;
-  letter-spacing: 0.2px;
 }
 /* 문장 안에 링크를 넣으면 좁은 화면에서 "지 / 원 현황 조회" 처럼 낱말
    가운데가 잘린다. 링크를 줄로 떼어 낸다. */
@@ -1142,12 +914,6 @@
   align-items: center;
   gap: 4px;
   height: 34px;
-  padding: 0 12px;
-  border-radius: var(--r-xs);
-  background: var(--surface);
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
   white-space: nowrap;
 }
 .demo-menu-caret {
@@ -1175,10 +941,6 @@
   max-height: min(70vh, 540px);
   overflow-y: auto;
   padding: var(--gap-5) var(--gap-4);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  background: var(--bg);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
   text-align: left;
 }
 .demo-menu-head {
@@ -1295,19 +1057,13 @@
    좁은 화면에서도 두 열을 유지한다. 한 열로 접으면 다시 위아래가 되어
    물어보는 것 자체가 달라진다. 대신 글자 크기와 여백을 폭에 맞춰 줄인다. */
 .landing-choices {
-  display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--gap-3);
   /* 설명 줄이 있던 자리의 여백을 여기서 대신 만든다. */
-  margin-top: var(--gap-5);
 }
 .landing-choice {
-  display: flex;
   flex-direction: column;
   /* 고르는 칸이라 안의 것들을 가운데로 모은다. 왼쪽에 붙여 두면 읽는
      글이 되고, 가운데에 모으면 고르는 것이 된다. */
-  align-items: center;
-  justify-content: center;
   text-align: center;
   gap: var(--gap-3);
   width: 100%;
@@ -1315,9 +1071,7 @@
   height: 100%;
   /* 최소 높이를 두지 않는다. 두었더니 그림과 이름이 작아 가운데가 텅 비었다.
      내용이 칸의 높이를 정하게 하고, 대신 그 내용을 키운다. */
-  padding: var(--gap-5) var(--gap-5);
   border: 0;
-  border-radius: var(--r-lg);
   background: var(--surface-strong);
   color: var(--text-h);
 }
@@ -1397,73 +1151,30 @@
 
 /* 공고 목록 */
 .job-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
   flex-direction: column;
-  gap: 10px;
 }
 /* 공고 한 줄.
    테두리 상자로 두었더니 카드가 여럿일 때 화면이 격자처럼 보이고, 눌러서
    들어가는 것인지 그냥 정보인지 알기 어려웠다. 면으로 물리고 오른쪽에
    화살표를 둔다 -- 목록의 줄은 누르는 것이라는 약속이 이미 널리 쓰인다. */
 .job-card {
-  display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: var(--gap-5);
-  border: 0;
-  border-radius: var(--r-lg);
-  background: var(--surface);
-  background: var(--bg);
-  color: inherit;
   transition:
     box-shadow 0.15s ease,
     transform 0.15s ease,
     border-color 0.15s ease;
 }
-.job-card:hover {
-  background: var(--btn-face-hover);
-  text-decoration: none;
-}
 .job-card-title {
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-  color: var(--text-h);
   /* 누르면 넘어간다는 표시. 목록의 줄에는 이 약속이 이미 널리 쓰인다. */
-  padding-right: var(--gap-5);
-  position: relative;
-}
-.job-card-title::after {
-  content: '›';
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-muted);
-  font-size: 18px;
-  font-weight: 400;
-}
-.job-card-meta {
-  font-size: 13px;
-  color: var(--text-muted);
 }
 .job-card-deadline {
-  font-size: 12px;
   font-weight: 600;
-  color: var(--accent);
 }
 /* 마감이 임박한 공고는 색만이 아니라 글자로도 "오늘 마감"이라고 말한다 */
 .job-card-deadline.urgent,
 .job-detail-meta.deadline-urgent {
   color: var(--danger-text);
-}
-
-.job-detail-meta {
-  color: var(--text-muted);
-  font-size: 14px;
 }
 .job-detail-body {
   white-space: pre-wrap;
@@ -1471,25 +1182,13 @@
   font-size: 15px;
   color: var(--text);
 }
-.job-detail-actions {
-  display: flex;
-  gap: 12px;
-}
 
 /* 지원서 폼 */
 .apply-form {
-  display: flex;
   flex-direction: column;
-  gap: 20px;
 }
 .apply-section {
-  display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 24px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
 }
 .apply-section h2 {
   margin: 0;
@@ -1527,14 +1226,9 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
 }
 .career-row {
   display: flex;
-  gap: 12px;
   flex-wrap: wrap;
   width: 100%;
 }
@@ -1682,13 +1376,7 @@
   margin: 0;
 }
 .posting-form {
-  display: flex;
   flex-direction: column;
-  gap: var(--gap-4);
-  padding: var(--gap-5);
-  border: 0;
-  border-radius: var(--r-lg);
-  background: var(--surface);
 }
 /* 긴 폼의 끝에 놓이는 제출 버튼.
    항목을 열 개 넘게 채운 끝에 작은 버튼이 왼쪽 구석에 있으면, 다 적고도
@@ -1715,7 +1403,6 @@
 /* 지원서 검색·필터 */
 .filter-row {
   display: flex;
-  gap: 10px;
   align-items: center;
   flex-wrap: wrap;
 }
@@ -1820,9 +1507,6 @@
   justify-content: space-between;
 }
 .application-fields {
-  display: grid;
-  grid-template-columns: 100px 1fr;
-  gap: 8px 16px;
   margin: 0;
   font-size: 14px;
 }
@@ -1847,9 +1531,6 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
   font-size: 13px;
 }
 .career-view p {
@@ -1876,10 +1557,6 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 24px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
 }
 .room-invite-email h2 {
   margin: 0;
@@ -1968,14 +1645,8 @@
    것들이 서로 다른 회색이면 그 자체가 어수선하다. */
 .notif-bell {
   position: relative;
-  background: var(--bg);
-  border-radius: var(--radius-full);
-  padding: 8px 12px;
   font-size: 16px;
   line-height: 1;
-}
-.notif-bell:hover:not(:disabled) {
-  background: var(--btn-face);
 }
 .notif-badge {
   position: absolute;
@@ -2000,10 +1671,6 @@
   right: 0;
   z-index: 100;
   width: min(360px, 90vw);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
   overflow: hidden;
   text-align: left;
 }
@@ -2086,14 +1753,7 @@
 /* 지원 현황 조회 (공개) */
 .status-page {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  padding: 40px 48px;
-  text-align: left;
   max-width: 640px;
-  width: 100%;
-  margin: 0 auto;
 }
 @media (max-width: 640px) {
   .status-page {
@@ -2101,8 +1761,6 @@
   }
 }
 .status-form {
-  display: flex;
-  gap: 10px;
   flex-wrap: wrap;
 }
 .status-form input {
@@ -2114,21 +1772,12 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 28px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
-  box-shadow: var(--shadow-sm);
 }
 .status-card h2 {
   margin: 0;
 }
 .status-card .badge {
   align-self: flex-start;
-}
-.status-meta {
-  font-size: 13px;
-  color: var(--text-muted);
 }
 .status-desc {
   font-size: 15px;
@@ -2138,12 +1787,10 @@
   align-self: flex-start;
   padding: 10px 20px;
   border-radius: var(--radius-full);
-  background: var(--accent);
   color: var(--on-accent) !important;
   font-weight: 600;
 }
 .status-login-btn:hover {
-  background: var(--accent-hover);
   text-decoration: none;
 }
 
@@ -2182,10 +1829,6 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 24px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
 }
 .contract-translation h2 {
   margin: 0;
@@ -2196,7 +1839,6 @@
 }
 .translation-controls {
   display: flex;
-  gap: 10px;
   align-items: center;
   flex-wrap: wrap;
 }
@@ -2210,10 +1852,6 @@
   flex-wrap: wrap;
   padding-top: 4px;
 }
-.translation-tabs .active {
-  background: var(--accent);
-  color: var(--on-accent);
-}
 .translation-body {
   display: flex;
   flex-direction: column;
@@ -2225,10 +1863,6 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 8px;
-  padding: 14px 16px;
-  border: 1px solid var(--line-soft, var(--border));
-  border-radius: var(--radius-sm);
-  background: var(--surface);
 }
 @media (min-width: 760px) {
   .translation-row {
@@ -2271,10 +1905,6 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 20px 24px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
 }
 .my-applications {
   display: flex;
@@ -2283,18 +1913,11 @@
   margin: 24px 0;
 }
 .my-app-list {
-  display: grid;
-  gap: 12px;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
 }
 .my-app-card {
-  display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 18px 20px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
 }
 .my-app-head {
   display: flex;
@@ -2309,10 +1932,6 @@
 .my-app-code {
   font-size: 13px;
   color: var(--text-muted);
-}
-.my-app-headline {
-  font-size: 14px;
-  line-height: 1.5;
 }
 .my-app-steps {
   display: flex;
@@ -2356,11 +1975,7 @@
   font-size: 12px;
 }
 .my-app-actions {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
 }
 /* 표 안의 행 머리(이름)는 열 머리처럼 굵게 보이지 않아야 한다 */
 .posting-compare {
@@ -2392,10 +2007,7 @@
    겹치면 어디까지가 한 묶음인지 오히려 흐려진다. 왼쪽 선 하나로 "여기부터
    여기까지 한 묶음"만 표시한다. */
 .posting-conditions {
-  border: 0;
   border-left: 2px solid var(--border);
-  border-radius: 0;
-  padding: var(--gap-1) 0 var(--gap-1) var(--gap-4);
   margin: var(--gap-2) 0;
 }
 .posting-conditions legend {
@@ -2409,10 +2021,6 @@
   flex-direction: column;
   gap: 10px;
   align-items: flex-start;
-  padding: 20px 24px;
-  border: 1px solid var(--accent-border);
-  border-radius: var(--radius);
-  background: var(--accent-bg);
 }
 .explain-note {
   font-size: 13px;
@@ -2443,8 +2051,6 @@
   grid-template-columns: 116px 1fr;
   gap: 4px 12px;
   padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  background: var(--bg);
   border-left: 3px solid var(--border);
   font-size: 14px;
 }
@@ -2491,13 +2097,8 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 20px 24px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
 }
 .delivery-list {
-  margin: 0;
   padding-left: 20px;
   font-size: 13px;
   line-height: 1.7;
@@ -2508,10 +2109,6 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 20px 24px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
 }
 .audit-certificate > button {
   align-self: flex-start;
@@ -2541,18 +2138,8 @@
 .certificate-serial code {
   word-break: break-all;
 }
-.certificate-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
 .certificate-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
   flex-direction: column;
-  gap: 10px;
 }
 .certificate-list li {
   display: flex;
@@ -2563,11 +2150,6 @@
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-}
-.certificate-row {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
 }
 .certificate-meta {
   font-size: 12px;
@@ -2580,17 +2162,10 @@
 
 /* 공개 진위 확인 화면 */
 .verify-page {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
   max-width: 760px;
-  margin: 0 auto;
-  padding: 40px 20px;
 }
 .verify-form {
-  display: flex;
   flex-direction: column;
-  gap: 8px;
   padding: 24px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -2613,10 +2188,6 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 24px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
 }
 .verify-result .badge {
   align-self: flex-start;
@@ -2711,10 +2282,6 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 20px 24px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
 }
 .summary-meta {
   font-size: 13px;
@@ -2768,9 +2335,6 @@
   align-items: center;
   gap: 10px;
 }
-.period-head h2 {
-  margin: 0;
-}
 .period-detail {
   font-size: 15px;
   color: var(--text);
@@ -2808,21 +2372,12 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 24px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
 }
 .change-requests h2 {
   margin: 0;
 }
 .request-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
   flex-direction: column;
-  gap: 10px;
 }
 .request-list.resolved {
   opacity: 0.75;
@@ -2832,9 +2387,6 @@
   flex-direction: column;
   gap: 6px;
   padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
 }
 .request-head {
   display: flex;
@@ -2858,15 +2410,10 @@
   color: var(--text-muted);
 }
 .request-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
   margin-top: 2px;
 }
 .request-form {
-  display: flex;
   flex-direction: column;
-  gap: 12px;
   padding-top: 14px;
   border-top: 1px solid var(--border);
 }
@@ -2971,10 +2518,6 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 24px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
 }
 .signed-contract-section h2 {
   margin: 0;
@@ -3037,10 +2580,6 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 20px 24px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
 }
 .wage-note {
   font-size: 13px;
@@ -3055,7 +2594,6 @@
 .wage-row {
   display: grid;
   grid-template-columns: 1.4fr 1.6fr 1fr auto auto;
-  gap: 8px;
   align-items: center;
 }
 /* 좁은 화면 대응이 실효가 없었다. 그리드 자식은 자동 최소 크기를 갖기 때문에,
@@ -3124,9 +2662,6 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 12px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
 }
 .wage-totals strong {
   font-size: 20px;
@@ -3159,10 +2694,6 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 20px 24px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
 }
 .rights-note {
   font-size: 13px;
@@ -3260,10 +2791,6 @@
   flex-direction: column;
   gap: 8px;
   align-items: flex-start;
-  padding: 16px 20px;
-  border: 1px solid var(--warning-border);
-  border-radius: var(--radius);
-  background: var(--warning-bg);
 }
 /* align-items: flex-start 는 세로 배치에서 자식의 가로 폭을 내용 크기로 줄인다.
    그래서 문단은 제 폭을 못 가져 이상한 자리에서 줄바꿈되고, 입력 줄은 칸마다
@@ -3273,10 +2800,6 @@
   flex-direction: column;
   gap: 12px;
   align-items: stretch;
-  padding: 20px 24px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
   text-align: left;
 }
 .room-close h2 {
@@ -3319,32 +2842,16 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 24px;
   max-width: 860px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 40px 24px 64px;
-  text-align: left;
 }
 .tech-tabs {
-  display: flex;
-  gap: 12px;
   flex-wrap: wrap;
 }
 .tech-tab {
-  flex: 1;
   min-width: 240px;
-  display: flex;
   flex-direction: column;
-  gap: 4px;
   align-items: flex-start;
-  padding: 16px 20px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
-  color: var(--text);
   cursor: pointer;
-  text-align: left;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 .tech-tab:hover {
@@ -3352,72 +2859,35 @@
 }
 .tech-tab.active {
   border-color: var(--accent-border);
-  background: var(--accent-bg);
 }
 .tech-tab-title {
-  font-size: 17px;
-  font-weight: 700;
   color: var(--text-h);
 }
 .tech-tab-desc {
-  font-size: 13px;
   color: var(--text-muted);
 }
 .tech-panel {
-  display: flex;
   flex-direction: column;
-  gap: 20px;
-}
-.tech-lead {
-  font-size: 15px;
-  line-height: 1.75;
-  color: var(--text-muted);
 }
 .tech-steps {
   list-style: none;
-  margin: 0;
-  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
-.tech-steps li {
-  display: grid;
-  grid-template-columns: 56px 1fr;
-  gap: 12px;
-  padding: 18px 0;
-  border-top: 1px solid var(--border);
-}
-.tech-steps li.accent .tech-step-num {
-  color: var(--accent);
-}
 .tech-step-num {
   font-family: var(--mono);
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
-}
-.tech-step-body h3 {
-  margin: 0 0 6px;
-  font-size: 17px;
-}
-.tech-step-body p {
-  margin: 0;
-  font-size: 15px;
-  line-height: 1.75;
 }
 .tech-step-detail {
   margin-top: 6px !important;
   font-size: 13px !important;
-  color: var(--text-muted);
 }
 .tech-group {
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding-top: 20px;
-  border-top: 1px solid var(--border);
 }
 .tech-group h3 {
   margin: 0;
@@ -3429,26 +2899,10 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  margin: 0;
 }
 .tech-item dt {
   font-family: var(--mono);
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-h);
   margin-bottom: 4px;
-}
-.tech-item dd {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.75;
-  color: var(--text-muted);
-}
-.tech-foot {
-  padding-top: 20px;
-  border-top: 1px solid var(--border);
-  font-size: 14px;
-  color: var(--text-muted);
 }
 @media (max-width: 640px) {
   .tech-steps li {
@@ -3469,8 +2923,6 @@
   padding: 6px 14px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--on-accent);
-  background: var(--accent);
   border: none;
   border-radius: var(--radius-full);
   box-shadow: var(--shadow-sm);
@@ -3586,8 +3038,6 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 20px 24px;
-  border-radius: var(--radius);
   text-align: left;
 }
 .offer-watch h3 {
@@ -3648,10 +3098,7 @@
   font-weight: 700;
 }
 .offer-actions {
-  display: flex;
   flex-direction: column;
-  gap: 8px;
-  align-items: flex-start;
 }
 .offer-hint {
   font-size: 14px;
@@ -3662,10 +3109,6 @@
    채팅 로그를 다시 읽으면 다 있지만, 수백 줄에서 찾는 것과 뽑아 늘어놓은 것은
    다르다. 다툼이 생겼을 때 필요한 것은 후자다. */
 .negotiation-log {
-  padding: 20px 24px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
   text-align: left;
 }
 .negotiation-log > button,
@@ -3758,10 +3201,6 @@
 
 /* 계약서 쓰기 전 검토 — 값으로 계산한 것과 맥락으로 읽은 것을 나란히 둔다. */
 .pre-contract-review {
-  padding: 20px 24px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
   text-align: left;
 }
 .pre-contract-review h2 {
@@ -3781,12 +3220,6 @@
   .review-result {
     grid-template-columns: 1fr;
   }
-}
-.review-block {
-  padding: 16px 18px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
 }
 .review-block h3 {
   display: flex;
@@ -3855,9 +3288,6 @@
 
 /* 공고 등록의 임금·시간 입력. 그리드라는 이름만 있고 그리드가 없었다. */
 .form-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
   width: 100%;
 }
 .form-grid label {
@@ -3932,9 +3362,6 @@
 
 /* 로그인 유지 — 세로로 쌓는 auth-page label 규칙을 넘어 한 줄로 둔다. */
 .auth-page label.remember-me {
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
   font-weight: 500;
   margin-top: -4px;
 }
@@ -3952,10 +3379,6 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 10px;
-  padding: 18px 20px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
 }
 .room-archive h2 {
   margin: 0;
@@ -3972,10 +3395,6 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
-  padding: 16px 20px;
-  border: 1px solid var(--warning-border);
-  border-radius: var(--radius);
-  background: var(--warning-bg);
 }
 
 .room-archived-note {
@@ -4021,14 +3440,8 @@
    화면에 온 사람 대부분은 공고를 보러 온 사람이고, 코드를 받은 사람은 소수다.
    면을 회색으로 물려 순서를 되돌린다. */
 .room-enter {
-  display: flex;
   flex-direction: column;
-  gap: var(--gap-3);
   margin-bottom: var(--gap-6);
-  padding: var(--gap-5);
-  border: 0;
-  border-radius: var(--r-lg);
-  background: var(--surface);
 }
 .room-enter h2 {
   margin: 0;
@@ -4127,7 +3540,6 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 16px 24px;
   cursor: pointer;
   list-style: none;
   user-select: none;
@@ -4147,9 +3559,6 @@
 .fold[open] > .fold-head::after {
   transform: rotate(90deg);
 }
-.fold-head h2 {
-  margin: 0;
-}
 .fold-head:hover {
   background: var(--bg-subtle, var(--bg));
 }
@@ -4163,7 +3572,6 @@
   color: var(--muted);
 }
 .fold-body {
-  padding: 0 24px 24px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -4174,13 +3582,10 @@
    버튼 하나만 남기고, 펼쳐도 화면 높이의 절반을 넘기지 않는다. */
 .dm-dock {
   position: fixed;
-  right: 16px;
-  bottom: 16px;
   z-index: 60;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: var(--gap-2);
   /* 창이 없는 자리는 뒤 화면을 그대로 쓰게 둔다. 이걸 빼면 접혀 있을 때도
      오른쪽 아래 사각형 전체가 클릭을 먹는다. */
   pointer-events: none;
@@ -4201,24 +3606,15 @@
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+  box-shadow: none;
 }
 .dock-theme:hover:not(:disabled) {
   background: var(--surface);
 }
 
 .dm-launcher {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
   position: relative;
-  min-height: 52px;
-  padding: 0 20px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: #fff;
   font-weight: 600;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
 }
 .dm-launcher-text {
   font-size: 15px;
@@ -4245,10 +3641,6 @@
      화면이 허락하는 만큼 넓게 잡되, 좁은 화면에서는 여백만 남기고 채운다. */
   width: min(400px, calc(100vw - 24px));
   max-height: min(72vh, 620px);
-  border-radius: var(--r-lg);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
   overflow: hidden;
 }
 .dm-window-head {
@@ -4258,7 +3650,6 @@
   gap: var(--gap-2);
   padding: 12px 14px;
   background: var(--surface);
-  border-bottom: 1px solid var(--border);
 }
 .dm-window-title {
   font-weight: 600;
@@ -4306,7 +3697,6 @@
 }
 .dm-bubble {
   padding: 10px 13px;
-  border-radius: var(--r-md);
   background: var(--surface);
   font-size: 15px;
   line-height: 1.55;
@@ -4314,10 +3704,6 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: keep-all;
-}
-.dm-bubble-row.mine .dm-bubble {
-  background: var(--accent);
-  color: #fff;
 }
 .dm-bubble-time {
   font-size: 12px;
@@ -4422,7 +3808,7 @@
   border-radius: var(--r-md);
   background: var(--bg);
   border: 1px solid var(--border);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  box-shadow: none;
   font-size: 14px;
   text-align: left;
   word-break: keep-all;

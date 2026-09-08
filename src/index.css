@@ -1,52 +1,66 @@
 :root {
   color-scheme: dark;
-  --text: #b0b8c1;
-  --text-h: #f2f4f6;
-  --text-muted: #98a2ad;
   --bg: #000;
-  --surface: #1d1d1f;
-  --surface-strong: #2c2c2e;
+  --text: #f5f5f7;
+  --text-h: #f5f5f7;
+  --text-muted: #a1a1a6;
+  --muted: var(--text-muted);
+  --surface: #272729;
+  --surface-strong: #2a2a2c;
+  --surface-low: #252527;
+  --panel: var(--surface);
   --border: #424245;
-  --code-bg: #2c2c2e;
-  --btn-face: #2c2c2e;
-  --btn-face-hover: #3a3a3c;
-  --btn-border: #6a6a7a;
+  --border-strong: #86868b;
+  --code-bg: var(--surface-strong);
+  --btn-face: #1d1d1f;
+  --btn-face-hover: var(--surface-strong);
+  --btn-border: var(--border);
+  --primary: #0066cc;
+  --primary-focus: #0071e3;
   --accent: #2997ff;
-  --accent-bg: rgba(41, 151, 255, 0.14);
-  --accent-border: rgba(41, 151, 255, 0.45);
-  --accent-hover: #40a9ff;
-  --danger: #ff6b76;
-  --danger-bg: rgba(255, 107, 118, 0.14);
-  --danger-border: rgba(255, 107, 118, 0.4);
-  --success: #2ee08f;
-  --success-bg: rgba(46, 224, 143, 0.14);
-  --success-border: rgba(46, 224, 143, 0.4);
-  --warning: #ffb84d;
-  --warning-bg: rgba(255, 184, 77, 0.14);
-  --warning-border: rgba(255, 184, 77, 0.4);
-  --danger-text: #ff8e97;
-  --success-text: #4ee7a2;
-  --warning-text: #ffc670;
+  --accent-hover: #64b4ff;
+  --action-bg: var(--primary);
+  --action-hover: var(--primary-focus);
+  --accent-bg: #10273f;
+  --accent-border: #245d91;
   --on-accent: #fff;
-  --toast-text: #fff;
-  --toast-success: #00875a;
-  --toast-danger: #cf2637;
-  --toast-info: #2b2f36;
-  --toast-border: rgba(255, 255, 255, 0.22);
-  --overlay: rgba(0, 0, 0, 0.66);
-  --social-bg: rgba(255, 255, 255, 0.04);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
-  --shadow: rgba(0, 0, 0, 0.6) 0 10px 15px -3px, rgba(0, 0, 0, 0.4) 0 4px 6px -2px;
-
+  /* 상태 색은 오류·경고·성공의 의미 전달에만 사용한다. */
+  --danger: #ff6961;
+  --danger-text: #ff817a;
+  --danger-bg: #351818;
+  --danger-border: #743431;
+  --success: #63c174;
+  --success-text: #78d087;
+  --success-bg: #17301e;
+  --success-border: #386a43;
+  --warning: #e8ad4a;
+  --warning-text: #f1bc63;
+  --warning-bg: #352817;
+  --warning-border: #72572f;
+  --toast-text: var(--text);
+  --toast-success: var(--success-bg);
+  --toast-danger: var(--danger-bg);
+  --toast-info: var(--surface);
+  --toast-border: var(--border);
+  --overlay: rgba(0, 0, 0, 0.76);
+  --social-bg: var(--surface-low);
+  --nav-bg: #000;
+  --shadow-sm: none;
+  --shadow: none;
+  --nav-h: 44px;
+  --nav-max: 1120px;
+  --content-max: 980px;
+  --wide-max: 1440px;
+  --gutter: 24px;
+  --tile-gap: 0px;
   --r-xs: 8px;
-  --r-sm: 10px;
-  --r-md: 12px;
-  --r-lg: 16px;
-  --r-xl: 20px;
-  --radius: 16px;
-  --radius-sm: 10px;
+  --r-sm: 8px;
+  --r-md: 11px;
+  --r-lg: 18px;
+  --r-xl: 18px;
+  --radius: 18px;
+  --radius-sm: 8px;
   --radius-full: 9999px;
-
   --gap-1: 4px;
   --gap-2: 8px;
   --gap-3: 12px;
@@ -55,12 +69,17 @@
   --gap-6: 24px;
   --gap-8: 32px;
   --gap-10: 40px;
-  --page-x: 20px;
-  --tap: 48px;
-  --tap-lg: 56px;
+  --section-space: 80px;
+  --page-x: var(--gutter);
+  --tap: 44px;
+  --tap-lg: 48px;
+  --motion-fast: 120ms;
+  --motion-ui: 240ms;
+  --motion-panel: 320ms;
+  --ease-ui: cubic-bezier(0.4, 0, 0.6, 1);
   --font-apple:
-    'SUIT Variable', SUIT, -apple-system, BlinkMacSystemFont,
-    'SF Pro Text', 'SF Pro Display', 'Apple SD Gothic Neo', 'Helvetica Neue',
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
+    'Apple SD Gothic Neo', 'SUIT Variable', SUIT, 'Helvetica Neue',
     'Noto Sans KR', 'Malgun Gothic', 'Segoe UI', Arial, sans-serif;
   --font-apple-mono:
     'SFMono-Regular', 'SF Mono', ui-monospace, Menlo, Monaco, Consolas,
@@ -68,19 +87,13 @@
   --sans: var(--font-apple);
   --heading: var(--font-apple);
   --mono: var(--font-apple-mono);
-
-  font: 18px/145% var(--sans);
-  letter-spacing: 0;
+  font: 100%/1.47 var(--sans);
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
 }
 
 .document-download-link {

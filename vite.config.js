@@ -4,29 +4,8 @@ import { createHash } from 'node:crypto'
 import { readFileSync, writeFileSync, appendFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 
-// 첫 화면이 뜨기까지 브라우저가 몇 번 왕복하는가.
-//
-// 재 보니 두 군데서 기다리고 있었다.
-//
-//   하나. 스타일시트가 첫 그림을 막는다. 첫 글자가 124ms 에 떴는데 CSS 가
-//   100ms 에 도착했다 -- 껍데기를 인라인 스타일로 그려 놔도, <head> 의
-//   stylesheet 링크 하나가 그 그림까지 붙잡는다. 브라우저는 스타일이 다 오기
-//   전에는 아무것도 그리지 않기 때문이다.
-//
-//   둘. 화면 조각이 한 박자 늦게 출발한다. /jobs 를 바로 열면 본 코드가 75ms 에
-//   도착하고, 그것을 실행해 "아 JobsPage 가 필요하구나"를 안 뒤에야 그 조각을
-//   받으러 간다 -- 145ms. 왕복이 하나 더 있는 셈이고, 그 사이 화면은 비어 있다.
-//
-// 아래 플러그인이 둘 다 없앤다.
-//
-//   CSS 는 index.html 안에 넣는다. 요청이 하나 줄고, 첫 그림이 스타일을
-//   기다리지 않는다. 대신 다시 찾아온 사람이 CSS 를 캐시에서 못 쓰게 되는데,
-//   이 사이트는 화면을 옮겨도 문서를 새로 받지 않으므로(SPA) 통째 로드 자체가
-//   드물다. 처음 오는 사람 쪽을 택한다.
-//
-//   화면 조각은 주소를 보고 미리 받는다. 어느 주소에 어느 조각이 필요한지는
-//   빌드가 알고 있으므로, 그 표를 HTML 에 적어 두고 문서를 읽는 순간 함께
-//   출발시킨다.
+// 경로에 필요한 화면 조각은 문서를 읽는 즉시 미리 받는다.
+// CSS는 해시가 붙은 별도 자산으로 유지해 반복 방문과 배포 사이에 캐시한다.
 
 // 주소 -> 그 화면을 그리는 파일. 아래에서 빌드 결과와 맞춰 실제 조각 이름을 찾는다.
 const ROUTE_PAGES = [
@@ -47,18 +26,6 @@ const ROUTE_PAGES = [
   ['/jobs/:detail', 'JobDetailPage.jsx'],
 ]
 
-// CSS 를 문서 안에 넣는 것이 실제로 이득인지 둘로 갈라 재 봤다. 나머지 조건을
-// 똑같이 두고 이것만 켜고 끈 결과(각 5회 중앙값):
-//
-//              문서 안에    파일로 따로
-//   첫 화면      104ms       124ms
-//   공고 목록     80ms       104ms
-//   기술 설명     84ms       108ms
-//
-// 세 화면 모두 20~24ms 빨라진다. 방향이 일정하고 이유도 분명하다 -- 막고 있던
-// 왕복이 하나 사라진다.
-const INLINE_CSS = true
-
 function fastFirstPaint() {
   return {
     name: 'fast-first-paint',
@@ -71,19 +38,12 @@ function fastFirstPaint() {
       if (!html) return
       let source = String(html.source)
 
-      // 1) 스타일시트를 문서 안으로 옮긴다.
-      const cssFiles = INLINE_CSS
-        ? Object.values(bundle).filter((f) => f.type === 'asset' && f.fileName.endsWith('.css'))
-        : []
-      for (const css of cssFiles) {
-        const link = new RegExp(
-          `<link[^>]+href="/${css.fileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*>`,
-          'g'
-        )
-        if (!link.test(source)) continue
-        source = source.replace(link, `<style>${String(css.source)}</style>`)
-        // 문서 안에 들어갔으므로 따로 내보내지 않는다.
-        delete bundle[css.fileName]
+      // 한국어 서체 요청이 CSS 다운로드 뒤로 밀리지 않게 한다.
+      const font = Object.values(bundle).find((file) =>
+        file.type === 'asset' && /SUIT-Variable.*\\.woff2$/.test(file.fileName)
+      )
+      if (font) {
+        source = source.replace('</head>', `<link rel="preload" as="font" type="font/woff2" crossorigin href="/${font.fileName}">\\n</head>`)
       }
 
       // 2) 주소마다 필요한 조각을 미리 받게 한다.
@@ -313,4 +273,13 @@ function securityHeaders() {
 export default defineConfig({
   base: '/',
   plugins: [react(), fastFirstPaint(), securityHeaders()],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://obumqkwkvnemkyaahjbn.supabase.co',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api(?=\/|$)/, '/functions/v1/api'),
+      },
+    },
+  },
 })
