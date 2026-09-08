@@ -50,10 +50,26 @@ describe('interview frontend session model', () => {
     expect(recordingActions(session.recording)).toEqual(['pause', 'stop'])
   })
 
-  it('accepts the join-token response without retaining unrelated fields', () => {
-    expect(extractJoinCredentials({ authToken: 'participant-token' })).toEqual({
+  it('accepts the Supabase join response without retaining unrelated fields', () => {
+    expect(extractJoinCredentials({
       authToken: 'participant-token',
-      roomName: undefined,
+      projectUrl: 'https://project.supabase.co',
+      publishableKey: 'sb_publishable_test',
+      meetingId: 'meeting-1',
+      participantId: 'participant-1',
+      customParticipantId: 'custom-1',
+      displayName: '지원자',
+      role: 'candidate',
+      ignored: 'value',
+    })).toEqual({
+      authToken: 'participant-token',
+      projectUrl: 'https://project.supabase.co',
+      publishableKey: 'sb_publishable_test',
+      meetingId: 'meeting-1',
+      participantId: 'participant-1',
+      customParticipantId: 'custom-1',
+      displayName: '지원자',
+      role: 'candidate',
     })
   })
 
@@ -65,12 +81,12 @@ describe('interview frontend session model', () => {
       '/rooms/room%2Fa/interview/session%201?identity=account'
     )
     expect(recordingFilePath('room/a', 'session 1', 'recording#1', true)).toBe(
-      '/api/rooms/room%2Fa/interviews/session%201/recordings/recording%231/file?download=1'
+      '/rooms/room%2Fa/interviews/session%201/recordings/recording%231/file?download=1'
     )
     expect(
       recordingFilePath('room/a', 'session 1', 'recording#1', true, 'code')
     ).toBe(
-      '/api/rooms/room%2Fa/interviews/session%201/recordings/recording%231/file?download=1&identity=code'
+      '/rooms/room%2Fa/interviews/session%201/recordings/recording%231/file?download=1&identity=code'
     )
   })
 

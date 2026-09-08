@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { checkRateLimit, releaseRateLimit } from '../functions/_lib/rateLimit.js'
+import { checkRateLimit, releaseRateLimit } from '../server/_lib/rateLimit.js'
 
 // D1을 흉내 내는 최소한의 가짜 DB.
 // 이 모듈의 관심사는 SQL 실행이 아니라 "어떤 문장을 어떤 값으로 보내는가"이므로,

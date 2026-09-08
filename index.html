@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko">
+<html lang="ko" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -16,29 +16,12 @@
       아래 두 줄은 HTML 만으로 바로 그려진다. 리액트가 뜨면 #root 안이 통째로
       바뀌므로 따로 지울 필요가 없다.
 
-      고른 화면 색을 먼저 입힌다. 이 스크립트가 없으면 저장해 둔 어두운 화면이
-      리액트가 뜬 뒤에야 적용돼, 어두운 화면을 쓰는 사람은 매번 흰 화면이
-      번쩍인 뒤 어두워진다.
+      서비스는 검은 화면만 사용한다. HTML 단계에서부터 색을 고정해 리액트가
+      뜨기 전 흰 화면이 잠깐 보이는 일도 막는다.
     -->
-    <script>
-      ;(function () {
-        try {
-          var t = localStorage.getItem('theme')
-          if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t)
-        } catch (e) {
-          /* 저장소를 못 쓰는 브라우저에서도 화면은 떠야 한다 */
-        }
-      })()
-    </script>
     <style>
       /* 본 스타일시트가 오기 전에도 맞는 색으로 그린다. */
       :root {
-        color-scheme: light;
-        --boot-bg: #f5f5f7;
-        --boot-heading: #1d1d1f;
-        --boot-muted: #6e6e73;
-      }
-      html[data-theme='dark'] {
         color-scheme: dark;
         --boot-bg: #000;
         --boot-heading: #f5f5f7;

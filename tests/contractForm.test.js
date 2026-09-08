@@ -50,7 +50,7 @@ describe('계약서 폼 세우기', () => {
 // 폼과 저장 필드가 어긋나는 것을 여기서 잡는다.
 describe('저장 필드와 폼이 어긋나지 않는다', () => {
   it('폼의 문자열 항목은 모두 저장할 수 있는 필드다', async () => {
-    const { EDITABLE_FIELDS } = await import('../functions/_lib/contract.js')
+    const { EDITABLE_FIELDS } = await import('../server/_lib/contract.js')
     const notStored = Object.entries(EMPTY_FORM)
       .filter(([, v]) => typeof v === 'string')
       .map(([k]) => k)
@@ -59,7 +59,7 @@ describe('저장 필드와 폼이 어긋나지 않는다', () => {
   })
 
   it('휴게시간이 폼과 저장 양쪽에 있다', async () => {
-    const { EDITABLE_FIELDS } = await import('../functions/_lib/contract.js')
+    const { EDITABLE_FIELDS } = await import('../server/_lib/contract.js')
     expect(EMPTY_FORM).toHaveProperty('breakTime')
     expect(EDITABLE_FIELDS.breakTime).toBe('break_time')
   })

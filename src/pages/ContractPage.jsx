@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { api } from '../api/client.js'
+import { api, downloadApiFile } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import SignatureModal from '../components/SignatureModal.jsx'
@@ -1610,7 +1610,13 @@ export default function ContractPage() {
                   ' · 이메일 미설정(저장만 완료)'}
               </p>
               <p>
-                <a href={`/api/rooms/${roomId}/signed-contract-file`}>저장된 계약서 PDF 다운로드 →</a>
+                <button
+                  type="button"
+                  className="document-download-link"
+                  onClick={() => void downloadApiFile(`/rooms/${roomId}/signed-contract-file`).catch((err) => toast.error(err.message))}
+                >
+                  저장된 계약서 PDF 다운로드 →
+                </button>
               </p>
               {signedContract.sha256Hash && (
                 <p className="integrity-hash">

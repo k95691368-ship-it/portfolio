@@ -11,7 +11,7 @@ import {
   normalizeForCompare,
   MINIMUM_HOURLY_WAGE_2026,
   parseBreakMinutes,
-} from '../functions/_lib/contractCheck.js'
+} from '../server/_lib/contractCheck.js'
 
 describe('parseTimeToMinutes', () => {
   it('parses common time formats', () => {

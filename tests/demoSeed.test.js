@@ -18,15 +18,15 @@ import {
   EXPECTED_PENDING_MISSING,
   demoSignatureDataUrl,
   DEMO_DOMAIN,
-} from '../functions/_lib/demoSeed.js'
+} from '../server/_lib/demoSeed.js'
 import {
   checkLegalCompliance,
   findMissingFields,
   computeWeeklyHours,
-} from '../functions/_lib/contractCheck.js'
-import { checkPeriodCompliance, describeRetention } from '../functions/_lib/contractPeriod.js'
-import { checkProbationCompliance } from '../functions/_lib/probation.js'
-import { comparePostingToContract } from '../functions/_lib/postingMatch.js'
+} from '../server/_lib/contractCheck.js'
+import { checkPeriodCompliance, describeRetention } from '../server/_lib/contractPeriod.js'
+import { checkProbationCompliance } from '../server/_lib/probation.js'
+import { comparePostingToContract } from '../server/_lib/postingMatch.js'
 
 const NOW = new Date(Date.UTC(2026, 8, 15)) // 2026-09-15
 

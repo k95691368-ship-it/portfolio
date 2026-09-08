@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { onRequest as authMiddleware } from '../functions/api/_middleware.js'
+import { onRequest as authMiddleware } from '../server/api/_middleware.js'
 
 function identityDb() {
   return {

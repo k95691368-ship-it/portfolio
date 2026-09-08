@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { canonicalizeContract, contractFingerprint } from '../functions/_lib/contractDocument.js'
+import { canonicalizeContract, contractFingerprint } from '../server/_lib/contractDocument.js'
 
 const TERMS = {
   employerName: '주식회사 테스트',

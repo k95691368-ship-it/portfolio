@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { explainContract } from '../functions/_lib/contractExplainer.js'
+import { explainContract } from '../server/_lib/contractExplainer.js'
 
 const NOW = new Date(Date.UTC(2026, 6, 30))
 

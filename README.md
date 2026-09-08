@@ -54,8 +54,8 @@
 
 ## 기술 구성
 
-- **런타임** Cloudflare Pages Functions (Workers)
-- **데이터** D1 (SQLite) · R2 (첨부 파일)
+- **배포** Cloudflare Pages (정적 프런트엔드만)
+- **백엔드** Supabase Edge Functions · PostgreSQL · Storage · Realtime
 - **화면** React 19 · Vite
 - **인증** PBKDF2-SHA256, 세션 토큰은 해시로만 저장
 - **테스트** 단위 테스트 · 배포 환경 읽기 점검 · 운영 전 과정 검증
@@ -64,35 +64,26 @@
 
 ```bash
 npm install
-npx wrangler d1 migrations apply interview-platform --local
 npm run dev
 ```
 
 AI 기능을 쓰려면 Anthropic API 키가 필요합니다.
 
 ```bash
-npx wrangler pages secret put CLAUDE_API_KEY --project-name=portfolio
+Supabase 프로젝트의 Edge Function secret에 `CLAUDE_API_KEY`를 등록합니다.
 ```
 
 법령 점검 · 전자서명 · 교부 · 증명서는 API 키 없이도 동작합니다.
 
 ## 화상 면접 운영 설정
 
-화상 면접은 Cloudflare RealtimeKit과 전용 R2 버킷을 사용합니다. Pages 프로젝트에는 다음 환경 변수와 비밀값을 설정해야 합니다.
+화상·음성은 브라우저 WebRTC로 직접 연결하고, 참가자 발견과 SDP/ICE 신호는 Supabase Realtime Broadcast/Presence로 전달합니다. 녹화 파일은 브라우저에서 합성한 뒤 Supabase Storage의 만료형 서명 업로드와 TUS 재개 업로드를 통해 `interview-recordings` 비공개 버킷에 보관합니다.
 
-- 환경 변수: `CLOUDFLARE_ACCOUNT_ID`, `REALTIMEKIT_APP_ID`, `REALTIMEKIT_HOST_PRESET`, `REALTIMEKIT_INTERVIEWER_PRESET`, `REALTIMEKIT_CANDIDATE_PRESET`, `REALTIMEKIT_OBSERVER_PRESET`, `REALTIMEKIT_DIRECT_R2_PATH=interviews`
-- 비밀값: `REALTIMEKIT_API_TOKEN`
-- R2 바인딩: `INTERVIEW_RECORDINGS` → `portfolio-interview-recordings`
-
-RealtimeKit의 Recording Storage는 같은 버킷과 `interviews` 경로를 사용해야 합니다. R2에는 `interviews/` 접두사 기준 30일 만료 수명 주기를 둡니다. 운영 webhook 주소는 `/webhooks/realtimekit`이며 회의 시작·종료, 참가자 입장·퇴장, 녹화 상태 변경 이벤트를 구독합니다.
-
-역할별 preset은 다음 경계를 지킵니다.
-
-- 진행자만 녹화 제어와 연결된 회의 생성·이동 권한을 갖습니다.
-- 진행자와 등록된 면접관만 1:1 비공개 글 대화를 주고받습니다. 파일 전송은 끕니다.
-- 지원자와 참관자는 비공개 대화 및 연결된 회의 이동 권한을 갖지 않습니다.
-- RealtimeKit 자체 공개 대화, 직접 녹화, 라이브스트림은 전 역할에서 끕니다. 공개 대화는 이 서비스의 면접 기록에만 저장합니다.
-- 녹화 필수 일정은 동의 응답을 서버에 기록한 뒤에만 입장 토큰을 발급합니다. 거부한 참가자는 기존 공급자 참가자도 폐기되어 입장할 수 없습니다.
+- 진행자만 녹화를 시작·일시정지·종료할 수 있습니다.
+- 녹화 필수 일정은 현재 안내문에 동의한 참가자에게만 입장 정보를 발급합니다.
+- 면접관 협의 중에는 지원자와 면접관 사이의 송신 오디오 트랙을 끊고, 면접관 비공개 대화는 WebRTC 데이터 채널로 대상 면접관에게만 보냅니다.
+- 공개 대화는 기존 면접 기록 API를 통해 PostgreSQL에 남깁니다.
+- 녹화는 30일 보관 후 삭제하며, 파일 크기와 SHA-256 지문을 데이터베이스에 기록합니다.
 
 ## 스크립트
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { retentionUntil, renderContractDocument } from '../functions/_lib/contractArchive.js'
+import { retentionUntil, renderContractDocument } from '../server/_lib/contractArchive.js'
 
 // 보존 기간과 정본 문서.
 //

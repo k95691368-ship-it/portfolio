@@ -150,7 +150,7 @@ function apiFiles(dir, out = []) {
 }
 
 describe('서버 라우트를 한 번씩 돌려 본다', () => {
-  const files = apiFiles(join(ROOT, 'functions', 'api'))
+  const files = apiFiles(join(ROOT, 'server', 'api'))
 
   it('라우트를 찾아 낸다', () => {
     // 이 시험이 헛돌지 않는지 먼저 본다. 경로가 어긋나 파일을 하나도 못

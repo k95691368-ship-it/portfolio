@@ -10,7 +10,7 @@ import {
   blockedWhenClosed,
   normalizeCloseReason,
   CLOSABLE_STATUSES,
-} from '../functions/_lib/roomLifecycle.js'
+} from '../server/_lib/roomLifecycle.js'
 import { roomStatusInfo } from '../src/lib/roomStatus.js'
 
 describe('canClose', () => {

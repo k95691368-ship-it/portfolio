@@ -4,9 +4,9 @@
 // "어제"다. 날짜만 비교하는 자리에서 이 어긋남이 그대로 들어가면, 그 아홉 시간
 // 동안 사용자는 오늘 날짜조차 미래로 거부당한다.
 import { describe, expect, it } from 'vitest'
-import { koreanToday } from '../functions/_lib/koreanTime.js'
-import { describeContractPeriod, describeRetention } from '../functions/_lib/contractPeriod.js'
-import { describeAnnualLeave } from '../functions/_lib/workerRights.js'
+import { koreanToday } from '../server/_lib/koreanTime.js'
+import { describeContractPeriod, describeRetention } from '../server/_lib/contractPeriod.js'
+import { describeAnnualLeave } from '../server/_lib/workerRights.js'
 
 // 한국시간 2026-08-08 01:00 = UTC 2026-08-07 16:00
 const KST_EARLY_MORNING = new Date('2026-08-07T16:00:00Z')

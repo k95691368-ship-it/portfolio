@@ -5,10 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:full": "wrangler pages dev -- npm run dev",
-    "build": "vite build && npm run build:functions",
-    "//build:functions": "vite build는 프론트엔드만 본다. 서버 코드(functions/)의 import 오류는 Cloudflare에 올라간 뒤에야 드러나 배포가 통째로 실패한다. 실제로 그렇게 한 번 실패했다. 참고: Windows에서 wrangler가 컴파일 성공 후 종료 과정에서 간헐적으로 비정상 코드를 반환한다 - 'Compiled Worker successfully'가 찍혔다면 성공이다. 최종 판정은 배포 상태(wrangler pages deployment list)로 한다.",
-    "build:functions": "wrangler pages functions build --outdir=.functions-build",
+    "build": "vite build && npm run build:api",
+    "build:api": "node scripts/generate-supabase-routes.mjs && esbuild supabase/functions/api/index.ts --bundle --format=esm --platform=neutral --target=es2022 --external:npm:postgres@3.4.7 --outfile=.tmp-supabase-edge-index.js",
     "lint": "oxlint",
     "test": "vitest run --exclude tests/smoke.test.js --exclude tests/e2e.test.js",
     "smoke": "vitest run tests/smoke.test.js",
@@ -16,21 +14,21 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@cloudflare/realtimekit-react": "^2.0.2",
-    "@cloudflare/realtimekit-react-ui": "^2.0.2",
-    "@cloudflare/realtimekit-ui": "^2.0.2",
+    "@supabase/supabase-js": "^2.57.4",
     "@sun-typeface/suit": "2.0.5",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1",
-    "signature_pad": "^5.1.3"
+    "signature_pad": "^5.1.3",
+    "tus-js-client": "^4.3.1"
   },
   "devDependencies": {
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
+    "esbuild": "^0.28.1",
     "oxlint": "^1.71.0",
     "vite": "^8.1.1",
     "vitest": "^3.2.7",

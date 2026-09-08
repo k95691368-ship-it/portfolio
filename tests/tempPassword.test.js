@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { genTempPassword } from '../functions/_lib/tempPassword.js'
+import { genTempPassword } from '../server/_lib/tempPassword.js'
 
 const ALLOWED = /^[ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789]+$/
 

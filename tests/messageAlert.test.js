@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { shouldEmailCandidate } from '../functions/_lib/messageAlert.js'
+import { shouldEmailCandidate } from '../server/_lib/messageAlert.js'
 
 // 지원자에게 메일을 보낼 것인가.
 //

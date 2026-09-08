@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mergeValue, mergeSocialInsurance } from '../functions/_lib/merge.js'
+import { mergeValue, mergeSocialInsurance } from '../server/_lib/merge.js'
 
 describe('mergeValue', () => {
   it('keeps the new value when it is present', () => {

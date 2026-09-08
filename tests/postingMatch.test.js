@@ -3,7 +3,7 @@ import {
   comparePostingToContract,
   postingWageToMonthly,
   wageTypeLabel,
-} from '../functions/_lib/postingMatch.js'
+} from '../server/_lib/postingMatch.js'
 
 const POSTING = {
   wageType: 'monthly',

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canManageRecruiting, canManagePosting } from '../functions/_lib/recruiter.js'
+import { canManageRecruiting, canManagePosting } from '../server/_lib/recruiter.js'
 
 describe('canManageRecruiting', () => {
   it('allows admins and recruiters', () => {

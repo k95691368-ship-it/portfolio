@@ -4,7 +4,7 @@
 // 사용자가 할 수 있는 일은 적혀 있지 않으며, 운영자의 결제 상태를 지나가는
 // 사람 모두에게 알린다.
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { analyzeConversation } from '../functions/_lib/claude.js'
+import { analyzeConversation } from '../server/_lib/claude.js'
 
 const ENV = { CLAUDE_API_KEY: 'test-key' }
 const TRANSCRIPT = '회사: 안녕하세요\n지원자: 안녕하세요'

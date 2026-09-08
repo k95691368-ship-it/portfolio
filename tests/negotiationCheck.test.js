@@ -9,7 +9,7 @@ import {
   pendingAgreements,
   checkNegotiatedTerms,
   candidateRequests,
-} from '../functions/_lib/negotiationCheck.js'
+} from '../server/_lib/negotiationCheck.js'
 
 const row = (field, value, extra = {}) => ({ field, value, ...extra })
 

@@ -4,7 +4,7 @@ import {
   isValidEmail,
   validateApplication,
   normalizeCareer,
-} from '../functions/_lib/application.js'
+} from '../server/_lib/application.js'
 
 describe('parseBool', () => {
   it('treats common truthy string forms as true', () => {

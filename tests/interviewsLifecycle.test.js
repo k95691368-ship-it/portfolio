@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { onRequestPost as closeRoom } from '../functions/api/rooms/[roomId]/close.js'
-import { onRequestPost as archiveRoom } from '../functions/api/rooms/[roomId]/archive.js'
+import { onRequestPost as closeRoom } from '../server/api/rooms/[roomId]/close.js'
+import { onRequestPost as archiveRoom } from '../server/api/rooms/[roomId]/archive.js'
 
 function lifecycleDb() {
   const writes = []

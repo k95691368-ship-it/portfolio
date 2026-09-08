@@ -45,3 +45,8 @@ dist-ssr
 .claude/
 .codex/
 .perfprobe/
+
+# 로컬 마이그레이션 중간 산출물. 실제 사용자 데이터와 번들된 서버 코드가
+# 포함될 수 있으므로 저장소에 올리지 않는다.
+.tmp-*
+/supabase/.temp/

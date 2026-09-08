@@ -11,7 +11,7 @@ import {
   blockedWhenArchived,
   blockedWhenFrozen,
   blockedWhenClosed,
-} from '../functions/_lib/roomLifecycle.js'
+} from '../server/_lib/roomLifecycle.js'
 
 const room = (over = {}) => ({ status: 'active', archived_at: null, ...over })
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatKstDate } from '../lib/formatTime.js'
 import { Link } from 'react-router-dom'
-import { api, markRoomDoor } from '../api/client.js'
+import { api, downloadApiFile, markRoomDoor } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import NotificationBell from '../components/NotificationBell.jsx'
@@ -237,9 +237,13 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
                 <ul className="doc-download-list">
                   {detail.documents.map((d) => (
                     <li key={d.id}>
-                      <a href={`/api/applications/${appId}/doc/${d.id}`}>
+                      <button
+                        type="button"
+                        className="document-download-link"
+                        onClick={() => void downloadApiFile(`/applications/${appId}/doc/${d.id}`).catch((err) => toast.error(err.message))}
+                      >
                         {d.docType === 'resume' ? '이력서' : '포트폴리오'}: {d.filename}
-                      </a>
+                      </button>
                     </li>
                   ))}
                 </ul>

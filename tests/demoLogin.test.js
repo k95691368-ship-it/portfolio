@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { DEMO_ACCOUNTS, DEMO_DOMAIN } from '../functions/_lib/demoSeed.js'
-import { onRequestPost } from '../functions/api/demo/login.js'
+import { DEMO_ACCOUNTS, DEMO_DOMAIN } from '../server/_lib/demoSeed.js'
+import { onRequestPost } from '../server/api/demo/login.js'
 
 // 이 경로는 비밀번호 없이 세션을 만들어 준다. 이 앱에서 가장 위험한 문이다.
 // 열 수 있는 대상이 체험 계정으로만 한정되는지 여기서 못박는다.

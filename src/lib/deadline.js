@@ -4,7 +4,7 @@
 // 알 수 있고, 오늘까지인 공고와 두 달 남은 공고가 똑같아 보인다.
 // 남은 날을 대신 세어 준다.
 
-import { koreanToday } from '../../functions/_lib/koreanTime.js'
+import { koreanToday } from '../../server/_lib/koreanTime.js'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 export const DEADLINE_SOON_DAYS = 7

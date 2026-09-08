@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { webcrypto } from 'node:crypto'
-import { sendPush, vapidConfigured } from '../functions/_lib/webPush.js'
+import { sendPush, vapidConfigured } from '../server/_lib/webPush.js'
 
 // 웹 푸시는 눈에 보이지 않는 곳에서 두 가지를 한다 -- 서명과 암호화.
 // 둘 중 하나만 어긋나도 밀어 주는 서버가 조용히 거절하고, 알림은 그냥

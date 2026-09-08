@@ -3,7 +3,7 @@ import {
   normalizePostingConditions,
   postingConditionsFromRow,
   WAGE_TYPES,
-} from '../functions/_lib/postingConditions.js'
+} from '../server/_lib/postingConditions.js'
 
 describe('normalizePostingConditions', () => {
   it('아무것도 적지 않아도 통과한다 (모두 선택 항목)', () => {

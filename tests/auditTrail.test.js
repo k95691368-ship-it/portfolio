@@ -3,8 +3,8 @@ import {
   summarizeUserAgent,
   describeSigningEnvironment,
   buildAuditEvents,
-} from '../functions/_lib/auditTrail.js'
-import { mapRequestRow } from '../functions/_lib/changeRequests.js'
+} from '../server/_lib/auditTrail.js'
+import { mapRequestRow } from '../server/_lib/changeRequests.js'
 
 describe('summarizeUserAgent', () => {
   it('브라우저와 운영체제만 뽑아낸다', () => {

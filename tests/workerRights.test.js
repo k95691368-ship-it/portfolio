@@ -10,7 +10,7 @@ import {
   describeOvertimeRates,
   ordinaryWageBase,
   describeWorkerRights,
-} from '../functions/_lib/workerRights.js'
+} from '../server/_lib/workerRights.js'
 
 const NOW = new Date(Date.UTC(2026, 8, 15)) // 2026-09-15
 

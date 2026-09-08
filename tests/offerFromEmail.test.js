@@ -1,7 +1,7 @@
 // 채용내정의 성립 시점은 회사가 "채용하겠다"는 뜻을 알린 때다.
 // 그 알림의 가장 전형적인 형태가 최종합격 통보 메일이다.
 import { describe, expect, it } from 'vitest'
-import { offerExcerptFromEmail } from '../functions/_lib/offerFromEmail.js'
+import { offerExcerptFromEmail } from '../server/_lib/offerFromEmail.js'
 
 describe('메일 발송을 확정의 근거로 남기기', () => {
   // 나중에 "언제 무엇으로 확정됐는가"를 다투는 자리에서 읽히는 문장이다.

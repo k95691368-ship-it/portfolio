@@ -1,74 +1,43 @@
 :root {
-  --text: #4e5968;
-  --text-h: #191f28;
-  /* 흰 바탕에서 작은 글씨도 읽히도록 (WCAG AA 4.5:1). 이전 값은 3.2:1이었다. */
-  --text-muted: #6b7684;
-  --bg: #fff;
-  --surface: #f2f4f6;
-  /* 고르는 칸처럼 면 하나가 화면을 대표하는 자리에 쓴다. --surface 는 흰
-     바탕과 너무 가까워 칸의 경계가 흐렸다. 여기만 한 단계 진하게 둔다. */
-  --surface-strong: #e8ecf2;
-  --border: #e5e8eb;
-  --code-bg: #f2f4f6;
-  /* 기본 버튼의 면과 테두리.
-     면에 --surface(#f2f4f6)를 쓰고 테두리를 두지 않아, 흰 바탕과의 대비가
-     1.06:1 이었다. 글자는 읽히는데 버튼의 경계가 보이지 않아서 무엇이
-     눌리는 것인지 알 수 없었다. 테두리는 흰 바탕에 3:1 이상으로 둔다
-     (WCAG 1.4.11 — 조작 요소의 경계는 글자와 같은 기준으로 보여야 한다). */
-  --btn-face: #eceff3;
-  --btn-face-hover: #dee3e9;
-  --btn-border: #8b95a1;
-  /* --success / --danger 는 면과 테두리용이다. 밝은 화면에서 그대로 글자색으로
-     쓰면 흰 바탕 대비가 2.1:1(초록), 3.7:1(빨강)까지 떨어진다. 서명 직전
-     최종 확인처럼 "무엇이 바뀌었는가"를 읽어야 하는 자리에서 그 글자가 가장
-     안 보였다. 글자 전용 색을 따로 둔다. */
-  --success-text: #00734c;
-  --danger-text: #c11b2a;
-  --warning-text: #8a5300;
-  /* 강조색 면 위에 얹는 글자색. 밝은 화면에서 --accent는 진한 파랑이라 흰 글자가
-     읽히지만, 어두운 화면에서는 --accent가 밝아지므로 이 값도 함께 뒤집힌다. */
+  color-scheme: dark;
+  --text: #b0b8c1;
+  --text-h: #f2f4f6;
+  --text-muted: #98a2ad;
+  --bg: #000;
+  --surface: #1d1d1f;
+  --surface-strong: #2c2c2e;
+  --border: #424245;
+  --code-bg: #2c2c2e;
+  --btn-face: #2c2c2e;
+  --btn-face-hover: #3a3a3c;
+  --btn-border: #6a6a7a;
+  --accent: #2997ff;
+  --accent-bg: rgba(41, 151, 255, 0.14);
+  --accent-border: rgba(41, 151, 255, 0.45);
+  --accent-hover: #40a9ff;
+  --danger: #ff6b76;
+  --danger-bg: rgba(255, 107, 118, 0.14);
+  --danger-border: rgba(255, 107, 118, 0.4);
+  --success: #2ee08f;
+  --success-bg: rgba(46, 224, 143, 0.14);
+  --success-border: rgba(46, 224, 143, 0.4);
+  --warning: #ffb84d;
+  --warning-bg: rgba(255, 184, 77, 0.14);
+  --warning-border: rgba(255, 184, 77, 0.4);
+  --danger-text: #ff8e97;
+  --success-text: #4ee7a2;
+  --warning-text: #ffc670;
   --on-accent: #fff;
-  /* 토스트는 어느 화면에서든 같은 색 면 위에 흰 글자를 얹는다 */
   --toast-text: #fff;
   --toast-success: #00875a;
   --toast-danger: #cf2637;
   --toast-info: #2b2f36;
-  --toast-border: transparent;
-  --overlay: rgba(15, 23, 42, 0.5);
+  --toast-border: rgba(255, 255, 255, 0.22);
+  --overlay: rgba(0, 0, 0, 0.66);
+  --social-bg: rgba(255, 255, 255, 0.04);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow: rgba(0, 0, 0, 0.6) 0 10px 15px -3px, rgba(0, 0, 0, 0.4) 0 4px 6px -2px;
 
-  --accent: #0064ff;
-  --accent-bg: rgba(0, 100, 255, 0.08);
-  --accent-border: rgba(0, 100, 255, 0.35);
-  --accent-hover: #0052d6;
-
-  --danger: #f04452;
-  --danger-bg: rgba(240, 68, 82, 0.08);
-  --danger-border: rgba(240, 68, 82, 0.3);
-
-  --success: #00c471;
-  --success-bg: rgba(0, 196, 113, 0.08);
-  --success-border: rgba(0, 196, 113, 0.3);
-
-  --warning: #ff9f1a;
-  --warning-bg: rgba(255, 159, 26, 0.1);
-  --warning-border: rgba(255, 159, 26, 0.35);
-
-  /* 면·테두리에 쓰는 색을 그대로 글자에 쓰면 옅은 바탕에서 읽히지 않는다.
-     글자로 쓸 때는 아래 값을 쓴다. */
-  --danger-text: #d0323f;
-  --success-text: #00885a;
-  --warning-text: #a35c00;
-
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.08);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
-
-  /* 모서리.
-     기본이 알약(9999px)이었다. 알약 버튼은 눈에 띄지만 여러 개가 나란히
-     서면 전부 똑같이 떠 보여, 무엇이 주된 행동인지 사라진다. 실제로 첫
-     화면에 파란 알약이 둘 나란히 서 있었다.
-     면의 크기에 따라 모서리를 다르게 준다 -- 큰 면일수록 크게. */
   --r-xs: 8px;
   --r-sm: 10px;
   --r-md: 12px;
@@ -78,8 +47,6 @@
   --radius-sm: 10px;
   --radius-full: 9999px;
 
-  /* 세로 리듬. 4의 배수로만 띄운다. 눈금이 하나면 화면끼리 간격이 어긋나지
-     않는다. */
   --gap-1: 4px;
   --gap-2: 8px;
   --gap-3: 12px;
@@ -88,16 +55,9 @@
   --gap-6: 24px;
   --gap-8: 32px;
   --gap-10: 40px;
-  /* 화면 좌우 여백. 모바일에서 이 값 하나로 모든 화면이 같은 선에 선다. */
   --page-x: 20px;
-
-  /* 누를 수 있는 것의 높이. 손가락이 닿는 크기를 밑돌지 않게 한다. */
   --tap: 48px;
   --tap-lg: 56px;
-
-  /* Apple SD Gothic Neo와 비슷한 글자 밀도를 목표로 설계된 SUIT를
-     주 서체로 쓴다. 현대 한글 11,172자를 모두 담은 가변 파일을
-     직접 배포해 Windows와 Apple 기기에서 같은 자형으로 보인다. */
   --font-apple:
     'SUIT Variable', SUIT, -apple-system, BlinkMacSystemFont,
     'SF Pro Text', 'SF Pro Display', 'Apple SD Gothic Neo', 'Helvetica Neue',
@@ -111,7 +71,6 @@
 
   font: 18px/145% var(--sans);
   letter-spacing: 0;
-  color-scheme: light;
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
@@ -124,112 +83,21 @@
   }
 }
 
-/* 어두운 화면.
-   기기 설정이 어두움이면 따라가고, 사용자가 직접 고르면 그 선택이 이긴다.
-   (선택은 <html data-theme="..."> 로 표시된다) */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    color-scheme: dark;
-
-    --text: #b0b8c1;
-    --text-h: #f2f4f6;
-    --text-muted: #98a2ad;
-    --bg: #17171c;
-    --surface: #23232a;
-    --surface-strong: #2c2c36;
-    --border: #33333d;
-    --code-bg: #23232a;
-    --btn-face: #2b2b34;
-    --btn-face-hover: #383843;
-    --btn-border: #6a6a7a;
-    /* 어두운 화면에서는 원래 색이 밝아서 그대로 써도 대비가 선다. */
-    --success-text: var(--success);
-    --danger-text: var(--danger);
-    --warning-text: var(--warning);
-
-    --accent: #4d94ff;
-    --accent-bg: rgba(77, 148, 255, 0.14);
-    --accent-border: rgba(77, 148, 255, 0.45);
-    --accent-hover: #6ba6ff;
-
-    --danger: #ff6b76;
-    --danger-bg: rgba(255, 107, 118, 0.14);
-    --danger-border: rgba(255, 107, 118, 0.4);
-
-    --success: #2ee08f;
-    --success-bg: rgba(46, 224, 143, 0.14);
-    --success-border: rgba(46, 224, 143, 0.4);
-
-    --warning: #ffb84d;
-    --warning-bg: rgba(255, 184, 77, 0.14);
-    --warning-border: rgba(255, 184, 77, 0.4);
-
-    /* 어두운 바탕에서는 밝은 쪽이 잘 읽힌다 */
-    --danger-text: #ff8e97;
-    --success-text: #4ee7a2;
-    --warning-text: #ffc670;
-
-    /* 어두운 화면에서는 강조색이 밝아지므로, 그 위의 글자는 어두워야 읽힌다.
-       (흰 글자는 2.6:1로 미달, 이 값은 7.5:1) */
-    --on-accent: #10131a;
-    --toast-border: rgba(255, 255, 255, 0.22);
-    --overlay: rgba(0, 0, 0, 0.66);
-
-    --social-bg: rgba(255, 255, 255, 0.04);
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
-    --shadow: rgba(0, 0, 0, 0.6) 0 10px 15px -3px, rgba(0, 0, 0, 0.4) 0 4px 6px -2px;
-  }
+.document-download-link {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent, #2997ff);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
 }
 
-:root[data-theme='dark'] {
-  color-scheme: dark;
-
-  --text: #b0b8c1;
-  --text-h: #f2f4f6;
-  --text-muted: #98a2ad;
-  --bg: #17171c;
-  --surface: #23232a;
-  --surface-strong: #2c2c36;
-  --border: #33333d;
-  --code-bg: #23232a;
-  --btn-face: #2b2b34;
-  --btn-face-hover: #383843;
-  --btn-border: #6a6a7a;
-  /* 어두운 화면에서는 원래 색이 밝아서 그대로 써도 대비가 선다. */
-  --success-text: var(--success);
-  --danger-text: var(--danger);
-  --warning-text: var(--warning);
-
-  --accent: #4d94ff;
-  --accent-bg: rgba(77, 148, 255, 0.14);
-  --accent-border: rgba(77, 148, 255, 0.45);
-  --accent-hover: #6ba6ff;
-
-  --danger: #ff6b76;
-  --danger-bg: rgba(255, 107, 118, 0.14);
-  --danger-border: rgba(255, 107, 118, 0.4);
-
-  --success: #2ee08f;
-  --success-bg: rgba(46, 224, 143, 0.14);
-  --success-border: rgba(46, 224, 143, 0.4);
-
-  --warning: #ffb84d;
-  --warning-bg: rgba(255, 184, 77, 0.14);
-  --warning-border: rgba(255, 184, 77, 0.4);
-
-  --danger-text: #ff8e97;
-  --success-text: #4ee7a2;
-  --warning-text: #ffc670;
-
-  /* 어두운 화면에서는 강조색이 밝아지므로, 그 위의 글자는 어두워야 읽힌다.
-     (흰 글자는 2.6:1로 미달, 이 값은 7.5:1) */
-  --on-accent: #10131a;
-  --toast-border: rgba(255, 255, 255, 0.22);
-  --overlay: rgba(0, 0, 0, 0.66);
-
-  --social-bg: rgba(255, 255, 255, 0.04);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
-  --shadow: rgba(0, 0, 0, 0.6) 0 10px 15px -3px, rgba(0, 0, 0, 0.4) 0 4px 6px -2px;
+.document-download-link:hover {
+  text-decoration: underline;
 }
 
 * {

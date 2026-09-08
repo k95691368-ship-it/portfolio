@@ -8,7 +8,7 @@ import {
   checkDocumentConsistency,
   checkRequiredArticles,
   checkContractDocument,
-} from '../functions/_lib/documentCheck.js'
+} from '../server/_lib/documentCheck.js'
 
 const TERMS = {
   employerName: '주식회사 테스트',

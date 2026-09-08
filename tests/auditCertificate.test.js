@@ -9,7 +9,7 @@ import {
   canonicalizeCertificate,
   certificateFingerprint,
   verifyCertificate,
-} from '../functions/_lib/auditCertificate.js'
+} from '../server/_lib/auditCertificate.js'
 
 describe('발급번호', () => {
   it('AC-XXXX-XXXX-XXXX 형식으로 만든다', () => {

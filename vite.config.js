@@ -169,26 +169,15 @@ const ANALYTICS = {
   img: ['https://www.google-analytics.com', 'https://*.google-analytics.com', 'https://*.clarity.ms'],
 }
 
-// RealtimeKit 브라우저 SDK가 직접 닿는 곳. 관리 API 토큰은 서버에서만 쓰고,
-// 화면에는 참가자용 단기 토큰만 내려간다. 와일드카드 하나로 열지 않고 공식
-// 허용 목록의 서비스별 주소만 적는다.
-const REALTIMEKIT = {
+// 정적 화면은 API와 면접 신호를 Supabase에만 보낸다. 프로젝트 주소를 정확히
+// 고정해 다른 Supabase 프로젝트로 개인정보가 빠져나갈 여지를 만들지 않는다.
+const SUPABASE = {
   connect: [
-    'https://api.realtime.cloudflare.com',
-    'https://api-silos.realtime.cloudflare.com',
-    'https://da-collector.realtime.cloudflare.com',
-    'https://location.realtime.cloudflare.com',
-    'https://r2.cloudflarestorage.com',
-    'https://*.r2.cloudflarestorage.com',
-    'https://socket-edge.realtime.cloudflare.com',
-    'wss://socket-edge.realtime.cloudflare.com',
-    'https://rtk-assets.realtime.cloudflare.com',
-    'https://rtk-uploads.realtime.cloudflare.com',
+    'https://obumqkwkvnemkyaahjbn.supabase.co',
+    'https://obumqkwkvnemkyaahjbn.storage.supabase.co',
+    'wss://obumqkwkvnemkyaahjbn.supabase.co',
   ],
-  asset: [
-    'https://rtk-assets.realtime.cloudflare.com',
-    'https://rtk-uploads.realtime.cloudflare.com',
-  ],
+  media: ['https://obumqkwkvnemkyaahjbn.supabase.co'],
 }
 
 // 일부러 허용하지 않는 것: c.bing.com
@@ -237,7 +226,7 @@ function securityHeaders() {
         "style-src 'self' 'unsafe-inline'",
         `img-src 'self' data: blob: ${ANALYTICS.img.join(' ')}`,
         "font-src 'self' data:",
-        `connect-src 'self' ${ANALYTICS.connect.join(' ')}`,
+        `connect-src 'self' ${SUPABASE.connect.join(' ')} ${ANALYTICS.connect.join(' ')}`,
         // 일반 화면의 서비스워커는 우리 것만 허용한다.
         "worker-src 'self'",
         // 액자에 넣지 못하게. 클릭재킹을 막는 자리다.
@@ -253,14 +242,14 @@ function securityHeaders() {
 
       const interviewCsp = [
         "default-src 'self'",
-        // 면접 문서는 분석 스크립트를 로드하지 않는다. RTK SDK도 번들 안에 있다.
+        // 면접 화면에는 분석 스크립트를 로드하지 않는다.
         `script-src 'self' ${hashes.join(' ')}`,
         "style-src 'self' 'unsafe-inline'",
-        `img-src 'self' data: blob: ${REALTIMEKIT.asset.join(' ')}`,
+        "img-src 'self' data: blob:",
         "font-src 'self' data:",
-        `connect-src 'self' ${REALTIMEKIT.connect.join(' ')}`,
-        `media-src 'self' blob: ${REALTIMEKIT.asset.join(' ')}`,
-        // RealtimeKit은 오디오 처리용 blob worker를 만들 수 있다.
+        `connect-src 'self' ${SUPABASE.connect.join(' ')}`,
+        `media-src 'self' blob: ${SUPABASE.media.join(' ')}`,
+        // 녹화 합성과 오디오 처리는 브라우저의 blob worker를 쓸 수 있다.
         "worker-src 'self' blob:",
         "frame-ancestors 'none'",
         "frame-src 'none'",

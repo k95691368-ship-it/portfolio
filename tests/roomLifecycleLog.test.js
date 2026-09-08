@@ -4,8 +4,8 @@
 // "종료했다가 되돌렸다"는 사실이 흔적 없이 사라진다. 채용절차법 제10조의
 // 고지 사실과, 보존 기간 3년의 기산일이 걸린 자리다.
 import { describe, expect, it } from 'vitest'
-import { LIFECYCLE_ACTIONS, lifecycleEvents } from '../functions/_lib/roomLifecycleLog.js'
-import { buildAuditEvents } from '../functions/_lib/auditTrail.js'
+import { LIFECYCLE_ACTIONS, lifecycleEvents } from '../server/_lib/roomLifecycleLog.js'
+import { buildAuditEvents } from '../server/_lib/auditTrail.js'
 
 const ROOM = { id: 'r1', title: '백엔드 개발자 계약', created_at: '2026-08-01 09:00:00', status: 'closed' }
 

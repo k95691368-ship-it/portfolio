@@ -3,7 +3,7 @@ import {
   describeApplicationProgress,
   sortMyApplications,
   STEP_KEYS,
-} from '../functions/_lib/applicationProgress.js'
+} from '../server/_lib/applicationProgress.js'
 
 function stateOf(progress, key) {
   return progress.steps.find((s) => s.key === key).state

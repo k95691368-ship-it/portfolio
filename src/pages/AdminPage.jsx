@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useDm } from '../context/DmContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
-import { api } from '../api/client.js'
+import { api, downloadApiFile } from '../api/client.js'
 import { roomStatusInfo } from '../lib/roomStatus.js'
 import Modal from '../components/Modal.jsx'
 import { formatKst, formatKstDate } from '../lib/formatTime.js'
@@ -533,9 +533,13 @@ export default function AdminPage() {
                   </td>
                   <td>{c.certificateSerial || '—'}</td>
                   <td>
-                    <a className="btn-sm" href={`/api/admin/contracts/${c.id}/file`}>
+                    <button
+                      type="button"
+                      className="btn-sm"
+                      onClick={() => void downloadApiFile(`/admin/contracts/${c.id}/file`).catch((err) => toast.error(err.message))}
+                    >
                       내려받기
-                    </a>
+                    </button>
                   </td>
                 </tr>
               ))}

@@ -8,7 +8,7 @@ import {
   extractTermsFromMessage,
   selectNewEntries,
   describeNegotiation,
-} from '../functions/_lib/termsNegotiation.js'
+} from '../server/_lib/termsNegotiation.js'
 
 const read = (body) => extractTermsFromMessage({ body }, { year: 2026 })
 const fieldsOf = (body) => read(body).map((e) => e.field)

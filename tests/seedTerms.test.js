@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { seedTermsFromApplication, hasSeedValues } from '../functions/_lib/seedTerms.js'
+import { seedTermsFromApplication, hasSeedValues } from '../server/_lib/seedTerms.js'
 
 const POSTING = {
   title: 'AX 프로젝트 매니저',

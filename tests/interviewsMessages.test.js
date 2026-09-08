@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   onRequestGet as getMessages,
   onRequestPost as postMessage,
-} from '../functions/api/rooms/[roomId]/messages.js'
+} from '../server/api/rooms/[roomId]/messages.js'
 
 function messageDb({ videoRole = 'interviewer', messages = [] } = {}) {
   const calls = []

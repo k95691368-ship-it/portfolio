@@ -3,7 +3,7 @@ import {
   rowToCamelTerms,
   buildArticlesFromTerms,
   buildArticlesForTranslation,
-} from '../functions/_lib/contract.js'
+} from '../server/_lib/contract.js'
 
 describe('rowToCamelTerms', () => {
   it('returns null for a falsy row', () => {

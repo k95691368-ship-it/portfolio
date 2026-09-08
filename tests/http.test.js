@@ -1,6 +1,6 @@
 // 내려받는 파일의 이름과, 개인정보 응답의 캐시 지시.
 import { describe, expect, it } from 'vitest'
-import { contentDisposition, isAppFetch, jsonResponse } from '../functions/_lib/http.js'
+import { contentDisposition, isAppFetch, jsonResponse } from '../server/_lib/http.js'
 
 describe('contentDisposition', () => {
   // 한글 이름이 퍼센트 인코딩된 채로 저장되면, 자기 이력서를 내려받고도

@@ -226,10 +226,28 @@ export function extractJoinCredentials(payload) {
   if (!payload || typeof payload !== 'object') return null
   const source = payload.participant ?? payload.credentials ?? payload
   const authToken = firstDefined(source.authToken, source.auth_token, source.token)
-  if (!authToken || typeof authToken !== 'string') return null
+  const projectUrl = firstDefined(source.projectUrl, source.project_url)
+  const publishableKey = firstDefined(source.publishableKey, source.publishable_key)
+  const meetingId = firstDefined(source.meetingId, source.meeting_id)
+  const participantId = firstDefined(source.participantId, source.participant_id)
+  if (
+    ![authToken, projectUrl, publishableKey, meetingId, participantId].every(
+      (value) => typeof value === 'string' && value
+    )
+  ) return null
   return {
     authToken,
-    roomName: firstDefined(source.roomName, source.room_name, payload.roomName, payload.room_name),
+    projectUrl,
+    publishableKey,
+    meetingId,
+    participantId,
+    customParticipantId: firstDefined(
+      source.customParticipantId,
+      source.custom_participant_id,
+      participantId
+    ),
+    displayName: firstDefined(source.displayName, source.display_name, '참가자'),
+    role: firstDefined(source.role, 'candidate'),
   }
 }
 
@@ -277,7 +295,7 @@ export function recordingFilePath(
   download = false,
   identity = ''
 ) {
-  const path = `/api/rooms/${encodeURIComponent(roomId)}/interviews/${encodeURIComponent(
+  const path = `/rooms/${encodeURIComponent(roomId)}/interviews/${encodeURIComponent(
     sessionId
   )}/recordings/${encodeURIComponent(recordingId)}/file`
   const params = new URLSearchParams()

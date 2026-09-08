@@ -2,7 +2,7 @@
 // SQL 에만 걸어 두면, 미룰 필요가 없는 요청에서도 쓰기가 한 번씩 나간다.
 // 로그인한 사람의 모든 요청마다 UPDATE 를 쏘는 셈이었다.
 import { describe, expect, it } from 'vitest'
-import { needsRenewal, wasPersistentSession } from '../functions/_lib/auth.js'
+import { needsRenewal, wasPersistentSession } from '../server/_lib/auth.js'
 
 const DAY = 24 * 60 * 60 * 1000
 const iso = (ms) => new Date(ms).toISOString()

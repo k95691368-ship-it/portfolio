@@ -5,7 +5,7 @@ import {
   toComparable,
   rankApplicants,
   summarizeRanking,
-} from '../functions/_lib/ranking.js'
+} from '../server/_lib/ranking.js'
 
 const NOW = new Date(Date.UTC(2026, 8, 15)) // 2026-09-15 기준으로 고정
 

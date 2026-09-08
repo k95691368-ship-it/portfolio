@@ -28,13 +28,14 @@ function formatRetentionDate(value) {
 function RecordingResult({ roomId, session, onRecordingChanged }) {
   const [retrying, setRetrying] = useState(false)
   const [retryError, setRetryError] = useState('')
+  const [videoUrl, setVideoUrl] = useState('')
+  const [fileError, setFileError] = useState('')
+  const [downloading, setDownloading] = useState(false)
   const recording = session?.recording
-  if (!recording?.id || recording.status === 'idle') return null
-
-  const expired = recording.expired || recording.status === 'deleted'
-  const storageFailed = recording.storageStatus === 'copy_failed'
+  const expired = recording?.expired || recording?.status === 'deleted'
+  const storageFailed = recording?.storageStatus === 'copy_failed'
   const canPlay = Boolean(
-    recording.status === 'available' &&
+    recording?.status === 'available' &&
       recording.available !== false &&
       !expired &&
       !storageFailed &&
@@ -54,7 +55,30 @@ function RecordingResult({ roomId, session, onRecordingChanged }) {
 
   const selectedDoor = roomDoorFor(roomId)
   const identity = selectedDoor === 'code' || selectedDoor === 'account' ? selectedDoor : ''
-  const filePath = recordingFilePath(roomId, session.id, recording.id, false, identity)
+  const filePath = recording?.id
+    ? recordingFilePath(roomId, session.id, recording.id, false, identity)
+    : ''
+
+  useEffect(() => {
+    if (!canPlay || !filePath) {
+      setVideoUrl('')
+      return undefined
+    }
+    let current = true
+    const separator = filePath.includes('?') ? '&' : '?'
+    void api.get(`${filePath}${separator}signed=1`)
+      .then((response) => {
+        if (current) setVideoUrl(response?.url || '')
+      })
+      .catch((caught) => {
+        if (current) setFileError(caught.message)
+      })
+    return () => {
+      current = false
+    }
+  }, [canPlay, filePath])
+
+  if (!recording?.id || recording.status === 'idle') return null
 
   const retryStorage = async () => {
     if (!recording?.id || retrying) return
@@ -73,6 +97,22 @@ function RecordingResult({ roomId, session, onRecordingChanged }) {
     }
   }
 
+  const downloadRecording = async () => {
+    if (!filePath || downloading) return
+    setDownloading(true)
+    setFileError('')
+    try {
+      const separator = filePath.includes('?') ? '&' : '?'
+      const response = await api.get(`${filePath}${separator}signed=1&download=1`)
+      if (!response?.url) throw new Error('녹화 파일 주소를 받지 못했습니다.')
+      window.location.assign(response.url)
+    } catch (caught) {
+      setFileError(caught.message)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
   return (
     <section className="interview-recording-result" aria-label="최근 녹화">
       <div className="interview-recording-result__heading">
@@ -84,17 +124,24 @@ function RecordingResult({ roomId, session, onRecordingChanged }) {
       </div>
       {canPlay && (
         <>
-          <video controls preload="metadata" src={filePath}>
-            이 브라우저에서는 녹화 영상을 재생할 수 없습니다.
-          </video>
-          <a
+          {videoUrl ? (
+            <video controls preload="metadata" src={videoUrl}>
+              이 브라우저에서는 녹화 영상을 재생할 수 없습니다.
+            </video>
+          ) : (
+            <p className="interview-panel-status">녹화 영상을 불러오는 중입니다.</p>
+          )}
+          <button
+            type="button"
             className="interview-recording-download"
-            href={recordingFilePath(roomId, session.id, recording.id, true, identity)}
+            disabled={downloading}
+            onClick={() => void downloadRecording()}
           >
-            녹화 파일 다운로드
-          </a>
+            {downloading ? '다운로드 준비 중…' : '녹화 파일 다운로드'}
+          </button>
         </>
       )}
+      {fileError && <p className="interview-member-error" role="alert">{fileError}</p>}
       {storageFailed && session.myRole === 'host' && (
         <div className="interview-recording-retry">
           <button type="button" disabled={retrying} onClick={retryStorage}>

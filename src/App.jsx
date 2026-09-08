@@ -10,7 +10,6 @@ import PageViewTracker from './components/PageViewTracker.jsx'
 import DmDock from './components/DmDock.jsx'
 import DmLink from './components/DmLink.jsx'
 import DemoMenu from './components/DemoMenu.jsx'
-import ThemeToggle from './components/ThemeToggle.jsx'
 import './App.css'
 import './redesign.css'
 
@@ -67,8 +66,7 @@ function App() {
           면접방이나 계약서 화면에 코드로 바로 들어온 사람은 자기가 어느
           서비스에 있는지 알 방법이 없었다.
 
-          화면 색 버튼도 여기로 들인다. 오른쪽 아래에 동그라미로 떠 있어
-          맨 밑의 버튼을 가리고 있었다. */}
+          검은 화면 하나만 사용하므로 화면 색 전환은 두지 않는다. */}
       {!isInterview && (
         <header className="app-bar">
           <BrandLogo />
@@ -103,7 +101,6 @@ function App() {
               관리자 패널
             </Link>
           )}
-          <ThemeToggle className="app-bar-theme" />
           <details className="mobile-nav">
             <summary aria-label="메뉴">
               <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">

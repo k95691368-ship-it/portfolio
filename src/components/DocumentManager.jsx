@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { api } from '../api/client.js'
+import { api, downloadApiFile } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
 
 const LABELS = { resume: '이력서', cover_letter: '자기소개서' }
@@ -59,9 +59,13 @@ export default function DocumentManager() {
             <span className="document-label">{LABELS[type]}</span>
             {doc ? (
               <>
-                <a href={`/api/documents/${doc.id}/download`} target="_blank" rel="noreferrer">
+                <button
+                  type="button"
+                  className="document-download-link"
+                  onClick={() => void downloadApiFile(`/documents/${doc.id}/download`).catch((err) => toast.error(err.message))}
+                >
                   {doc.filename}
-                </a>
+                </button>
                 <button type="button" className="btn-danger btn-sm" onClick={() => handleDelete(doc.id)}>
                   삭제
                 </button>

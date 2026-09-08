@@ -3,8 +3,8 @@ import {
   InterviewDeletionError,
   acquireInterviewRoomDeletionLocks,
   prepareInterviewRoomDeletion,
-} from '../functions/_lib/interviewDeletion.js'
-import { onRequestDelete as deleteAdminRoom } from '../functions/api/admin/rooms/[roomId]/index.js'
+} from '../server/_lib/interviewDeletion.js'
+import { onRequestDelete as deleteAdminRoom } from '../server/api/admin/rooms/[roomId]/index.js'
 
 function deletionDb({ activeSessions = 0, activeRecordings = 0, files = [] } = {}) {
   return {

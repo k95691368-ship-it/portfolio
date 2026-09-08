@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { describeDeliveryState, channelLabel, DELIVERY_CHANNELS } from '../functions/_lib/delivery.js'
+import { describeDeliveryState, channelLabel, DELIVERY_CHANNELS } from '../server/_lib/delivery.js'
 
 describe('channelLabel', () => {
   it('채널을 한국어로 옮긴다', () => {

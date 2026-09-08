@@ -9,8 +9,8 @@ import {
   minimumWageBase,
   effectiveWageItems,
   describeWageComposition,
-} from '../functions/_lib/wageItems.js'
-import { checkLegalCompliance } from '../functions/_lib/contractCheck.js'
+} from '../server/_lib/wageItems.js'
+import { checkLegalCompliance } from '../server/_lib/contractCheck.js'
 
 const HOURS = {
   workHoursStart: '09:00',

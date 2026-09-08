@@ -4,72 +4,12 @@
  */
 
 :root,
-:root[data-theme='light'] {
-  color-scheme: light;
-  --text-h: #1d1d1f;
-  --text: #1d1d1f;
-  --text-muted: #6e6e73;
-  --muted: var(--text-muted);
-  --bg: #f5f5f7;
-  --surface: #f5f5f7;
-  --surface-strong: #e8e8ed;
-  --panel: #ffffff;
-  --border: #d2d2d7;
-  --border-strong: #86868b;
-  --code-bg: #f5f5f7;
-  --btn-face: #e8e8ed;
-  --btn-face-hover: #dedee3;
-  --btn-border: #d2d2d7;
-  --accent: #0066cc;
-  --accent-hover: #0071e3;
-  --action-bg: #0071e3;
-  --action-hover: #0076df;
-  --accent-bg: #eaf4ff;
-  --accent-border: #8cc4f5;
-  --on-accent: #ffffff;
-  --danger: #e30000;
-  --danger-text: #b00000;
-  --danger-bg: #fff0f0;
-  --danger-border: #ffc5c5;
-  --success: #16813d;
-  --success-text: #11672f;
-  --success-bg: #edf8f0;
-  --success-border: #b8dfc4;
-  --warning: #9a6700;
-  --warning-text: #7a5200;
-  --warning-bg: #fff8e6;
-  --warning-border: #ead39a;
-  --overlay: rgba(0, 0, 0, 0.48);
-  --nav-bg: rgba(250, 250, 252, 0.82);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow: 0 18px 60px rgba(0, 0, 0, 0.16);
-  --nav-h: 44px;
-  --nav-max: 1024px;
-  --content-max: 980px;
-  --wide-max: 1200px;
-  --gutter: 22px;
-  --tile-gap: 12px;
-  --r-xs: 8px;
-  --r-sm: 10px;
-  --r-md: 12px;
-  --r-lg: 18px;
-  --r-xl: 22px;
-  --radius: 18px;
-  --radius-sm: 10px;
-  --tap: 44px;
-  --tap-lg: 50px;
-  --page-x: var(--gutter);
-  --motion-fast: 120ms;
-  --motion-ui: 240ms;
-  --motion-panel: 320ms;
-  --ease-ui: cubic-bezier(0.4, 0, 0.6, 1);
-}
-
 :root[data-theme='dark'] {
   color-scheme: dark;
   --text-h: #f5f5f7;
   --text: #f5f5f7;
   --text-muted: #a1a1a6;
+  --muted: var(--text-muted);
   --bg: #000000;
   --surface: #1d1d1f;
   --surface-strong: #2c2c2e;
@@ -103,6 +43,26 @@
   --nav-bg: rgba(22, 22, 23, 0.82);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28);
   --shadow: 0 20px 64px rgba(0, 0, 0, 0.64);
+  --nav-h: 44px;
+  --nav-max: 1024px;
+  --content-max: 980px;
+  --wide-max: 1200px;
+  --gutter: 22px;
+  --tile-gap: 12px;
+  --r-xs: 8px;
+  --r-sm: 10px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --r-xl: 22px;
+  --radius: 18px;
+  --radius-sm: 10px;
+  --tap: 44px;
+  --tap-lg: 50px;
+  --page-x: var(--gutter);
+  --motion-fast: 120ms;
+  --motion-ui: 240ms;
+  --motion-panel: 320ms;
+  --ease-ui: cubic-bezier(0.4, 0, 0.6, 1);
 }
 
 html {
@@ -1604,7 +1564,6 @@ tbody tr:hover {
 
 @media (max-width: 833px) {
   :root,
-  :root[data-theme='light'],
   :root[data-theme='dark'] {
     --nav-h: 48px;
   }

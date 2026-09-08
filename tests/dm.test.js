@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { canMessage, partnerView } from '../functions/_lib/dm.js'
+import { canMessage, partnerView } from '../server/_lib/dm.js'
 
 // 쪽지를 누가 누구에게 보낼 수 있는가.
 //

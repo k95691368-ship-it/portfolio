@@ -8,7 +8,7 @@ import {
   describeOfferStatus,
   describeCancellationRisk,
   describeUnfavourableChanges,
-} from '../functions/_lib/jobOffer.js'
+} from '../server/_lib/jobOffer.js'
 
 const msg = (role, body) => ({ role_in_room: role, body, created_at: '2026-09-01 10:00:00' })
 

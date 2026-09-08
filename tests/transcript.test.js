@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildTranscript, speakerLabel } from '../functions/_lib/transcript.js'
+import { buildTranscript, speakerLabel } from '../server/_lib/transcript.js'
 
 describe('speakerLabel', () => {
   it('역할을 한국어로 옮긴다', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateUploadFile, fileExt, matchesSignature } from '../functions/_lib/uploads.js'
+import { validateUploadFile, fileExt, matchesSignature } from '../server/_lib/uploads.js'
 
 function fakeFile(name, size) {
   return { name, size }

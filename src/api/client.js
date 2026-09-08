@@ -1,4 +1,77 @@
-const API_BASE = '/api'
+export const API_BASE =
+  import.meta.env.VITE_API_BASE ||
+  (import.meta.env.PROD
+    ? 'https://obumqkwkvnemkyaahjbn.supabase.co/functions/v1/api'
+    : '/api')
+
+// Supabase publishable keys are intentionally safe to ship in browser bundles.
+// The environment override keeps previews portable while the checked-in fallback
+// lets Cloudflare Pages deploy directly from GitHub without a secret binding.
+const SUPABASE_PUBLISHABLE_KEY =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  'sb_publishable_zmTib9W6f8wfKt-p_mBuVw_XxCe2EwR'
+
+const SESSION_KEY = 'portfolioSession'
+const ROOM_SESSION_KEY = 'portfolioRoomSessions'
+
+function parseStored(storage, key) {
+  try {
+    const value = JSON.parse(storage.getItem(key) || 'null')
+    if (!value?.token) return null
+    if (value.expiresAt && Date.parse(value.expiresAt) <= Date.now()) {
+      storage.removeItem(key)
+      return null
+    }
+    return value
+  } catch {
+    return null
+  }
+}
+
+function accountSession() {
+  return parseStored(sessionStorage, SESSION_KEY) || parseStored(localStorage, SESSION_KEY)
+}
+
+function storeAccountSession(data) {
+  if (!data?.sessionToken) return
+  const target = data.sessionPersistent === false ? sessionStorage : localStorage
+  const other = target === localStorage ? sessionStorage : localStorage
+  other.removeItem(SESSION_KEY)
+  target.setItem(
+    SESSION_KEY,
+    JSON.stringify({ token: data.sessionToken, expiresAt: data.sessionExpiresAt || null })
+  )
+}
+
+function clearAccountSession() {
+  localStorage.removeItem(SESSION_KEY)
+  sessionStorage.removeItem(SESSION_KEY)
+}
+
+function roomSessions() {
+  try {
+    const rows = JSON.parse(localStorage.getItem(ROOM_SESSION_KEY) || '{}')
+    const current = {}
+    for (const [roomId, value] of Object.entries(rows || {})) {
+      if (value?.token && (!value.expiresAt || Date.parse(value.expiresAt) > Date.now())) {
+        current[roomId] = value
+      }
+    }
+    return current
+  } catch {
+    return {}
+  }
+}
+
+function storeRoomSession(data) {
+  if (!data?.roomId || !data?.roomSessionToken) return
+  const rows = roomSessions()
+  rows[data.roomId] = {
+    token: data.roomSessionToken,
+    expiresAt: data.roomSessionExpiresAt || null,
+  }
+  localStorage.setItem(ROOM_SESSION_KEY, JSON.stringify(rows))
+}
 
 // 어느 문으로 방에 들어왔는가.
 //
@@ -47,6 +120,29 @@ function roomIdentityHeader(path) {
     : null
 }
 
+function authHeaders(path) {
+  const headers = {
+    'X-App-Request': '1',
+    apikey: SUPABASE_PUBLISHABLE_KEY,
+  }
+  const account = accountSession()
+  if (account?.token) headers['X-App-Authorization'] = `Bearer ${account.token}`
+
+  const match = path.match(/^\/rooms\/([^/]+)\/.+/)
+  if (match) {
+    const roomId = decodeURIComponent(match[1])
+    const room = roomSessions()[roomId]
+    if (room?.token) headers['X-Room-Authorization'] = `Bearer ${room.token}`
+  }
+  return headers
+}
+
+function acceptAuthResponse(path, data) {
+  storeAccountSession(data)
+  storeRoomSession(data)
+  if (path === '/logout') clearAccountSession()
+}
+
 // 서버 응답을 사용자에게 보여줄 오류로 변환한다.
 // 권한 거부(403)는 항상 "권한 없음"으로 시작하게 맞춰, 어떤 화면에서 막히든
 // 같은 문구로 인지되도록 한다. 상태 코드 자체는 절대 노출하지 않는다.
@@ -66,9 +162,10 @@ function toUserError(res, data) {
 
 async function request(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
-    credentials: 'include',
+    credentials: 'omit',
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders(path),
       ...roomIdentityHeader(path),
       ...(options.headers || {}),
     },
@@ -76,19 +173,51 @@ async function request(path, options = {}) {
   })
   const data = await res.json().catch(() => null)
   if (!res.ok) throw toUserError(res, data)
+  acceptAuthResponse(path, data)
   return data
 }
 
 async function upload(path, formData) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
-    credentials: 'include',
-    headers: { ...roomIdentityHeader(path) },
+    credentials: 'omit',
+    headers: { ...authHeaders(path), ...roomIdentityHeader(path) },
     body: formData,
   })
   const data = await res.json().catch(() => null)
   if (!res.ok) throw toUserError(res, data)
+  acceptAuthResponse(path, data)
   return data
+}
+
+export async function apiBlob(path) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    credentials: 'omit',
+    headers: { ...authHeaders(path), ...roomIdentityHeader(path) },
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => null)
+    throw toUserError(res, data)
+  }
+  return {
+    blob: await res.blob(),
+    filename: decodeURIComponent(
+      res.headers.get('Content-Disposition')?.match(/filename\*=UTF-8''([^;]+)/i)?.[1] ||
+        'download'
+    ),
+  }
+}
+
+export async function downloadApiFile(path) {
+  const { blob, filename } = await apiBlob(path)
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 export const api = {

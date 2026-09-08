@@ -8,7 +8,7 @@ import {
   checkContinuityCompliance,
   describeRetention,
   describeRetentionHold,
-} from '../functions/_lib/contractPeriod.js'
+} from '../server/_lib/contractPeriod.js'
 
 const NOW = new Date(Date.UTC(2026, 8, 15)) // 2026-09-15 기준으로 고정
 

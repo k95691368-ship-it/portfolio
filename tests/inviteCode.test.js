@@ -3,9 +3,9 @@ import {
   genInviteCode,
   normalizeInviteCode,
   formatInviteCode,
-} from '../functions/_lib/inviteCode.js'
-import { roomIdFromApiPath } from '../functions/_lib/auth.js'
-import { signerVerificationMethod, describeVerificationMethod } from '../functions/_lib/auditCertificate.js'
+} from '../server/_lib/inviteCode.js'
+import { roomIdFromApiPath } from '../server/_lib/auth.js'
+import { signerVerificationMethod, describeVerificationMethod } from '../server/_lib/auditCertificate.js'
 
 describe('면접방 입장 코드', () => {
   it('12자리다 — 코드가 로그인 수단이므로 6자리로는 맞힐 수 있다', () => {
@@ -61,7 +61,7 @@ describe('서류합격 안내 메일', () => {
   it('입장 코드를 눈으로 읽을 수 있는 모양으로 담는다', async () => {
     // 코드가 전해지지 않으면 지원자는 면접방에 못 들어오고, 그러면 계약도
     // 서명도 시작되지 않는다. 메일 본문에 실제로 들어 있는지 본다.
-    const { sendApplicationResultEmail } = await import('../functions/_lib/email.js')
+    const { sendApplicationResultEmail } = await import('../server/_lib/email.js')
     let captured = null
     const env = {
       MAILJET_API_KEY: 'k',

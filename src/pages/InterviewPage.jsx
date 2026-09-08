@@ -493,6 +493,7 @@ export default function InterviewPage() {
       <RecordingBar
         roomId={roomId}
         session={session}
+        meeting={meetingClient}
         meetingJoined={meetingJoined}
         controlsLocked={huddleLocksRecordingControls(huddlePhase)}
         onRecordingChanged={updateRecording}

@@ -3,7 +3,7 @@
 // 수습은 "그동안은 덜 줘도 된다"로 널리 오해되는 자리라, 위반이 가장 흔하면서도
 // 당사자 둘 다 위반인 줄 모르고 넘어간다. 값이 정해진 규칙이므로 계산으로 잡는다.
 import { describe, expect, it } from 'vitest'
-import { parseProbation, checkProbationCompliance } from '../functions/_lib/probation.js'
+import { parseProbation, checkProbationCompliance } from '../server/_lib/probation.js'
 
 const BASE = {
   contractStartDate: '2026-09-01',

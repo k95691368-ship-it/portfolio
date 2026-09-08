@@ -5,10 +5,10 @@
 // 적용되지 않는다. 이 구분이 없으면 두 방향으로 틀린다 — 적용되지 않는 조항으로
 // 서명을 막거나, 발생하지 않는 권리를 확정 금액으로 약속하거나.
 import { describe, expect, it } from 'vitest'
-import { workplaceScope, SMALL_WORKPLACE_THRESHOLD } from '../functions/_lib/workplaceScope.js'
-import { checkLegalCompliance } from '../functions/_lib/contractCheck.js'
-import { describeAnnualLeave, describeOvertimeRates } from '../functions/_lib/workerRights.js'
-import { describeCancellationRisk } from '../functions/_lib/jobOffer.js'
+import { workplaceScope, SMALL_WORKPLACE_THRESHOLD } from '../server/_lib/workplaceScope.js'
+import { checkLegalCompliance } from '../server/_lib/contractCheck.js'
+import { describeAnnualLeave, describeOvertimeRates } from '../server/_lib/workerRights.js'
+import { describeCancellationRisk } from '../server/_lib/jobOffer.js'
 
 const NOW = new Date(Date.UTC(2026, 8, 15))
 
