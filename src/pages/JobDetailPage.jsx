@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { describeDeadline } from '../lib/deadline.js'
+import PostingDescription from '../components/PostingDescription.jsx'
 
 export default function JobDetailPage() {
   const { id } = useParams()
@@ -70,7 +71,7 @@ export default function JobDetailPage() {
         </p>
       )}
 
-      <div className="job-detail-body">{posting.description}</div>
+      <div className="job-detail-body"><PostingDescription value={posting.description} /></div>
 
       {posting.open !== false && (
         <div className="job-detail-actions">

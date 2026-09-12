@@ -3,10 +3,11 @@ import { genId } from '../../../_lib/db.js'
 import { hashPassword, normalizeEmail } from '../../../_lib/auth.js'
 import { genTempPassword } from '../../../_lib/tempPassword.js'
 import { logAdminAction } from '../../../_lib/auditLog.js'
+import { isProtectedDeveloper } from '../../../_lib/developerTrial.js'
 
 const MAX_USERS = 500
 
-export async function onRequestGet({ env }) {
+export async function onRequestGet({ env, data = {} }) {
   const { results } = await env.DB.prepare(
     `SELECT id, email, display_name, company_name, role, is_admin, is_recruiter, is_developer, is_suspended,
             must_change_password, created_at
@@ -18,7 +19,7 @@ export async function onRequestGet({ env }) {
   return jsonResponse({
     truncated: results.length >= MAX_USERS,
     limit: MAX_USERS,
-    users: results.map((u) => ({
+    users: results.filter((u) => !data.user?.developer_trial || !isProtectedDeveloper(u)).map((u) => ({
       id: u.id,
       email: u.email,
       displayName: u.display_name,

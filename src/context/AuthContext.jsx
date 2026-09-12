@@ -25,6 +25,13 @@ export function AuthProvider({ children }) {
   // 서버에 닿지 못한 상태. null 이면 문제 없음.
   const [connectionError, setConnectionError] = useState(null)
 
+  useEffect(() => {
+    if (!user?.developerTrial || !user.trialExpiresAt) return undefined
+    const remaining = Date.parse(user.trialExpiresAt) - Date.now()
+    const timer = setTimeout(() => setUser(null), Math.max(0, remaining))
+    return () => clearTimeout(timer)
+  }, [user?.developerTrial, user?.trialExpiresAt])
+
   const refresh = useCallback(async () => {
     const data = await api.get('/me')
     setUser(data.user)

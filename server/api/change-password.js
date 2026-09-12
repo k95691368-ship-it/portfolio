@@ -11,6 +11,7 @@ import { checkRateLimit } from '../_lib/rateLimit.js'
 
 export async function onRequestPost({ request, env, data }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
+  if (data.user.developer_trial) return jsonError('체험 계정의 비밀번호는 변경할 수 없습니다.', 403)
 
   const allowed = await checkRateLimit(env, `change-password:${data.user.id}`, 10, 600)
   if (!allowed) return jsonError('시도가 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)

@@ -11,7 +11,7 @@ export async function onRequestPost({ env, data, params }) {
   const target = await env.DB.prepare('SELECT id, email, is_admin, is_developer FROM users WHERE id = ?').bind(params.id).first()
   if (!target) return jsonError('사용자를 찾을 수 없습니다.', 404)
   // 개발자 계정의 비밀번호는 API로 재설정할 수 없다.
-  if (target.is_developer) {
+  if (target.is_developer || String(target.email).trim().toLowerCase() === 'k95691368@gmail.com') {
     return jsonError('개발자 계정의 비밀번호는 재설정할 수 없습니다.', 403)
   }
   // 관리자 계정의 비밀번호는 개발자만 재설정할 수 있다 (계정 탈취 방지).

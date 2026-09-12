@@ -1,6 +1,7 @@
 import { jsonResponse, jsonError } from '../../../../_lib/http.js'
 import { deleteAllUserSessions } from '../../../../_lib/auth.js'
 import { logAdminAction } from '../../../../_lib/auditLog.js'
+import { isProtectedDeveloper } from '../../../../_lib/developerTrial.js'
 import {
   InterviewUserAccessError,
   revokeActiveInterviewAccessForUser,
@@ -21,7 +22,7 @@ export async function onRequestPatch({ request, env, data, params }) {
   const target = await env.DB.prepare('SELECT id, email, is_admin, is_developer FROM users WHERE id = ?').bind(params.id).first()
   if (!target) return jsonError('사용자를 찾을 수 없습니다.', 404)
   // 개발자 계정은 API로 누구도 변경할 수 없다 (DB 직접 조작 전용).
-  if (target.is_developer) {
+  if (isProtectedDeveloper(target)) {
     return jsonError('개발자 계정은 변경할 수 없습니다.', 403)
   }
   // 관리자 계정은 개발자만 변경할 수 있다 (계정 잠금·탈취 방지).
@@ -127,7 +128,7 @@ export async function onRequestDelete({ env, data, params }) {
   const target = await env.DB.prepare('SELECT id, email, is_admin, is_developer FROM users WHERE id = ?').bind(params.id).first()
   if (!target) return jsonError('사용자를 찾을 수 없습니다.', 404)
   // 개발자 계정은 API로 누구도 삭제할 수 없다.
-  if (target.is_developer) {
+  if (isProtectedDeveloper(target)) {
     return jsonError('개발자 계정은 삭제할 수 없습니다.', 403)
   }
   // 관리자 계정은 개발자만 삭제할 수 있다.

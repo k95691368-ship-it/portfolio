@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import DeveloperTrialEntry from '../components/DeveloperTrialEntry.jsx'
 
 export default function LandingPage() {
   return (
@@ -25,6 +26,7 @@ export default function LandingPage() {
           <Link to="/verify">증명서 진위 확인 →</Link>
           <Link to="/tech">기술 구현 보러가기 →</Link>
       </nav>
+      <DeveloperTrialEntry />
     </div>
   )
 }

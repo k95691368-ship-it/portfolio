@@ -72,6 +72,9 @@ export async function onRequest(context) {
   // 여기서 정해진 값이 곧 data.user 다. 이 아래 어느 코드도 신원을 다시
   // 판단하지 않는다 — 판정이 여러 층에 흩어졌던 것이 지난번 사고의 원인이다.
   const roomId = roomIdFromApiPath(requestUrl.pathname)
+  if (context.data.user?.developer_trial && requestUrl.pathname === '/api/change-password') {
+    return jsonError('체험 계정의 로그인 정보는 변경할 수 없습니다.', 403)
+  }
   const isRecordingFileGet =
     request.method === 'GET' &&
     /^\/api\/rooms\/[^/]+\/interviews\/[^/]+\/recordings\/[^/]+\/file\/?$/.test(

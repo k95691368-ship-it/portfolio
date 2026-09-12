@@ -17,6 +17,7 @@ export async function onRequestPost({ request, env }) {
   // 반대로 계정만 세면 한 IP 가 여러 계정을 훑는 것을 못 막는다. 둘 다 센다.
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
   const email = normalizeEmail(body.email)
+  if (email.endsWith('@trial.invalid')) return jsonError('체험 계정은 홈의 체험 버튼으로만 이용할 수 있습니다.', 403)
   const tooBusy = '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.'
 
   const byIp = await checkRateLimit(env, `login:${ip}`, 20, 600)

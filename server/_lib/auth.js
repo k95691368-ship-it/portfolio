@@ -1,3 +1,5 @@
+import { applyTrialCapabilities, TRIAL_AUTH_METHOD, TRIAL_SECONDS } from './developerTrial.js'
+
 const PBKDF2_ITERATIONS = 100000
 // 로그인 유지를 고른 경우와 아닌 경우.
 //
@@ -79,7 +81,9 @@ export async function verifyPassword(password, storedHash, storedSalt) {
 export async function createSession(db, userId, options = {}) {
   // 명시하지 않으면 유지한다 — 예전 동작 그대로.
   const persistent = options.persistent !== false
-  const ttl = persistent ? SESSION_TTL_SECONDS : SHORT_SESSION_TTL_SECONDS
+  const ttl = options.authMethod === TRIAL_AUTH_METHOD
+    ? TRIAL_SECONDS
+    : persistent ? SESSION_TTL_SECONDS : SHORT_SESSION_TTL_SECONDS
   // 어떻게 로그인했는가. 서명 기록의 본인확인 수단이 이 값에서 나온다.
   // 명시하지 않으면 비밀번호로 본다(예전 세션과 같은 취급).
   const authMethod = options.authMethod ?? 'password'
@@ -186,7 +190,7 @@ export async function getRoomSessionUser(db, request, roomId) {
     .bind(tokenHash, roomId)
     .first()
   if (!row || row.is_suspended) return null
-  return row
+  return applyTrialCapabilities(row)
 }
 
 // 경로에서 방 id 를 읽는다. /api/rooms/<id>/... 만 해당한다.
@@ -223,7 +227,7 @@ export async function getSessionUser(db, request) {
     .bind(tokenHash)
     .first()
   if (!row || row.is_suspended) return null
-  return row
+  return applyTrialCapabilities(row)
 }
 
 // 쓰고 있는 동안에는 로그인이 끝나지 않게 만료를 미룬다.
@@ -259,6 +263,7 @@ function normalizeStamp(value) {
 
 // 지금 미뤄야 하는가. 조회해 온 행만 보고 판단한다 — DB 를 다시 부르지 않는다.
 export function needsRenewal(user) {
+  if (user?.session_auth_method === TRIAL_AUTH_METHOD) return false
   const expires = user?.session_expires_at
   const started = user?.session_started_at
   if (!expires || !started) return false

@@ -7,6 +7,8 @@ import { useToast } from '../context/ToastContext.jsx'
 import NotificationBell from '../components/NotificationBell.jsx'
 import ApplicantCompare from '../components/ApplicantCompare.jsx'
 import Modal from '../components/Modal.jsx'
+import PostingEditor from '../components/PostingEditor.jsx'
+import { EXAMPLE_POSTING } from '../../shared/jobPostingTemplate.js'
 
 // 공고 등록 폼의 빈 상태. 한 곳에만 두어, 등록 후 초기화에서 필드를 빠뜨리는 일을 막는다.
 const EMPTY_POSTING = {
@@ -624,15 +626,12 @@ export default function RecruitPage() {
             </div>
           </fieldset>
 
-          <label>
-            상세 내용 <span className="consent-required" aria-hidden="true">*</span>
-            <textarea
-              value={form.description}
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              rows={6}
-              required
-            />
-          </label>
+          <PostingEditor value={form.description}
+            onChange={(description) => setForm((f) => ({ ...f, description }))}
+            onLoadExample={() => {
+              if ((form.title || form.description) && !window.confirm('작성 중인 공고를 예시 공고문으로 바꾸시겠습니까?')) return
+              setForm({ ...EMPTY_POSTING, ...EXAMPLE_POSTING })
+            }} />
           <button type="submit" className="btn-primary" disabled={creating}>
             {creating ? '등록 중...' : '공고 등록'}
           </button>
