@@ -60,25 +60,27 @@ import * as route58 from '../../../server/api/rooms/join.js'
 import * as route59 from '../../../server/api/push/key.js'
 import * as route60 from '../../../server/api/applications/[id]/index.js'
 import * as route61 from '../../../server/api/documents/[id]/index.js'
-import * as route62 from '../../../server/api/postings/[id]/index.js'
-import * as route63 from '../../../server/api/jobs/[id]/index.js'
-import * as route64 from '../../../server/api/dm/[partnerId].js'
-import * as route65 from '../../../server/api/my-applications/index.js'
-import * as route66 from '../../../server/api/notifications/index.js'
-import * as route67 from '../../../server/api/application-status.js'
-import * as route68 from '../../../server/api/applications/index.js'
-import * as route69 from '../../../server/api/verify-certificate.js'
-import * as route70 from '../../../server/api/change-password.js'
-import * as route71 from '../../../server/api/postings/index.js'
-import * as route72 from '../../../server/api/demo/index.js'
-import * as route73 from '../../../server/api/jobs/index.js'
-import * as route74 from '../../../server/api/dashboard.js'
-import * as route75 from '../../../server/api/dm/index.js'
-import * as route76 from '../../../server/api/logout.js'
-import * as route77 from '../../../server/api/signup.js'
-import * as route78 from '../../../server/api/login.js'
-import * as route79 from '../../../server/api/me.js'
-import * as route80 from '../../../server/api/[[path]].js'
+import * as route62 from '../../../server/api/posting-drafts/[id].js'
+import * as route63 from '../../../server/api/postings/[id]/index.js'
+import * as route64 from '../../../server/api/jobs/[id]/index.js'
+import * as route65 from '../../../server/api/dm/[partnerId].js'
+import * as route66 from '../../../server/api/my-applications/index.js'
+import * as route67 from '../../../server/api/posting-drafts/index.js'
+import * as route68 from '../../../server/api/notifications/index.js'
+import * as route69 from '../../../server/api/application-status.js'
+import * as route70 from '../../../server/api/applications/index.js'
+import * as route71 from '../../../server/api/verify-certificate.js'
+import * as route72 from '../../../server/api/change-password.js'
+import * as route73 from '../../../server/api/postings/index.js'
+import * as route74 from '../../../server/api/demo/index.js'
+import * as route75 from '../../../server/api/jobs/index.js'
+import * as route76 from '../../../server/api/dashboard.js'
+import * as route77 from '../../../server/api/dm/index.js'
+import * as route78 from '../../../server/api/logout.js'
+import * as route79 from '../../../server/api/signup.js'
+import * as route80 from '../../../server/api/login.js'
+import * as route81 from '../../../server/api/me.js'
+import * as route82 from '../../../server/api/[[path]].js'
 
 export const routes = [
   { pattern: new RegExp("^/rooms\\/([^/]+)\\/interviews\\/([^/]+)\\/recordings\\/([^/]+)\\/complete/?$"), params: ["roomId","sessionId","recordingId"], module: route0 },
@@ -143,23 +145,25 @@ export const routes = [
   { pattern: new RegExp("^/push\\/key/?$"), params: [], module: route59 },
   { pattern: new RegExp("^/applications\\/([^/]+)/?$"), params: ["id"], module: route60 },
   { pattern: new RegExp("^/documents\\/([^/]+)/?$"), params: ["id"], module: route61 },
-  { pattern: new RegExp("^/postings\\/([^/]+)/?$"), params: ["id"], module: route62 },
-  { pattern: new RegExp("^/jobs\\/([^/]+)/?$"), params: ["id"], module: route63 },
-  { pattern: new RegExp("^/dm\\/([^/]+)/?$"), params: ["partnerId"], module: route64 },
-  { pattern: new RegExp("^/my-applications/?$"), params: [], module: route65 },
-  { pattern: new RegExp("^/notifications/?$"), params: [], module: route66 },
-  { pattern: new RegExp("^/application-status/?$"), params: [], module: route67 },
-  { pattern: new RegExp("^/applications/?$"), params: [], module: route68 },
-  { pattern: new RegExp("^/verify-certificate/?$"), params: [], module: route69 },
-  { pattern: new RegExp("^/change-password/?$"), params: [], module: route70 },
-  { pattern: new RegExp("^/postings/?$"), params: [], module: route71 },
-  { pattern: new RegExp("^/demo/?$"), params: [], module: route72 },
-  { pattern: new RegExp("^/jobs/?$"), params: [], module: route73 },
-  { pattern: new RegExp("^/dashboard/?$"), params: [], module: route74 },
-  { pattern: new RegExp("^/dm/?$"), params: [], module: route75 },
-  { pattern: new RegExp("^/logout/?$"), params: [], module: route76 },
-  { pattern: new RegExp("^/signup/?$"), params: [], module: route77 },
-  { pattern: new RegExp("^/login/?$"), params: [], module: route78 },
-  { pattern: new RegExp("^/me/?$"), params: [], module: route79 },
-  { pattern: new RegExp("^/(.*)$"), params: ["path"], module: route80 },
+  { pattern: new RegExp("^/posting-drafts\\/([^/]+)/?$"), params: ["id"], module: route62 },
+  { pattern: new RegExp("^/postings\\/([^/]+)/?$"), params: ["id"], module: route63 },
+  { pattern: new RegExp("^/jobs\\/([^/]+)/?$"), params: ["id"], module: route64 },
+  { pattern: new RegExp("^/dm\\/([^/]+)/?$"), params: ["partnerId"], module: route65 },
+  { pattern: new RegExp("^/my-applications/?$"), params: [], module: route66 },
+  { pattern: new RegExp("^/posting-drafts/?$"), params: [], module: route67 },
+  { pattern: new RegExp("^/notifications/?$"), params: [], module: route68 },
+  { pattern: new RegExp("^/application-status/?$"), params: [], module: route69 },
+  { pattern: new RegExp("^/applications/?$"), params: [], module: route70 },
+  { pattern: new RegExp("^/verify-certificate/?$"), params: [], module: route71 },
+  { pattern: new RegExp("^/change-password/?$"), params: [], module: route72 },
+  { pattern: new RegExp("^/postings/?$"), params: [], module: route73 },
+  { pattern: new RegExp("^/demo/?$"), params: [], module: route74 },
+  { pattern: new RegExp("^/jobs/?$"), params: [], module: route75 },
+  { pattern: new RegExp("^/dashboard/?$"), params: [], module: route76 },
+  { pattern: new RegExp("^/dm/?$"), params: [], module: route77 },
+  { pattern: new RegExp("^/logout/?$"), params: [], module: route78 },
+  { pattern: new RegExp("^/signup/?$"), params: [], module: route79 },
+  { pattern: new RegExp("^/login/?$"), params: [], module: route80 },
+  { pattern: new RegExp("^/me/?$"), params: [], module: route81 },
+  { pattern: new RegExp("^/(.*)$"), params: ["path"], module: route82 },
 ]

@@ -3,6 +3,7 @@ import { jsonResponse, jsonError } from '../../_lib/http.js'
 import { canManageRecruiting } from '../../_lib/recruiter.js'
 import { logAdminAction } from '../../_lib/auditLog.js'
 import { normalizePostingConditions } from '../../_lib/postingConditions.js'
+import { validDraftId } from '../../_lib/postingDrafts.js'
 
 const TITLE_MAX = 150
 const SHORT_MAX = 100
@@ -68,15 +69,18 @@ export async function onRequestPost({ request, env, data }) {
   if (!description) return jsonError('공고 상세 내용을 입력해주세요.', 400)
   if (deadline && !DATE_RE.test(deadline)) return jsonError('마감일 형식이 올바르지 않습니다.', 400)
   if (conditions.error) return jsonError(conditions.error, 400)
+  const draftId = body?.draftId
+  if (draftId != null && (!validDraftId(draftId) || !Number.isSafeInteger(body.draftRevision) || body.draftRevision < 1)) {
+    return jsonError('임시저장 공고를 저장하거나 다시 불러온 뒤 등록해주세요.', 400)
+  }
 
   const id = genId()
-  await env.DB.prepare(
+  const insertSql =
     `INSERT INTO job_postings
        (id, created_by_user_id, title, department, employment_type, location, description, deadline,
         wage_type, wage_min, wage_max, work_hours_start, work_hours_end, work_days)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  )
-    .bind(
+     ${draftId ? 'SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM posting_drafts WHERE id = ? AND user_id = ? AND published_posting_id = ?' : 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'}`
+  const values = [
       id,
       data.user.id,
       title,
@@ -90,9 +94,21 @@ export async function onRequestPost({ request, env, data }) {
       conditions.wageMax,
       conditions.workHoursStart,
       conditions.workHoursEnd,
-      conditions.workDays
-    )
-    .run()
+      conditions.workDays,
+  ]
+  if (draftId) {
+    // Claim and publish in one transaction. The revision-checked UPDATE locks
+    // the draft, so two concurrent registrations cannot both publish it.
+    const results = await env.DB.batch([
+      env.DB.prepare(`UPDATE posting_drafts SET published_at = ?, published_posting_id = ?, revision = revision + 1
+        WHERE id = ? AND user_id = ? AND revision = ? AND published_at IS NULL`)
+        .bind(new Date().toISOString(), id, draftId, data.user.id, body.draftRevision),
+      env.DB.prepare(insertSql).bind(...values, draftId, data.user.id, id),
+    ])
+    if (!results[0].meta.changes) return jsonError('이미 등록되었거나 다른 창에서 변경된 공고입니다. 임시저장 목록을 새로고침해주세요.', 409)
+  } else {
+    await env.DB.prepare(insertSql).bind(...values).run()
+  }
 
   await logAdminAction(env, {
     actorId: data.user.id,

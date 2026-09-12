@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { formatKstDate } from '../lib/formatTime.js'
+import { formatKstDate, formatKst } from '../lib/formatTime.js'
 import { Link } from 'react-router-dom'
 import { api, downloadApiFile, markRoomDoor } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -433,6 +433,67 @@ export default function RecruitPage() {
   const [form, setForm] = useState(EMPTY_POSTING)
 
   const [creating, setCreating] = useState(false)
+  const [drafts, setDrafts] = useState([])
+  const [draftId, setDraftId] = useState(null)
+  const [draftRevision, setDraftRevision] = useState(0)
+  const [draftSavedAt, setDraftSavedAt] = useState(null)
+  const [savedForm, setSavedForm] = useState(JSON.stringify(EMPTY_POSTING))
+  const [savingDraft, setSavingDraft] = useState(false)
+  const [loadingDraft, setLoadingDraft] = useState(false)
+  const [draftsLoading, setDraftsLoading] = useState(true)
+  const [draftsError, setDraftsError] = useState('')
+  const draftBusy = creating || savingDraft || loadingDraft
+  const unsaved = JSON.stringify(form) !== savedForm
+
+  const loadDrafts = useCallback(async () => {
+    setDraftsLoading(true)
+    setDraftsError('')
+    try { setDrafts((await api.get('/posting-drafts')).drafts) }
+    catch (err) { setDraftsError(err.message) }
+    finally { setDraftsLoading(false) }
+  }, [])
+
+  useEffect(() => { loadDrafts() }, [loadDrafts])
+
+  const resetDraftForm = () => {
+    setForm(EMPTY_POSTING)
+    setDraftId(null)
+    setDraftRevision(0)
+    setDraftSavedAt(null)
+    setSavedForm(JSON.stringify(EMPTY_POSTING))
+  }
+
+  const saveDraft = async () => {
+    if (draftBusy) return
+    const id = draftId || crypto.randomUUID()
+    setDraftId(id) // Retain the id after network errors for an idempotent retry.
+    setSavingDraft(true)
+    try {
+      const saved = await api.put(`/posting-drafts/${id}`, { fields: form, revision: draftRevision })
+      setDraftRevision(saved.revision)
+      setDraftSavedAt(saved.updatedAt)
+      setSavedForm(JSON.stringify(form))
+      toast.success('임시저장했습니다. 공고는 아직 공개되지 않습니다.')
+      await loadDrafts()
+    } catch (err) { toast.error(err.message) }
+    finally { setSavingDraft(false) }
+  }
+
+  const openDraft = async (id) => {
+    if (draftBusy || (unsaved && !window.confirm('저장하지 않은 변경사항이 있습니다. 임시저장 공고를 불러오시겠습니까?'))) return
+    setLoadingDraft(true)
+    try {
+      const { draft } = await api.get(`/posting-drafts/${id}`)
+      const fields = { ...EMPTY_POSTING, ...draft.fields }
+      setForm(fields)
+      setDraftId(draft.id)
+      setDraftRevision(draft.revision)
+      setDraftSavedAt(draft.updatedAt)
+      setSavedForm(JSON.stringify(fields))
+      toast.success('임시저장 공고를 불러왔습니다.')
+    } catch (err) { toast.error(err.message) }
+    finally { setLoadingDraft(false) }
+  }
 
   // 지원서 검색·필터
   const [appSearch, setAppSearch] = useState('')
@@ -469,13 +530,15 @@ export default function RecruitPage() {
 
   const handleCreate = async (e) => {
     e.preventDefault()
+    if (draftBusy) return
     setCreating(true)
     try {
-      await api.post('/postings', form)
+      await api.post('/postings', { ...form, ...(draftId ? { draftId, draftRevision } : {}) })
       // 한 곳에 모아 둔 초기값을 그대로 쓴다. 예전에는 여기서 필드를 빠뜨려
       // 그 칸이 제어를 벗어났고, 화면에는 앞 공고의 값이 남아 있는데 다음 공고는
       // 비어 있는 채로 저장됐다.
-      setForm(EMPTY_POSTING)
+      resetDraftForm()
+      await loadDrafts()
       await loadAll()
       toast.success('공고가 정상 등록되었습니다.')
     } catch (err) {
@@ -521,7 +584,11 @@ export default function RecruitPage() {
 
       <section className="recruit-section">
         <h2>채용 공고 등록</h2>
+        <p className="muted" role="status">
+          {draftSavedAt ? `${formatKst(draftSavedAt)} 임시저장${unsaved ? ' · 저장하지 않은 변경사항' : ''}` : '임시저장한 공고는 본인에게만 보입니다.'}
+        </p>
         <form onSubmit={handleCreate} className="posting-form">
+          <fieldset className="posting-draft-fields" disabled={draftBusy}>
           <label>
             공고 제목 <span className="consent-required" aria-hidden="true">*</span>
             <input
@@ -632,10 +699,41 @@ export default function RecruitPage() {
               if ((form.title || form.description) && !window.confirm('작성 중인 공고를 예시 공고문으로 바꾸시겠습니까?')) return
               setForm({ ...EMPTY_POSTING, ...EXAMPLE_POSTING })
             }} />
-          <button type="submit" className="btn-primary" disabled={creating}>
+          <div className="posting-editor-toolbar">
+          <button type="button" className="btn-secondary" onClick={saveDraft}>
+            {savingDraft ? '저장 중...' : '임시저장'}
+          </button>
+          <button type="submit" className="btn-primary">
             {creating ? '등록 중...' : '공고 등록'}
           </button>
+          <button type="button" className="btn-ghost" onClick={() => {
+            if (unsaved && !window.confirm('저장하지 않은 변경사항이 있습니다. 새 공고를 작성하시겠습니까?')) return
+            resetDraftForm()
+          }}>새 공고 작성</button>
+          </div>
+          </fieldset>
         </form>
+      </section>
+
+      <section className="recruit-section" aria-labelledby="posting-drafts-title">
+        <div className="dashboard-header">
+          <h2 id="posting-drafts-title">내 임시저장 공고</h2>
+          <button type="button" className="btn-sm" onClick={loadDrafts} disabled={draftsLoading || draftBusy}>새로고침</button>
+        </div>
+        {draftsLoading ? <p role="status">불러오는 중...</p> : draftsError ? <p role="alert" className="error">{draftsError}</p> : drafts.length === 0 ?
+          <p className="notice">임시저장한 공고가 없습니다.</p> :
+          <div className="table-scroll" tabIndex={0}>
+            <table className="admin-table">
+              <caption className="sr-only">내 임시저장 공고 {drafts.length}건</caption>
+              <thead><tr><th scope="col">제목</th><th scope="col">저장 시각</th><th scope="col">관리</th></tr></thead>
+              <tbody>{drafts.map(draft => <tr key={draft.id}>
+                <th scope="row" className="cell-rowhead">{draft.title || '제목 없는 공고'}{draft.id === draftId ? ' · 작성 중' : ''}</th>
+                <td>{formatKst(draft.updatedAt)}</td>
+                <td><button type="button" className="btn-sm" onClick={() => openDraft(draft.id)} disabled={draftBusy}
+                  aria-label={`${draft.title || '제목 없는 공고'} 불러오기`}>불러오기</button></td>
+              </tr>)}</tbody>
+            </table>
+          </div>}
       </section>
 
       <section className="recruit-section">

@@ -4,6 +4,7 @@
 }
 .developer-trial-entry p { margin: var(--gap-3) auto 0; max-width: 520px; font-size: .875rem; color: var(--text-muted); }
 .posting-editor { display: grid; gap: var(--gap-3); }
+.posting-draft-fields { display: grid; gap: var(--gap-4); min-width: 0; margin: 0; padding: 0; border: 0; }
 .posting-form .posting-editor > label { display: flex; flex-direction: row; align-items: baseline; gap: var(--gap-1); }
 .posting-editor-toolbar { display: flex; flex-wrap: wrap; gap: var(--gap-2); }
 .posting-emoji-picker { display: flex; flex-wrap: wrap; gap: var(--gap-2); padding: var(--gap-3); border: 1px solid var(--border); border-radius: var(--r-sm); }
