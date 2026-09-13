@@ -64,14 +64,19 @@ describe('서류합격 안내 메일', () => {
     const { sendApplicationResultEmail } = await import('../server/_lib/email.js')
     let captured = null
     const env = {
-      MAILJET_API_KEY: 'k',
-      MAILJET_SECRET_KEY: 's',
+      EMAIL_ENABLED: '1',
+      GMAIL_CLIENT_ID: 'test-client',
+      GMAIL_CLIENT_SECRET: 'test-secret',
+      GMAIL_REFRESH_TOKEN: 'test-refresh',
       FINAL_OFFER_FROM_EMAIL: 'no-reply@example.com',
     }
     const realFetch = globalThis.fetch
     globalThis.fetch = async (_url, init) => {
+      if (_url === 'https://oauth2.googleapis.com/token') {
+        return new Response(JSON.stringify({ access_token: 'test-access' }), { status: 200 })
+      }
       captured = JSON.parse(init.body)
-      return new Response(JSON.stringify({ Messages: [{ Status: 'success' }] }), { status: 200 })
+      return new Response(JSON.stringify({ id: 'test-message' }), { status: 200 })
     }
     try {
       await sendApplicationResultEmail(env, {
@@ -84,7 +89,9 @@ describe('서류합격 안내 메일', () => {
     } finally {
       globalThis.fetch = realFetch
     }
-    const body = JSON.stringify(captured)
+    const mime = Buffer.from(captured.raw, 'base64url').toString('utf8')
+    const encoded = mime.match(/Content-Type: text\/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n([A-Za-z0-9+/=\r\n]*?)\r\n--/)[1]
+    const body = Buffer.from(encoded, 'base64').toString('utf8')
     expect(body).toContain('AC3K-M7PQ-4RTV')
     expect(body).toContain('입장 코드')
   })

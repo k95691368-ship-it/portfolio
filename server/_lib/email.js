@@ -1,4 +1,5 @@
 import { formatInviteCode } from './inviteCode.js'
+import { isGmailConfigured, sendGmailEmail } from './gmail.js'
 
 export function maskEmail(email) {
   const [local, domain] = String(email || '').split('@')
@@ -63,60 +64,23 @@ function buildBrandedEmailHtml({
 // 기능을 아직 만들지 않은 것으로 취급하고, 화면은 그렇게 안내한다.
 // 발송을 되살릴 때는 자격 증명과 함께 EMAIL_ENABLED=1을 넣으면 된다.
 export function isEmailConfigured(env) {
-  if (env.EMAIL_ENABLED !== '1') return false
-  return !!(env.MAILJET_API_KEY && env.MAILJET_SECRET_KEY && env.FINAL_OFFER_FROM_EMAIL)
+  return isGmailConfigured(env)
 }
 
-// 공용 발송 함수 — 모든 이메일이 이 함수를 통해 Mailjet(v3.1)으로 발송된다.
+// 공용 발송 함수 — 모든 이메일이 서버에 연결된 Gmail 계정으로 발송된다.
 // attachments: [{ filename, contentBase64, contentType }] (선택)
 async function sendBrandedEmail(
   env,
   { to, subject, bodyText, companyName, heading, title, attachments }
 ) {
-  if (!env.MAILJET_API_KEY || !env.MAILJET_SECRET_KEY) {
-    throw new Error('MAILJET_API_KEY / MAILJET_SECRET_KEY 환경 변수가 설정되지 않았습니다.')
-  }
-  if (!env.FINAL_OFFER_FROM_EMAIL) {
-    throw new Error('FINAL_OFFER_FROM_EMAIL 환경 변수가 설정되지 않았습니다.')
-  }
-
-  const fromName = env.FINAL_OFFER_FROM_NAME || companyName || ''
-  const message = {
-    From: { Email: env.FINAL_OFFER_FROM_EMAIL, Name: fromName },
-    To: [{ Email: to }],
-    Subject: subject,
-    TextPart: bodyText,
-    HTMLPart: buildBrandedEmailHtml({ bodyText, companyName, heading, title }),
-  }
-  if (Array.isArray(attachments) && attachments.length > 0) {
-    message.Attachments = attachments.map((a) => ({
-      ContentType: a.contentType || 'application/octet-stream',
-      Filename: a.filename,
-      Base64Content: a.contentBase64,
-    }))
-  }
-
-  const auth = btoa(`${env.MAILJET_API_KEY}:${env.MAILJET_SECRET_KEY}`)
-  const res = await fetch('https://api.mailjet.com/v3.1/send', {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${auth}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ Messages: [message] }),
+  return sendGmailEmail(env, {
+    fromName: env.FINAL_OFFER_FROM_NAME || companyName || '',
+    to,
+    subject,
+    text: bodyText,
+    html: buildBrandedEmailHtml({ bodyText, companyName, heading, title }),
+    attachments,
   })
-
-  if (!res.ok) {
-    const detail = await res.text()
-    throw new Error(`Mailjet API 오류 (${res.status}): ${detail.slice(0, 300)}`)
-  }
-
-  const result = await res.json()
-  const status = result?.Messages?.[0]?.Status
-  if (status !== 'success') {
-    throw new Error(`Mailjet 발송 실패: ${JSON.stringify(result?.Messages?.[0] ?? result).slice(0, 300)}`)
-  }
-  return result
 }
 
 export async function sendFinalOfferEmail(env, { to, subject, bodyText, companyName }) {
