@@ -3859,3 +3859,22 @@
     max-height: 68vh;
   }
 }
+/* Public policy links use full navigation to their script-free HTML documents. */
+.app-legal-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 24px;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 24px var(--gutter) 88px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.app-legal-footer a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--text-muted);
+}
+.app-legal-footer a[href="/privacy/"] { font-weight: 600; }

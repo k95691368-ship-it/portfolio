@@ -33,7 +33,7 @@ function fastFirstPaint() {
     enforce: 'post',
     generateBundle(_options, bundle) {
       const html = Object.values(bundle).find(
-        (f) => f.type === 'asset' && f.fileName.endsWith('index.html')
+        (f) => f.type === 'asset' && f.fileName === 'index.html'
       )
       if (!html) return
       let source = String(html.source)
@@ -69,7 +69,7 @@ function fastFirstPaint() {
         if (!entry) continue
         // 본 묶음이 이미 받는 것은 뺀다 -- 두 번 받을 이유가 없다.
         const main = Object.values(bundle).find(
-          (f) => f.type === 'chunk' && f.isEntry
+          (f) => f.type === 'chunk' && f.isEntry && f.name === 'app'
         )
         const already = withDeps(main)
         map[route] = [...withDeps(entry[1])].filter((f) => !already.has(f))
@@ -273,6 +273,15 @@ function securityHeaders() {
 export default defineConfig({
   base: '/',
   plugins: [react(), fastFirstPaint(), securityHeaders()],
+  build: {
+    rollupOptions: {
+      input: {
+        app: 'index.html',
+        privacy: 'privacy/index.html',
+        terms: 'terms/index.html',
+      },
+    },
+  },
   server: {
     proxy: {
       '/api': {

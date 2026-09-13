@@ -175,6 +175,14 @@ function App() {
           </Routes>
         </Suspense>
       </main>
+      {!isInterview && (
+        <footer className="app-legal-footer" aria-label="서비스 정책">
+          <span>운영자 김현욱</span>
+          <a href="/privacy/">개인정보처리방침</a>
+          <a href="/terms/">이용약관</a>
+          <a href="mailto:k95691368@gmail.com">문의</a>
+        </footer>
+      )}
       {/* 오른쪽 아래 쪽지함. 로그인하지 않았으면 스스로 아무것도 그리지 않는다. */}
       {!isInterview && user && <Suspense fallback={null}><DmDock /></Suspense>}
     </>
