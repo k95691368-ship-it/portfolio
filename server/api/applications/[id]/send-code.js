@@ -50,6 +50,7 @@ export async function onRequestPost({ env, data, params }) {
   const companyName = data.user.company_name || data.user.display_name
   try {
     await sendApplicationResultEmail(env, {
+      idempotencyKey: `application:${params.id}:passed`,
       to: application.applicant_email,
       applicantName: application.applicant_name,
       companyName,
@@ -57,6 +58,7 @@ export async function onRequestPost({ env, data, params }) {
       inviteCode: room.invite_code,
     })
   } catch (err) {
+    if (err.deliveryState === 'unknown') return jsonError('이메일 발송 결과를 확인 중입니다. 보낸메일함 확인 전 재전송하지 마세요.', 409)
     await releaseRateLimit(env, bucket, ticket)
     const detail = String(err?.message || err).slice(0, 300)
     console.error(`Send code email failed (application ${params.id}):`, detail)

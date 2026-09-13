@@ -72,6 +72,7 @@ export async function onRequestPost({ env, data, params }) {
   if (isEmailConfigured(env)) {
     try {
       await sendApplicationResultEmail(env, {
+        idempotencyKey: `application:${params.id}:rejected`,
         to: application.applicant_email,
         applicantName: application.applicant_name,
         companyName,
@@ -79,7 +80,7 @@ export async function onRequestPost({ env, data, params }) {
       })
       emailStatus = 'sent'
     } catch (err) {
-      emailStatus = 'failed'
+      emailStatus = err.deliveryState === 'unknown' ? 'unknown' : 'failed'
       emailError = String(err?.message || err).slice(0, 300)
       console.error(`Reject result email failed (application ${params.id}):`, emailError)
     }

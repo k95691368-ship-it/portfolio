@@ -1,0 +1,9 @@
+project_id = "portfolio"
+
+# API routes validate X-App-Authorization / X-Room-Authorization themselves.
+[functions.api]
+verify_jwt = false
+
+# Retention validates its separate RETENTION_JOB_SECRET before any operation.
+[functions.retention]
+verify_jwt = false

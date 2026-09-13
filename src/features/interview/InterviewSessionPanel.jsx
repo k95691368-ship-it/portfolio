@@ -44,7 +44,8 @@ function RecordingResult({ roomId, session, onRecordingChanged }) {
   const retentionDate = formatRetentionDate(recording.retentionUntil)
 
   let detail = recording.label
-  if (expired) detail = '보관 기간이 끝나 녹화 파일이 삭제되었습니다.'
+  if (recording.status === 'deleted') detail = '녹화 파일 삭제가 완료되었습니다.'
+  else if (expired) detail = '보관 기간이 만료되어 재생할 수 없습니다. 저장 파일은 삭제 대기 중입니다.'
   else if (recording.status === 'processing' || recording.storageStatus === 'copying') {
     detail = '녹화 파일을 처리하는 중입니다.'
   } else if (recording.status === 'failed' || storageFailed) {

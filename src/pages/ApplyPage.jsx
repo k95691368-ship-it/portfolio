@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
-import { CONSENT_ITEMS } from '../lib/consentText.js'
+import { CONSENT_ITEMS, CONSENT_VERSION } from '../lib/consentText.js'
 import { isApplyFormDirty, LEAVE_CONFIRM_MESSAGE } from '../lib/applyForm.js'
 
 const EMPLOYMENT_TYPES = ['정규직', '계약직', '인턴', '아르바이트', '프리랜서', '기타']
@@ -150,17 +150,21 @@ export default function ApplyPage() {
       toast.error('이력서 파일을 첨부해주세요.')
       return
     }
+    if (!consents.consentOptional && (careers.length || portfolio)) {
+      toast.error('경력사항과 포트폴리오를 제거하거나 선택항목 수집에 동의해주세요.')
+      return
+    }
 
     setSubmitting(true)
     try {
       const form = new FormData()
+      form.append('consentVersion', CONSENT_VERSION)
       form.append('applicantName', name)
       form.append('applicantEmail', email)
       form.append('applicantPhone', phone)
       form.append('careerJson', JSON.stringify(careers))
       form.append('consentRequired', consents.consentRequired ? 'true' : 'false')
       form.append('consentOptional', consents.consentOptional ? 'true' : 'false')
-      form.append('consentThirdParty', consents.consentThirdParty ? 'true' : 'false')
       form.append('resume', resume)
       if (portfolio) form.append('portfolio', portfolio)
 

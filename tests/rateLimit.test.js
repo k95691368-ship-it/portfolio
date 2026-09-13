@@ -22,7 +22,7 @@ function fakeDb({ count = 0, lastRowId = 42 } = {}) {
         },
         async run() {
           calls.push({ sql, binds: statement.binds, kind: 'run' })
-          return { meta: { last_row_id: lastRowId } }
+          return { meta: { changes: sql.includes('INSERT') && count >= statement.binds[2] ? 0 : 1, last_row_id: lastRowId } }
         },
       }
       return statement
@@ -45,7 +45,7 @@ describe('checkRateLimit', () => {
     const db = fakeDb({ count: 5 })
     const ticket = await checkRateLimit(env(db), 'apply:1.1.1.1', 5, 3600)
     expect(ticket).toBe(0)
-    expect(db.calls.some((c) => c.sql.includes('INSERT INTO rate_limit_hits'))).toBe(false)
+    expect(db.calls.find((c) => c.sql.includes('INSERT INTO rate_limit_hits')).sql).toContain('SELECT COUNT(*)')
   })
 
   it('한도를 넘어선 뒤에도 막는다', async () => {
@@ -68,15 +68,13 @@ describe('releaseRateLimit', () => {
     const del = db.calls.find((c) => c.sql.includes('DELETE'))
     expect(del.sql).toContain('WHERE id = ?')
     expect(del.sql).not.toContain('ORDER BY')
-    expect(del.binds).toEqual([77])
+    expect(del.binds).toEqual([77, 'apply:1.1.1.1'])
   })
 
-  it('티켓이 없으면 그 버킷의 가장 최근 기록을 지운다', async () => {
+  it('티켓이 없으면 다른 요청의 기록을 지우지 않는다', async () => {
     const db = fakeDb()
     await releaseRateLimit(env(db), 'apply:1.1.1.1')
-    const del = db.calls.find((c) => c.sql.includes('DELETE'))
-    expect(del.sql).toContain('ORDER BY id DESC')
-    expect(del.binds).toEqual(['apply:1.1.1.1'])
+    expect(db.calls).toHaveLength(0)
   })
 
   it('되돌리기가 실패해도 요청 처리를 막지 않는다', async () => {

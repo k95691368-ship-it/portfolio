@@ -94,29 +94,8 @@ export async function onRequestGet({ request, env, data, params }) {
   const wantsDownload = new URL(request.url).searchParams.get('download') === '1'
   const action = wantsDownload ? 'download' : 'view'
   if (retentionHasExpired(recording.retention_until)) {
-    if (recording.r2_key) {
-      if (!env.INTERVIEW_RECORDINGS) {
-        await logAccess(env, request, recording.id, data.user.id, action, 'failed', 'binding_missing')
-        return jsonError('만료된 녹화 파일을 삭제할 수 없어 접근을 차단했습니다.', 503)
-      }
-      try {
-        await env.INTERVIEW_RECORDINGS.delete(recording.r2_key)
-      } catch (error) {
-        console.error(`Expired recording delete failed (${recording.id}):`, error)
-        await logAccess(env, request, recording.id, data.user.id, action, 'failed', 'expiry_delete_failed')
-        return jsonError('만료된 녹화 파일 삭제를 완료하지 못했습니다.', 503)
-      }
-    }
-    await env.DB.prepare(
-      `UPDATE interview_recordings
-          SET status = 'deleted', storage_status = 'deleted', r2_key = NULL,
-              deleted_at = COALESCE(deleted_at, datetime('now')), updated_at = datetime('now')
-        WHERE id = ?`
-    )
-      .bind(recording.id)
-      .run()
     await logAccess(env, request, recording.id, data.user.id, action, 'denied', 'retention_expired')
-    return jsonError('보존 기간이 끝나 녹화 파일이 삭제되었습니다.', 410)
+    return jsonError('보관 기간이 만료되어 녹화 파일에 접근할 수 없습니다.', 410)
   }
   if (recording.status !== 'available' || recording.storage_status !== 'stored' || !recording.r2_key) {
     await logAccess(env, request, recording.id, data.user.id, action, 'denied', 'not_available')

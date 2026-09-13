@@ -17,13 +17,13 @@ export function applyTrialCapabilities(user) {
       !Number.isFinite(expires) || !Number.isFinite(started) || expires <= Date.now() ||
       started > Date.now() + 1000 || expires <= started ||
       expires - started > (TRIAL_SECONDS + 1) * 1000) return null
-  return { ...user, is_admin: 1, is_recruiter: 1, is_developer: 1, developer_trial: true }
+  return { ...user, is_admin: 0, is_recruiter: 1, is_developer: 0, developer_trial: true }
 }
 
 export function trialProfile(user) {
   return {
     id: user.id, email: user.email, role: 'company', displayName: user.display_name,
-    isAdmin: true, isRecruiter: true, isDeveloper: true, developerTrial: true,
+    isAdmin: false, isRecruiter: true, isDeveloper: false, developerTrial: true,
     trialExpiresAt: user.session_expires_at, mustChangePassword: false,
   }
 }

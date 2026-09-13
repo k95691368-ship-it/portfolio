@@ -32,12 +32,6 @@ function publicKey(env) {
   ).trim()
 }
 
-function serviceKey(env) {
-  return String(
-    env?.SUPABASE_SERVICE_ROLE_KEY ||
-      firstKey(env?.SUPABASE_SECRET_KEYS)
-  ).trim()
-}
 
 export function getSupabaseRealtimeConfig(env) {
   const projectUrl = String(env?.SUPABASE_URL || '').trim().replace(/\/$/, '')
@@ -62,32 +56,18 @@ export function createMeeting() {
 }
 
 async function broadcastControl(env, meetingId, event, payload = {}) {
-  const projectUrl = String(env?.SUPABASE_URL || '').trim().replace(/\/$/, '')
-  const key = serviceKey(env)
-  if (!projectUrl || !key) return
-
-  const response = await fetch(`${projectUrl}/realtime/v1/api/broadcast`, {
-    method: 'POST',
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      messages: [
-        {
-          topic: `interview:${meetingId}`,
-          event: 'control',
-          private: false,
-          payload: { event, ...payload },
-        },
-      ],
-    }),
-  }).catch(() => null)
-
-  if (!response?.ok) {
-    throw new VideoServiceError('화상 면접 제어 신호를 보내지 못했습니다.', response?.status || 503)
+  if (!env.DB) throw new VideoServiceConfigError(['DB'])
+  const session = await env.DB.prepare('SELECT id FROM interview_sessions WHERE provider_meeting_id = ?').bind(meetingId).first()
+  if (!session) throw new VideoServiceError('회의를 찾을 수 없습니다.', 404)
+  if (event === 'meeting-ended') {
+    await env.DB.prepare("UPDATE interview_sessions SET status = 'ended', ended_at = datetime('now') WHERE id = ?").bind(session.id).run()
   }
+  const ids = payload.customParticipantIds || []
+  const scoped = event === 'participants-kicked'
+  await env.DB.prepare(`UPDATE interview_session_members SET provider_participant_id = NULL,
+    signaling_seen_at = NULL, admitted_at = NULL, left_at = datetime('now')
+    WHERE session_id = ?${scoped ? ' AND (custom_participant_id IN (' + ids.map(() => '?').join(',') + ') OR provider_participant_id IN (' + ids.map(() => '?').join(',') + '))' : ''}`)
+    .bind(session.id, ...(scoped ? [...ids, ...ids] : [])).run()
 }
 
 export async function closeMeeting(env, { meetingId }) {
@@ -121,7 +101,8 @@ export function issueParticipantCredentials(
 ) {
   const config = getSupabaseRealtimeConfig(env)
   return {
-    ...config,
+    projectUrl: config.projectUrl,
+    transport: 'authenticated-api',
     authToken: randomToken(),
     meetingId,
     participantId,

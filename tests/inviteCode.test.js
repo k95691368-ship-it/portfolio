@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { sqliteApp } from './helpers/sqliteApp.js'
 import {
   genInviteCode,
   normalizeInviteCode,
@@ -64,6 +65,7 @@ describe('서류합격 안내 메일', () => {
     const { sendApplicationResultEmail } = await import('../server/_lib/email.js')
     let captured = null
     const env = {
+      DB: sqliteApp(),
       EMAIL_ENABLED: '1',
       GMAIL_CLIENT_ID: 'test-client',
       GMAIL_CLIENT_SECRET: 'test-secret',
@@ -87,6 +89,7 @@ describe('서류합격 안내 메일', () => {
         inviteCode: 'AC3KM7PQ4RTV',
       })
     } finally {
+      env.DB.close()
       globalThis.fetch = realFetch
     }
     const mime = Buffer.from(captured.raw, 'base64url').toString('utf8')

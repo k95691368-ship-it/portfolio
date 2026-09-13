@@ -117,17 +117,7 @@ function fastFirstPaint() {
 //
 // frame-ancestors 도 여기서 막는다. 계약서 화면을 보이지 않는 액자에 넣고 그
 // 위에 가짜 버튼을 얹으면, 누르는 사람은 다른 것을 누른 줄 알고 서명한다.
-const ANALYTICS = {
-  script: ['https://www.googletagmanager.com', 'https://www.clarity.ms', 'https://scripts.clarity.ms'],
-  connect: [
-    'https://www.google-analytics.com',
-    'https://analytics.google.com',
-    'https://*.google-analytics.com',
-    'https://*.clarity.ms',
-    'https://*.googletagmanager.com',
-  ],
-  img: ['https://www.google-analytics.com', 'https://*.google-analytics.com', 'https://*.clarity.ms'],
-}
+const ANALYTICS = { script: [], connect: [], img: [] }
 
 // 정적 화면은 API와 면접 신호를 Supabase에만 보낸다. 프로젝트 주소를 정확히
 // 고정해 다른 Supabase 프로젝트로 개인정보가 빠져나갈 여지를 만들지 않는다.

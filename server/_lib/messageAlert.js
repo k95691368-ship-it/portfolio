@@ -90,6 +90,7 @@ export async function alertCandidate(env, { roomId, room, candidate, companyName
 
   try {
     await sendNewMessageEmail(env, {
+      idempotencyKey: `message:${roomId}:${crypto.randomUUID()}`,
       to: candidate.email,
       companyName,
       roomTitle: room?.title ?? '면접방',
@@ -98,6 +99,7 @@ export async function alertCandidate(env, { roomId, room, candidate, companyName
     return { emailed: true }
   } catch (err) {
     console.error(`new message email failed (${roomId}):`, err)
+    if (err.deliveryState === 'unknown') return { emailed: false, reason: 'unknown' }
     // 보내지 못했으면 표시를 되돌린다. 그대로 두면 다음 메시지도 조용히
     // 건너뛰어, 지원자는 아무 소식도 못 받는다.
     await env.DB.prepare(

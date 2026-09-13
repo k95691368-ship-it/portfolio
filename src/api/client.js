@@ -48,6 +48,22 @@ function clearAccountSession() {
   sessionStorage.removeItem(SESSION_KEY)
 }
 
+// Update only the token used for this request: a late response must not extend
+// a different account after logout/login in another tab.
+function acceptRenewal(res, headers) {
+  const expiresAt = res.headers.get('X-App-Session-Expires-At')
+  if (!expiresAt || !Number.isFinite(Date.parse(expiresAt)) || Date.parse(expiresAt) <= Date.now()) return
+  for (const storage of [localStorage, sessionStorage]) {
+    try {
+      const saved = JSON.parse(storage.getItem(SESSION_KEY) || 'null')
+      if (saved?.token && headers['X-App-Authorization'] === `Bearer ${saved.token}` &&
+          Date.parse(expiresAt) > Date.parse(saved.expiresAt || 0)) {
+        storage.setItem(SESSION_KEY, JSON.stringify({ ...saved, expiresAt }))
+      }
+    } catch { /* Private browsing can deny storage writes. */ }
+  }
+}
+
 function roomSessions() {
   try {
     const rows = JSON.parse(localStorage.getItem(ROOM_SESSION_KEY) || '{}')
@@ -169,6 +185,7 @@ async function performRequest(path, options, headers) {
     credentials: 'omit',
     headers,
   })
+  acceptRenewal(res, headers)
   const data = await res.json().catch(() => null)
   if (!res.ok) throw toUserError(res, data)
   acceptAuthResponse(path, data)
@@ -199,12 +216,14 @@ function request(path, options = {}) {
 
 async function upload(path, formData) {
   writeGeneration += 1
+  const headers = { ...authHeaders(path), ...roomIdentityHeader(path) }
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     credentials: 'omit',
-    headers: { ...authHeaders(path), ...roomIdentityHeader(path) },
+    headers,
     body: formData,
   }).finally(() => { writeGeneration += 1 })
+  acceptRenewal(res, headers)
   const data = await res.json().catch(() => null)
   if (!res.ok) throw toUserError(res, data)
   acceptAuthResponse(path, data)
@@ -212,10 +231,12 @@ async function upload(path, formData) {
 }
 
 export async function apiBlob(path) {
+  const headers = { ...authHeaders(path), ...roomIdentityHeader(path) }
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: 'omit',
-    headers: { ...authHeaders(path), ...roomIdentityHeader(path) },
+    headers,
   })
+  acceptRenewal(res, headers)
   if (!res.ok) {
     const data = await res.json().catch(() => null)
     throw toUserError(res, data)
@@ -243,7 +264,7 @@ export async function downloadApiFile(path) {
 
 export const api = {
   get: (path) => request(path),
-  post: (path, body) => request(path, { method: 'POST', body: JSON.stringify(body) }),
+  post: (path, body, options = {}) => request(path, { ...options, method: 'POST', body: JSON.stringify(body) }),
   put: (path, body) => request(path, { method: 'PUT', body: JSON.stringify(body) }),
   patch: (path, body) => request(path, { method: 'PATCH', body: JSON.stringify(body) }),
   // DELETE에도 본문을 실을 수 있어야 한다 — 보존 의무처럼 "알고도 지운다"는

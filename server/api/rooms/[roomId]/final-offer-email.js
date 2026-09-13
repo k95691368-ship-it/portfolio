@@ -14,7 +14,6 @@ const BODY_MAX_LENGTH = 5000
 // (요청이 도중에 끊기거나 워커가 회수되는 경우) 그러면 "이미 진행 중"이라는
 // 이유로 최종합격 이메일을 영영 다시 보낼 수 없게 된다. 발송은 몇 초면 끝나므로,
 // 이 시간이 지나도록 그대로인 것은 끊긴 것으로 보고 다시 잡을 수 있게 한다.
-const STUCK_SENDING_SECONDS = 300
 
 async function getCandidate(env, roomId) {
   return env.DB.prepare(
@@ -132,9 +131,7 @@ export async function onRequestPost({ request, env, data, params }) {
        attempt_count=final_offer_emails.attempt_count + 1,
        error_message=NULL,
        updated_at=datetime('now')
-     WHERE final_offer_emails.status = 'failed'
-        OR (final_offer_emails.status = 'sending'
-            AND final_offer_emails.updated_at < datetime('now', '-' || ?7 || ' seconds'))`
+     WHERE final_offer_emails.status = 'failed'`
   )
     .bind(
       genId(),
@@ -142,8 +139,7 @@ export async function onRequestPost({ request, env, data, params }) {
       data.user.id,
       candidate.email,
       subject,
-      bodyText,
-      STUCK_SENDING_SECONDS
+      bodyText
     )
     .run()
 
@@ -152,38 +148,43 @@ export async function onRequestPost({ request, env, data, params }) {
     if (existing?.status === 'sent') {
       return jsonError('최종합격 이메일은 이미 발송되었습니다.', 409)
     }
-    return jsonError('최종합격 이메일 발송이 이미 진행 중입니다. 잠시 후 다시 시도해주세요.', 409)
+    return jsonError('발송 중이거나 발송 결과 확인이 필요합니다. 보낸메일함과 발송 기록 확인 전에는 재전송하지 않습니다.', 409)
   }
 
   let sentDelivery = null
+  let accepted = false
   try {
-    await sendFinalOfferEmail(env, {
+    const provider = await sendFinalOfferEmail(env, {
+      idempotencyKey: `room:${params.roomId}:final-offer`,
       to: candidate.email,
       subject,
       bodyText,
       companyName,
     })
+    accepted = true
 
     await env.DB.prepare(
       `UPDATE final_offer_emails
-       SET status = 'sent', sent_at = datetime('now'), updated_at = datetime('now'), error_message = NULL
+       SET status = 'sent', sent_at = datetime('now'), updated_at = datetime('now'), error_message = NULL, provider_message_id = ?
        WHERE room_id = ?`
     )
-      .bind(params.roomId)
+      .bind(provider.id, params.roomId)
       .run()
     // 확정 근거에 발송 시각을 담는다. "언제 알렸는가"가 곧 성립 시점이다.
     sentDelivery = await getDelivery(env, params.roomId)
   } catch (error) {
+    const unknown = accepted || error.deliveryState === 'unknown'
     const detail = String(error?.message || 'Unknown email error').slice(0, 500)
     console.error(`Final offer email failed for room ${params.roomId}:`, detail)
     await env.DB.prepare(
       `UPDATE final_offer_emails
-       SET status = 'failed', error_message = ?, updated_at = datetime('now')
+       SET status = ?, error_message = ?, updated_at = datetime('now')
        WHERE room_id = ?`
     )
-      .bind(detail, params.roomId)
+      .bind(unknown ? 'unknown' : 'failed', detail, params.roomId)
       .run()
-    return jsonError('이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.', 502)
+      .catch(() => {})
+    return jsonError(unknown ? '메일이 발송되었을 수 있습니다. 보낸메일함 확인 전 재전송하지 마세요.' : '이메일 발송에 실패했습니다. 설정과 한도를 확인해주세요.', 502)
   }
 
   // 보낸 그 순간 채용내정이 확정된다.

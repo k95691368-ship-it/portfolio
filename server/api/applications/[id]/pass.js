@@ -37,6 +37,9 @@ export async function onRequestPost({ env, data, params }) {
   if (existingUser && existingUser.role !== 'candidate') {
     return jsonError('이 이메일은 이미 다른 유형의 계정으로 사용 중이라 지원자로 연결할 수 없습니다.', 409)
   }
+  if (existingUser && application.created_user_id !== existingUser.id) {
+    return jsonError('지원자가 로그인한 뒤 지원 현황에서 접수번호로 본인 계정에 지원서를 연결해야 합니다. 이메일 주소만으로는 계정에 연결하지 않습니다.', 409)
+  }
 
   let candidateUserId
   let tempPassword = null
@@ -163,6 +166,7 @@ export async function onRequestPost({ env, data, params }) {
   if (isEmailConfigured(env)) {
     try {
       await sendApplicationResultEmail(env, {
+        idempotencyKey: `application:${params.id}:passed`,
         to: application.applicant_email,
         applicantName: application.applicant_name,
         companyName,
@@ -172,7 +176,7 @@ export async function onRequestPost({ env, data, params }) {
       })
       emailStatus = 'sent'
     } catch (err) {
-      emailStatus = 'failed'
+      emailStatus = err.deliveryState === 'unknown' ? 'unknown' : 'failed'
       emailError = String(err?.message || err).slice(0, 300)
       console.error(`Pass result email failed (application ${params.id}):`, emailError)
     }

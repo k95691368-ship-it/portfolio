@@ -79,9 +79,6 @@ export function redactPath(pathname) {
 // 화면 하나 만들 때마다 이 목록을 기억해야 하고, 잊는 순간 새어 나간다.
 const PUBLIC_SCREENS = [
   '/', // 첫 화면
-  '/login',
-  '/signup',
-  '/change-password',
   '/jobs', // 공고 목록
   '/tech', // 기술 설명
 ]
@@ -106,7 +103,7 @@ function ready() {
 }
 
 export function trackPageView(pathname) {
-  if (!ready()) return
+  if (!ready() || holdsPersonalData(pathname)) return
   const page_path = redactPath(pathname)
   const fields = {
     page_path,

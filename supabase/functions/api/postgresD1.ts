@@ -64,6 +64,13 @@ export class PostgresD1 {
     return new PostgresStatement(this, source)
   }
 
+  async withRateLimitLock<T>(bucket: string, operation: (db: PostgresD1) => Promise<T>) {
+    return this.client.begin(async (transaction) => {
+      await transaction.unsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [bucket])
+      return operation(new PostgresD1(transaction as SqlClient))
+    })
+  }
+
   async batch(statements: PostgresStatement[]) {
     return this.client.begin(async (transaction) => {
       const database = new PostgresD1(transaction as SqlClient)

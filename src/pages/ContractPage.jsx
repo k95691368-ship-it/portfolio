@@ -1437,6 +1437,7 @@ export default function ContractPage() {
                 <li key={d.channel}>
                   <strong>{d.channelLabel}</strong> · {formatKst(d.deliveredAt)}
                   {d.status === 'failed' && <span className="compare-concern"> · 발송 실패</span>}
+                  {d.status === 'unknown' && <span className="compare-concern"> · 발송 결과 확인 필요</span>}
                   {d.firstViewedAt && ` · 열람 ${formatKst(d.firstViewedAt)}`}
                   {d.downloadedAt && ` · 내려받음 ${formatKst(d.downloadedAt)}`}
                 </li>
@@ -1605,6 +1606,7 @@ export default function ContractPage() {
                 계약서가 저장되었습니다. ({formatKst(signedContract.createdAt)})
                 {signedContract.emailStatus === 'sent' && ' · 이메일로 사본 전송 완료'}
                 {signedContract.emailStatus === 'failed' && ' · 이메일 전송 실패'}
+                {signedContract.emailStatus === 'unknown' && ' · 이메일 발송 결과 확인 필요'}
                 {signedContract.emailStatus === 'not_sent' &&
                   !signedMeta.emailConfigured &&
                   ' · 이메일 미설정(저장만 완료)'}

@@ -76,12 +76,14 @@ export async function onRequestPost({ request, env, data, params }) {
   const companyName = data.user.company_name || data.user.display_name
   try {
     await sendRoomInviteEmail(env, {
+      idempotencyKey: `room:${params.roomId}:invite`,
       to: candidate.email,
       subject,
       bodyText,
       companyName,
     })
   } catch (error) {
+    if (error.deliveryState === 'unknown') return jsonError('이메일 발송 결과를 확인 중입니다. 보낸메일함 확인 전 재전송하지 마세요.', 409)
     const detail = String(error?.message || 'Unknown email error').slice(0, 500)
     console.error(`Room invite email failed for room ${params.roomId}:`, detail)
     return jsonError('이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.', 502)

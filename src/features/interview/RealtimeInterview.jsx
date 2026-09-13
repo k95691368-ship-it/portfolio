@@ -1,4 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
+import { createAuthorizedChannel } from './authorizedChannel.js'
+import { beginRecordingBackup, appendRecordingChunk, recoverRecording, removeRecordingBackup } from './recordingStore.js'
 import * as tus from 'tus-js-client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
@@ -93,10 +94,6 @@ function drawVideoCover(context, video, x, y, width, height) {
   context.drawImage(video, sourceX, sourceY, sourceWidth, sourceHeight, x, y, width, height)
 }
 
-async function hashBlob(blob) {
-  const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer())
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
-}
 
 function directStorageEndpoint(projectUrl) {
   const url = new URL(projectUrl)
@@ -131,7 +128,7 @@ function VideoTile({ stream, label, muted = false, outputDeviceId = '' }) {
   )
 }
 
-function createCompositeRecording(getSources) {
+async function createCompositeRecording(getSources, recordingId, owner, sessionId) {
   if (typeof MediaRecorder === 'undefined') {
     throw new Error('이 브라우저에서는 면접 녹화를 지원하지 않습니다.')
   }
@@ -206,14 +203,50 @@ function createCompositeRecording(getSources) {
     ...destination.stream.getAudioTracks(),
   ])
   const mimeType = preferredRecordingMime()
-  const recorder = new MediaRecorder(output, mimeType ? { mimeType } : undefined)
-  const chunks = []
-  const startedAt = Date.now()
-  recorder.ondataavailable = (event) => {
-    if (event.data?.size) chunks.push(event.data)
+  const releaseCapture = async () => {
+    cancelAnimationFrame(animationFrame)
+    for (const entry of media.values()) { entry.audioNode?.disconnect(); entry.video.srcObject = null }
+    output.getTracks().forEach((track) => track.stop())
+    await audioContext.close().catch(() => {})
   }
-  draw()
-  recorder.start(1000)
+  let recorder
+  try {
+    recorder = new MediaRecorder(output, mimeType ? { mimeType } : undefined)
+    await beginRecordingBackup(recordingId, owner, sessionId, recorder.mimeType || 'video/webm')
+  } catch (error) {
+    await releaseCapture()
+    throw error
+  }
+  let writes = Promise.resolve(), chunkIndex = 0, storageError = null
+  const warnOnExit = (event) => { event.preventDefault(); event.returnValue = '' }
+  window.addEventListener('beforeunload', warnOnExit)
+  recorder.ondataavailable = (event) => {
+    if (event.data?.size) writes = writes.then(() => appendRecordingChunk(recordingId, chunkIndex++, event.data))
+      .catch((error) => { storageError = error; if (recorder.state !== 'inactive') recorder.stop() })
+  }
+  let finishResolve, finishReject
+  const finished = new Promise((resolve, reject) => { finishResolve = resolve; finishReject = reject })
+  void finished.catch(() => {})
+  recorder.onerror = () => { storageError = new Error('녹화가 중단되었습니다. 저장된 조각을 복구해주세요.'); if (recorder.state !== 'inactive') recorder.stop() }
+  recorder.onstop = async () => {
+    window.removeEventListener('beforeunload', warnOnExit)
+    await releaseCapture()
+    await writes
+    if (storageError) { finishReject(storageError); return }
+    try {
+      const result = await recoverRecording(recordingId, owner, sessionId)
+      if (!result) throw new Error('저장된 녹화 조각이 없습니다.')
+      finishResolve(result)
+    } catch (error) { finishReject(error) }
+  }
+  try {
+    draw()
+    recorder.start(1000)
+  } catch (error) {
+    window.removeEventListener('beforeunload', warnOnExit)
+    await releaseCapture()
+    throw error
+  }
 
   return {
     pause() {
@@ -223,27 +256,8 @@ function createCompositeRecording(getSources) {
       if (recorder.state === 'paused') recorder.resume()
     },
     stop() {
-      return new Promise((resolve, reject) => {
-        recorder.onerror = () => reject(new Error('녹화 파일을 만들지 못했습니다.'))
-        recorder.onstop = async () => {
-          cancelAnimationFrame(animationFrame)
-          for (const entry of media.values()) {
-            entry.audioNode?.disconnect()
-            entry.video.srcObject = null
-          }
-          output.getTracks().forEach((track) => track.stop())
-          await audioContext.close().catch(() => {})
-          const blob = new Blob(chunks, { type: recorder.mimeType || 'video/webm' })
-          resolve({
-            blob,
-            sha256: await hashBlob(blob),
-            sizeBytes: blob.size,
-            durationSeconds: Math.max(0, Math.round((Date.now() - startedAt) / 1000)),
-          })
-        }
-        if (recorder.state === 'inactive') reject(new Error('진행 중인 녹화가 없습니다.'))
-        else recorder.stop()
-      })
+      if (recorder.state !== 'inactive') recorder.stop()
+      return finished
     },
   }
 }
@@ -270,7 +284,6 @@ export default function RealtimeInterview({
   const localStreamRef = useRef(null)
   const remoteRef = useRef([])
   const channelRef = useRef(null)
-  const supabaseRef = useRef(null)
   const peersRef = useRef(new Map())
   const meetingRef = useRef(null)
   const recordingRef = useRef(null)
@@ -316,7 +329,7 @@ export default function RealtimeInterview({
       [...peersRef.current.values()].map((peer) =>
         peer.audioSender?.replaceTrack(
           micOnRef.current && !shouldSeparateAudio(peer.participant.role) ? track : null
-        ).catch(() => {})
+        ).catch(() => { peer.connection.close() })
       )
     )
   }, [shouldSeparateAudio])
@@ -331,6 +344,7 @@ export default function RealtimeInterview({
   }, [updateRemoteParticipants])
 
   const attachDataChannel = useCallback((peer, dataChannel) => {
+    if (!['host', 'interviewer'].includes(credentials.role) || !['host', 'interviewer'].includes(peer.participant.role)) { dataChannel.close(); return }
     peer.dataChannel = dataChannel
     dataChannel.onmessage = (event) => {
       let message
@@ -339,11 +353,14 @@ export default function RealtimeInterview({
       } catch {
         return
       }
-      if (message?.type !== 'private-chat' || typeof message.message !== 'string') return
+      if (message?.type !== 'text' || typeof message.message !== 'string' || message.message.length > 2000) return
       const chat = meetingRef.current?.chat
       if (!chat) return
       chat.messages.push({
         ...message,
+        userId: peer.participant.id,
+        peerId: peer.participant.id,
+        displayName: peer.participant.displayName,
         id: message.id || crypto.randomUUID(),
         type: 'text',
         targetUserIds: [meetingRef.current.self.id],
@@ -351,7 +368,7 @@ export default function RealtimeInterview({
       })
       chat._events.emit('chatUpdate')
     }
-  }, [])
+  }, [credentials.role])
 
   const ensurePeer = useCallback((participant) => {
     const existing = peersRef.current.get(participant.id)
@@ -359,7 +376,7 @@ export default function RealtimeInterview({
       existing.participant = participant
       return existing
     }
-    const connection = new RTCPeerConnection({ iceServers: ICE_SERVERS })
+    const connection = new RTCPeerConnection({ iceServers: credentials.iceServers || ICE_SERVERS })
     const peer = {
       participant,
       connection,
@@ -371,7 +388,9 @@ export default function RealtimeInterview({
       videoSender: null,
     }
     for (const track of localStreamRef.current?.getTracks() || []) {
-      const sender = connection.addTrack(track, localStreamRef.current)
+      const sender = track.kind === 'audio' && shouldSeparateAudio(participant.role)
+        ? connection.addTransceiver('audio', { direction: 'sendrecv', streams: [localStreamRef.current] }).sender
+        : connection.addTrack(track, localStreamRef.current)
       if (track.kind === 'audio') peer.audioSender = sender
       if (track.kind === 'video') peer.videoSender = sender
     }
@@ -391,15 +410,26 @@ export default function RealtimeInterview({
     }
     connection.ondatachannel = (event) => attachDataChannel(peer, event.channel)
     connection.onconnectionstatechange = () => {
-      if (['failed', 'closed'].includes(connection.connectionState)) removePeer(participant.id)
+      if (connection.connectionState === 'closed') { removePeer(participant.id); return }
+      if (connection.connectionState === 'failed') {
+        if ((peer.restartCount || 0) >= 2) { removePeer(participant.id); return }
+        peer.restartCount = (peer.restartCount || 0) + 1
+        if (credentials.participantId < participant.id) {
+          void (async () => {
+            const offer = await connection.createOffer({ iceRestart: true })
+            await connection.setLocalDescription(offer)
+            await sendBroadcast('signal', { to: participant.id, description: connection.localDescription })
+          })().catch(() => removePeer(participant.id))
+        }
+      }
     }
-    if (credentials.participantId < participant.id) {
+    if (credentials.participantId < participant.id && ['host', 'interviewer'].includes(credentials.role) && ['host', 'interviewer'].includes(participant.role)) {
       attachDataChannel(peer, connection.createDataChannel('staff-chat', { ordered: true }))
     }
     peersRef.current.set(participant.id, peer)
     void applyOutgoingAudio()
     return peer
-  }, [applyOutgoingAudio, attachDataChannel, credentials.participantId, removePeer, sendBroadcast, updateRemoteParticipants])
+  }, [applyOutgoingAudio, attachDataChannel, credentials.participantId, credentials.iceServers, credentials.role, removePeer, sendBroadcast, shouldSeparateAudio, updateRemoteParticipants])
 
   const makeOffer = useCallback(async (participant) => {
     const peer = ensurePeer(participant)
@@ -419,6 +449,7 @@ export default function RealtimeInterview({
   }, [credentials.participantId, ensurePeer, sendBroadcast])
 
   const leave = useCallback(async () => {
+    if (recordingRef.current) { void recordingRef.current.stop().catch(() => {}); recordingRef.current = null }
     const meeting = meetingRef.current
     if (meeting?.self?.roomJoined) {
       meeting.self.roomJoined = false
@@ -430,7 +461,6 @@ export default function RealtimeInterview({
       await channelRef.current.unsubscribe().catch(() => {})
     }
     channelRef.current = null
-    if (supabaseRef.current) await supabaseRef.current.removeAllChannels().catch(() => {})
     setPhase('left')
     onJoinedChange?.(false)
     onConnectionState?.('left')
@@ -503,24 +533,26 @@ export default function RealtimeInterview({
         async enter() {
           huddleRef.current = true
           setHuddleActive(true)
-          await sendBroadcast('huddle', { active: true, from: self.id })
           await applyOutgoingAudio()
+          await sendBroadcast('huddle', { active: true, from: self.id })
         },
         async leave() {
+          await sendBroadcast('huddle', { active: false, from: self.id })
           huddleRef.current = false
           setHuddleActive(false)
-          await sendBroadcast('huddle', { active: false, from: self.id })
           await applyOutgoingAudio()
         },
       },
       recording: {
-        start() {
+        async start(recordingId) {
           if (recordingRef.current) throw new Error('이미 녹화 중입니다.')
-          recordingRef.current = createCompositeRecording(() => [
+          recordingRef.current = await createCompositeRecording(() => [
             { stream: localStreamRef.current, label: `${credentials.displayName} (나)` },
             ...remoteRef.current.map((item) => ({ stream: item.stream, label: item.displayName })),
-          ].filter((item) => item.stream))
+          ].filter((item) => item.stream), recordingId, credentials.customParticipantId, credentials.sessionId)
         },
+        recover: (id) => recoverRecording(id, credentials.customParticipantId, credentials.sessionId),
+        clearBackup: (id) => removeRecordingBackup(id),
         pause() {
           recordingRef.current?.pause()
         },
@@ -614,8 +646,9 @@ export default function RealtimeInterview({
       if (!presence) continue
       const participant = participantFromPresence(id, presence)
       participants.push(participant)
+      const existing = peersRef.current.has(id)
       ensurePeer(participant)
-      if (credentials.participantId < id) void makeOffer(participant).catch(() => {})
+      if (!existing && credentials.participantId < id) void makeOffer(participant).catch(() => {})
     }
     const active = new Set(participants.map((item) => item.id))
     for (const id of peersRef.current.keys()) if (!active.has(id)) removePeer(id)
@@ -627,20 +660,15 @@ export default function RealtimeInterview({
     setPhase('joining')
     setError('')
     onConnectionState?.('connecting')
-    const supabase = createClient(credentials.projectUrl, credentials.publishableKey, {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-    })
-    const channel = supabase.channel(`interview:${credentials.meetingId}`, {
-      config: { presence: { key: credentials.participantId }, broadcast: { self: false } },
-    })
-    supabaseRef.current = supabase
+    const channel = createAuthorizedChannel(credentials)
     channelRef.current = channel
     channel
-      .on('presence', { event: 'sync' }, () => void syncPresence())
+      .on('presence', { event: 'sync' }, () => syncPresence())
       .on('broadcast', { event: 'signal' }, async ({ payload }) => {
         if (payload?.to !== credentials.participantId || !payload.from) return
         const state = channel.presenceState()
-        const presence = state[payload.from]?.at(-1) || {}
+        const presence = state[payload.from]?.at(-1)
+        if (!presence) return
         const participant = participantFromPresence(payload.from, presence)
         const peer = ensurePeer(participant)
         try {
@@ -669,10 +697,10 @@ export default function RealtimeInterview({
           removePeer(payload.from)
         }
       })
-      .on('broadcast', { event: 'huddle' }, ({ payload }) => {
+      .on('broadcast', { event: 'huddle' }, async ({ payload }) => {
         huddleRef.current = payload?.active === true
         setHuddleActive(huddleRef.current)
-        void applyOutgoingAudio()
+        await applyOutgoingAudio()
       })
       .on('broadcast', { event: 'control' }, ({ payload }) => {
         if (payload?.event === 'meeting-ended' || payload?.event === 'all-participants-kicked') {
@@ -812,6 +840,7 @@ export default function RealtimeInterview({
         <div className="webrtc-prejoin__settings">
           <p className="interview-consent-eyebrow">장치 확인</p>
           <h2>카메라와 마이크를 확인해주세요.</h2>
+          {!credentials.relayConfigured && <p className="notice">중계 서버가 연결되지 않아 회사·학교 네트워크에서는 통화가 연결되지 않을 수 있습니다.</p>}
           <label>
             마이크
             <select value={audioDeviceId} onChange={(event) => void replaceDevice('audio', event.target.value)}>

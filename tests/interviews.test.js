@@ -98,7 +98,7 @@ describe('Supabase 화상 신호', () => {
     })
     expect(credentials).toMatchObject({
       projectUrl: env.SUPABASE_URL,
-      publishableKey: env.SUPABASE_PUBLISHABLE_KEY,
+      transport: 'authenticated-api',
       meetingId: first.id,
       participantId: 'participant-1',
       role: 'candidate',
@@ -107,24 +107,27 @@ describe('Supabase 화상 신호', () => {
     expect(JSON.stringify(credentials)).not.toContain(env.SUPABASE_SERVICE_ROLE_KEY)
   })
 
-  it('강제 퇴장 신호는 해당 Supabase 회의 토픽으로만 보낸다', async () => {
+  it('강제 퇴장은 공개 방송 없이 서버의 회의별 입장 권한을 폐기한다', async () => {
     const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
-    await kickParticipants(env, {
+    const writes = []
+    const DB = {
+      prepare(sql) {
+        let values
+        return {
+          bind(...args) { values = args; return this },
+          async first() { return { id: 'session-1' } },
+          async run() { writes.push({ sql, values }); return { meta: { changes: 1 } } },
+        }
+      },
+    }
+    await kickParticipants({ ...env, DB }, {
       meetingId: 'meeting-1',
       customParticipantIds: ['candidate-1'],
     })
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    const [url, options] = fetchMock.mock.calls[0]
-    expect(String(url)).toBe('https://project.supabase.co/realtime/v1/api/broadcast')
-    expect(JSON.parse(options.body)).toEqual({
-      messages: [{
-        topic: 'interview:meeting-1',
-        event: 'control',
-        private: false,
-        payload: { event: 'participants-kicked', customParticipantIds: ['candidate-1'] },
-      }],
-    })
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(writes[0].values).toEqual(['session-1', 'candidate-1', 'candidate-1'])
+    expect(writes[0].sql).toContain('provider_participant_id = NULL')
   })
 })
 

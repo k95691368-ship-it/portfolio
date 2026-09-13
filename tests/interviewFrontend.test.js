@@ -61,15 +61,16 @@ describe('interview frontend session model', () => {
       displayName: '지원자',
       role: 'candidate',
       ignored: 'value',
+      roomId: 'room-1', sessionId: 'session-1',
     })).toEqual({
       authToken: 'participant-token',
       projectUrl: 'https://project.supabase.co',
-      publishableKey: 'sb_publishable_test',
       meetingId: 'meeting-1',
       participantId: 'participant-1',
       customParticipantId: 'custom-1',
       displayName: '지원자',
       role: 'candidate',
+      roomId: 'room-1', sessionId: 'session-1', iceServers: undefined, relayConfigured: false,
     })
   })
 
@@ -115,7 +116,7 @@ describe('interview frontend session model', () => {
     expect(session.recording).toMatchObject({
       id: 'recording-1',
       status: 'deleted',
-      label: '보관 기간 만료',
+      label: '삭제 완료',
     })
   })
 

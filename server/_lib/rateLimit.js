@@ -2,6 +2,17 @@
 // 두 값 모두 조건문에서 그대로 쓸 수 있고(0은 거짓), 이 id를 releaseRateLimit에
 // 넘기면 다른 요청의 기록을 건드리지 않고 내 것만 되돌릴 수 있다.
 export async function checkRateLimit(env, bucket, maxHits, windowSeconds) {
+  if (!Number.isInteger(maxHits) || maxHits < 1 || !Number.isInteger(windowSeconds) || windowSeconds < 1) return 0
+  // PostgreSQL serializes this whole operation across edge instances. SQLite
+  // serializes the conditional INSERT itself. Never use a process-local mutex.
+  if (env.DB.withRateLimitLock) {
+    return env.DB.withRateLimitLock(bucket, (db) => reserve(db, bucket, maxHits, windowSeconds))
+  }
+  return reserve(env.DB, bucket, maxHits, windowSeconds)
+}
+
+async function reserve(db, bucket, maxHits, windowSeconds) {
+  const env = { DB: db }
   await env.DB.prepare(
     `DELETE FROM rate_limit_hits WHERE bucket = ? AND created_at < datetime('now', '-' || ? || ' seconds')`
   )
@@ -16,9 +27,6 @@ export async function checkRateLimit(env, bucket, maxHits, windowSeconds) {
       .catch(() => {})
   }
 
-  const row = await env.DB.prepare('SELECT COUNT(*) AS count FROM rate_limit_hits WHERE bucket = ?')
-    .bind(bucket)
-    .first()
   // 조회가 비어 올 수 있다는 것을 가정한다.
   //
   // COUNT 는 늘 한 줄을 준다고 여기고 row.count 를 바로 읽었는데, first() 가
@@ -28,13 +36,12 @@ export async function checkRateLimit(env, bucket, maxHits, windowSeconds) {
   // 막으라고 넣은 장치가 서비스를 멈추는 원인이 되면 안 된다. 세지 못했으면
   // 0회로 보고 통과시킨다. 세지 못한 요청 하나를 더 받는 것이, 멀쩡한 사람을
   // 전부 막는 것보다 낫다.
-  const used = Number(row?.count ?? 0)
-  if (used >= maxHits) return 0
-
-  const inserted = await env.DB.prepare('INSERT INTO rate_limit_hits (bucket) VALUES (?)')
-    .bind(bucket)
+  const inserted = await env.DB.prepare(
+    'INSERT INTO rate_limit_hits (bucket) SELECT ? WHERE (SELECT COUNT(*) FROM rate_limit_hits WHERE bucket = ?) < ?'
+  )
+    .bind(bucket, bucket, maxHits)
     .run()
-  return inserted.meta?.last_row_id ?? 1
+  return inserted.meta?.changes ? inserted.meta.last_row_id : 0
 }
 
 // 방금 기록한 시도 하나를 되돌린다.
@@ -48,12 +55,7 @@ export async function checkRateLimit(env, bucket, maxHits, windowSeconds) {
 // 그중 하나만 실패하면, "가장 최근 기록"을 지우는 방식은 성공한 쪽의 기록을
 // 지울 수 있다. 내 것을 정확히 지우기 위해 id로 지운다.
 export async function releaseRateLimit(env, bucket, ticket) {
-  const statement = ticket
-    ? env.DB.prepare('DELETE FROM rate_limit_hits WHERE id = ?').bind(ticket)
-    : env.DB.prepare(
-        `DELETE FROM rate_limit_hits WHERE id = (
-           SELECT id FROM rate_limit_hits WHERE bucket = ? ORDER BY id DESC LIMIT 1
-         )`
-      ).bind(bucket)
+  if (!ticket) return
+  const statement = env.DB.prepare('DELETE FROM rate_limit_hits WHERE id = ? AND bucket = ?').bind(ticket, bucket)
   await statement.run().catch(() => {})
 }

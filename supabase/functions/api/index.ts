@@ -63,7 +63,7 @@ function corsHeaders(origin: string | null) {
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     'Access-Control-Allow-Headers':
       'apikey, Authorization, Content-Type, Idempotency-Key, X-App-Authorization, X-App-Request, X-Room-Authorization, X-Room-Identity',
-    'Access-Control-Expose-Headers': 'Content-Disposition, Content-Length, Content-Range',
+    'Access-Control-Expose-Headers': 'Content-Disposition, Content-Length, Content-Range, X-App-Session-Expires-At',
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin, Authorization, X-App-Authorization, X-Room-Authorization, apikey',
   })

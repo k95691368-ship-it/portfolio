@@ -13,7 +13,11 @@
 //   (대상 주소는 SMOKE_URL 로 바꿀 수 있다)
 import { describe, expect, it, beforeAll, afterAll } from 'vitest'
 
-const BASE = process.env.SMOKE_URL || 'https://portfolio-epa.pages.dev'
+const BASE = process.env.E2E_API_BASE
+if (!BASE || process.env.E2E_ALLOW_WRITES !== '1' || process.env.E2E_ENVIRONMENT !== 'test') {
+  throw new Error('E2E_API_BASE, E2E_ENVIRONMENT=test, E2E_ALLOW_WRITES=1 are required. E2E never defaults to production.')
+}
+if (BASE.includes('obumqkwkvnemkyaahjbn') || BASE.includes('portfolio-epa.pages.dev')) throw new Error('Production E2E writes are prohibited.')
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD
 // 가입은 IP당 시간당 10회로 제한된다. 그 한도에 걸렸거나 계정을 새로 만들고
@@ -31,21 +35,23 @@ const PASSWORD = 'e2e-test-password-2026'
 
 // 쿠키를 직접 들고 다닌다 (fetch에는 쿠키 저장소가 없다).
 function makeClient() {
-  let cookie = ''
+  let sessionToken = ''
+  const roomTokens = new Map()
   return async function call(path, { method = 'GET', body, raw } = {}) {
-    const headers = {}
-    if (cookie) headers.Cookie = cookie
+    const headers = { 'X-App-Request': '1' }
+    if (process.env.E2E_PUBLISHABLE_KEY) headers.apikey = process.env.E2E_PUBLISHABLE_KEY
+    if (sessionToken) headers['X-App-Authorization'] = `Bearer ${sessionToken}`
+    const room = path.match(/^\/api\/rooms\/([^/]+)\//)?.[1]
+    if (room && roomTokens.has(room)) {
+      headers['X-Room-Authorization'] = `Bearer ${roomTokens.get(room)}`
+      headers['X-Room-Identity'] = 'code'
+    }
     if (body && !raw) headers['Content-Type'] = 'application/json'
-    const res = await fetch(`${BASE}${path}`, {
+    const res = await fetch(`${BASE.replace(/\/$/, '')}${path.replace(/^\/api/, '')}`, {
       method,
       headers,
       body: raw ? body : body ? JSON.stringify(body) : undefined,
     })
-    const setCookie = res.headers.get('set-cookie')
-    if (setCookie) {
-      const session = setCookie.split(';')[0]
-      if (session.startsWith('session=')) cookie = session
-    }
     const text = await res.text()
     let json = null
     try {
@@ -53,6 +59,9 @@ function makeClient() {
     } catch {
       /* 라우트가 없으면 HTML이 온다 */
     }
+    if (json?.sessionToken) sessionToken = json.sessionToken
+    if (json?.roomSessionToken && json.roomId) roomTokens.set(json.roomId, json.roomSessionToken)
+    if (path === '/api/logout' && res.ok) sessionToken = ''
     return { status: res.status, json, text }
   }
 }
@@ -70,6 +79,7 @@ const state = {
   requestId: null,
 }
 const hasAdmin = Boolean(ADMIN_EMAIL && ADMIN_PASSWORD)
+if (!hasAdmin) throw new Error('Dedicated test administrator credentials are required; this suite must not silently skip.')
 
 describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
   beforeAll(async () => {

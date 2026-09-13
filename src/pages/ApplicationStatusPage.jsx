@@ -3,6 +3,7 @@ import { formatKstDate } from '../lib/formatTime.js'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 
 const STATUS_INFO = {
   submitted: { label: '심사 대기 중', badge: 'badge-warning', desc: '제출하신 지원서를 검토하고 있습니다. 조금만 기다려주세요.' },
@@ -19,11 +20,20 @@ const STATUS_INFO = {
 }
 
 export default function ApplicationStatusPage() {
+  const { user } = useAuth()
   const toast = useToast()
   const [searchParams] = useSearchParams()
   const [code, setCode] = useState(searchParams.get('code') || '')
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
+  const claim = async () => {
+    setLoading(true)
+    try {
+      await api.post('/applications/claim', { code })
+      toast.success('이 지원서를 본인 계정에 연결했습니다.')
+    } catch (err) { toast.error(err.message) }
+    finally { setLoading(false) }
+  }
 
   const lookup = async (value) => {
     const trimmed = value.trim().toUpperCase()
@@ -95,6 +105,9 @@ export default function ApplicationStatusPage() {
             {result.reviewedAt && ` · 심사 완료 ${formatKstDate(result.reviewedAt)}`}
           </p>
           <p className="status-desc">{info.desc}</p>
+          {result.status === 'submitted' && (user?.role === 'candidate'
+            ? <button type="button" className="btn-secondary" disabled={loading} onClick={claim}>접수번호로 내 계정에 연결</button>
+            : <Link to="/login" className="back-link">기존 지원자 계정이 있다면 로그인 후 접수번호로 연결해주세요.</Link>)}
           {result.status === 'passed' && (
             <Link to="/login" className="btn-primary status-login-btn">
               로그인하러 가기

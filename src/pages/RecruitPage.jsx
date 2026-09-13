@@ -84,7 +84,9 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
       // 제10조는 구직자에게 채용 여부를 알리도록 한다. 알림이 실패한 것을
       // 알리지 않으면 담당자는 통보가 끝났다고 믿고 넘어간다.
       toast.success(
-        result?.emailStatus === 'failed'
+        result?.emailStatus === 'unknown'
+          ? '서류합격 처리되었습니다. 이메일 발송 결과는 확인 중입니다. 보낸메일함 확인 전 재전송하지 마세요.'
+          : result?.emailStatus === 'failed'
           ? '서류합격 처리되었습니다. 다만 결과 안내 이메일 발송에 실패했습니다 — 지원자에게 따로 연락해주세요.'
           : '서류합격 처리되었습니다. 지원자 계정과 면접방이 생성되었습니다.'
       )
@@ -120,7 +122,9 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
     try {
       const result = await api.post(`/applications/${appId}/reject`, {})
       toast.success(
-        result?.emailStatus === 'failed'
+        result?.emailStatus === 'unknown'
+          ? '불합격 처리되었습니다. 이메일 발송 결과는 확인 중입니다. 보낸메일함 확인 전 재전송하지 마세요.'
+          : result?.emailStatus === 'failed'
           ? '불합격 처리되었습니다. 다만 결과 안내 이메일 발송에 실패했습니다 — 지원자에게 따로 연락해주세요.'
           : '불합격 처리되었습니다.'
       )
@@ -173,7 +177,9 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
                   <em>
                     {passResult.emailStatus === 'sent'
                       ? '합격 안내 메일에 이 코드를 함께 보냈습니다. 지원자는 채용 공고 화면에서 코드를 넣어 로그인 없이 들어옵니다.'
-                      : '메일이 나가지 않았습니다 — 이 코드를 지원자에게 직접 전달해주세요. 지원자는 채용 공고 화면에서 코드를 넣어 로그인 없이 들어옵니다.'}
+                      : passResult.emailStatus === 'unknown'
+                        ? '메일이 발송되었을 수 있습니다. 보낸메일함 확인 전 재전송하지 마세요.'
+                        : '메일이 나가지 않았습니다 — 이 코드를 지원자에게 직접 전달해주세요. 지원자는 채용 공고 화면에서 코드를 넣어 로그인 없이 들어옵니다.'}
                   </em>
                 </p>
                 {passResult.roomId && (

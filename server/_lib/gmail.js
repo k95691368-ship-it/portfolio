@@ -4,6 +4,14 @@ const CRLF = '\r\n'
 const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024
 const encoder = new TextEncoder()
 
+export class EmailDeliveryError extends Error {
+  constructor(message, deliveryState = 'failed') {
+    super(message)
+    this.name = 'EmailDeliveryError'
+    this.deliveryState = deliveryState
+  }
+}
+
 function mailbox(value) {
   const email = String(value || '').trim()
   // One ASCII mailbox, not a display name or recipient list. Header injection
@@ -96,7 +104,7 @@ function attachmentPart(attachment) {
   ].join(CRLF)
 }
 
-function rawMessage({ from, fromName, to, subject, text, html, attachments = [] }) {
+function rawMessage({ from, fromName, to, subject, text, html, attachments = [], messageId }) {
   if (!Array.isArray(attachments) || attachments.length > 1) throw new Error('계약서 첨부는 1개까지 가능합니다.')
   const alternative = `alternative_${crypto.randomUUID()}`
   const mixed = `mixed_${crypto.randomUUID()}`
@@ -106,7 +114,7 @@ function rawMessage({ from, fromName, to, subject, text, html, attachments = [] 
     `To: <${mailbox(to)}>`,
     `Subject: ${header(subject)}`,
     `Date: ${new Date().toUTCString()}`,
-    `Message-ID: <${crypto.randomUUID()}@${mailbox(from).split('@')[1]}>`,
+    `Message-ID: <${/^[a-f0-9]{64}$/.test(messageId || '') ? messageId : crypto.randomUUID()}@${mailbox(from).split('@')[1]}>`,
     'MIME-Version: 1.0',
   ]
   const body = [
@@ -129,6 +137,7 @@ async function googleRequest(url, init, stage) {
     // Do not surface provider response text: routes store errors in delivery logs.
     const data = await response.json().catch(() => null)
     if (!response.ok) {
+      if (stage === '발송' && response.status >= 500) throw new EmailDeliveryError('Gmail 발송 결과를 확인하지 못했습니다. 보낸메일함을 확인해주세요.', 'unknown')
       if (stage === '인증' && data?.error === 'invalid_grant') {
         throw new Error('Gmail 연결 권한이 만료되거나 취소되었습니다. Google 계정을 다시 연결해주세요.')
       }
@@ -138,12 +147,13 @@ async function googleRequest(url, init, stage) {
     }
     return data
   } catch (error) {
+    if (error instanceof EmailDeliveryError) throw error
     if (error instanceof Error && error.message.startsWith('Gmail ')) throw error
     // A network failure may occur after Gmail accepted the message. Never retry
     // messages.send automatically, and never claim that no message was sent.
-    throw new Error(stage === '발송'
+    throw new EmailDeliveryError(stage === '발송'
       ? 'Gmail 발송 결과를 확인하지 못했습니다. 보낸메일함을 확인한 뒤 재시도해주세요.'
-      : 'Gmail 인증 서버에 연결하지 못했습니다.')
+      : 'Gmail 인증 서버에 연결하지 못했습니다.', stage === '발송' ? 'unknown' : 'failed')
   } finally {
     clearTimeout(timer)
   }
@@ -175,7 +185,7 @@ export async function sendGmailEmail(env, message) {
     body: JSON.stringify({ raw }),
   }, '발송')
   if (typeof result?.id !== 'string' || !/^[A-Za-z0-9_-]+$/.test(result.id)) {
-    throw new Error('Gmail 발송 결과를 확인하지 못했습니다. 보낸메일함을 확인한 뒤 재시도해주세요.')
+    throw new EmailDeliveryError('Gmail 발송 결과를 확인하지 못했습니다. 보낸메일함을 확인해주세요.', 'unknown')
   }
   // Accepted by Gmail does not guarantee inbox delivery. Return no provider data
   // other than the message identifier needed for diagnostics.

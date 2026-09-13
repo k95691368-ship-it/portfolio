@@ -111,15 +111,10 @@ export async function onRequest(context) {
   // 코드 세션은 여기서 미루지 않는다. 아래 갱신은 'session' 쿠키를 다시
   // 내려보내는 일인데, 코드로 들어온 사람의 신원은 다른 쿠키에 들어 있다.
   const renew = context.data.user && !viaRoomCookie ? needsRenewal(context.data.user) : false
-  if (renew) {
-    // 응답을 붙잡아 두지 않도록 뒤로 넘긴다 — 실패해도 이번 요청과는 상관없다.
-    const renewal = renewSessionIfStale(context.env.DB, request)
-    if (context.waitUntil) context.waitUntil(renewal)
-    else await renewal.catch(() => {})
-  }
+  const renewedUntil = renew ? await renewSessionIfStale(context.env.DB, request) : null
 
   const response = await context.next()
-  if (!renew) return response
+  if (!renewedUntil) return response
 
   // 서버 쪽 만료만 미루고 쿠키는 그대로 두고 있었다.
   //
@@ -147,6 +142,7 @@ export async function onRequest(context) {
   if (existing.some((c) => /^\s*session=/.test(c))) return response
 
   const withCookie = new Response(response.body, response)
+  withCookie.headers.set('X-App-Session-Expires-At', renewedUntil)
   withCookie.headers.append('Set-Cookie', sessionCookieHeader(token))
   return withCookie
 }

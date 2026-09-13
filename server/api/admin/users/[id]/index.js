@@ -179,6 +179,9 @@ export async function onRequestDelete({ env, data, params }) {
       console.error(`R2 delete failed for document ${docs[i].r2_key} (user ${params.id}):`, result.reason)
     }
   })
+  if (deletions.some((result) => result.status === 'rejected')) {
+    return jsonError('첨부 파일을 모두 삭제하지 못해 계정과 파일 기록을 보존했습니다. 삭제를 다시 시도해주세요.', 503)
+  }
 
   // D1은 외래키를 강제하므로, users 행을 지우기 전에 이 계정을 참조하는
   // 감사 로그·지원서 검토자 참조를 먼저 정리해야 한다 (안 하면 FK 위반으로 500).

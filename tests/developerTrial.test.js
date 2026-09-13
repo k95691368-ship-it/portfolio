@@ -18,7 +18,7 @@ function fakeDb(target = null, count = 0) {
     let args = []
     const st = {
       bind(...values) { args = values; return st },
-      async run() { writes.push({ sql, args }); return { meta: { changes: 1, last_row_id: 1 } } },
+      async run() { writes.push({ sql, args }); return { meta: { changes: sql.includes('INSERT INTO rate_limit_hits') && count >= args[2] ? 0 : 1, last_row_id: 1 } } },
       async first() { return sql.includes('COUNT(*)') ? { count } : target },
       async all() { return { results: [target, { id: 'trial', email: 'trial@trial.invalid' }].filter(Boolean) } },
     }
@@ -34,7 +34,7 @@ describe('one-hour developer trial', () => {
   it('grants virtual privileges only within the original UTC hour', () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date('2026-09-12T00:30:00Z'))
     const original = trial()
-    expect(applyTrialCapabilities(original)).toMatchObject({ developer_trial: true, is_admin: 1, is_developer: 1 })
+    expect(applyTrialCapabilities(original)).toMatchObject({ developer_trial: true, is_admin: 0, is_recruiter: 1, is_developer: 0 })
     expect(original.is_developer).toBe(0)
     expect(needsRenewal(original)).toBe(false)
     vi.setSystemTime(new Date('2026-09-12T01:00:00Z'))
@@ -64,7 +64,7 @@ describe('one-hour developer trial', () => {
     const res = await start({ request: request({ role: 'developer' }), env: { DB: db } })
     const body = await res.json()
     expect(res.status).toBe(200)
-    expect(body).toMatchObject({ developerTrial: true, isAdmin: true, isDeveloper: true })
+    expect(body).toMatchObject({ developerTrial: true, isAdmin: false, isRecruiter: true, isDeveloper: false })
     expect(body.email).toMatch(/@trial\.invalid$/)
     expect(body).not.toHaveProperty('password')
     expect(body).not.toHaveProperty('password_hash')

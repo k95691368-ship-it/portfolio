@@ -30,6 +30,22 @@ describe('진행 중인 API 조회 공유', () => {
   })
   afterEach(() => vi.unstubAllGlobals())
 
+  it('persists the server expiry only for the account that sent the request', async () => {
+    const original = new Date(Date.now() + 86400000).toISOString()
+    const renewed = new Date(Date.now() + 30 * 86400000).toISOString()
+    sessionStorage.setItem('portfolioSession', JSON.stringify({ token: 'first', expiresAt: original }))
+    fetch.mockResolvedValueOnce(new Response('{}', { headers: { 'X-App-Session-Expires-At': renewed } }))
+    await api.get('/me')
+    expect(JSON.parse(sessionStorage.getItem('portfolioSession')).expiresAt).toBe(renewed)
+    const pending = deferred()
+    fetch.mockReturnValueOnce(pending.promise)
+    const first = api.get('/me')
+    sessionStorage.setItem('portfolioSession', JSON.stringify({ token: 'second', expiresAt: original }))
+    pending.resolve(new Response('{}', { headers: { 'X-App-Session-Expires-At': renewed } }))
+    await first
+    expect(JSON.parse(sessionStorage.getItem('portfolioSession'))).toEqual({ token: 'second', expiresAt: original })
+  })
+
   it('동시 조회 3개는 1회 요청하고, 완료 후 조회는 다시 요청한다', async () => {
     const pending = deferred()
     fetch.mockReturnValueOnce(pending.promise)

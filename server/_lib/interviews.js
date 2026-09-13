@@ -89,8 +89,8 @@ export function serializeRecording(row) {
   const expired = retentionHasExpired(row.retention_until)
   return {
     id: row.id,
-    status: expired ? 'deleted' : row.status,
-    storageStatus: expired ? 'deleted' : row.storage_status ?? 'pending',
+    status: row.status === 'deleted' ? 'deleted' : expired ? 'expired' : row.status,
+    storageStatus: row.storage_status ?? 'pending',
     filename: row.filename ?? null,
     sizeBytes: row.size_bytes ?? null,
     durationSeconds: row.duration_seconds ?? null,

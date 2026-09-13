@@ -10,6 +10,6 @@ export function canManageRecruiting(user) {
 // 특정 공고를 이 사용자가 관리할 수 있는지. 관리자는 전체, 채용자는 본인 공고만.
 export function canManagePosting(user, posting) {
   if (!user || !posting) return false
-  if (user.is_admin) return true
+  if (user.is_admin && !user.developer_trial) return true
   return !!user.is_recruiter && posting.created_by_user_id === user.id
 }

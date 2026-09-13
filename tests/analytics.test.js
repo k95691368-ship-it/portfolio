@@ -58,7 +58,7 @@ describe('녹화에서 가려야 하는 화면', () => {
   })
 
   it('회사가 쓴 글만 있는 화면은 열어 둔다 — 다 가리면 볼 것이 없다', () => {
-    const open = ['/', '/login', '/signup', '/change-password', '/jobs', '/tech']
+    const open = ['/', '/jobs', '/tech']
     for (const path of open) {
       expect(holdsPersonalData(path), path).toBe(false)
     }
@@ -93,7 +93,8 @@ describe('측정 ID 는 한 곳에만 있다', () => {
 
     // 그리고 <head> 에는 실제로 있어야 한다 — 없으면 통계가 아예 안 잡힌다.
     const html = readFileSync('index.html', 'utf-8')
-    expect(html).toMatch(/G-[A-Z0-9]{8,}/)
+    expect(html).not.toMatch(/G-[A-Z0-9]{8,}/)
+    expect(html).not.toMatch(/clarity\.ms|googletagmanager\.com/)
   })
 })
 
@@ -120,13 +121,13 @@ describe('실제로 보내는 값', () => {
     // 막고, GA4 가 스스로 보내는 나머지(세션 시작·스크롤·참여 시간)는 보낼
     // 때마다 주소 표시줄을 다시 읽어 싣는다. 실제 브라우저로 확인했을 때
     // 방 화면의 uuid 가 바로 그 경로로 나갔다.
-    trackPageView('/rooms/8f3a1c2e-4b5d-4e6f-8a9b-0c1d2e3f4a5b')
+    trackPageView('/jobs/8f3a1c2e-4b5d-4e6f-8a9b-0c1d2e3f4a5b')
     const kinds = sent.map((args) => args[0])
     expect(kinds).toContain('set')
     expect(kinds.indexOf('set')).toBeLessThan(kinds.indexOf('event'))
 
     const [, setFields] = sent.find((args) => args[0] === 'set')
-    expect(setFields.page_path).toBe('/rooms/:roomId')
+    expect(setFields.page_path).toBe('/jobs/:id')
     expect(JSON.stringify(setFields)).not.toContain('8f3a1c2e')
   })
 
@@ -134,19 +135,12 @@ describe('실제로 보내는 값', () => {
     // 접수번호 하나면 남의 지원 내역이 열린다. 통계 보고서에 그것이 목록으로
     // 쌓이면 개인정보를 제3자에게 넘긴 것이 된다.
     trackPageView('/application-status')
-    const [, , params] = sent.find((args) => args[0] === 'event')
-    expect(JSON.stringify(params)).not.toContain('ABCD1234')
-    expect(params.page_path).toBe('/application-status')
-    expect(params.page_location).toBe('https://portfolio-epa.pages.dev/application-status')
+    expect(sent).toEqual([])
   })
 
   it('보내는 주소에도 id 가 들어가지 않는다', () => {
     trackPageView('/rooms/8f3a1c2e-4b5d-4e6f-8a9b-0c1d2e3f4a5b/contract')
-    const [, , params] = sent.find((args) => args[0] === 'event')
-    expect(JSON.stringify(params)).not.toContain('8f3a1c2e')
-    expect(params.page_location).toBe(
-      'https://portfolio-epa.pages.dev/rooms/:roomId/contract'
-    )
+    expect(sent).toEqual([])
   })
 
   it('태그가 막혀 있어도 화면이 죽지 않는다', () => {

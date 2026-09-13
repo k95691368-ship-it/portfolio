@@ -3,6 +3,7 @@ import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
 import { parseBool, validateApplication, normalizeCareer } from '../../../_lib/application.js'
 import { fileExt, mimeForExt, validateUploadFile, validateFileContent } from '../../../_lib/uploads.js'
+import { CONSENT_VERSION, CONSENT_SNAPSHOT } from '../../../../src/lib/consentText.js'
 
 const NAME_MAX = 100
 const PHONE_MAX = 40
@@ -19,7 +20,7 @@ function genLookupCode() {
 }
 
 // 공개: 특정 채용 공고에 지원. 로그인 불필요, multipart(파일 포함) 한 번의 요청.
-export async function onRequestPost({ request, env, params }) {
+export async function onRequestPost({ request, env, params, data }) {
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
   const bucket = `apply:${ip}`
   const ticket = await checkRateLimit(env, bucket, 5, 3600)
@@ -56,7 +57,7 @@ export async function onRequestPost({ request, env, params }) {
   const coverLetter = (form.get('coverLetter') || '').toString().trim().slice(0, COVER_MAX)
   const consentRequired = parseBool(form.get('consentRequired'))
   const consentOptional = parseBool(form.get('consentOptional'))
-  const consentThirdParty = parseBool(form.get('consentThirdParty'))
+  if (form.get('consentVersion') !== CONSENT_VERSION) return fail('동의 안내가 변경되었습니다. 페이지를 새로고침한 뒤 다시 확인해주세요.', 409)
 
   const validationError = validateApplication({ name, email, phone, consentRequired })
   if (validationError) return fail(validationError, 400)
@@ -73,6 +74,9 @@ export async function onRequestPost({ request, env, params }) {
 
   const portfolioFile = form.get('portfolio')
   const hasPortfolio = portfolioFile && typeof portfolioFile !== 'string' && portfolioFile.size > 0
+  if (!consentOptional && (hasPortfolio || source || coverLetter || career.value)) {
+    return fail('선택 정보 동의가 없습니다. 경력·자기소개·지원 경로·포트폴리오를 제거하거나 선택항목 수집에 동의해주세요.', 400)
+  }
   if (hasPortfolio) {
     const portfolioError = validateUploadFile(portfolioFile)
     if (portfolioError) return fail(`포트폴리오: ${portfolioError}`, 400)
@@ -124,8 +128,9 @@ export async function onRequestPost({ request, env, params }) {
       `INSERT INTO applications (
          id, posting_id, applicant_name, applicant_email, applicant_phone,
          career_json, application_source, cover_letter,
-         consent_required, consent_optional, consent_third_party, consented_at, lookup_code
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)`
+         consent_required, consent_optional, consent_third_party, consented_at, lookup_code,
+         consent_version, consent_snapshot, created_user_id
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, ?)`
     ).bind(
       appId,
       params.id,
@@ -137,8 +142,11 @@ export async function onRequestPost({ request, env, params }) {
       coverLetter || null,
       consentRequired ? 1 : 0,
       consentOptional ? 1 : 0,
-      consentThirdParty ? 1 : 0,
-      lookupCode
+      0,
+      lookupCode,
+      CONSENT_VERSION,
+      CONSENT_SNAPSHOT,
+      data?.user?.role === 'candidate' && data.user.email === email && !data.user.session_scoped_room_id ? data.user.id : null
     ),
     ...uploads.map((u) =>
       env.DB.prepare(

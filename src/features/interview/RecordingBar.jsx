@@ -49,6 +49,7 @@ export default function RecordingBar({
         durationSeconds: result.durationSeconds,
       }
     )
+    await meeting.recording.clearBackup?.(recordingId)
     pendingUploadRef.current = null
     uploadTicketRef.current = null
     setUploadProgress(1)
@@ -73,7 +74,20 @@ export default function RecordingBar({
           }
           throw new Error('녹화 저장 경로를 받지 못했습니다.')
         }
-        meeting.recording.start(next.id)
+        try {
+          await meeting.recording.start(next.id)
+        } catch (startError) {
+          try {
+            const cancelled = await api.put(
+              `/rooms/${roomId}/interviews/${session.id}/recording/${next.id}/control`, { action: 'abort' }
+            )
+            onRecordingChanged?.(recordingFromResponse(cancelled, next))
+          } catch {
+            onRecordingChanged?.(next)
+            throw new Error(`${startError.message} 서버의 녹화 상태 정리는 확인되지 않았습니다. 화면을 새로고침한 뒤 상태를 확인해주세요.`)
+          }
+          throw startError
+        }
         uploadTicketRef.current = { recordingId: next.id, ticket: response.upload }
         onRecordingChanged?.(next)
         return
@@ -125,6 +139,18 @@ export default function RecordingBar({
     }
   }
 
+  const recoverUpload = async () => {
+    if (!recording.id || !meeting?.recording?.recover) return
+    setBusyAction('recover'); setError('')
+    try {
+      const result = await meeting.recording.recover(recording.id)
+      if (!result) throw new Error('이 브라우저에 복구할 녹화 조각이 없습니다.')
+      const response = await api.post(`/rooms/${roomId}/interviews/${session.id}/recordings/${recording.id}/upload-ticket`, {})
+      await completeUpload({ recordingId: recording.id, result, ticket: response.upload })
+    } catch (caught) { setError(caught.message) }
+    finally { setBusyAction('') }
+  }
+
   const live = recording.status === 'recording'
   const active = ['starting', 'recording', 'paused', 'resuming', 'stopping'].includes(recording.status)
 
@@ -134,7 +160,7 @@ export default function RecordingBar({
         <span className={`interview-recording-state-dot${active ? ' is-active' : ''}`} aria-hidden="true" />
         <span className="interview-recording-bar__label">
           <strong>{busyAction === 'upload' ? `업로드 중 ${Math.round(uploadProgress * 100)}%` : recording.label}</strong>
-          <small>녹화 동의 필수 면접</small>
+          <small>녹화 동의 필수 면접 · 업로드 완료 전 이 브라우저에 복구용 임시 저장</small>
         </span>
       </div>
 
@@ -165,6 +191,9 @@ export default function RecordingBar({
         <button type="button" className="interview-upload-retry" onClick={() => void retryUpload()}>
           녹화 업로드 다시 시도
         </button>
+      )}
+      {session.canControlRecording && recording.id && !['available', 'expired', 'deleted'].includes(recording.status) && !busyAction && !uploadTicketRef.current && (
+        <button type="button" className="interview-upload-retry" onClick={() => void recoverUpload()}>이 브라우저의 중단된 녹화 복구</button>
       )}
       {actions.includes('start') && !meetingJoined && (
         <span className="interview-recording-bar__join-note">입장 후 녹화를 시작할 수 있습니다.</span>

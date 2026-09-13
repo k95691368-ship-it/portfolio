@@ -89,6 +89,7 @@ export default function FinalOfferEmailForm({ roomId, initial, candidateName, co
         <p className="notice">이전 발송이 완료되지 않았습니다. 내용을 확인하고 다시 시도해주세요.</p>
       )}
       {delivery?.status === 'sending' && <p className="notice">현재 이메일을 발송하고 있습니다.</p>}
+      {delivery?.status === 'unknown' && <p className="notice">메일이 발송되었을 수 있습니다. 운영자가 보낸메일함과 발송 기록을 확인하기 전에는 재전송할 수 없습니다.</p>}
       {!emailConfigured && (
         <p className="notice">
           이메일 발송 기능이 아직 설정되지 않았습니다. 지원자에게는 앱 알림으로 안내됩니다.
@@ -116,7 +117,7 @@ export default function FinalOfferEmailForm({ roomId, initial, candidateName, co
         <button
           type="submit"
           className="btn-primary"
-          disabled={sending || delivery?.status === 'sending' || !emailConfigured}
+          disabled={sending || ['sending', 'unknown'].includes(delivery?.status) || !emailConfigured}
         >
           {sending ? '발송 중...' : '최종합격 이메일 보내기'}
         </button>

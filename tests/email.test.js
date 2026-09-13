@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { sqliteApp } from './helpers/sqliteApp.js'
 import {
   maskEmail, isEmailConfigured, sendFinalOfferEmail, sendRoomInviteEmail,
   sendApplicationResultEmail, sendNewMessageEmail, sendSignedContractEmail,
@@ -29,7 +30,8 @@ function decodeWords(value) {
   return [...value.matchAll(/=\?UTF-8\?B\?([^?]+)\?=/g)]
     .map((match) => Buffer.from(match[1], 'base64').toString('utf8')).join('')
 }
-afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
+beforeEach(() => { env.DB = sqliteApp() })
+afterEach(() => { env.DB.close(); vi.unstubAllGlobals(); vi.useRealTimers() })
 
 describe('Gmail email adapter', () => {
   it('masks the candidate email address', () => {
@@ -166,7 +168,7 @@ describe('Gmail email adapter', () => {
     vi.stubGlobal('fetch', mock)
     const error = await sendFinalOfferEmail(env, message).catch((value) => value)
     expect(error).toBeInstanceOf(Error)
-    expect(error.message).toContain('Gmail')
+    expect(error.message).toMatch(/Gmail|보낸메일함/)
     expect(error.message).not.toContain('private-provider-detail')
     expect(mock).toHaveBeenCalledTimes(2)
   })
@@ -199,6 +201,7 @@ describe('Gmail email adapter', () => {
     }))
     vi.stubGlobal('fetch', mock)
     const check = expect(sendFinalOfferEmail(env, message)).rejects.toThrow('인증 서버')
+    await vi.waitFor(() => expect(mock).toHaveBeenCalledTimes(1))
     await vi.advanceTimersByTimeAsync(20_000)
     await check
     expect(mock).toHaveBeenCalledTimes(1)

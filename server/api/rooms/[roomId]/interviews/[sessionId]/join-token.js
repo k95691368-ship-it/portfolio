@@ -10,6 +10,7 @@ import {
   logInterviewEvent,
 } from '../../../../../_lib/interviews.js'
 import { blockedWhenFrozen } from '../../../../../_lib/roomLifecycle.js'
+import { interviewIceServers } from '../../../../../_lib/turn.js'
 import {
   VideoServiceConfigError,
   issueParticipantCredentials,
@@ -59,7 +60,7 @@ export async function onRequestPost({ env, data, params }) {
     return jsonError('계정이 비활성화되어 화상 면접에 입장할 수 없습니다.', 403)
   }
 
-  const participantId = member.provider_participant_id || crypto.randomUUID()
+  const participantId = crypto.randomUUID()
   const admitted = await env.DB.prepare(
     `UPDATE interview_session_members
         SET provider_participant_id = ?, admitted_at = COALESCE(admitted_at, datetime('now')),
@@ -137,5 +138,6 @@ export async function onRequestPost({ env, data, params }) {
     details: { role: member.role },
   })
 
-  return jsonResponse(credentials)
+  return jsonResponse({ ...credentials, roomId: params.roomId, sessionId: params.sessionId,
+    ...(await interviewIceServers(env, participantId)) })
 }

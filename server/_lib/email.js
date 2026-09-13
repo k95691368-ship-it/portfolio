@@ -1,5 +1,6 @@
 import { formatInviteCode } from './inviteCode.js'
-import { isGmailConfigured, sendGmailEmail } from './gmail.js'
+import { isGmailConfigured } from './gmail.js'
+import { sendTrackedEmail } from './emailOutbox.js'
 
 export function maskEmail(email) {
   const [local, domain] = String(email || '').split('@')
@@ -71,36 +72,39 @@ export function isEmailConfigured(env) {
 // attachments: [{ filename, contentBase64, contentType }] (선택)
 async function sendBrandedEmail(
   env,
-  { to, subject, bodyText, companyName, heading, title, attachments }
+  { to, subject, bodyText, companyName, heading, title, attachments, idempotencyKey }
 ) {
-  return sendGmailEmail(env, {
+  return sendTrackedEmail(env, {
     fromName: env.FINAL_OFFER_FROM_NAME || companyName || '',
     to,
     subject,
     text: bodyText,
     html: buildBrandedEmailHtml({ bodyText, companyName, heading, title }),
     attachments,
+    idempotencyKey,
   })
 }
 
-export async function sendFinalOfferEmail(env, { to, subject, bodyText, companyName }) {
+export async function sendFinalOfferEmail(env, { to, subject, bodyText, companyName, idempotencyKey }) {
   return sendBrandedEmail(env, {
     to,
     subject,
     bodyText,
     companyName,
     heading: 'FINAL OFFER',
+    idempotencyKey,
     title: '최종 합격 안내',
   })
 }
 
-export async function sendRoomInviteEmail(env, { to, subject, bodyText, companyName }) {
+export async function sendRoomInviteEmail(env, { to, subject, bodyText, companyName, idempotencyKey }) {
   return sendBrandedEmail(env, {
     to,
     subject,
     bodyText,
     companyName,
     heading: 'INTERVIEW INVITE',
+    idempotencyKey,
     title: '면접방 참여 안내',
   })
 }
@@ -108,7 +112,7 @@ export async function sendRoomInviteEmail(env, { to, subject, bodyText, companyN
 // 서류 전형 결과(합격/불합격)를 지원자에게 안내.
 export async function sendApplicationResultEmail(
   env,
-  { to, applicantName, companyName, result, inviteCode }
+  { to, applicantName, companyName, result, inviteCode, idempotencyKey }
 ) {
   const passed = result === 'passed'
   const subject = passed
@@ -148,6 +152,7 @@ ${companyName} 서류 전형에 지원해 주셔서 진심으로 감사드립니
     bodyText,
     companyName,
     heading: passed ? 'DOCUMENT PASS' : 'RESULT',
+    idempotencyKey,
     title: passed ? '서류 전형 합격 안내' : '서류 전형 결과 안내',
   })
 }
@@ -160,7 +165,7 @@ ${companyName} 서류 전형에 지원해 주셔서 진심으로 감사드립니
 //
 // 본문은 싣지 않는다. 처우 조건과 개인 사정이 오가는 대화라, 메일함에 그대로
 // 복사해 두면 지운 뒤에도 남는다. "왔다"는 사실과 들어올 길만 알린다.
-export async function sendNewMessageEmail(env, { to, companyName, roomTitle }) {
+export async function sendNewMessageEmail(env, { to, companyName, roomTitle, idempotencyKey }) {
   return sendBrandedEmail(env, {
     to,
     subject: `[${companyName || '회사'}] 면접방에 새 메시지가 도착했습니다`,
@@ -176,13 +181,14 @@ ${companyName || '회사'}에서 "${roomTitle || '면접방'}"에 새 메시지�
 감사합니다.`,
     companyName,
     heading: 'NEW MESSAGE',
+    idempotencyKey,
     title: '새 메시지 도착',
   })
 }
 
 // 서명 완료된 근로계약서 PDF를 첨부하여 지원자에게 발송.
 // pdfBase64 는 PDF 바이트의 base64 문자열.
-export async function sendSignedContractEmail(env, { to, companyName, pdfBase64, filename }) {
+export async function sendSignedContractEmail(env, { to, companyName, pdfBase64, filename, idempotencyKey }) {
   const bodyText = `안녕하세요.
 
 ${companyName}와(과) 체결한 근로계약서 서명본을 첨부합니다. 내용을 확인하시고 보관해 주세요.
@@ -195,6 +201,7 @@ ${companyName}와(과) 체결한 근로계약서 서명본을 첨부합니다. �
     bodyText,
     companyName,
     heading: 'LABOR CONTRACT',
+    idempotencyKey,
     title: '근로계약서 사본',
     attachments: [
       { filename: filename || '근로계약서.pdf', contentBase64: pdfBase64, contentType: 'application/pdf' },

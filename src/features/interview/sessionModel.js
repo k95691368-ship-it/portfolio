@@ -27,6 +27,7 @@ const RECORDING_STATUS_ALIASES = {
   failed: 'failed',
   errored: 'failed',
   deleted: 'deleted',
+  expired: 'expired',
 }
 
 const RECORDING_STATUS_LABELS = {
@@ -39,7 +40,8 @@ const RECORDING_STATUS_LABELS = {
   processing: '녹화 처리 중',
   available: '녹화 완료',
   failed: '녹화 실패',
-  deleted: '보관 기간 만료',
+  deleted: '삭제 완료',
+  expired: '보관 기간 만료 · 삭제 대기',
 }
 
 const CLOSED_SESSION_STATUSES = new Set(['ended', 'cancelled', 'failed'])
@@ -227,18 +229,20 @@ export function extractJoinCredentials(payload) {
   const source = payload.participant ?? payload.credentials ?? payload
   const authToken = firstDefined(source.authToken, source.auth_token, source.token)
   const projectUrl = firstDefined(source.projectUrl, source.project_url)
-  const publishableKey = firstDefined(source.publishableKey, source.publishable_key)
   const meetingId = firstDefined(source.meetingId, source.meeting_id)
   const participantId = firstDefined(source.participantId, source.participant_id)
   if (
-    ![authToken, projectUrl, publishableKey, meetingId, participantId].every(
+    ![authToken, projectUrl, source.roomId, source.sessionId, meetingId, participantId].every(
       (value) => typeof value === 'string' && value
     )
   ) return null
   return {
     authToken,
+    roomId: source.roomId,
+    sessionId: source.sessionId,
+    iceServers: source.iceServers,
+    relayConfigured: source.relayConfigured === true,
     projectUrl,
-    publishableKey,
     meetingId,
     participantId,
     customParticipantId: firstDefined(
@@ -254,7 +258,7 @@ export function extractJoinCredentials(payload) {
 export function recordingActions(recording, required = true) {
   if (!required) return []
   const status = normalizeRecording(recording).status
-  if (['idle', 'available', 'failed', 'deleted'].includes(status)) return ['start']
+  if (['idle', 'available', 'failed', 'deleted', 'expired'].includes(status)) return ['start']
   if (status === 'recording') return ['pause', 'stop']
   if (status === 'paused') return ['resume', 'stop']
   return []

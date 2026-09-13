@@ -150,6 +150,7 @@ export async function onRequestPost({ request, env, data, params }) {
     try {
       const companyName = data.user.company_name || data.user.display_name
       await sendSignedContractEmail(env, {
+        idempotencyKey: `room:${params.roomId}:signed-contract`,
         to: candidate.email,
         companyName,
         pdfBase64: arrayBufferToBase64(buffer),
@@ -157,7 +158,7 @@ export async function onRequestPost({ request, env, data, params }) {
       })
       emailStatus = 'sent'
     } catch (err) {
-      emailStatus = 'failed'
+      emailStatus = err.deliveryState === 'unknown' ? 'unknown' : 'failed'
       emailError = String(err?.message || 'Unknown email error').slice(0, 500)
       console.error(`Signed contract email failed for room ${params.roomId}:`, emailError)
     }
@@ -176,7 +177,7 @@ export async function onRequestPost({ request, env, data, params }) {
       channel: 'email',
       recipientUserId: candidate.id,
       recipientAddress: candidate.email,
-      status: emailStatus === 'sent' ? 'delivered' : 'failed',
+      status: emailStatus === 'sent' ? 'delivered' : emailStatus,
       errorMessage: emailError,
     })
   }

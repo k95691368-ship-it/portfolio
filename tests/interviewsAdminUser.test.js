@@ -24,7 +24,7 @@ function memberDb(writes = [], members = [{
       const statement = {
         bind() { return statement },
         async all() { return { results: members } },
-        async first() { return sql.includes('FROM interview_recordings') ? activeRecording : null },
+        async first() { return sql.includes('FROM interview_recordings') ? activeRecording : sql.includes('provider_meeting_id = ?') ? { id: 'session-1' } : null },
         async run() {
           writes.push(sql)
           return { meta: { changes: 1 } }
@@ -52,36 +52,35 @@ describe('관리자 계정 정지의 화상 면접 접근 폐기', () => {
       'user-1'
     )).resolves.toEqual({ revokedMemberships: 1 })
 
-    expect(sentEvents(fetchMock)).toEqual(['participants-kicked', 'participants-kicked'])
+    expect(sentEvents(fetchMock)).toEqual([])
     expect(writes.some((sql) => sql.includes('provider_participant_id = NULL'))).toBe(true)
   })
 
   it('개별 퇴장 신호가 실패하면 녹화를 멈추고 회의 전체 종료 신호를 보낸다', async () => {
     const writes = []
     let calls = 0
-    const fetchMock = vi.fn(async () => {
-      calls += 1
-      return new Response('{}', { status: calls <= 2 ? 503 : 200 })
-    })
+    const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
 
+    const db = memberDb(writes, undefined, { id: 'recording-1', provider_recording_id: 'recording-1' })
+    const prepare = db.prepare.bind(db)
+    db.prepare = (sql) => {
+      const st = prepare(sql), run = st.run
+      st.run = async () => {
+        if (sql.includes('custom_participant_id IN') && calls++ < 2) throw new Error('database temporarily unavailable')
+        return run()
+      }
+      return st
+    }
     await expect(revokeActiveInterviewAccessForUser(
       {
         ...SUPABASE_ENV,
-        DB: memberDb(writes, undefined, {
-          id: 'recording-1',
-          provider_recording_id: 'recording-1',
-        }),
+        DB: db,
       },
       'user-1'
     )).resolves.toEqual({ revokedMemberships: 1 })
 
-    expect(sentEvents(fetchMock)).toEqual([
-      'participants-kicked',
-      'participants-kicked',
-      'all-participants-kicked',
-      'meeting-ended',
-    ])
+    expect(sentEvents(fetchMock)).toEqual([])
     expect(writes.some((sql) => sql.includes("SET status = 'processing'"))).toBe(true)
     expect(writes.some((sql) => sql.includes("SET status = 'failed'"))).toBe(true)
   })
@@ -95,7 +94,7 @@ describe('관리자 계정 정지의 화상 면접 접근 폐기', () => {
       statement.first = async () =>
         sql.includes('FROM users WHERE id')
           ? { id: 'user-1', email: 'user@example.test', is_admin: 0, is_developer: 0 }
-          : null
+          : sql.includes('provider_meeting_id = ?') ? { id: 'session-1' } : null
       const originalRun = statement.run
       statement.run = async () => {
         if (sql.includes('DELETE FROM sessions WHERE user_id')) throw new Error('session unavailable')
@@ -118,7 +117,8 @@ describe('관리자 계정 정지의 화상 면접 접근 폐기', () => {
     })
 
     expect(response.status).toBe(500)
-    expect(sentEvents(fetchMock)).toContain('participants-kicked')
+    expect(sentEvents(fetchMock)).toEqual([])
+    expect(writes.some((sql) => sql.includes('provider_participant_id = NULL'))).toBe(true)
     await expect(response.json()).resolves.toMatchObject({
       accessRevocationPending: true,
       user: { isSuspended: true },

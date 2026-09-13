@@ -185,6 +185,7 @@ export async function getRoomSessionUser(db, request, roomId) {
               sessions.scoped_room_id AS session_scoped_room_id FROM sessions
        JOIN users ON users.id = sessions.user_id
        WHERE sessions.token_hash = ? AND sessions.scoped_room_id = ?
+         AND sessions.auth_method = 'invite_code'
          AND datetime(sessions.expires_at) > datetime('now')`
     )
     .bind(tokenHash, roomId)
@@ -222,7 +223,9 @@ export async function getSessionUser(db, request) {
               sessions.expires_at AS session_expires_at,
               sessions.auth_method AS session_auth_method FROM sessions
        JOIN users ON users.id = sessions.user_id
-       WHERE sessions.token_hash = ? AND datetime(sessions.expires_at) > datetime('now')`
+       WHERE sessions.token_hash = ? AND sessions.scoped_room_id IS NULL
+         AND sessions.auth_method IN ('password', 'developer_trial')
+         AND datetime(sessions.expires_at) > datetime('now')`
     )
     .bind(tokenHash)
     .first()
@@ -263,7 +266,7 @@ function normalizeStamp(value) {
 
 // 지금 미뤄야 하는가. 조회해 온 행만 보고 판단한다 — DB 를 다시 부르지 않는다.
 export function needsRenewal(user) {
-  if (user?.session_auth_method === TRIAL_AUTH_METHOD) return false
+  if (user?.session_scoped_room_id || (user?.session_auth_method && user.session_auth_method !== 'password')) return false
   const expires = user?.session_expires_at
   const started = user?.session_started_at
   if (!expires || !started) return false
@@ -283,20 +286,23 @@ export async function renewSessionIfStale(db, request) {
   if (!token) return
   const tokenHash = await sha256Hex(token)
 
-  await db
+  const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000).toISOString()
+  const result = await db
     .prepare(
       `UPDATE sessions
           SET expires_at = ?1
         WHERE token_hash = ?2
+          AND scoped_room_id IS NULL AND auth_method = 'password'
           AND datetime(expires_at) > datetime('now')
           AND datetime(expires_at) < datetime('now', ?3)
           AND (julianday(expires_at) - julianday(created_at)) > 1`
     )
     .bind(
-      new Date(Date.now() + SESSION_TTL_SECONDS * 1000).toISOString(),
+      expiresAt,
       tokenHash,
       `+${RENEW_WHEN_REMAINING_SECONDS} seconds`
     )
     .run()
-    .catch(() => {})
+    .catch(() => null)
+  return result?.meta?.changes ? expiresAt : null
 }
