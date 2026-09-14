@@ -42,7 +42,7 @@ describe('진행 중인 API 조회 공유', () => {
     const first = api.get('/me')
     sessionStorage.setItem('portfolioSession', JSON.stringify({ token: 'second', expiresAt: original }))
     pending.resolve(new Response('{}', { headers: { 'X-App-Session-Expires-At': renewed } }))
-    await first
+    await expect(first).rejects.toMatchObject({ code: 'STALE_AUTH_RESPONSE' })
     expect(JSON.parse(sessionStorage.getItem('portfolioSession'))).toEqual({ token: 'second', expiresAt: original })
   })
 
@@ -67,7 +67,7 @@ describe('진행 중인 API 조회 공유', () => {
     fetch.mockResolvedValueOnce(response({ user: 'second' }))
     expect(await api.get('/me')).toEqual({ user: 'second' })
     pending.resolve(response({ user: 'first' }))
-    await first
+    await expect(first).rejects.toMatchObject({ code: 'STALE_AUTH_RESPONSE' })
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 
@@ -80,7 +80,7 @@ describe('진행 중인 API 조회 공유', () => {
     fetch.mockResolvedValueOnce(response({ role: 'company' }))
     expect(await api.get('/rooms/r1/view')).toEqual({ role: 'company' })
     pending.resolve(response({ role: 'candidate' }))
-    await first
+    await expect(first).rejects.toMatchObject({ code: 'STALE_AUTH_RESPONSE' })
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 

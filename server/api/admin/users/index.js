@@ -4,6 +4,7 @@ import { hashPassword, normalizeEmail } from '../../../_lib/auth.js'
 import { genTempPassword } from '../../../_lib/tempPassword.js'
 import { logAdminAction } from '../../../_lib/auditLog.js'
 import { isProtectedDeveloper } from '../../../_lib/developerTrial.js'
+import { validateAccountProfile } from '../../../_lib/accountInput.js'
 
 const MAX_USERS = 500
 
@@ -37,15 +38,11 @@ export async function onRequestGet({ env, data = {} }) {
 
 export async function onRequestPost({ request, env, data }) {
   const body = await request.json().catch(() => null)
+  const profileError = validateAccountProfile(body)
+  if (profileError) return jsonError(profileError, 400)
   const { displayName, role, companyName, isRecruiter } = body || {}
   // 관리자가 대문자를 섞어 만들면 본인이 소문자로 로그인할 때 계정을 못 찾는다.
   const email = normalizeEmail(body?.email)
-  if (!email || !displayName || !role) {
-    return jsonError('이메일, 이름, 역할은 필수입니다.', 400)
-  }
-  if (!['company', 'candidate'].includes(role)) {
-    return jsonError('역할이 올바르지 않습니다.', 400)
-  }
 
   const tempPassword = genTempPassword()
   const { hash, salt } = await hashPassword(tempPassword)
@@ -57,7 +54,7 @@ export async function onRequestPost({ request, env, data }) {
       `INSERT INTO users (id, email, password_hash, password_salt, role, display_name, company_name, must_change_password, is_recruiter)
        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`
     )
-      .bind(id, email, hash, salt, role, displayName, companyName || null, recruiterFlag)
+      .bind(id, email, hash, salt, role, displayName.trim(), companyName?.trim() || null, recruiterFlag)
       .run()
   } catch (err) {
     if (String(err?.message || err).includes('UNIQUE')) {
@@ -79,8 +76,8 @@ export async function onRequestPost({ request, env, data }) {
       user: {
         id,
         email,
-        displayName,
-        companyName: companyName || null,
+        displayName: displayName.trim(),
+        companyName: companyName?.trim() || null,
         role,
         isAdmin: false,
         isRecruiter: !!recruiterFlag,

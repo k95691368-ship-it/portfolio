@@ -1,12 +1,14 @@
 import { verifyPassword, createSession, sessionCookieHeader, normalizeEmail } from '../_lib/auth.js'
 import { jsonResponse, jsonError } from '../_lib/http.js'
 import { checkRateLimit, releaseRateLimit } from '../_lib/rateLimit.js'
+import { isAccountEmail, isPasswordInput } from '../_lib/accountInput.js'
 
 export async function onRequestPost({ request, env }) {
   const body = await request.json().catch(() => null)
-  if (!body?.email || !body?.password) {
+  if (!isAccountEmail(body?.email) || !isPasswordInput(body?.password)) {
     return jsonError('이메일과 비밀번호를 입력해주세요.', 400)
   }
+  if (body.remember !== undefined && typeof body.remember !== 'boolean') return jsonError('로그인 유지 설정이 올바르지 않습니다.', 400)
 
   // 시도 제한을 두 축으로 건다.
   //

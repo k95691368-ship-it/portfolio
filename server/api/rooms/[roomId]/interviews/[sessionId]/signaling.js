@@ -1,6 +1,6 @@
 import { jsonResponse, jsonError } from '../../../../../_lib/http.js'
 import { checkRateLimit } from '../../../../../_lib/rateLimit.js'
-import { activeSignalMembers, validateSignal } from '../../../../../_lib/interviewSignaling.js'
+import { activeSignalMembers, validateSignal, SIGNAL_INBOX_SQL } from '../../../../../_lib/interviewSignaling.js'
 
 export async function onRequestPost({ env, request, data, params }) {
   if (!data.user || data.user.is_admin) return jsonError('참가자 인증이 필요합니다.', 403)
@@ -38,14 +38,12 @@ export async function onRequestPost({ env, request, data, params }) {
   }
   // Read a recent overlap rather than a sequence cursor: concurrent transaction
   // commits can be observed out of sequence. The browser deduplicates IDs.
-  const { results: messages } = await env.DB.prepare(`SELECT id, sender_id, payload FROM interview_signals
-    WHERE session_id = ? AND recipient_id = ? AND created_at > datetime('now', '-30 seconds') ORDER BY id LIMIT 600`)
+  const { results: messages } = await env.DB.prepare(SIGNAL_INBOX_SQL)
     .bind(params.sessionId, self.provider_participant_id).all()
-  const session = await env.DB.prepare('SELECT huddle_active FROM interview_sessions WHERE id = ?').bind(params.sessionId).first()
   const alive = members.filter((m) => m.user_id === self.user_id || Date.parse(String(m.signaling_seen_at || '').replace(' ', 'T').replace(/Z?$/, 'Z')) > Date.now() - 10000)
   return jsonResponse({
     members: alive.map((m) => ({ participantId: m.provider_participant_id, customParticipantId: m.custom_participant_id, role: m.role, displayName: m.display_name })),
     messages: (messages || []).filter((m) => alive.some((p) => p.provider_participant_id === m.sender_id)).map((m) => ({ id: String(m.id), payload: JSON.parse(m.payload) })),
-    huddleActive: session?.huddle_active === 1,
+    huddleActive: self.huddle_active === 1,
   })
 }

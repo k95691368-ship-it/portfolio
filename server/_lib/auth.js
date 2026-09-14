@@ -1,4 +1,5 @@
 import { applyTrialCapabilities, TRIAL_AUTH_METHOD, TRIAL_SECONDS } from './developerTrial.js'
+import { isPasswordInput } from './accountInput.js'
 
 const PBKDF2_ITERATIONS = 100000
 // 로그인 유지를 고른 경우와 아닌 경우.
@@ -68,12 +69,14 @@ export function normalizeEmail(value) {
 }
 
 export async function hashPassword(password) {
+  if (!isPasswordInput(password)) throw new TypeError('Invalid password input')
   const salt = crypto.getRandomValues(new Uint8Array(16))
   const hashBytes = await pbkdf2(password, salt)
   return { hash: toBase64(hashBytes), salt: toBase64(salt) }
 }
 
 export async function verifyPassword(password, storedHash, storedSalt) {
+  if (!isPasswordInput(password) || typeof storedHash !== 'string' || typeof storedSalt !== 'string') return false
   const hashBytes = await pbkdf2(password, fromBase64(storedSalt))
   return timingSafeEqual(toBase64(hashBytes), storedHash)
 }

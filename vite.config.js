@@ -40,10 +40,10 @@ function fastFirstPaint() {
 
       // 한국어 서체 요청이 CSS 다운로드 뒤로 밀리지 않게 한다.
       const font = Object.values(bundle).find((file) =>
-        file.type === 'asset' && /SUIT-Variable.*\\.woff2$/.test(file.fileName)
+        file.type === 'asset' && /SUIT-Variable.*\.woff2$/.test(file.fileName)
       )
       if (font) {
-        source = source.replace('</head>', `<link rel="preload" as="font" type="font/woff2" crossorigin href="/${font.fileName}">\\n</head>`)
+        source = source.replace('</head>', `<link rel="preload" as="font" type="font/woff2" crossorigin href="/${font.fileName}">\n</head>`)
       }
 
       // 2) 주소마다 필요한 조각을 미리 받게 한다.

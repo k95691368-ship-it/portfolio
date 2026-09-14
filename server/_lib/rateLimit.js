@@ -20,22 +20,14 @@ async function reserve(db, bucket, maxHits, windowSeconds) {
     .run()
 
   // 가끔 전역 청소: 다시 조회되지 않는 콜드 버킷(예: 1회성 IP)의 오래된 행이
-  // 무한히 누적되는 것을 막는다. 가장 긴 윈도가 1시간이므로 1일 지난 행은 항상 무의미.
+  // 무한히 누적되는 것을 막는다. 현재 가장 긴 윈도는 이메일 일일 한도(24시간)다.
   if (Math.random() < 0.02) {
     await env.DB.prepare("DELETE FROM rate_limit_hits WHERE created_at < datetime('now', '-1 day')")
       .run()
       .catch(() => {})
   }
 
-  // 조회가 비어 올 수 있다는 것을 가정한다.
-  //
-  // COUNT 는 늘 한 줄을 준다고 여기고 row.count 를 바로 읽었는데, first() 가
-  // null 을 돌려주면 여기서 터진다. 그러면 시도 제한이 켜져 있는 경로 전체가
-  // 500 이 된다 -- 로그인, 지원, 지원 현황 조회, 증명서 확인이 한꺼번에.
-  //
-  // 막으라고 넣은 장치가 서비스를 멈추는 원인이 되면 안 된다. 세지 못했으면
-  // 0회로 보고 통과시킨다. 세지 못한 요청 하나를 더 받는 것이, 멀쩡한 사람을
-  // 전부 막는 것보다 낫다.
+  // Count and reserve in the same statement; failed writes never grant a ticket.
   const inserted = await env.DB.prepare(
     'INSERT INTO rate_limit_hits (bucket) SELECT ? WHERE (SELECT COUNT(*) FROM rate_limit_hits WHERE bucket = ?) < ?'
   )

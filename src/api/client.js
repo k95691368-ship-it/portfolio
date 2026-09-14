@@ -1,3 +1,5 @@
+import { withRequestDeadline } from './requestDeadline.js'
+
 export const API_BASE =
   import.meta.env.VITE_API_BASE ||
   (import.meta.env.PROD
@@ -153,9 +155,32 @@ function authHeaders(path) {
   return headers
 }
 
+const ACCOUNT_AUTH_PATHS = new Set(['/login', '/signup', '/demo/login', '/change-password', '/logout'])
+let authGeneration = 0
+
+function identitySnapshot(path) {
+  const headers = authHeaders(path)
+  return JSON.stringify([
+    authGeneration,
+    headers['X-App-Authorization'] || null,
+    headers['X-Room-Authorization'] || null,
+    roomIdentityHeader(path)?.['X-Room-Identity'] || null,
+  ])
+}
+
+function assertCurrentIdentity(path, snapshot, response) {
+  if (identitySnapshot(path) === snapshot) return
+  // Do not download another account's file if identity changed before headers arrived.
+  if (response?.body) void response.body.cancel().catch(() => {})
+  const error = new Error('로그인 또는 면접방 입장 상태가 변경되었습니다. 현재 계정에서 다시 확인해주세요.')
+  error.code = 'STALE_AUTH_RESPONSE'
+  error.status = 409
+  throw error
+}
+
 function acceptAuthResponse(path, data) {
-  storeAccountSession(data)
-  storeRoomSession(data)
+  if (ACCOUNT_AUTH_PATHS.has(path)) storeAccountSession(data)
+  if (path === '/rooms/enter') storeRoomSession(data)
   if (path === '/logout') clearAccountSession()
 }
 
@@ -179,17 +204,25 @@ function toUserError(res, data) {
 const pendingReads = new Map()
 let writeGeneration = 0
 
-async function performRequest(path, options, headers) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    credentials: 'omit',
-    headers,
-  })
-  acceptRenewal(res, headers)
-  const data = await res.json().catch(() => null)
-  if (!res.ok) throw toUserError(res, data)
-  acceptAuthResponse(path, data)
-  return data
+async function performRequest(path, options, headers, timeoutMs = 120_000) {
+  const snapshot = identitySnapshot(path)
+  return withRequestDeadline(async (signal) => {
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      signal,
+      credentials: 'omit',
+      headers,
+    })
+    if (signal.aborted) throw signal.reason
+    assertCurrentIdentity(path, snapshot, res)
+    const data = await res.json().catch(() => null)
+    if (signal.aborted) throw signal.reason
+    assertCurrentIdentity(path, snapshot, res)
+    acceptRenewal(res, headers)
+    if (!res.ok) throw toUserError(res, data)
+    acceptAuthResponse(path, data)
+    return data
+  }, { signal: options.signal, timeoutMs })
 }
 
 function request(path, options = {}) {
@@ -200,12 +233,13 @@ function request(path, options = {}) {
     ...(options.headers || {}),
   }
   if ((options.method || 'GET') !== 'GET') {
+    if (ACCOUNT_AUTH_PATHS.has(path) || path === '/rooms/enter') authGeneration += 1
     writeGeneration += 1
     return performRequest(path, options, headers).finally(() => { writeGeneration += 1 })
   }
   // 진행 중인 동일 조회만 공유한다. 인증·방 신원·쓰기 전후를 구별하며
   // 완료 응답은 저장하지 않아 다음 조회가 오래된 내용을 받지 않는다.
-  const key = JSON.stringify([writeGeneration, path, headers])
+  const key = JSON.stringify([writeGeneration, authGeneration, path, headers])
   if (pendingReads.has(key)) return pendingReads.get(key)
   const pending = performRequest(path, options, headers).finally(() => {
     if (pendingReads.get(key) === pending) pendingReads.delete(key)
@@ -217,37 +251,39 @@ function request(path, options = {}) {
 async function upload(path, formData) {
   writeGeneration += 1
   const headers = { ...authHeaders(path), ...roomIdentityHeader(path) }
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    credentials: 'omit',
-    headers,
-    body: formData,
-  }).finally(() => { writeGeneration += 1 })
-  acceptRenewal(res, headers)
-  const data = await res.json().catch(() => null)
-  if (!res.ok) throw toUserError(res, data)
-  acceptAuthResponse(path, data)
-  return data
+  return performRequest(path, { method: 'POST', body: formData }, headers, 300_000)
+    .finally(() => { writeGeneration += 1 })
 }
 
 export async function apiBlob(path) {
   const headers = { ...authHeaders(path), ...roomIdentityHeader(path) }
-  const res = await fetch(`${API_BASE}${path}`, {
-    credentials: 'omit',
-    headers,
-  })
-  acceptRenewal(res, headers)
-  if (!res.ok) {
-    const data = await res.json().catch(() => null)
-    throw toUserError(res, data)
-  }
-  return {
-    blob: await res.blob(),
-    filename: decodeURIComponent(
-      res.headers.get('Content-Disposition')?.match(/filename\*=UTF-8''([^;]+)/i)?.[1] ||
-        'download'
-    ),
-  }
+  const snapshot = identitySnapshot(path)
+  return withRequestDeadline(async (signal) => {
+    const res = await fetch(`${API_BASE}${path}`, {
+      signal,
+      credentials: 'omit',
+      headers,
+    })
+    if (signal.aborted) throw signal.reason
+    assertCurrentIdentity(path, snapshot, res)
+    if (!res.ok) {
+      const data = await res.json().catch(() => null)
+      if (signal.aborted) throw signal.reason
+      assertCurrentIdentity(path, snapshot, res)
+      throw toUserError(res, data)
+    }
+    const blob = await res.blob()
+    if (signal.aborted) throw signal.reason
+    assertCurrentIdentity(path, snapshot, res)
+    acceptRenewal(res, headers)
+    return {
+      blob,
+      filename: decodeURIComponent(
+        res.headers.get('Content-Disposition')?.match(/filename\*=UTF-8''([^;]+)/i)?.[1] ||
+          'download'
+      ),
+    }
+  }, { timeoutMs: 300_000 })
 }
 
 export async function downloadApiFile(path) {

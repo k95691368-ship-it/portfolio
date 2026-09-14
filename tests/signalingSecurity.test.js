@@ -54,3 +54,12 @@ it('issues limited-lifetime TURN credentials without exposing the shared secret'
   const expiry = Number(result.iceServers[1].username.split(':')[0])
   expect(expiry - Math.floor(Date.now() / 1000)).toBeGreaterThanOrEqual(7199)
 })
+
+it('returns authoritative huddle state without a redundant session SELECT on every heartbeat', async () => {
+  db.sql.exec("UPDATE interview_sessions SET huddle_active = 1 WHERE id = 'session'")
+  const prepare = vi.spyOn(db, 'prepare')
+  const result = await (await call('host')).json()
+  expect(result.huddleActive).toBe(true)
+  const reads = prepare.mock.calls.filter(([query]) => /^SELECT/i.test(query.trim()))
+  expect(reads).toHaveLength(2)
+})

@@ -14,25 +14,26 @@ export async function onRequestGet({ env, data }) {
 
   const { results } = await env.DB.prepare(
     `WITH mine AS (
-       SELECT id, body, created_at, read_at, sender_id, recipient_id,
+       SELECT id, created_at, read_at, sender_id, recipient_id,
               CASE WHEN sender_id = ?1 THEN recipient_id ELSE sender_id END AS partner_id
          FROM direct_messages
         WHERE sender_id = ?1 OR recipient_id = ?1
+     ), summaries AS (
+       SELECT partner_id, MAX(id) AS last_id, MAX(created_at) AS last_at,
+              SUM(CASE WHEN recipient_id = ?1 AND read_at IS NULL THEN 1 ELSE 0 END) AS unread
+         FROM mine
+        GROUP BY partner_id
+        ORDER BY last_id DESC
+        LIMIT 50
      )
      SELECT m.partner_id,
             u.display_name, u.company_name, u.role, u.is_admin,
-            (SELECT body FROM mine x WHERE x.partner_id = m.partner_id
-              ORDER BY x.id DESC LIMIT 1) AS last_body,
-            (SELECT sender_id FROM mine x WHERE x.partner_id = m.partner_id
-              ORDER BY x.id DESC LIMIT 1) AS last_sender_id,
-            MAX(m.id) AS last_id,
-            MAX(m.created_at) AS last_at,
-            SUM(CASE WHEN m.recipient_id = ?1 AND m.read_at IS NULL THEN 1 ELSE 0 END) AS unread
-       FROM mine m
+            last.body AS last_body, last.sender_id AS last_sender_id,
+            m.last_id, m.last_at, m.unread
+       FROM summaries m
        JOIN users u ON u.id = m.partner_id
-      GROUP BY m.partner_id
-      ORDER BY last_id DESC
-      LIMIT 50`
+       JOIN direct_messages last ON last.id = m.last_id
+      ORDER BY m.last_id DESC`
   )
     .bind(me)
     .all()

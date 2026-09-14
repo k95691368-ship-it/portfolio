@@ -8,6 +8,7 @@ import {
   sessionCookieHeader,
 } from '../_lib/auth.js'
 import { jsonError } from '../_lib/http.js'
+import { boundedRequest, RequestBodyError } from '../_lib/requestBody.js'
 
 // 다른 사이트가 이 API 를 대신 부르는 것을 막는다.
 //
@@ -74,6 +75,15 @@ export async function onRequest(context) {
   const roomId = roomIdFromApiPath(requestUrl.pathname)
   if (context.data.user?.developer_trial && requestUrl.pathname === '/api/change-password') {
     return jsonError('체험 계정의 로그인 정보는 변경할 수 없습니다.', 403)
+  }
+
+  if (STATE_CHANGING.has(request.method)) {
+    try {
+      context.request = await boundedRequest(request)
+    } catch (error) {
+      if (error instanceof RequestBodyError) return jsonError(error.message, error.status)
+      return jsonError('요청 데이터를 읽을 수 없습니다.', 400)
+    }
   }
   const isRecordingFileGet =
     request.method === 'GET' &&

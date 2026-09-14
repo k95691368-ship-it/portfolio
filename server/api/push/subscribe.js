@@ -1,5 +1,6 @@
 import { jsonResponse, jsonError } from '../../_lib/http.js'
-import { vapidConfigured } from '../../_lib/webPush.js'
+import { vapidConfigured, validPushSubscription } from '../../_lib/webPush.js'
+import { checkRateLimit } from '../../_lib/rateLimit.js'
 
 // 이 기기로 알림을 밀어 달라고 등록한다.
 //
@@ -8,6 +9,7 @@ import { vapidConfigured } from '../../_lib/webPush.js'
 export async function onRequestPost({ request, env, data }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
   if (!vapidConfigured(env)) return jsonError('푸시 알림이 설정되지 않았습니다.', 503)
+  if (!await checkRateLimit(env, `push-subscribe:${data.user.id}`, 20, 3600)) return jsonError('등록 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)
 
   const body = await request.json().catch(() => null)
   const endpoint = String(body?.endpoint ?? '').trim()
@@ -17,16 +19,7 @@ export async function onRequestPost({ request, env, data }) {
 
   // 밀어 주는 주소는 브라우저 회사의 것이어야 한다. 아무 주소나 받으면 이
   // 서버가 남의 서버를 두드리는 도구가 된다.
-  let host
-  try {
-    const url = new URL(endpoint)
-    if (url.protocol !== 'https:') return jsonError('구독 정보가 올바르지 않습니다.', 400)
-    host = url.host
-  } catch {
-    return jsonError('구독 정보가 올바르지 않습니다.', 400)
-  }
-  const allowed = /(^|\.)(googleapis\.com|mozilla\.com|windows\.com|apple\.com)$/.test(host)
-  if (!allowed) return jsonError('지원하지 않는 알림 주소입니다.', 400)
+  if (!await validPushSubscription({ endpoint, p256dh, auth })) return jsonError('구독 정보가 올바르지 않습니다.', 400)
 
   // 같은 기기가 다시 등록하면 덮어쓴다. 브라우저는 열쇠를 갱신하기도 한다.
   //

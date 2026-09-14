@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { webcrypto } from 'node:crypto'
-import { sendPush, vapidConfigured } from '../server/_lib/webPush.js'
+import { sendPush, vapidConfigured, validPushEndpoint, validPushSubscription, pushToUser } from '../server/_lib/webPush.js'
+import { onRequestPost as subscribe } from '../server/api/push/subscribe.js'
+import { sqliteApp, seedUser } from './helpers/sqliteApp.js'
 
 // 웹 푸시는 눈에 보이지 않는 곳에서 두 가지를 한다 -- 서명과 암호화.
 // 둘 중 하나만 어긋나도 밀어 주는 서버가 조용히 거절하고, 알림은 그냥
@@ -68,6 +70,8 @@ describe('웹 푸시', () => {
     expect(sent.init.headers['Content-Encoding']).toBe('aes128gcm')
     expect(sent.init.headers.TTL).toBe('86400')
     expect(sent.init.headers.Authorization).toMatch(/^vapid t=[\w-]+\.[\w-]+\.[\w-]+, k=/)
+    expect(sent.init.redirect).toBe('error')
+    expect(sent.init.signal).toBeInstanceOf(AbortSignal)
   })
 
   it('서명이 실제로 검증된다', async () => {
@@ -151,5 +155,78 @@ describe('웹 푸시', () => {
       const r = await sendPush(env, sub, { title: 'x' })
       expect(r.gone, `status ${status}`).toBe(gone)
     }
+  })
+
+  it('rejects stored non-push URLs before making any network request', async () => {
+    const vapid = await makeVapid()
+    const subscription = await makeSubscription()
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 201 }))
+    for (const endpoint of ['https://www.googleapis.com/anything', 'https://www.apple.com/', 'https://127.0.0.1/', 'https://fcm.googleapis.com@localhost/', 'https://fcm.googleapis.com:444/send']) {
+      const result = await sendPush({ VAPID_PUBLIC_KEY: vapid.publicKey, VAPID_PRIVATE_KEY: vapid.privateKey },
+        { ...subscription, endpoint }, { title: 'x' })
+      expect(result.reason).toBe('invalid_subscription')
+    }
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('does not buffer the push provider response body or expose it in logs', async () => {
+    const vapid = await makeVapid()
+    const cancel = vi.fn()
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(new ReadableStream({
+      start(controller) { controller.enqueue(new TextEncoder().encode('private-provider-response')) }, cancel,
+    }), { status: 503 }))
+    const result = await sendPush({ VAPID_PUBLIC_KEY: vapid.publicKey, VAPID_PRIVATE_KEY: vapid.privateKey }, await makeSubscription(), { title: 'x' })
+    expect(cancel).toHaveBeenCalled()
+    expect(result.reason).toBe('provider_error')
+  })
+
+  it('accepts standard browser push providers but rejects credentials, fragments and misleading hosts', () => {
+    for (const url of ['https://fcm.googleapis.com/fcm/send/abc', 'https://updates.push.services.mozilla.com/wpush/v2/abc', 'https://wns2.notify.windows.com/w/?token=abc', 'https://web.push.apple.com/abc']) {
+      expect(validPushEndpoint(url), url).toBe(true)
+    }
+    for (const url of ['http://fcm.googleapis.com/abc', 'https://fcm.googleapis.com.evil.invalid/abc', 'https://user:password@fcm.googleapis.com/abc', 'https://fcm.googleapis.com/abc#fragment', 'https://evilnotify.windows.com/']) {
+      expect(validPushEndpoint(url), url).toBe(false)
+    }
+  })
+
+  it('validates both key lengths and the actual P-256 curve point', async () => {
+    const subscription = await makeSubscription()
+    expect(await validPushSubscription(subscription)).toBe(true)
+    expect(await validPushSubscription({ ...subscription, auth: b64url(new Uint8Array(15)) })).toBe(false)
+    const offCurve = new Uint8Array(65); offCurve[0] = 4
+    expect(await validPushSubscription({ ...subscription, p256dh: b64url(offCurve) })).toBe(false)
+  })
+
+  it('registers valid subscriptions, rejects malformed ones, and rate-limits registration in a real database', async () => {
+    const db = sqliteApp()
+    try {
+      const user = seedUser(db, 'push-user')
+      const env = { DB: db, VAPID_PUBLIC_KEY: 'unused', VAPID_PRIVATE_KEY: 'unused' }
+      const subscription = await makeSubscription()
+      const call = (body) => subscribe({ env, data: { user }, request: new Request('https://test.invalid/api/push/subscribe', { method: 'POST', body: JSON.stringify(body) }) })
+      expect((await call(subscription)).status).toBe(201)
+      expect((await call({ ...subscription, auth: 'invalid' })).status).toBe(400)
+      for (let i = 0; i < 18; i++) expect((await call(subscription)).status).toBe(201)
+      expect((await call(subscription)).status).toBe(429)
+      expect(db.sql.prepare('SELECT COUNT(*) AS n FROM push_subscriptions').get().n).toBe(1)
+    } finally { db.close() }
+  })
+
+  it.each(['owner', 'keys'])('does not delete a subscription whose %s changed while sending', async (change) => {
+    const db = sqliteApp()
+    try {
+      seedUser(db, 'push-before'); seedUser(db, 'push-after')
+      const vapid = await makeVapid()
+      const sub = await makeSubscription()
+      db.sql.prepare('INSERT INTO push_subscriptions (endpoint,user_id,p256dh,auth) VALUES (?,?,?,?)').run(sub.endpoint, 'push-before', sub.p256dh, sub.auth)
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+        if (change === 'owner') db.sql.exec("UPDATE push_subscriptions SET user_id = 'push-after'")
+        else db.sql.prepare('UPDATE push_subscriptions SET auth = ?').run(b64url(new Uint8Array(16)))
+        return new Response(null, { status: 410 })
+      })
+      const result = await pushToUser({ DB: db, VAPID_PUBLIC_KEY: vapid.publicKey, VAPID_PRIVATE_KEY: vapid.privateKey }, 'push-before', { title: 'x' })
+      expect(result.removed).toBe(0)
+      expect(db.sql.prepare('SELECT user_id FROM push_subscriptions').get().user_id).toBe(change === 'owner' ? 'push-after' : 'push-before')
+    } finally { db.close() }
   })
 })

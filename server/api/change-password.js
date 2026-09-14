@@ -8,6 +8,7 @@ import {
 } from '../_lib/auth.js'
 import { jsonResponse, jsonError } from '../_lib/http.js'
 import { checkRateLimit } from '../_lib/rateLimit.js'
+import { isPasswordInput } from '../_lib/accountInput.js'
 
 export async function onRequestPost({ request, env, data }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
@@ -23,11 +24,11 @@ export async function onRequestPost({ request, env, data }) {
   if (typeof currentPassword !== 'string' || typeof newPassword !== 'string') {
     return jsonError('현재 비밀번호와 새 비밀번호를 입력해주세요.', 400)
   }
-  if (!currentPassword || !newPassword) {
+  if (!isPasswordInput(currentPassword)) {
     return jsonError('현재 비밀번호와 새 비밀번호를 입력해주세요.', 400)
   }
-  if (newPassword.length < 8) {
-    return jsonError('새 비밀번호는 8자 이상이어야 합니다.', 400)
+  if (!isPasswordInput(newPassword, 8)) {
+    return jsonError('새 비밀번호는 8~1024자여야 합니다.', 400)
   }
 
   const valid = await verifyPassword(currentPassword, data.user.password_hash, data.user.password_salt)

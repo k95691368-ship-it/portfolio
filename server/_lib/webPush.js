@@ -44,6 +44,32 @@ const concat = (...arrays) => {
 
 const utf8 = (s) => new TextEncoder().encode(s)
 
+export function validPushEndpoint(endpoint) {
+  if (typeof endpoint !== 'string' || endpoint.length > 4096) return false
+  try {
+    const url = new URL(endpoint)
+    if (url.protocol !== 'https:' || url.username || url.password || url.port || url.hash) return false
+    return url.hostname === 'fcm.googleapis.com'
+      || url.hostname === 'updates.push.services.mozilla.com'
+      || url.hostname.endsWith('.notify.windows.com')
+      || url.hostname === 'web.push.apple.com'
+      || url.hostname.endsWith('.push.apple.com')
+  } catch { return false }
+}
+
+export async function validPushSubscription(subscription) {
+  if (!validPushEndpoint(subscription?.endpoint)) return false
+  const { p256dh, auth } = subscription
+  if (typeof p256dh !== 'string' || !/^[\w-]{87}=?$/.test(p256dh)
+    || typeof auth !== 'string' || !/^[\w-]{22}(==)?$/.test(auth)) return false
+  try {
+    const key = b64urlToBytes(p256dh)
+    if (key.length !== 65 || key[0] !== 4 || b64urlToBytes(auth).length !== 16) return false
+    await crypto.subtle.importKey('raw', key, { name: 'ECDH', namedCurve: 'P-256' }, false, [])
+    return true
+  } catch { return false }
+}
+
 // HKDF (RFC 5869). 하나의 비밀에서 서로 다른 용도의 열쇠 여러 개를 뽑는다.
 async function hkdf(salt, ikm, info, length) {
   const key = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits'])
@@ -164,6 +190,8 @@ export function vapidConfigured(env) {
 // 않으면 매번 죽은 주소로 보내다 실패한다.
 export async function sendPush(env, subscription, payload) {
   if (!vapidConfigured(env)) return { ok: false, gone: false, status: 0, reason: 'not_configured' }
+  // Recheck stored rows too, including subscriptions registered before validation tightened.
+  if (!await validPushSubscription(subscription)) return { ok: false, gone: true, status: 0, reason: 'invalid_subscription' }
 
   const body = await encryptPayload(JSON.stringify(payload), {
     p256dh: subscription.p256dh,
@@ -177,6 +205,8 @@ export async function sendPush(env, subscription, payload) {
 
   const res = await fetch(subscription.endpoint, {
     method: 'POST',
+    redirect: 'error',
+    signal: AbortSignal.timeout(10_000),
     headers: {
       Authorization: authorization,
       'Content-Encoding': 'aes128gcm',
@@ -187,12 +217,15 @@ export async function sendPush(env, subscription, payload) {
     body,
   })
 
+  // The provider's response is not needed; do not buffer or log arbitrary bodies.
+  if (res.body) void res.body.cancel().catch(() => {})
+
   return {
     ok: res.ok,
     // 이 두 가지만 '죽은 구독'이다. 429·5xx 는 지금 못 보낸 것뿐이라 지우면 안 된다.
     gone: res.status === 404 || res.status === 410,
     status: res.status,
-    reason: res.ok ? null : (await res.text().catch(() => '')).slice(0, 200),
+    reason: res.ok ? null : 'provider_error',
   }
 }
 
@@ -213,19 +246,22 @@ export async function pushToUser(env, userId, payload) {
     try {
       const r = await sendPush(env, sub, payload)
       if (r.ok) sent += 1
-      else if (r.gone) dead.push(sub.endpoint)
+      else if (r.gone) dead.push(sub)
       else console.error(`push failed (${r.status}): ${r.reason}`)
-    } catch (err) {
-      console.error('push threw:', err)
+    } catch {
+      console.error('push transport failed')
     }
   }
 
+  let removed = 0
   if (dead.length > 0) {
-    await env.DB.batch(
-      dead.map((e) =>
-        env.DB.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(e)
+    const results = await env.DB.batch(
+      dead.map((sub) =>
+        env.DB.prepare('DELETE FROM push_subscriptions WHERE endpoint = ? AND user_id = ? AND p256dh = ? AND auth = ?')
+          .bind(sub.endpoint, userId, sub.p256dh, sub.auth)
       )
-    ).catch(() => {})
+    ).catch(() => [])
+    removed = results.reduce((count, result) => count + Number(result.meta?.changes || 0), 0)
   }
-  return { sent, removed: dead.length }
+  return { sent, removed }
 }

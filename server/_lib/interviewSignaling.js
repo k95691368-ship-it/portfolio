@@ -1,10 +1,16 @@
 import { CONSENT_NOTICE_HASH, CONSENT_NOTICE_VERSION } from './interviews.js'
 
+// Keep ordering aligned with the time-range index so LIMIT does not encourage
+// PostgreSQL to scan old primary-key entries looking for a recent message.
+export const SIGNAL_INBOX_SQL = `SELECT id, sender_id, payload FROM interview_signals
+  WHERE session_id = ? AND recipient_id = ? AND created_at > datetime('now', '-30 seconds')
+  ORDER BY created_at, id LIMIT 600`
+
 // Identity, admission, consent and role are read from the database on every
 // exchange. No public Realtime presence/broadcast data is trusted.
 export async function activeSignalMembers(db, roomId, sessionId) {
   const { results } = await db.prepare(`SELECT m.user_id, m.provider_participant_id,
-      m.custom_participant_id, m.role, m.signaling_seen_at, u.display_name
+      m.custom_participant_id, m.role, m.signaling_seen_at, u.display_name, s.huddle_active
     FROM interview_session_members m
     JOIN interview_sessions s ON s.id = m.session_id
     JOIN interview_rooms r ON r.id = s.room_id
