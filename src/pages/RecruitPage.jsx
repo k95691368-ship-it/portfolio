@@ -8,6 +8,7 @@ import NotificationBell from '../components/NotificationBell.jsx'
 import ApplicantCompare from '../components/ApplicantCompare.jsx'
 import Modal from '../components/Modal.jsx'
 import PostingEditor from '../components/PostingEditor.jsx'
+import PostingQrModal from '../components/PostingQrModal.jsx'
 import { EXAMPLE_POSTING } from '../../shared/jobPostingTemplate.js'
 
 // 공고 등록 폼의 빈 상태. 한 곳에만 두어, 등록 후 초기화에서 필드를 빠뜨리는 일을 막는다.
@@ -434,6 +435,7 @@ export default function RecruitPage() {
   const [loading, setLoading] = useState(true)
   const [selectedApp, setSelectedApp] = useState(null)
   const [comparePosting, setComparePosting] = useState(null)
+  const [qrPosting, setQrPosting] = useState(null)
 
   // 새 공고 폼
   const [form, setForm] = useState(EMPTY_POSTING)
@@ -497,6 +499,20 @@ export default function RecruitPage() {
       setDraftSavedAt(draft.updatedAt)
       setSavedForm(JSON.stringify(fields))
       toast.success('임시저장 공고를 불러왔습니다.')
+    } catch (err) { toast.error(err.message) }
+    finally { setLoadingDraft(false) }
+  }
+
+  const reusePosting = async (posting) => {
+    if (draftBusy || (unsaved && !window.confirm('작성 중인 내용 대신 이전 공고를 불러오시겠습니까? 저장하지 않은 내용은 사라집니다.'))) return
+    setLoadingDraft(true)
+    try {
+      const { fields } = await api.get(`/postings/${posting.id}/reuse`)
+      resetDraftForm()
+      setForm({ ...EMPTY_POSTING, ...fields })
+      toast.success('새 공고로 불러왔습니다. 마감일과 본문의 날짜·급여·근무 조건을 확인해주세요. 아직 공개되지 않았습니다.')
+      document.getElementById('new-posting-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      document.querySelector('#new-posting-form input')?.focus({ preventScroll: true })
     } catch (err) { toast.error(err.message) }
     finally { setLoadingDraft(false) }
   }
@@ -593,7 +609,7 @@ export default function RecruitPage() {
         <p className="muted" role="status">
           {draftSavedAt ? `${formatKst(draftSavedAt)} 임시저장${unsaved ? ' · 저장하지 않은 변경사항' : ''}` : '임시저장한 공고는 본인에게만 보입니다.'}
         </p>
-        <form onSubmit={handleCreate} className="posting-form">
+        <form id="new-posting-form" onSubmit={handleCreate} className="posting-form">
           <fieldset className="posting-draft-fields" disabled={draftBusy}>
           <label>
             공고 제목 <span className="consent-required" aria-hidden="true">*</span>
@@ -782,6 +798,8 @@ export default function RecruitPage() {
                     <td>{p.applicationCount}명</td>
                     <td>{formatKstDate(p.createdAt)}</td>
                     <td>
+                      {p.canReuse && <><button type="button" className="btn-sm" disabled={draftBusy} onClick={() => reusePosting(p)}>복사해 새 공고 작성</button>{' '}</>}
+                      <button type="button" className="btn-sm" disabled={p.status !== 'open' || Boolean(p.deadline && p.deadline < formatKstDate(new Date().toISOString()))} onClick={() => setQrPosting(p)}>QR 코드 만들기</button>{' '}
                       <button
                         type="button"
                         className="btn-sm"
@@ -809,6 +827,7 @@ export default function RecruitPage() {
         )}
       </section>
 
+      {qrPosting && <PostingQrModal posting={qrPosting} onClose={() => setQrPosting(null)} />}
       {comparePosting && (
         <ApplicantCompare
           postingId={comparePosting.id}

@@ -2,7 +2,6 @@ import { jsonError, jsonResponse } from '../../../../../_lib/http.js'
 import {
   InterviewAccessError,
   getInterviewSessionAccess,
-  getRoomForInterview,
   loadSessionForUser,
   loadSessionMembers,
   loadSessionRecordings,
@@ -12,6 +11,7 @@ import {
   serializeSession,
 } from '../../../../../_lib/interviews.js'
 import { blockedWhenFrozen } from '../../../../../_lib/roomLifecycle.js'
+import { withScheduleLock, getSelectableSlot, findScheduleConflict, normalizeDuration } from '../../../../../_lib/interviewScheduling.js'
 import {
   VideoServiceError,
   VideoServiceConfigError,
@@ -59,15 +59,9 @@ export async function onRequestGet({ env, data, params }) {
   return jsonResponse({ session })
 }
 
-export async function onRequestPatch({ request, env, data, params }) {
-  let access
-  try {
-    access = await getRoomForInterview(env, params.roomId, data.user, { allowAdminRead: false })
-  } catch (error) {
-    if (error instanceof InterviewAccessError) return jsonError(error.message, error.status)
-    throw error
-  }
+export const onRequestPatch = context => withScheduleLock(context, changeInterview)
 
+async function changeInterview({ request, env, data, params, scheduleAccess: access }) {
   const current = await loadSessionForUser(
     env,
     params.roomId,
@@ -75,7 +69,9 @@ export async function onRequestPatch({ request, env, data, params }) {
     data.user.id
   )
   if (!current) return jsonError('화상 면접을 찾을 수 없습니다.', 404)
-  if (current.my_role !== 'host') {
+  const body = await request.json().catch(() => null)
+  const candidateBooking = current.my_role === 'candidate' && current.booking_slot_id
+  if (current.my_role !== 'host' && !candidateBooking) {
     return jsonError('화상 면접 일정은 진행자만 변경할 수 있습니다.', 403)
   }
   const frozen = blockedWhenFrozen(access.room, 'edit_interview')
@@ -84,8 +80,16 @@ export async function onRequestPatch({ request, env, data, params }) {
     return jsonError('종료되었거나 취소된 화상 면접은 변경할 수 없습니다.', 409)
   }
 
-  const body = await request.json().catch(() => null)
   if (!body || typeof body !== 'object') return jsonError('요청 내용을 확인해주세요.', 400)
+  if (body.status && (Object.hasOwn(body, 'slotId') || Object.hasOwn(body, 'scheduledAt') || Object.hasOwn(body, 'durationMinutes'))) return jsonError('시간 변경과 취소는 각각 요청해주세요.', 400)
+  if (candidateBooking && Object.keys(body).some(key => !['slotId', 'status'].includes(key))) {
+    return jsonError('지원자는 시간 선택 또는 예약 취소만 할 수 있습니다.', 403)
+  }
+  const rescheduling = Object.hasOwn(body, 'slotId') || Object.hasOwn(body, 'scheduledAt') || Object.hasOwn(body, 'durationMinutes')
+  if (rescheduling || candidateBooking) {
+    const admitted = await env.DB.prepare('SELECT user_id FROM interview_session_members WHERE session_id = ? AND (admitted_at IS NOT NULL OR joined_at IS NOT NULL) LIMIT 1').bind(params.sessionId).first()
+    if (!['scheduled', 'waiting'].includes(current.status) || admitted) return jsonError('참가자 입장이 시작된 면접은 예약을 변경할 수 없습니다.', 409)
+  }
   if (Object.hasOwn(body, 'recordingRequired')) {
     return jsonError(
       '녹화 필수 여부는 화상 면접을 만들 때 확정되며 기존 일정에서는 변경할 수 없습니다.',
@@ -100,12 +104,17 @@ export async function onRequestPatch({ request, env, data, params }) {
       setters.push('title = ?')
       values.push(normalizeTitle(body.title))
     }
-    if (Object.hasOwn(body, 'scheduledAt')) {
-      setters.push('scheduled_at = ?')
-      values.push(normalizeScheduledAt(body.scheduledAt))
+    if (rescheduling) {
+      const slot = Object.hasOwn(body, 'slotId') ? await getSelectableSlot(env, access.room.company_user_id, body.slotId, current.id) : null
+      if (slot && slot.recording_required !== current.recording_required) return jsonError('녹화 조건이 같은 시간을 선택해주세요. 조건을 바꾸려면 기존 예약을 취소해주세요.', 409)
+      const at = slot?.starts_at ?? (Object.hasOwn(body, 'scheduledAt') ? normalizeScheduledAt(body.scheduledAt) : current.scheduled_at)
+      const duration = slot?.duration_minutes ?? normalizeDuration(body.durationMinutes ?? current.duration_minutes ?? 30)
+      if (await findScheduleConflict(env, access.room.company_user_id, at, duration, current.id)) return jsonError('담당자의 다른 면접 일정과 겹칩니다.', 409)
+      setters.push('scheduled_at = ?', 'booking_slot_id = ?', 'duration_minutes = ?')
+      values.push(at, slot?.id ?? null, duration)
     }
   } catch (error) {
-    return jsonError(error.message, 400)
+    return jsonError(error.message, error.status ?? 400)
   }
 
   if (Object.hasOwn(body, 'status')) {
@@ -158,11 +167,14 @@ export async function onRequestPatch({ request, env, data, params }) {
 
   if (setters.length === 0) return jsonError('변경할 항목이 없습니다.', 400)
   setters.push("updated_at = datetime('now')")
-  await env.DB.prepare(
-    `UPDATE interview_sessions SET ${setters.join(', ')} WHERE id = ? AND room_id = ?`
+  const saved = await env.DB.prepare(
+    `UPDATE interview_sessions SET ${setters.join(', ')} WHERE id = ? AND room_id = ?
+      ${rescheduling ? `AND status IN ('scheduled','waiting') AND NOT EXISTS (
+        SELECT 1 FROM interview_session_members WHERE session_id = interview_sessions.id AND (admitted_at IS NOT NULL OR joined_at IS NOT NULL))` : ''}`
   )
     .bind(...values, params.sessionId, params.roomId)
     .run()
+  if (saved.meta?.changes === 0) return jsonError('면접 상태가 변경되었습니다. 새로고침해주세요.', 409)
 
   if (body.status === 'cancelled') {
     await logInterviewEvent(env, {

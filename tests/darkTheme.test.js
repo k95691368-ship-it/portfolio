@@ -12,7 +12,7 @@ describe('검은 테마 고정', () => {
 
     expect(html).toContain('<html lang="ko" data-theme="dark">')
     expect(css).toContain('color-scheme: dark')
-    expect(css).toMatch(/--bg:\s*#000;/)
+    expect(css).toMatch(/--bg:\s*#111110;/)
   })
 
   it('테마 전환 UI와 컨텍스트를 앱에 다시 연결하지 않는다', () => {

@@ -12,13 +12,13 @@ export default function LandingPage() {
             to="/login"
             className="landing-choice landing-choice--company"
           >
-            회사
+            <span>회사</span><span className="landing-choice-arrow" aria-hidden="true">→</span>
           </Link>
           <Link
             to="/jobs"
             className="landing-choice landing-choice--candidate"
           >
-            지원자
+            <span>지원자</span><span className="landing-choice-arrow" aria-hidden="true">→</span>
           </Link>
         </div>
       </section>

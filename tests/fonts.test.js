@@ -28,32 +28,37 @@ describe('전역 UI 글꼴', () => {
     expect(existsSync(suitFont)).toBe(true)
   })
 
-  it('Apple에서는 시스템 서체, Windows에서는 번들 한글 서체를 먼저 쓴다', () => {
+  it('화면용 서체와 한국어 대체 서체를 분리하고 라이선스를 보존한다', () => {
     const css = read('src', 'index.css')
-    const apple = css.indexOf('-apple-system')
-    const suit = css.indexOf("'SUIT Variable'")
-    const windowsFallback = css.indexOf("'Malgun Gothic'")
     const license = read('public', 'licenses', 'SUIT-OFL-1.1.txt')
-
-    expect(apple).toBeGreaterThan(-1)
-    expect(suit).toBeGreaterThan(-1)
-    expect(suit).toBeGreaterThan(apple)
-    expect(windowsFallback).toBeGreaterThan(suit)
+    expect(css).toContain("--font-display: 'Plus Jakarta Sans', 'SUIT Variable'")
+    expect(css).toContain("--font-body: Aptos, 'Segoe UI', 'SUIT Variable'")
+    expect(css).toContain("--font-mono: 'Geist Mono', 'SUIT Variable'")
     expect(license).toContain('SIL OPEN FONT LICENSE Version 1.1')
     expect(license).toContain('Reserved Font Name SUIT')
   })
 
-  it('한국어 랜딩 제목과 CTA는 Apple식 타이포그래피 위계를 사용한다', () => {
+  it('Microsoft 기준의 압축된 제목과 선택 영역 위계를 사용한다', () => {
     const css = read('src', 'redesign.css')
     const heading = css.match(/\.landing-hero h1\s*\{([^}]*)\}/)?.[1] ?? ''
     const choice = css.match(/\.landing-choice\s*\{([^}]*)\}/)?.[1] ?? ''
 
-    expect(heading).toContain('font-weight: 600')
-    expect(heading).toContain('font-size: 3.5rem')
-    expect(heading).toContain('line-height: 1.07')
-    expect(heading).toContain('letter-spacing: -0.01em')
-    expect(choice).toContain('font-size: 17px')
-    expect(choice).toContain('font-weight: 400')
-    expect(choice).toContain('line-height: 1.17647')
+    expect(heading).toContain('font-weight: 800')
+    expect(heading).toContain('font-size: var(--text-4xl)')
+    expect(heading).toContain('line-height: 1.2')
+    expect(choice).toContain('font-size: var(--text-lg)')
+    expect(choice).toContain('font-weight: 700')
+    expect(choice).toContain('min-height: 76px')
+  })
+
+  it('영문 표시·코드 서체도 CDN 없이 WOFF2와 라이선스를 제공한다', () => {
+    const css = read('src', 'fonts.css')
+    for (const name of ['plus-jakarta-sans', 'geist-mono']) {
+      const filename = `${name}-latin-wght-normal.woff2`
+      expect(css).toContain(filename)
+      expect(existsSync(join(ROOT, 'node_modules', '@fontsource-variable', name, 'files', filename))).toBe(true)
+      expect(read('public', 'licenses', `${name}-OFL.txt`)).toContain('SIL OPEN FONT LICENSE')
+    }
+    expect(css).not.toMatch(/https?:\/\//)
   })
 })

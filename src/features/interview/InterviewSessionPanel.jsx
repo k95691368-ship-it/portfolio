@@ -11,6 +11,7 @@ import {
   toScheduledIso,
 } from './sessionModel.js'
 import './interview.css'
+import InterviewSlotPicker from './InterviewSlotPicker.jsx'
 
 function formatRetentionDate(value) {
   if (!value) return ''
@@ -168,6 +169,7 @@ export default function InterviewSessionPanel({
   const [formOpen, setFormOpen] = useState(false)
   const [title, setTitle] = useState(roomTitle ? `${roomTitle} 화상 면접` : '화상 면접')
   const [scheduledAt, setScheduledAt] = useState('')
+  const [durationMinutes, setDurationMinutes] = useState(30)
   const [recordingRequired, setRecordingRequired] = useState(true)
   const [memberEmail, setMemberEmail] = useState('')
   const [memberBusy, setMemberBusy] = useState('')
@@ -224,6 +226,7 @@ export default function InterviewSessionPanel({
       const created = await api.post(`/rooms/${roomId}/interviews`, {
         title: cleanTitle,
         scheduledAt: toScheduledIso(scheduledAt),
+        durationMinutes,
         recordingRequired,
         clientRequestId: createRequestIdRef.current,
       })
@@ -242,7 +245,7 @@ export default function InterviewSessionPanel({
   const canEnter = session && !disabled && !isClosedInterviewStatus(session.status)
   const isSessionHost = isCompany && session?.myRole === 'host'
   const canCancel = Boolean(
-    isSessionHost && !disabled && ['scheduled', 'waiting'].includes(session?.status)
+    (isSessionHost || (session?.myRole === 'candidate' && session?.bookingSlotId)) && !disabled && ['scheduled', 'waiting'].includes(session?.status)
   )
   const memberChangesLocked = Boolean(
     disabled ||
@@ -367,12 +370,15 @@ export default function InterviewSessionPanel({
       {loading && <p className="interview-panel-status" role="status">일정을 불러오는 중입니다.</p>}
       {error && <p className="interview-inline-error" role="alert">{error}</p>}
 
+      {!loading && (isCompany || myRole === 'candidate') && <InterviewSlotPicker roomId={roomId} isCompany={isCompany} session={session} disabled={disabled} onChanged={loadSessions} />}
+
       {!loading && session && !formOpen && (
         <article className="interview-session-card">
           <div className="interview-session-card__main">
             <div className="interview-session-card__copy">
               <div className="interview-session-card__meta">
                 <span>{formatScheduledAt(session.scheduledAt)}</span>
+                <span>{session.durationMinutes ?? 30}분</span>
                 <span aria-hidden="true">·</span>
                 <span>{session.statusLabel}</span>
                 {session.recordingRequired && (
@@ -518,6 +524,7 @@ export default function InterviewSessionPanel({
               onChange={(event) => setScheduledAt(event.target.value)}
             />
           </label>
+          <label><span>소요 시간</span><select value={durationMinutes} onChange={event => setDurationMinutes(Number(event.target.value))}>{[15,30,45,60,90,120].map(minutes => <option key={minutes} value={minutes}>{minutes}분</option>)}</select></label>
           <label className="interview-recording-option">
             <input
               type="checkbox"

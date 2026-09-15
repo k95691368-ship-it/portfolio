@@ -489,7 +489,7 @@
   overflow: auto;
   background: var(--interview-bg);
   color: var(--interview-text);
-  font-family: var(--font-apple);
+  font-family: var(--font-body);
   font-kerning: normal;
   font-optical-sizing: auto;
   font-variant-ligatures: common-ligatures contextual;
@@ -1427,8 +1427,8 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
  */
 .interview-session-panel,
 .interview-page {
-  --interview-ui-blue: var(--primary);
-  --interview-ui-blue-hover: var(--primary-focus);
+  --interview-ui-blue: var(--action-bg);
+  --interview-ui-blue-hover: var(--action-hover);
   --interview-ui-text: var(--text);
   --interview-ui-muted: var(--text-muted);
   --interview-ui-line: var(--border);
@@ -1440,7 +1440,7 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
 
 .interview-session-panel {
   border-color: var(--border);
-  border-radius: 18px;
+  border-radius: var(--r-md);
   background: var(--panel);
   box-shadow: none;
 }
@@ -1539,16 +1539,16 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
 }
 
 .interview-page {
-  --interview-bg: #000000;
-  --interview-card: #000000;
-  --interview-text: #f5f5f7;
-  --interview-muted: #a1a1a6;
-  --interview-line: #424245;
-  --interview-blue: #2997ff;
-  --interview-action: var(--primary);
-  --interview-action-hover: var(--primary-focus);
-  --interview-ui-blue: var(--primary);
-  --interview-ui-blue-hover: var(--primary-focus);
+  --interview-bg: var(--bg);
+  --interview-card: var(--bg);
+  --interview-text: var(--text);
+  --interview-muted: var(--text-muted);
+  --interview-line: var(--border-strong);
+  --interview-blue: var(--accent);
+  --interview-action: var(--action-bg);
+  --interview-action-hover: var(--action-hover);
+  --interview-ui-blue: var(--action-bg);
+  --interview-ui-blue-hover: var(--action-hover);
   --interview-ui-text: var(--text);
   --interview-ui-muted: var(--text-muted);
   --interview-ui-line: var(--border);
@@ -1591,19 +1591,19 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
 
 .interview-state-card h1,
 .interview-meeting-failure h2 {
-  font-size: clamp(32px, 5vw, 48px);
-  line-height: 1.08;
+  font-size: clamp(24px, 4vw, 30px);
+  line-height: 1.3;
 }
 
 .interview-consent-card h1 {
-  font-size: clamp(36px, 5vw, 56px);
-  line-height: 1.08;
+  font-size: clamp(24px, 4vw, 30px);
+  line-height: 1.3;
 }
 
 .interview-state-card__copy,
 .interview-consent-lead {
   color: var(--interview-muted);
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 400;
   line-height: 1.47;
 }
@@ -1654,15 +1654,15 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
 }
 
 .interview-page--meeting {
-  --interview-ui-blue: var(--primary);
-  --interview-ui-blue-hover: var(--primary-focus);
+  --interview-ui-blue: var(--action-bg);
+  --interview-ui-blue-hover: var(--action-hover);
   --interview-ui-text: var(--text);
   --interview-ui-muted: var(--text-muted);
   --interview-ui-line: var(--border);
   --interview-ui-fill: var(--surface-strong);
   --interview-ui-panel: var(--surface);
-  background: #000000;
-  color: #f5f5f7;
+  background: var(--bg);
+  color: var(--text);
   color-scheme: dark;
 }
 
@@ -1672,24 +1672,24 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
 .interview-workspace,
 .interview-meeting-loading,
 .interview-meeting-failure {
-  background: #000000;
+  background: var(--bg);
   box-shadow: none;
 }
 
 .interview-live-header {
   min-height: 60px;
-  border-color: #2c2c2e;
+  border-color: var(--surface-hover);
 }
 
 .interview-live-header__back {
   width: 44px;
   height: 44px;
-  background: #1d1d1f;
+  background: var(--surface);
   font-weight: 400;
 }
 
 .interview-live-header__back:hover {
-  background: #2c2c2e;
+  background: var(--surface-hover);
 }
 
 .interview-live-header__title strong,
@@ -1703,8 +1703,8 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
 .interview-huddle-control > button,
 .interview-recording-actions button {
   min-height: 44px;
-  border-color: #424245;
-  background: #1d1d1f;
+  border-color: var(--border-strong);
+  background: var(--surface);
   font-weight: 600;
   letter-spacing: 0;
   box-shadow: none;
@@ -1714,23 +1714,23 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
 .interview-huddle-control > button:hover:not(:disabled),
 .interview-conversation-toggle.is-active,
 .interview-recording-actions button:hover:not(:disabled) {
-  border-color: #6e6e73;
-  background: #2c2c2e;
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
 }
 
 .interview-recording-bar {
   min-height: 58px;
-  border-color: #2c2c2e;
+  border-color: var(--surface-hover);
 }
 
 .interview-recording-bar.is-live {
-  background: #000000;
+  background: var(--bg);
 }
 
 .interview-recording-actions button.is-danger {
-  border-color: #ff453a;
+  border-color: var(--danger);
   background: transparent;
-  color: #ff6961;
+  color: var(--danger-text);
 }
 
 .interview-huddle-control > p,
@@ -1741,13 +1741,13 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
 }
 
 .interview-conversation-panel {
-  border-color: #2c2c2e;
-  background: #1d1d1f;
+  border-color: var(--surface-hover);
+  background: var(--surface);
   box-shadow: none;
 }
 
 .interview-conversation-panel__header {
-  border-color: #2c2c2e;
+  border-color: var(--surface-hover);
 }
 
 .interview-conversation-panel__header button {
@@ -1757,48 +1757,48 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
 }
 
 .interview-conversation-panel__header button:hover {
-  background: #2c2c2e;
+  background: var(--surface-hover);
 }
 
 .interview-conversation-tabs {
-  border: 1px solid #424245;
+  border: 1px solid var(--border-strong);
   border-radius: var(--r-sm);
   background: transparent;
 }
 
 .interview-conversation-tabs button {
   min-height: 44px;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   font-weight: 600;
   letter-spacing: 0;
 }
 
 .interview-conversation-tabs button[aria-selected='true'] {
-  background: #2c2c2e;
+  background: var(--surface-hover);
 }
 
 .interview-conversation-message p {
   border: 0;
-  border-radius: 16px;
-  background: #2c2c2e;
+  border-radius: var(--r-lg);
+  background: var(--surface-hover);
   box-shadow: none;
 }
 
 .interview-conversation-message.is-mine p {
   border: 0;
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   background: var(--interview-ui-blue);
 }
 
 .interview-conversation-composer {
-  border-color: #2c2c2e;
+  border-color: var(--surface-hover);
 }
 
 .interview-conversation-composer textarea {
   min-height: 48px;
-  border-color: #424245;
+  border-color: var(--border-strong);
   border-radius: var(--r-md);
-  background: #000000;
+  background: var(--bg);
   box-shadow: none;
 }
 
@@ -1820,8 +1820,8 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
 .interview-conversation-note {
   margin: 0;
   padding: 0 16px 13px;
-  color: #a1a1a6;
-  font-size: 11px;
+  color: var(--text-muted);
+  font-size: 14px;
 }
 
 .webrtc-prejoin {
@@ -1830,7 +1830,7 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
   min-height: 0;
   margin: auto;
   grid-template-columns: minmax(0, 1.6fr) minmax(300px, 0.8fr);
-  gap: clamp(28px, 5vw, 72px);
+  gap: 32px;
   align-items: center;
   padding: 48px 0;
 }
@@ -1847,19 +1847,19 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
 
 .webrtc-prejoin__settings h2 {
   margin: -6px 0 12px;
-  color: #f5f5f7;
-  font-size: clamp(28px, 4vw, 44px);
+  color: var(--text);
+  font-size: clamp(24px, 4vw, 30px);
   font-weight: 600;
-  letter-spacing: -0.035em;
-  line-height: 1.08;
+  letter-spacing: 0;
+  line-height: 1.3;
 }
 
 .webrtc-prejoin__settings label,
 .webrtc-device-panel label {
   display: grid;
   gap: 7px;
-  color: #a1a1a6;
-  font-size: 12px;
+  color: var(--text-muted);
+  font-size: 14px;
   font-weight: 600;
 }
 
@@ -1868,10 +1868,10 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
   width: 100%;
   min-height: 44px;
   padding: 0 38px 0 13px;
-  border: 1px solid #424245;
-  border-radius: 11px;
-  background: #1d1d1f;
-  color: #f5f5f7;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text);
   font: inherit;
 }
 
@@ -1885,12 +1885,12 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
 .interview-upload-retry {
   min-height: 44px;
   padding: 0 17px;
-  border: 1px solid #424245;
-  border-radius: 999px;
-  background: #1d1d1f;
-  color: #f5f5f7;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -1911,9 +1911,9 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
   min-width: 0;
   min-height: 220px;
   overflow: hidden;
-  border: 1px solid #2c2c2e;
-  border-radius: 18px;
-  background: #141416;
+  border: 1px solid var(--surface-hover);
+  border-radius: var(--r-lg);
+  background: var(--surface-low);
 }
 
 .webrtc-video-tile video {
@@ -1931,14 +1931,14 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
   max-width: calc(100% - 26px);
   overflow: hidden;
   padding: 7px 10px;
-  border-radius: 999px;
+  border-radius: var(--r-sm);
   background: rgba(0, 0, 0, 0.66);
-  color: #f5f5f7;
-  font-size: 12px;
+  color: var(--text);
+  font-size: 14px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
-  backdrop-filter: blur(14px);
+  backdrop-filter: none;
 }
 
 .webrtc-video-avatar {
@@ -1949,8 +1949,8 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
   height: 82px;
   place-items: center;
   border-radius: 50%;
-  background: #2c2c2e;
-  color: #d1d1d6;
+  background: var(--surface-hover);
+  color: var(--text);
   font-size: 30px;
   font-weight: 600;
   transform: translate(-50%, -50%);
@@ -1966,16 +1966,16 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
   gap: 8px;
   padding: 7px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  background: rgba(29, 29, 31, 0.86);
+  border-radius: var(--r-sm);
+  background: var(--surface);
   transform: translateX(-50%);
-  backdrop-filter: blur(22px) saturate(150%);
+  backdrop-filter: none;
 }
 
 .webrtc-controls button:hover,
 .webrtc-prejoin__toggles button:hover,
 .interview-upload-retry:hover {
-  background: #2c2c2e;
+  background: var(--surface-hover);
 }
 
 .webrtc-controls button.is-active {
@@ -1985,8 +1985,8 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
 
 .webrtc-controls button.is-off,
 .webrtc-controls button.is-leave {
-  border-color: #ff453a;
-  background: #ff453a;
+  border-color: var(--danger);
+  background: var(--danger);
   color: #fff;
 }
 
@@ -1999,11 +1999,11 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
   width: min(330px, calc(100% - 36px));
   gap: 14px;
   padding: 18px;
-  border: 1px solid #424245;
-  border-radius: 18px;
-  background: rgba(29, 29, 31, 0.94);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  background: var(--surface);
   box-shadow: none;
-  backdrop-filter: blur(22px) saturate(150%);
+  backdrop-filter: none;
 }
 
 .webrtc-huddle-banner {
@@ -2012,10 +2012,10 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
   left: 50%;
   z-index: 30;
   padding: 8px 13px;
-  border-radius: 999px;
-  background: #ffd60a;
-  color: #1d1d1f;
-  font-size: 12px;
+  border-radius: var(--r-sm);
+  background: var(--warning);
+  color: var(--surface);
+  font-size: 14px;
   font-weight: 600;
   transform: translateX(-50%);
 }
@@ -2074,12 +2074,20 @@ html:lang(ko) .interview-page :where(h1, h2, h3, h4, p, a, button, label, span, 
 
 .interview-session-panel :where(button, a),
 .interview-page :where(button, .interview-primary-link) {
-  font-weight: 400;
+  font-family: var(--font-display);
+  font-weight: 600;
 }
+.interview-session-panel button,
+.interview-page button { border-radius: var(--r-sm); }
+.interview-recording-chip { border-radius: 4px; }
 .interview-primary-button,
 .interview-enter-link,
 .interview-primary-link {
   border-radius: var(--radius-full);
-  font-size: 1.0625rem;
-  padding: 11px 22px;
+  font-size: .875rem;
+  padding: 10px 20px;
 }
+.interview-slot-picker { margin-block: 20px; }
+.interview-slot-picker summary { cursor: pointer; padding-block: 12px; }
+.interview-slot-picker .interview-member-list { max-height: 320px; overflow-y: auto; }
+.interview-session-form select { width: 100%; min-width: 0; font: inherit; }

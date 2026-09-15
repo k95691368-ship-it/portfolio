@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 const ROOT = process.cwd()
 const read = (...parts) => readFileSync(join(ROOT, ...parts), 'utf8')
 
-describe('Apple식 UI 구조', () => {
+describe('Microsoft Agent Resources 기반 다크 UI 구조', () => {
   it('랜딩은 평면 히어로와 두 단계 CTA를 유지한다', () => {
     const page = read('src', 'pages', 'LandingPage.jsx')
     const css = read('src', 'redesign.css')
@@ -15,8 +15,10 @@ describe('Apple식 UI 구조', () => {
     expect(page).toContain('landing-choice--candidate')
     expect(page).toContain('landing-actions')
     expect(page).not.toContain('ChoiceIcon')
-    expect(hero).toContain('100svh - var(--nav-h)')
-    expect(hero).toContain('border-radius: 0')
+    expect(hero).toContain('min-height: 0')
+    expect(hero).toContain('text-align: left')
+    expect(hero).toContain('background: var(--brand-deep)')
+    expect(hero).toContain('border-bottom: 3px solid var(--accent)')
   })
 
   it('모바일에서도 전역 이동 경로를 숨기지 않는다', () => {
@@ -33,8 +35,18 @@ describe('Apple식 UI 구조', () => {
     const css = read('src', 'redesign.css')
 
     expect(css).not.toMatch(/(?:linear|radial)-gradient/)
-    expect(read('src', 'index.css')).toContain('--primary: #0066cc')
+    expect(read('src', 'index.css')).toContain('--action-bg: #006bbd')
+    expect(read('src', 'index.css')).toContain('--brand-accent: #a0c8f0')
     expect(css).toContain('.chat-row-right .chat-message')
     expect(css).toContain('.dm-bubble-row.mine .dm-bubble')
+  })
+
+  it('기술 문서는 키보드 탭과 네이티브 접기로 탐색한다', () => {
+    const page = read('src', 'pages', 'TechPage.jsx')
+    expect(page).toContain('className="tech-disclosure"')
+    expect(page).toContain('<summary>')
+    expect(page).toContain('role="tabpanel"')
+    expect(page).toContain('aria-controls="tech-panel-system"')
+    expect(page).toContain("['ArrowLeft', 'ArrowRight', 'Home', 'End']")
   })
 })

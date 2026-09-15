@@ -312,6 +312,13 @@ const STACK = [
 
 export default function TechPage() {
   const [tab, setTab] = useState('system')
+  function handleTabKey(event) {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+    event.preventDefault()
+    const next = event.key === 'Home' ? 'system' : event.key === 'End' ? 'stack' : tab === 'system' ? 'stack' : 'system'
+    setTab(next)
+    document.getElementById(`tech-tab-${next}`)?.focus()
+  }
 
   return (
     <div className="tech-page">
@@ -323,11 +330,14 @@ export default function TechPage() {
         <p>무엇을 만들었는지와 어떻게 만들었는지를 나눠 정리했습니다.</p>
       </header>
 
-      <div className="tech-tabs" role="tablist" aria-label="설명 갈래">
+      <div className="tech-tabs" role="tablist" aria-label="설명 갈래" onKeyDown={handleTabKey}>
         <button
           type="button"
           role="tab"
           aria-selected={tab === 'system'}
+          id="tech-tab-system"
+          aria-controls="tech-panel-system"
+          tabIndex={tab === 'system' ? 0 : -1}
           className={`tech-tab${tab === 'system' ? ' active' : ''}`}
           onClick={() => setTab('system')}
         >
@@ -338,6 +348,9 @@ export default function TechPage() {
           type="button"
           role="tab"
           aria-selected={tab === 'stack'}
+          id="tech-tab-stack"
+          aria-controls="tech-panel-stack"
+          tabIndex={tab === 'stack' ? 0 : -1}
           className={`tech-tab${tab === 'stack' ? ' active' : ''}`}
           onClick={() => setTab('stack')}
         >
@@ -349,7 +362,7 @@ export default function TechPage() {
       </div>
 
       {tab === 'system' ? (
-        <section className="tech-panel">
+        <section className="tech-panel" role="tabpanel" id="tech-panel-system" aria-labelledby="tech-tab-system" tabIndex={0}>
           <p className="tech-lead">
             흩어져 있던 채용과 근로계약 과정을 하나로 이었습니다. 각 단계는 앞 단계가 남긴 값을 근거로
             다음 판단을 합니다.
@@ -357,18 +370,19 @@ export default function TechPage() {
           <ol className="tech-steps">
             {SYSTEM.map((s) => (
               <li key={s.step} className={s.accent ? 'accent' : ''}>
-                <span className="tech-step-num">{s.step}</span>
-                <div className="tech-step-body">
-                  <h3>{s.title}</h3>
-                  <p>{s.body}</p>
-                  {s.detail && <p className="tech-step-detail">{s.detail}</p>}
-                </div>
+                <details className="tech-disclosure" open={s.step === '01'}>
+                  <summary><span className="tech-step-num">{s.step}</span><h3>{s.title}</h3></summary>
+                  <div className="tech-step-body">
+                    <p>{s.body}</p>
+                    {s.detail && <p className="tech-step-detail">{s.detail}</p>}
+                  </div>
+                </details>
               </li>
             ))}
           </ol>
         </section>
       ) : (
-        <section className="tech-panel">
+        <section className="tech-panel" role="tabpanel" id="tech-panel-stack" aria-labelledby="tech-tab-stack" tabIndex={0}>
           <p className="tech-lead">
             Supabase의 PostgreSQL·Edge Functions·Storage·Realtime을 나눠 쓰면서 무결성과 동시성을 어떻게 확보했는지가
             이 프로젝트의 기술적 중심입니다. 아래 항목의 상당수는 만들면서 실제로 겪은 실패와 그 원인입니다 —

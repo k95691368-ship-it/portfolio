@@ -55,9 +55,11 @@ class PostgresStatement {
 
 export class PostgresD1 {
   client: SqlClient
+  inTransaction: boolean
 
-  constructor(client: SqlClient) {
+  constructor(client: SqlClient, inTransaction = false) {
     this.client = client
+    this.inTransaction = inTransaction
   }
 
   prepare(source: string) {
@@ -67,12 +69,12 @@ export class PostgresD1 {
   async withRateLimitLock<T>(bucket: string, operation: (db: PostgresD1) => Promise<T>) {
     return this.client.begin(async (transaction) => {
       await transaction.unsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [bucket])
-      return operation(new PostgresD1(transaction as SqlClient))
+      return operation(new PostgresD1(transaction as SqlClient, true))
     })
   }
 
   async batch(statements: PostgresStatement[]) {
-    return this.client.begin(async (transaction) => {
+    const execute = async (transaction: SqlClient) => {
       const database = new PostgresD1(transaction as SqlClient)
       const results = []
       for (const statement of statements) {
@@ -80,7 +82,12 @@ export class PostgresD1 {
         results.push(await rebound.run())
       }
       return results
-    })
+    }
+    // Scheduling wraps a multi-statement insert in a company lock transaction.
+    // Keep batch rollback semantics inside it using a PostgreSQL savepoint.
+    return this.inTransaction
+      ? (this.client as any).savepoint(execute)
+      : this.client.begin(execute)
   }
 }
 

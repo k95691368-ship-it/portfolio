@@ -12,6 +12,7 @@ import {
 } from '../../../../_lib/interviews.js'
 import { blockedWhenFrozen } from '../../../../_lib/roomLifecycle.js'
 import { createMeeting } from '../../../../_lib/supabaseRealtime.js'
+import { withScheduleLock, getSelectableSlot, findScheduleConflict, normalizeDuration } from '../../../../_lib/interviewScheduling.js'
 
 function accessError(error) {
   if (error instanceof InterviewAccessError) return jsonError(error.message, error.status)
@@ -44,46 +45,40 @@ export async function onRequestGet({ env, data, params }) {
   return jsonResponse({ sessions, latestSession: sessions[0] ?? null })
 }
 
-export async function onRequestPost({ request, env, data, params }) {
-  let access
-  try {
-    access = await getRoomForInterview(env, params.roomId, data.user, { allowAdminRead: false })
-  } catch (error) {
-    return accessError(error)
-  }
-  if (access.room.company_user_id !== data.user.id) {
+export const onRequestPost = context => withScheduleLock(context, createInterview)
+
+async function createInterview({ request, env, data, params, scheduleAccess: access }) {
+  const body = await request.json().catch(() => null)
+  const selectingSlot = typeof body?.slotId === 'string'
+  if (access.room.company_user_id !== data.user.id && !(access.roomRole === 'candidate' && selectingSlot)) {
     return jsonError('화상 면접은 이 면접방을 만든 회사 담당자만 만들 수 있습니다.', 403)
   }
 
   const frozen = blockedWhenFrozen(access.room, 'create_interview')
   if (frozen) return jsonError(frozen, 409)
 
-  const body = await request.json().catch(() => null)
   if (!body || typeof body !== 'object') return jsonError('요청 내용을 확인해주세요.', 400)
 
   let title
   let scheduledAt
   let key
+  let slot = null
+  let duration
   try {
-    title = normalizeTitle(body.title, `${access.room.title} 화상 면접`)
-    scheduledAt = normalizeScheduledAt(body.scheduledAt)
     key = idempotencyKey(request, body)
-  } catch (error) {
-    return jsonError(error.message, 400)
-  }
-  const recordingRequired = body.recordingRequired !== false
-
-  if (key) {
-    const existing = await env.DB.prepare(
-      'SELECT id FROM interview_sessions WHERE room_id = ? AND idempotency_key = ?'
-    )
-      .bind(params.roomId, key)
-      .first()
-    if (existing) {
-      const row = await loadSessionForUser(env, params.roomId, existing.id, data.user.id)
-      return jsonResponse({ session: serializeSession(row) })
+    if (key) {
+      const existing = await env.DB.prepare('SELECT id FROM interview_sessions WHERE room_id = ? AND idempotency_key = ?').bind(params.roomId, key).first()
+      if (existing) return jsonResponse({ session: serializeSession(await loadSessionForUser(env, params.roomId, existing.id, data.user.id)) })
     }
+    if (selectingSlot) slot = await getSelectableSlot(env, access.room.company_user_id, body.slotId)
+    title = normalizeTitle(body.title, `${access.room.title} 화상 면접`)
+    if (access.roomRole === 'candidate') title = normalizeTitle(undefined, `${access.room.title} 화상 면접`)
+    scheduledAt = slot?.starts_at ?? normalizeScheduledAt(body.scheduledAt)
+    duration = slot?.duration_minutes ?? normalizeDuration(body.durationMinutes)
+  } catch (error) {
+    return jsonError(error.message, error.status ?? 400)
   }
+  const recordingRequired = slot ? slot.recording_required === 1 : body.recordingRequired !== false
 
   const activeExisting = await env.DB.prepare(
     `SELECT id FROM interview_sessions
@@ -108,6 +103,9 @@ export async function onRequestPost({ request, env, data, params }) {
     )
   }
 
+  if (await findScheduleConflict(env, access.room.company_user_id, scheduledAt, duration)) {
+    return jsonError('담당자의 다른 면접 일정과 겹칩니다. 다른 시간을 선택해주세요.', 409)
+  }
   const provider = await createMeeting(env, { title })
   if (!provider?.id) {
     console.error('Supabase interview meeting id was not created')
@@ -124,8 +122,8 @@ export async function onRequestPost({ request, env, data, params }) {
     env.DB.prepare(
       `INSERT INTO interview_sessions
          (id, room_id, provider_meeting_id, title, recording_required, scheduled_at,
-          created_by_user_id, idempotency_key)
-       SELECT ?, r.id, ?, ?, ?, ?, ?, ?
+          created_by_user_id, idempotency_key, booking_slot_id, duration_minutes)
+       SELECT ?, r.id, ?, ?, ?, ?, ?, ?, ?, ?
          FROM interview_rooms r
         WHERE r.id = ? AND r.archived_at IS NULL AND r.status <> 'closed'
           AND NOT EXISTS (
@@ -141,6 +139,8 @@ export async function onRequestPost({ request, env, data, params }) {
       scheduledAt,
       data.user.id,
       key,
+      slot?.id ?? null,
+      duration,
       params.roomId
     ),
   ]

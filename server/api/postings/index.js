@@ -11,9 +11,10 @@ const DESC_MAX = 20000
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
-function mapRow(row) {
+function mapRow(row, userId) {
   return {
     id: row.id,
+    canReuse: row.created_by_user_id === userId,
     title: row.title,
     department: row.department,
     employmentType: row.employment_type,
@@ -32,7 +33,7 @@ export async function onRequestGet({ env, data }) {
   if (!canManageRecruiting(data.user)) return jsonError('채용 관리 권한이 없습니다.', 403)
 
   const base = `
-    SELECT p.id, p.title, p.department, p.employment_type, p.location, p.status, p.deadline, p.created_at,
+    SELECT p.id, p.created_by_user_id, p.title, p.department, p.employment_type, p.location, p.status, p.deadline, p.created_at,
            u.display_name AS created_by_display_name,
            (SELECT COUNT(*) FROM applications a WHERE a.posting_id = p.id) AS application_count
     FROM job_postings p
@@ -45,7 +46,7 @@ export async function onRequestGet({ env, data }) {
       )
 
   const { results } = await stmt.all()
-  return jsonResponse({ postings: results.map(mapRow) })
+  return jsonResponse({ postings: results.map(row => mapRow(row, data.user.id)) })
 }
 
 // 관리: 채용 공고 등록.

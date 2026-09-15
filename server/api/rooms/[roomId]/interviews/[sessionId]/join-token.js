@@ -11,6 +11,7 @@ import {
 } from '../../../../../_lib/interviews.js'
 import { blockedWhenFrozen } from '../../../../../_lib/roomLifecycle.js'
 import { interviewIceServers } from '../../../../../_lib/turn.js'
+import { withScheduleLock } from '../../../../../_lib/interviewScheduling.js'
 import {
   VideoServiceConfigError,
   issueParticipantCredentials,
@@ -23,7 +24,9 @@ async function userIsActive(env, userId) {
   return Boolean(user) && Number(user.is_suspended) === 0
 }
 
-export async function onRequestPost({ env, data, params }) {
+export const onRequestPost = context => withScheduleLock(context, joinInterview, { sessionAccess: true })
+
+async function joinInterview({ env, data, params }) {
   let access
   try {
     access = await getInterviewSessionAccess(

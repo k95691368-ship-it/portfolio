@@ -135,6 +135,8 @@ export function serializeSession(row, { members = [], recordings = [] } = {}) {
     title: row.title,
     status: row.status,
     scheduledAt: row.scheduled_at ?? null,
+    bookingSlotId: row.booking_slot_id ?? null,
+    durationMinutes: row.duration_minutes ?? 30,
     startedAt: row.started_at ?? null,
     endedAt: row.ended_at ?? null,
     recordingRequired: Number(row.recording_required) === 1,
@@ -279,7 +281,8 @@ export async function loadSessionsForUser(env, roomId, userId) {
        LEFT JOIN interview_recording_consents c
          ON c.session_id = s.id AND c.user_id = ? AND c.notice_version = ?
       WHERE s.room_id = ?
-      ORDER BY COALESCE(s.scheduled_at, s.created_at) DESC, s.created_at DESC`
+      ORDER BY CASE WHEN s.status IN ('scheduled','waiting','live') THEN 0 ELSE 1 END,
+        COALESCE(s.scheduled_at, s.created_at) DESC, s.created_at DESC`
   )
     .bind(
       CONSENT_NOTICE_HASH,
