@@ -162,6 +162,31 @@ describe('Gmail email adapter', () => {
     expect(mock).toHaveBeenCalledTimes(1)
   })
 
+  it.each([
+    [sendFinalOfferEmail, message, '최종 합격 안내', '지원 현황 확인'],
+    [sendRoomInviteEmail, message, '면접방 참여 안내', '면접방 입장 코드 입력'],
+    [sendApplicationResultEmail, { to: message.to, companyName: '회사', applicantName: '지원자', result: 'passed', inviteCode: 'AC3KM7PQ4RTV' }, '서류 전형 합격 안내', '면접방 입장 코드 입력'],
+    [sendApplicationResultEmail, { to: message.to, companyName: '회사', applicantName: '지원자', result: 'rejected' }, '서류 전형 결과 안내', null],
+    [sendNewMessageEmail, { to: message.to, companyName: '회사', roomTitle: '면접방 제목' }, '새 메시지 도착', '면접방 입장 코드 입력'],
+    [sendSignedContractEmail, { to: message.to, companyName: '회사', pdfBase64: 'JVBERg==', filename: '서명본.pdf' }, '근로계약서 사본', null],
+  ])('uses the shared layout for %s without changing the recipient or number of sends', async (send, data, title, action) => {
+    const mock = mockGoogle()
+    await send(env, data)
+    const mime = mimeFrom(mock)
+    const html = textParts(mime).find(part => part.type === 'html').value
+    expect(mime).toContain(`To: <${message.to}>`)
+    expect(mock).toHaveBeenCalledTimes(2)
+    expect(html).toContain(`<title>${title}</title>`)
+    expect(html).toContain('<th scope="row"')
+    expect(html).toContain('통합 채용 플랫폼')
+    if (action) expect(html).toContain(action)
+    else expect(html).not.toContain('버튼이 열리지 않으면')
+    if (data.inviteCode) expect(html).toContain('AC3K-M7PQ-4RTV')
+    if (data.roomTitle) expect(html).toContain(data.roomTitle)
+    if (data.filename) expect(html).toContain(data.filename)
+    if (data.result === 'rejected') expect(html).not.toContain('면접방 입장 코드')
+  })
+
   it.each([401, 403, 429, 500])('rejects Gmail HTTP %s without provider body or automatic resend', async (status) => {
     const mock = vi.fn().mockResolvedValueOnce(json({ access_token: 'test-access' }))
       .mockResolvedValueOnce(json({ error: { message: 'private-provider-detail' } }, status))

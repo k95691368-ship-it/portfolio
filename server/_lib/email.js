@@ -1,55 +1,13 @@
 import { formatInviteCode } from './inviteCode.js'
 import { isGmailConfigured } from './gmail.js'
 import { sendTrackedEmail } from './emailOutbox.js'
+import { buildBrandedEmailHtml } from './emailTemplate.js'
 
 export function maskEmail(email) {
   const [local, domain] = String(email || '').split('@')
   if (!local || !domain) return ''
   const visible = local.slice(0, Math.min(2, local.length))
   return `${visible}${'*'.repeat(Math.max(1, local.length - visible.length))}@${domain}`
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
-}
-
-// 브랜디드 이메일 HTML 템플릿 (최종합격/면접초대 등 공용).
-// heading/title 기본값은 최종합격 안내 — 기존 호출부는 그대로 동작.
-function buildBrandedEmailHtml({
-  bodyText,
-  companyName,
-  heading = 'FINAL OFFER',
-  title = '최종 합격 안내',
-}) {
-  const bodyHtml = escapeHtml(bodyText).replace(/\r?\n/g, '<br>')
-  const companyHtml = escapeHtml(companyName)
-  const headingHtml = escapeHtml(heading)
-  const titleHtml = escapeHtml(title)
-
-  return `<!doctype html>
-<html lang="ko">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>${titleHtml}</title>
-  </head>
-  <body style="margin:0;background:#f5f6f8;font-family:'SUIT Variable',SUIT,-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display','Apple SD Gothic Neo','Helvetica Neue','Noto Sans KR','Malgun Gothic','Segoe UI',Arial,sans-serif;color:#20242a;">
-    <div style="max-width:640px;margin:0 auto;padding:32px 20px;">
-      <div style="background:#ffffff;border:1px solid #e2e5e9;border-radius:12px;padding:32px;">
-        <div style="font-size:13px;font-weight:700;color:#3569d4;margin-bottom:18px;">${headingHtml}</div>
-        <div style="font-size:16px;line-height:1.75;white-space:normal;">${bodyHtml}</div>
-        <div style="margin-top:28px;padding-top:18px;border-top:1px solid #eceef1;color:#68707a;font-size:13px;">
-          ${companyHtml} 채용 담당
-        </div>
-      </div>
-    </div>
-  </body>
-</html>`
 }
 
 // True when the environment has everything needed to actually send mail.
@@ -72,14 +30,14 @@ export function isEmailConfigured(env) {
 // attachments: [{ filename, contentBase64, contentType }] (선택)
 async function sendBrandedEmail(
   env,
-  { to, subject, bodyText, companyName, heading, title, attachments, idempotencyKey }
+  { to, subject, bodyText, companyName, title, details, action, attachments, idempotencyKey }
 ) {
   return sendTrackedEmail(env, {
     fromName: env.FINAL_OFFER_FROM_NAME || companyName || '',
     to,
     subject,
     text: bodyText,
-    html: buildBrandedEmailHtml({ bodyText, companyName, heading, title }),
+    html: buildBrandedEmailHtml({ bodyText, companyName, title, details, action }),
     attachments,
     idempotencyKey,
   })
@@ -91,7 +49,8 @@ export async function sendFinalOfferEmail(env, { to, subject, bodyText, companyN
     subject,
     bodyText,
     companyName,
-    heading: 'FINAL OFFER',
+    details: [['제목', subject]],
+    action: 'status',
     idempotencyKey,
     title: '최종 합격 안내',
   })
@@ -103,7 +62,8 @@ export async function sendRoomInviteEmail(env, { to, subject, bodyText, companyN
     subject,
     bodyText,
     companyName,
-    heading: 'INTERVIEW INVITE',
+    details: [['제목', subject]],
+    action: 'room',
     idempotencyKey,
     title: '면접방 참여 안내',
   })
@@ -151,7 +111,13 @@ ${companyName} 서류 전형에 지원해 주셔서 진심으로 감사드립니
     subject,
     bodyText,
     companyName,
-    heading: passed ? 'DOCUMENT PASS' : 'RESULT',
+    details: [
+      ['지원자', applicantName],
+      ['전형', '서류 전형'],
+      ['결과', passed ? '합격' : '불합격'],
+      ...(passed ? [['면접방 입장 코드', inviteCode ? formatInviteCode(inviteCode) : '(담당자에게 문의)']] : []),
+    ],
+    action: passed ? 'room' : undefined,
     idempotencyKey,
     title: passed ? '서류 전형 합격 안내' : '서류 전형 결과 안내',
   })
@@ -180,7 +146,8 @@ ${companyName || '회사'}에서 "${roomTitle || '면접방'}"에 새 메시지�
 
 감사합니다.`,
     companyName,
-    heading: 'NEW MESSAGE',
+    details: [['면접방', roomTitle || '면접방']],
+    action: 'room',
     idempotencyKey,
     title: '새 메시지 도착',
   })
@@ -200,7 +167,7 @@ ${companyName}와(과) 체결한 근로계약서 서명본을 첨부합니다. �
     subject: `[${companyName}] 근로계약서 사본 전달`,
     bodyText,
     companyName,
-    heading: 'LABOR CONTRACT',
+    details: [['문서', '서명 완료 근로계약서'], ['첨부파일', filename || '근로계약서.pdf']],
     idempotencyKey,
     title: '근로계약서 사본',
     attachments: [
