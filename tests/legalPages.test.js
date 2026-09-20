@@ -10,7 +10,8 @@ describe.each([
   const html = read(`${route}/index.html`)
 
   it('is a complete Korean document readable without JavaScript or login', () => {
-    expect(html).toContain('<html lang="ko" data-theme="dark">')
+    expect(html).toContain('<html lang="ko" data-theme="light">')
+    expect(html).toContain('<meta name="theme-color" content="#ffffff">')
     expect(html).toContain(`<h1>${title}</h1>`)
     expect(html).toContain('김현욱')
     expect(html).toContain('mailto:k95691368@gmail.com')
@@ -23,6 +24,22 @@ describe.each([
     const css = read('src/legal.css')
     expect(css).toContain("@import './fonts.css'")
     expect(css).toContain("@import './index.css'")
+  })
+
+  it('uses the shared light typography and responsive policy layout', () => {
+    const css = read('src/legal.css')
+    const title = css.match(/\.policy-main h1\s*\{([^}]*)\}/)?.[1] ?? ''
+    const toc = css.match(/\.policy-toc\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(title).toContain('font-family: var(--font-display)')
+    expect(title).toContain('font-size: 44px')
+    expect(title).toContain('font-weight: 600')
+    expect(toc).toContain('padding: 32px')
+    expect(toc).toContain('border-radius: 20px')
+    expect(toc).toContain('background: var(--surface-alt)')
+    expect(css).toContain('@media (max-width: 640px)')
+    expect(css).toContain('grid-template-columns: 1fr')
+    expect(css).toContain('min-height: 44px')
+    expect(css).toContain('@media print')
   })
 
   it('has working section anchors with unique IDs and links to both policies', () => {

@@ -1,5 +1,6 @@
 import { describeContractPeriod } from './contractPeriod.js'
 import { describeApplicationProgress, sortMyApplications } from './applicationProgress.js'
+import { applicationStatus } from './applicationAccess.js'
 
 // 대시보드가 쓰는 두 조회.
 //
@@ -103,7 +104,7 @@ export async function loadMyRooms(env, user) {
 // 것)만 본인 지원서로 본다. 증명 없이 추측으로 소유를 인정하지 않는다.
 export async function loadMyApplications(env, user) {
   const { results } = await env.DB.prepare(
-    `SELECT a.id, a.status, a.created_at, a.reviewed_at, a.room_id, a.lookup_code,
+    `SELECT a.id, a.status, a.withdrawn_at, a.created_at, a.reviewed_at, a.room_id, a.lookup_code,
             p.title AS posting_title, p.department, p.employment_type, p.location,
             r.status AS room_status, r.title AS room_title, r.archived_at AS room_archived_at,
             sc.created_at AS signed_at
@@ -126,7 +127,7 @@ export async function loadMyApplications(env, user) {
       department: r.department,
       employmentType: r.employment_type,
       location: r.location,
-      status: r.status,
+      status: applicationStatus(r),
       createdAt: r.created_at,
       reviewedAt: r.reviewed_at,
       roomId: r.room_id,

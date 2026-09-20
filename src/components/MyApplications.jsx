@@ -5,6 +5,7 @@ const STATUS_BADGE = {
   submitted: { label: '심사 대기', badge: 'badge-warning' },
   passed: { label: '서류합격', badge: 'badge-success' },
   rejected: { label: '불합격', badge: 'badge-neutral' },
+  withdrawn: { label: '지원 철회', badge: 'badge-neutral' },
 }
 
 // 단계의 상태는 점 색깔로만 구분된다. 색을 구분하지 못하거나 화면을 읽어 주는
@@ -56,6 +57,7 @@ export default function MyApplications({ applications = [] }) {
               <p className="my-app-headline">{a.progress.headline}</p>
 
               <div className="my-app-actions">
+                <Link to="/application-manage" className="btn-sm">제출 내용 확인·수정</Link>
                 {a.progress.link && (
                   <Link to={a.progress.link} className="btn-sm">
                     {a.progress.linkLabel}

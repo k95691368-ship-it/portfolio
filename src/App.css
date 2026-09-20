@@ -295,11 +295,10 @@
   font-weight: 500;
   color: var(--text-muted);
 }
-/* 투명도로 흐려 두어 파랑 배경 위에서 대비가 떨어졌다. 누가 말한 값인지는
-   나중에 채용내정 성립의 근거로 인용되는 정보라, 한쪽만 읽히면 안 된다. */
+/* 발신자와 역할도 밝은 말풍선 위에서 읽히도록 불투명한 짙은 색을 쓴다. */
 .chat-row-right .chat-role {
-  color: var(--on-accent);
-  opacity: 0.88;
+  color: var(--text-muted);
+  opacity: 1;
 }
 .chat-message p {
   margin: 0;
@@ -315,7 +314,7 @@
   color: var(--text-muted);
 }
 .chat-row-right .chat-sender {
-  color: var(--on-accent);
+  color: var(--text);
 }
 .chat-composer {
   display: flex;
@@ -1687,6 +1686,10 @@
   color: var(--text-muted);
   text-align: center;
 }
+.notif-feedback { padding: 16px; font-size: 14px; overflow-wrap: anywhere; }
+.notif-feedback p { margin: 0 0 12px; }
+.dm-inbox-feedback { margin-bottom: 16px; overflow-wrap: anywhere; }
+.dm-inbox-feedback .dm-error { margin: 0 0 12px; padding: 0; }
 .notif-list {
   list-style: none;
   margin: 0;
@@ -2880,8 +2883,8 @@
   font-variant-numeric: tabular-nums;
 }
 .tech-step-detail {
-  margin-top: 6px !important;
-  font-size: 13px !important;
+  margin-top: 12px;
+  font-size: 1rem;
 }
 .tech-group {
   display: flex;
@@ -3466,7 +3469,7 @@
   width: 100%;
   /* 코드는 눈으로 짚어 가며 친다. 고정폭으로 두어 자리가 흔들리지 않게 한다.
      자간까지 벌리면 열두 자리가 좁은 화면에서 넘쳐 잘린다. */
-  font-family: var(--font-apple-mono);
+  font-family: var(--font-mono);
   letter-spacing: 0.5px;
 }
 .room-enter-form button {

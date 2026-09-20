@@ -8,14 +8,19 @@ export default function JobsPage() {
   const [postings, setPostings] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [reload, setReload] = useState(0)
 
   useEffect(() => {
+    let active = true
+    setLoading(true)
+    setError('')
     api
       .get('/jobs')
-      .then((data) => setPostings(data.postings))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
-  }, [])
+      .then((data) => { if (active) setPostings(data.postings) })
+      .catch((err) => { if (active) setError(err.message || '공고를 불러오지 못했습니다.') })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [reload])
 
   return (
     <div className="jobs-page">
@@ -34,9 +39,15 @@ export default function JobsPage() {
         </Link>
       </header>
 
-      {error && <p className="error" role="alert">{error}</p>}
+      <div className="jobs-workspace">
+      <section className="jobs-results" aria-label="모집 중인 공고">
       {loading ? (
-        <p className="notice">불러오는 중...</p>
+        <p className="notice" role="status">불러오는 중...</p>
+      ) : error ? (
+        <div>
+          <p className="error" role="alert">공고 목록을 불러오지 못했습니다. {error}</p>
+          <button type="button" className="btn-secondary" onClick={() => setReload(value => value + 1)}>공고 다시 불러오기</button>
+        </div>
       ) : postings.length === 0 ? (
         <p className="notice">현재 모집 중인 공고가 없습니다.</p>
       ) : (
@@ -65,9 +76,12 @@ export default function JobsPage() {
         </ul>
       )}
 
-      {/* 공고 탐색이 이 화면의 첫 번째 목적이다. 초대 코드를 받은 지원자의
-          면접방 입구는 목록 다음의 독립된 보조 영역으로 유지한다. */}
+      </section>
+      {/* DOM 순서는 공고 다음 입장 안내. PC에서는 보조 영역을 오른쪽에 둔다. */}
+      <aside className="jobs-entry" aria-label="면접방 입장 안내">
       <RoomEnterForm />
+      </aside>
+      </div>
     </div>
   )
 }

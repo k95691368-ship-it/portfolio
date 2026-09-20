@@ -1,6 +1,7 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { canManagePosting } from '../../../_lib/recruiter.js'
 import { logAdminAction } from '../../../_lib/auditLog.js'
+import { postingInputError } from '../../../_lib/postingInput.js'
 
 const TITLE_MAX = 150
 const SHORT_MAX = 100
@@ -46,34 +47,35 @@ export async function onRequestPatch({ request, env, data, params }) {
   if (!canManagePosting(data.user, posting)) return jsonError('이 공고를 수정할 권한이 없습니다.', 403)
 
   const body = await request.json().catch(() => null)
-  if (!body) return jsonError('잘못된 요청입니다.', 400)
+  const inputError = postingInputError(body)
+  if (inputError) return jsonError(inputError, 400)
 
   const fields = []
   const values = []
 
   if (body.title !== undefined) {
-    const title = body.title.toString().trim().slice(0, TITLE_MAX)
+    const title = (body.title ?? '').trim().slice(0, TITLE_MAX)
     if (!title) return jsonError('공고 제목을 입력해주세요.', 400)
     fields.push('title = ?')
     values.push(title)
   }
   if (body.description !== undefined) {
-    const description = body.description.toString().trim().slice(0, DESC_MAX)
+    const description = (body.description ?? '').trim().slice(0, DESC_MAX)
     if (!description) return jsonError('공고 상세 내용을 입력해주세요.', 400)
     fields.push('description = ?')
     values.push(description)
   }
   if (body.department !== undefined) {
     fields.push('department = ?')
-    values.push(body.department.toString().trim().slice(0, SHORT_MAX) || null)
+    values.push((body.department ?? '').trim().slice(0, SHORT_MAX) || null)
   }
   if (body.employmentType !== undefined) {
     fields.push('employment_type = ?')
-    values.push(body.employmentType.toString().trim().slice(0, SHORT_MAX) || null)
+    values.push((body.employmentType ?? '').trim().slice(0, SHORT_MAX) || null)
   }
   if (body.location !== undefined) {
     fields.push('location = ?')
-    values.push(body.location.toString().trim().slice(0, SHORT_MAX) || null)
+    values.push((body.location ?? '').trim().slice(0, SHORT_MAX) || null)
   }
   if (body.status !== undefined) {
     if (!['open', 'closed'].includes(body.status)) return jsonError('상태 값이 올바르지 않습니다.', 400)

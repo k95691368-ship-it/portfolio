@@ -4,6 +4,8 @@ import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { CONSENT_ITEMS, CONSENT_VERSION } from '../lib/consentText.js'
 import { isApplyFormDirty, LEAVE_CONFIRM_MESSAGE } from '../lib/applyForm.js'
+import UnsavedChangesGuard from '../components/UnsavedChangesGuard.jsx'
+import { applicationOperation, restartApplicationOperation } from '../lib/applicationSelfService.js'
 
 const EMPLOYMENT_TYPES = ['정규직', '계약직', '인턴', '아르바이트', '프리랜서', '기타']
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
@@ -67,6 +69,8 @@ export default function ApplyPage() {
 
   const [posting, setPosting] = useState(null)
   const [loadError, setLoadError] = useState('')
+  const [postingLoading, setPostingLoading] = useState(true)
+  const [reload, setReload] = useState(0)
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -85,7 +89,9 @@ export default function ApplyPage() {
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
   const [lookupCode, setLookupCode] = useState('')
+  const [receiptStatus, setReceiptStatus] = useState('submitted')
   const careerKeyRef = useRef(0)
+  const submitRef = useRef(false)
 
   const pickFile = (setter) => (event) => {
     const file = event.target.files?.[0] || null
@@ -99,30 +105,31 @@ export default function ApplyPage() {
   }
 
   useEffect(() => {
+    let active = true
+    setPostingLoading(true)
+    setLoadError('')
     api
       .get(`/jobs/${id}`)
-      .then((data) => setPosting(data.posting))
-      .catch((err) => setLoadError(err.message))
+      .then((data) => { if (active) setPosting(data.posting) })
+      .catch((err) => { if (active) setLoadError(err.message || '공고를 확인하지 못했습니다.') })
+      .finally(() => { if (active) setPostingLoading(false) })
+    return () => { active = false }
+  }, [id, reload])
+
+  useEffect(() => {
+    let active = true
+    try {
+      const operationToken = sessionStorage.getItem(`portfolioApplicationOperation:${id}`)
+      if (operationToken) void api.post('/application-receipt', { postingId: id, operationToken })
+        .then(result => { if (active) { setLookupCode(result.lookupCode); setReceiptStatus(result.status || 'submitted'); setDone(true) } })
+        .catch(() => {})
+    } catch { /* Receipt recovery remains available through email verification. */ }
+    return () => { active = false }
   }, [id])
 
   // 로그인 없이 지원하는 구조라 쓰다 만 지원서는 어디에도 남지 않는다.
   // 실수로 탭을 닫거나 새로고침하면 전부 사라지므로 한 번 되묻는다.
   const dirty = isApplyFormDirty({ name, email, phone, careers, resume, portfolio })
-  useEffect(() => {
-    if (!dirty || done) return undefined
-    const onBeforeUnload = (event) => {
-      event.preventDefault()
-      event.returnValue = ''
-    }
-    window.addEventListener('beforeunload', onBeforeUnload)
-    return () => window.removeEventListener('beforeunload', onBeforeUnload)
-  }, [dirty, done])
-
-  // 화면 안에서 이동하는 링크는 브라우저가 막아 주지 않으므로 직접 확인한다.
-  const confirmLeave = (event) => {
-    if (!dirty || done) return
-    if (!window.confirm(LEAVE_CONFIRM_MESSAGE)) event.preventDefault()
-  }
 
   const allChecked = useMemo(
     () => CONSENT_ITEMS.every((c) => consents[c.key]),
@@ -141,6 +148,11 @@ export default function ApplyPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (submitRef.current) return
+    if (postingLoading || loadError || !posting || posting.open === false) {
+      toast.error('모집 중인 공고인지 먼저 확인해주세요.')
+      return
+    }
 
     if (!consents.consentRequired) {
       toast.error('개인정보 필수항목 수집·이용에 동의해야 지원할 수 있습니다.')
@@ -155,9 +167,11 @@ export default function ApplyPage() {
       return
     }
 
+    submitRef.current = true
     setSubmitting(true)
     try {
       const form = new FormData()
+      form.append('operationToken', applicationOperation(id))
       form.append('consentVersion', CONSENT_VERSION)
       form.append('applicantName', name)
       form.append('applicantEmail', email)
@@ -170,38 +184,40 @@ export default function ApplyPage() {
 
       const res = await api.upload(`/jobs/${id}/apply`, form)
       setLookupCode(res.lookupCode || '')
+      setReceiptStatus(res.status || 'submitted')
       setDone(true)
-      toast.success('지원서가 정상 제출되었습니다.')
+      if (res.recovered) toast.success('기존 접수 내역을 확인했습니다.')
+      else toast.success('지원서가 정상 제출되었습니다.')
     } catch (err) {
-      toast.error(err.message)
+      // A response lost after database commit must recover the original receipt.
+      try {
+        const result = await api.post('/application-receipt', { postingId: id, operationToken: applicationOperation(id) })
+        setLookupCode(result.lookupCode); setReceiptStatus(result.status || 'submitted'); setDone(true)
+        toast.success('접수된 지원 내역을 확인했습니다.')
+      } catch { toast.error(`${err.message} 접수 여부가 불확실하면 다시 제출하거나 이메일로 지원 내역을 확인해주세요.`) }
     } finally {
+      submitRef.current = false
       setSubmitting(false)
     }
-  }
-
-  if (loadError) {
-    return (
-      <div className="apply-page">
-        <p className="error" role="alert">{loadError}</p>
-        <p>
-          <Link to="/jobs">← 채용 공고 목록으로</Link>
-        </p>
-      </div>
-    )
   }
 
   if (done) {
     return (
       <div className="apply-page">
         <div className="apply-done">
-          <h1>지원이 완료되었습니다</h1>
-          <p>
-            소중한 지원 감사합니다. 서류 심사 후 결과를 지원하신 이메일(<strong>{email}</strong>)로
+          <h1>{receiptStatus === 'withdrawn' ? '철회한 지원 내역입니다' : receiptStatus === 'passed' ? '서류에 합격한 지원입니다' : receiptStatus === 'rejected' ? '불합격한 지원 내역입니다' : '지원이 완료되었습니다'}</h1>
+          {receiptStatus === 'submitted' && <p>
+            서류 심사 후 결과를 지원하신 이메일{email ? <>(<strong>{email}</strong>)</> : null}로
             안내드립니다.
-          </p>
-          <p className="notice">
-            서류에 합격하면 이 이메일을 아이디로 하는 계정과 임시 비밀번호가 발급됩니다.
-          </p>
+          </p>}
+          {['submitted', 'passed'].includes(receiptStatus) && <p className="notice">
+            서류에 합격하면 결과 이메일의 입장 코드로 면접방에 들어갈 수 있습니다.
+          </p>}
+          {receiptStatus === 'withdrawn' && <><p>이전 지원은 철회되어 심사하지 않습니다. 새로 지원하려면 아래에서 새 지원서를 시작해주세요.</p>
+            {posting?.status === 'open' && <button type="button" className="btn-primary" onClick={() => {
+              try { restartApplicationOperation(id); setLookupCode(''); setReceiptStatus('submitted'); setDone(false) }
+              catch { toast.error('새 지원 정보를 저장하지 못했습니다. 브라우저 저장소 설정을 확인해주세요.') }
+            }}>새 지원서 작성</button>}</>}
           {lookupCode && (
             <div className="lookup-code-box">
               <p className="lookup-code-label">접수번호 (심사 상태 조회에 사용됩니다 — 꼭 보관하세요)</p>
@@ -221,6 +237,7 @@ export default function ApplyPage() {
           <button type="button" className="btn-primary" onClick={() => navigate('/jobs')}>
             다른 공고 보기
           </button>
+          <p><Link to="/application-manage">제출 내용 확인·수정 · 지원 철회</Link></p>
         </div>
       </div>
     )
@@ -228,8 +245,9 @@ export default function ApplyPage() {
 
   return (
     <div className="apply-page">
+      <UnsavedChangesGuard when={dirty || submitting} message={LEAVE_CONFIRM_MESSAGE} />
       <header className="page-header">
-        <Link to={`/jobs/${id}`} className="back-link" onClick={confirmLeave}>
+        <Link to={`/jobs/${id}`} className="back-link">
           ← 공고로 돌아가기
         </Link>
         <h1>{posting ? posting.title : '지원서 작성'}</h1>
@@ -237,6 +255,14 @@ export default function ApplyPage() {
           <span className="consent-required" aria-hidden="true">*</span> 표시는 필수 입력 항목입니다.
         </p>
       </header>
+
+      {postingLoading && <p role="status">지원할 공고를 확인하는 중입니다. 입력은 계속할 수 있습니다.</p>}
+      {loadError && <div>
+        <p className="error" role="alert">공고를 확인하지 못해 아직 제출할 수 없습니다. 작성 중인 내용은 유지됩니다. {loadError}</p>
+        <button type="button" className="btn-secondary" onClick={() => setReload(value => value + 1)}>공고 다시 불러오기</button>
+        <p><Link to="/jobs">← 채용 공고 목록으로</Link></p>
+      </div>}
+      {!postingLoading && !loadError && posting?.open === false && <p className="notice" role="status">마감된 공고에는 지원할 수 없습니다. 다른 공고를 확인해주세요.</p>}
 
       <form onSubmit={handleSubmit} className="apply-form">
         <section className="apply-section">
@@ -419,7 +445,7 @@ export default function ApplyPage() {
           </label>
         </section>
 
-        <button type="submit" className="btn-primary btn-block" disabled={submitting}>
+        <button type="submit" className="btn-primary btn-block" disabled={submitting || postingLoading || !!loadError || !posting || posting.open === false}>
           {submitting ? '제출 중...' : '지원서 제출하기'}
         </button>
       </form>

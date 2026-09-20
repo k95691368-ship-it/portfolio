@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import UnsavedChangesGuard from '../components/UnsavedChangesGuard.jsx'
 import { useParams, Link } from 'react-router-dom'
 import { api, downloadApiFile } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -705,6 +706,11 @@ export default function ContractPage() {
   const [signatures, setSignatures] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const lifecycle = useRef({ active: false, epoch: 0 })
+  const readGeneration = useRef(0)
+  const viewTrusted = useRef(false)
+  const mutation = useRef(null)
+  const [mutating, setMutating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [offerWarning, setOfferWarning] = useState(null)
   const [signingRole, setSigningRole] = useState(null)
@@ -751,90 +757,168 @@ export default function ContractPage() {
   const printRef = useRef(null)
 
   const loadAll = useCallback(async () => {
-    // 이 화면에 필요한 모든 정보를 한 번의 요청으로 받는다.
-    const view = await api.get(`/rooms/${roomId}/contract-view`)
-    const roomData = view.room
-    const contractData = view.contract
-    const sigData = { signatures: view.signatures }
-    const historyData = { history: view.history }
-    const auditData = view.auditTrail
-    const preSignData = view.preSignCheck
-    const storedData = view.signedContract
-    setAuditTrail(auditData)
-    setRoom(roomData)
-    setHistory(historyData.history ?? [])
-    setContractMeta({
-      hireConfirmed: contractData.hireConfirmed,
-      hireConfirmedAt: contractData.hireConfirmedAt,
-      confirmationExcerpt: contractData.confirmationExcerpt,
-    })
-    setAiDocument(contractData.terms?.aiDocument ?? null)
-
-    const nextForm = formFromTerms(contractData.terms, roomData.participants)
-
-    // 저장하지 않은 입력을 서버 값으로 덮어쓰지 않는다.
-    //
-    // loadAll 은 채용 확정·수정 요청 응답·이전 계약 연결 등 거의 모든 동작
-    // 뒤에 불린다. 그때마다 폼을 서버 값으로 되돌리고 있었으므로, 회사가
-    // 임금을 고치던 중에 다른 버튼을 한 번 누르면 입력한 내용이 사라지고
-    // "처리되었습니다" 토스트만 뜬다. 무엇이 사라졌는지 알 방법이 없다.
-    const dirty = JSON.stringify(formRef.current) !== JSON.stringify(savedFormRef.current)
-    const serverChanged = JSON.stringify(nextForm) !== JSON.stringify(savedFormRef.current)
-    savedFormRef.current = nextForm
-    if (!dirty) {
-      setForm(nextForm)
-      setServerChangedWhileEditing(false)
-    } else if (serverChanged) {
-      // 내 입력은 지키되, 서버 쪽도 바뀌었다는 사실은 알린다.
-      setServerChangedWhileEditing(true)
-    }
-
-    const t = contractData.terms || {}
-    setEmploymentEnd({ endedAt: t.employmentEndedAt ?? null, reason: t.employmentEndReason ?? null })
-    setSignatures(sigData.signatures)
-    setChangeRequests(view.changeRequests ?? [])
-    setPeriod(view.period ?? null)
-    setExplanation(view.explanation ?? null)
-    setPostingComparison(view.postingComparison ?? null)
-    setDeliveries(view.deliveries ?? [])
-    setDeliveryState(view.deliveryState ?? null)
-    setDocumentSha256(view.documentSha256 ?? null)
-    setTermsUpdatedAt(view.contract?.updatedAt ?? view.updatedAt ?? null)
-    setRevokedSignatures(view.revokedSignatures ?? [])
-    setCertificates(view.certificates ?? [])
-    setWageComposition(view.wageComposition ?? null)
-    setHistoryTotal(view.historyTotal ?? 0)
-    setWorkerRights(view.workerRights ?? null)
-    setContinuity(view.continuity ?? null)
-    setRetention(view.retention ?? null)
-    setLinkableRooms(view.linkableRooms ?? [])
-    setTranslations(view.translations ?? [])
-    setLanguages(view.languages ?? [])
-    setSourceArticles(view.sourceArticles ?? [])
-
-    // 서명 전 최종 안전 점검은 아직 체결되지 않은 계약서에만 보여준다.
-    setPreSign(roomData.status === 'signed' ? null : preSignData)
-    // 점검 결과를 다시 읽었으면 "모두 검토했다"는 확인도 다시 받는다.
-    //
-    // 체크는 한 번 누르면 그대로 남아 있었다. 그런데 그 사이 조건이 바뀌어
-    // 새 위반이 생겨도 체크는 켜진 채이므로, 본 적 없는 문제까지 동의한
-    // 것이 된다. 이 체크는 서명을 여는 유일한 문이다.
-    setAcknowledged(false)
-
-    if (roomData.status === 'signed' && storedData) {
-      setSignedContract(storedData.stored)
-      setSignedMeta({
-        emailConfigured: storedData.emailConfigured,
-        candidateEmailMasked: storedData.candidateEmailMasked,
+    if (!lifecycle.current.active) return null
+    const generation = ++readGeneration.current
+    const epoch = lifecycle.current.epoch
+    const isCurrent = () => lifecycle.current.active && lifecycle.current.epoch === epoch && readGeneration.current === generation
+    viewTrusted.current = false
+    setLoading(true)
+    setError('')
+    try {
+      // 이 화면에 필요한 모든 정보를 한 번의 요청으로 받는다.
+      const view = await api.get(`/rooms/${roomId}/contract-view`)
+      if (!isCurrent()) return null
+      // 잘못된 성공 응답도 조회 실패다. 상태를 일부만 적용하기 전에 검증한다.
+      const listFields = ['history', 'changeRequests', 'deliveries', 'revokedSignatures', 'certificates', 'linkableRooms', 'translations', 'languages', 'sourceArticles']
+      if (!view?.room || !Array.isArray(view.room.participants) || !view.contract || !Array.isArray(view.signatures) ||
+          listFields.some((key) => view[key] != null && !Array.isArray(view[key]))) {
+        throw new Error('Invalid contract view')
+      }
+      const roomData = view.room
+      const contractData = view.contract
+      const sigData = { signatures: view.signatures }
+      const historyData = { history: view.history }
+      const auditData = view.auditTrail
+      const preSignData = view.preSignCheck
+      const storedData = view.signedContract
+      setAuditTrail(auditData)
+      setRoom(roomData)
+      setHistory(historyData.history ?? [])
+      setContractMeta({
+        hireConfirmed: contractData.hireConfirmed,
+        hireConfirmedAt: contractData.hireConfirmedAt,
+        confirmationExcerpt: contractData.confirmationExcerpt,
       })
+      setAiDocument(contractData.terms?.aiDocument ?? null)
+
+      const nextForm = formFromTerms(contractData.terms, roomData.participants)
+
+      // 저장하지 않은 입력을 서버 값으로 덮어쓰지 않는다.
+      //
+      // loadAll 은 채용 확정·수정 요청 응답·이전 계약 연결 등 거의 모든 동작
+      // 뒤에 불린다. 그때마다 폼을 서버 값으로 되돌리고 있었으므로, 회사가
+      // 임금을 고치던 중에 다른 버튼을 한 번 누르면 입력한 내용이 사라지고
+      // "처리되었습니다" 토스트만 뜬다. 무엇이 사라졌는지 알 방법이 없다.
+      const dirty = JSON.stringify(formRef.current) !== JSON.stringify(savedFormRef.current)
+      const serverChanged = JSON.stringify(nextForm) !== JSON.stringify(savedFormRef.current)
+      savedFormRef.current = nextForm
+      if (!dirty) {
+        setForm(nextForm)
+        setServerChangedWhileEditing(false)
+      } else if (serverChanged) {
+        // 내 입력은 지키되, 서버 쪽도 바뀌었다는 사실은 알린다.
+        setServerChangedWhileEditing(true)
+      }
+
+      const t = contractData.terms || {}
+      setEmploymentEnd({ endedAt: t.employmentEndedAt ?? null, reason: t.employmentEndReason ?? null })
+      setSignatures(sigData.signatures)
+      setChangeRequests(view.changeRequests ?? [])
+      setPeriod(view.period ?? null)
+      setExplanation(view.explanation ?? null)
+      setPostingComparison(view.postingComparison ?? null)
+      setDeliveries(view.deliveries ?? [])
+      setDeliveryState(view.deliveryState ?? null)
+      setDocumentSha256(view.documentSha256 ?? null)
+      setTermsUpdatedAt(view.contract?.updatedAt ?? view.updatedAt ?? null)
+      setRevokedSignatures(view.revokedSignatures ?? [])
+      setCertificates(view.certificates ?? [])
+      setWageComposition(view.wageComposition ?? null)
+      setHistoryTotal(view.historyTotal ?? 0)
+      setWorkerRights(view.workerRights ?? null)
+      setContinuity(view.continuity ?? null)
+      setRetention(view.retention ?? null)
+      setLinkableRooms(view.linkableRooms ?? [])
+      setTranslations(view.translations ?? [])
+      setLanguages(view.languages ?? [])
+      setSourceArticles(view.sourceArticles ?? [])
+
+      // 서명 전 최종 안전 점검은 아직 체결되지 않은 계약서에만 보여준다.
+      setPreSign(roomData.status === 'signed' ? null : preSignData)
+      // 점검 결과를 다시 읽었으면 "모두 검토했다"는 확인도 다시 받는다.
+      //
+      // 체크는 한 번 누르면 그대로 남아 있었다. 그런데 그 사이 조건이 바뀌어
+      // 새 위반이 생겨도 체크는 켜진 채이므로, 본 적 없는 문제까지 동의한
+      // 것이 된다. 이 체크는 서명을 여는 유일한 문이다.
+      setAcknowledged(false)
+
+      if (roomData.status === 'signed' && storedData) {
+        setSignedContract(storedData.stored)
+        setSignedMeta({
+          emailConfigured: storedData.emailConfigured,
+          candidateEmailMasked: storedData.candidateEmailMasked,
+        })
+      } else {
+        setSignedContract(null)
+        setSignedMeta({ emailConfigured: true, candidateEmailMasked: null })
+      }
+      viewTrusted.current = true
+      return true
+    } catch {
+      if (!isCurrent()) return null
+      setError('계약서 정보를 불러오지 못했습니다. 연결 상태를 확인한 뒤 다시 불러와주세요.')
+      return false
+    } finally {
+      if (isCurrent()) setLoading(false)
     }
   }, [roomId])
 
   useEffect(() => {
+    const currentLifecycle = lifecycle.current
+    currentLifecycle.active = true
     loadAll()
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
+    return () => {
+      currentLifecycle.active = false
+      currentLifecycle.epoch += 1
+      readGeneration.current += 1
+      viewTrusted.current = false
+      mutation.current = null
+    }
   }, [loadAll])
+
+  const canMutate = () => lifecycle.current.active && viewTrusted.current && !mutation.current
+  const runMutation = async (setBusy, action) => {
+    if (!canMutate()) return false
+    const operation = { epoch: lifecycle.current.epoch }
+    mutation.current = operation
+    setMutating(true)
+    setBusy?.(true)
+    const isCurrent = () => lifecycle.current.active && lifecycle.current.epoch === operation.epoch && mutation.current === operation
+    try {
+      return await action(isCurrent)
+    } catch (err) {
+      if (!isCurrent()) return false
+      if (!err?.status || err.status === 408 || err.status >= 500) {
+        viewTrusted.current = false
+        setError('변경 결과를 확인하지 못했습니다. 다시 불러와 현재 계약 상태를 확인해주세요.')
+      }
+      toast.error(err.message)
+      return false
+    } finally {
+      if (isCurrent()) {
+        mutation.current = null
+        setMutating(false)
+        setBusy?.(false)
+      }
+    }
+  }
+  const refreshAfterWrite = async (isCurrent, completed = '변경') => {
+    if (!isCurrent()) return null
+    const refreshed = await loadAll()
+    if (refreshed === false && isCurrent()) {
+      toast.info(`${completed}은 완료됐지만 최신 계약서 정보를 불러오지 못했습니다. 계약서를 다시 불러와 확인해주세요.`)
+    }
+    return refreshed
+  }
+  const writeAndRefresh = (setBusy, request, message, committed) => runMutation(setBusy, async (isCurrent) => {
+    const response = await request()
+    if (!isCurrent()) return false
+    committed?.(response)
+    toast.success(message)
+    await refreshAfterWrite(isCurrent)
+    return isCurrent()
+  })
+  const retryLoad = () => !mutation.current ? loadAll() : Promise.resolve(null)
 
   const updateField = (key, value) => setForm((f) => ({ ...f, [key]: value }))
   const toggleInsurance = (key) =>
@@ -871,194 +955,118 @@ export default function ContractPage() {
   ).length
 
   const handleSave = async () => {
-    setSaving(true)
-    try {
-      const filteredCustomTerms = form.customTerms.filter((c) => c.label && c.value)
-      const droppedCount = form.customTerms.length - filteredCustomTerms.length
+    const submittedForm = form
+    const submittedSnapshot = JSON.stringify(submittedForm)
+    return runMutation(setSaving, async (isCurrent) => {
+      const filteredCustomTerms = submittedForm.customTerms.filter((c) => c.label && c.value)
+      const droppedCount = submittedForm.customTerms.length - filteredCustomTerms.length
       // 이름도 금액도 비어 있는 줄은 보내지 않는다.
-      const filteredWageItems = (form.wageItems ?? []).filter(
+      const filteredWageItems = (submittedForm.wageItems ?? []).filter(
         (w) => String(w.name ?? '').trim() !== '' || String(w.amount ?? '').trim() !== ''
       )
       const payload = {
-        ...form,
-        wageBaseAmount: form.wageBaseAmount === '' || form.wageBaseAmount === null ? null : Number(form.wageBaseAmount),
+        ...submittedForm,
+        wageBaseAmount: submittedForm.wageBaseAmount === '' || submittedForm.wageBaseAmount === null ? null : Number(submittedForm.wageBaseAmount),
         customTerms: filteredCustomTerms,
         wageItems: filteredWageItems.map((w) => ({ ...w, amount: Number(w.amount) })),
       }
       const saved = await api.patch(`/rooms/${roomId}/contract`, payload)
+      if (!isCurrent()) return false
       // 확정 뒤의 불리한 변경은 실질적으로 취소일 수 있다. 토스트는 5초 뒤
       // 사라지므로, 이 경고는 화면에 남겨 둔다.
       setOfferWarning(saved?.offerWarning ?? null)
-      setForm((f) => ({ ...f, customTerms: filteredCustomTerms }))
-      // 저장했으므로 아래 loadAll 은 폼을 덮어써도 된다.
-      savedFormRef.current = { ...formRef.current, customTerms: filteredCustomTerms }
-      formRef.current = savedFormRef.current
+      // 저장된 것은 요청 당시 값뿐이다. 응답을 기다리며 추가한 입력은
+      // 미저장 상태로 보존해 아래 loadAll 이 덮어쓰지 않도록 한다.
+      const savedForm = formFromTerms(payload, room?.participants)
+      savedFormRef.current = savedForm
+      if (JSON.stringify(formRef.current) === submittedSnapshot) {
+        setForm(savedForm)
+        formRef.current = savedForm
+      }
       setServerChangedWhileEditing(false)
-      // 저장 후 다시 읽지 않으면 서명 전 점검이 저장 이전 상태로 남는다.
-      // 이미 해결한 경고가 계속 보이는 것보다 위험한 방향이 있다 — 저장으로
-      // 임금을 최저임금 미달로 낮춰도 낡은 점검이 "문제 없음"을 유지하고
-      // 확인 체크박스가 아예 뜨지 않아, 안전망이 조용히 열린 채로 서명된다.
-      await loadAll()
+      // PATCH로 확정된 저장은 후속 조회를 기다리지 않고 알린다.
+      const hasNewerEdits = JSON.stringify(formRef.current) !== JSON.stringify(savedFormRef.current)
       toast.success(
-        droppedCount > 0
-          ? `저장되었습니다. (라벨/값이 비어있는 기타 항목 ${droppedCount}개는 저장되지 않았습니다.)`
-          : '정상적으로 저장되었습니다.'
+        (hasNewerEdits
+          ? '요청 당시 내용은 저장됐고 이후 입력은 아직 저장되지 않았습니다.'
+          : '정상적으로 저장되었습니다.') +
+        (droppedCount > 0
+          ? ` (라벨/값이 비어있는 기타 항목 ${droppedCount}개는 저장되지 않았습니다.)`
+          : '')
       )
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setSaving(false)
-    }
+      // 서명 전 점검도 최신 조건으로 읽는다. 실패하면 쓰기는 잠기지만
+      // 저장 성공 및 그 이후에 추가한 입력은 그대로 유지한다.
+      await refreshAfterWrite(isCurrent, '저장')
+      return isCurrent()
+    })
   }
 
-  const handleDraftDocument = async () => {
-    setDrafting(true)
-    try {
-      await api.post(`/rooms/${roomId}/contract-draft`, form)
-      // 본문이 바뀌면 서명 대상 문서가 바뀐 것이고, 서버의 문서 지문도 따라
-      // 바뀐다. 화면이 들고 있는 옛 지문으로 서명하면 서버가 409로 막는다.
-      // 본문만 갈아 끼우지 말고 지문과 점검 결과까지 함께 다시 읽는다.
-      await loadAll()
-      toast.success('AI 계약서 문장이 작성되었습니다.')
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setDrafting(false)
-    }
-  }
+  // 본문뿐 아니라 서명 대상 지문과 점검 결과까지 다시 읽는다.
+  const handleDraftDocument = () => writeAndRefresh(
+    setDrafting, () => api.post(`/rooms/${roomId}/contract-draft`, form), 'AI 계약서 문장이 작성되었습니다.'
+  )
 
-  const handleTranslate = async (language) => {
-    setTranslating(true)
-    try {
-      await api.post(`/rooms/${roomId}/translate`, { language })
-      await loadAll()
-      toast.success('번역본이 준비되었습니다.')
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setTranslating(false)
-    }
-  }
+  const handleTranslate = (language) => writeAndRefresh(
+    setTranslating, () => api.post(`/rooms/${roomId}/translate`, { language }), '번역본이 준비되었습니다.'
+  )
 
-  const handleLinkPrevious = async (previousRoomId) => {
-    setLinking(true)
-    try {
-      await api.post(`/rooms/${roomId}/link-previous`, { previousRoomId })
-      await loadAll()
-      toast.success('이전 계약과 연결되었습니다. 계속근로기간을 합산해 확인합니다.')
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setLinking(false)
-    }
-  }
+  const handleLinkPrevious = (previousRoomId) => writeAndRefresh(
+    setLinking, () => api.post(`/rooms/${roomId}/link-previous`, { previousRoomId }),
+    '이전 계약과 연결되었습니다. 계속근로기간을 합산해 확인합니다.'
+  )
 
-  const handleRecordEmploymentEnd = async ({ endedOn, reason }) => {
-    setLinking(true)
-    try {
-      await api.post(`/rooms/${roomId}/employment-end`, { endedOn, reason })
-      await loadAll()
-      toast.success('근로관계 종료가 기록되었습니다. 보존 기간은 이 날부터 3년입니다.')
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setLinking(false)
-    }
-  }
+  const handleRecordEmploymentEnd = ({ endedOn, reason }) => writeAndRefresh(
+    setLinking, () => api.post(`/rooms/${roomId}/employment-end`, { endedOn, reason }),
+    '근로관계 종료가 기록되었습니다. 보존 기간은 이 날부터 3년입니다.'
+  )
 
   const handleClearEmploymentEnd = async () => {
+    if (!canMutate()) return false
     if (!window.confirm('근로관계 종료 기록을 취소하면 다시 재직 중으로 표시되고 보존 의무가 계속됩니다. 진행할까요?')) {
-      return
+      return false
     }
-    setLinking(true)
-    try {
-      await api.delete(`/rooms/${roomId}/employment-end`)
-      await loadAll()
-      toast.success('근로관계 종료 기록을 취소했습니다.')
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setLinking(false)
-    }
+    return writeAndRefresh(setLinking, () => api.delete(`/rooms/${roomId}/employment-end`), '근로관계 종료 기록을 취소했습니다.')
   }
 
-  const handleUnlinkPrevious = async () => {
-    setLinking(true)
-    try {
-      await api.delete(`/rooms/${roomId}/link-previous`)
-      await loadAll()
-      toast.success('이전 계약 연결을 해제했습니다.')
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setLinking(false)
-    }
-  }
+  const handleUnlinkPrevious = () => writeAndRefresh(
+    setLinking, () => api.delete(`/rooms/${roomId}/link-previous`), '이전 계약 연결을 해제했습니다.'
+  )
 
   const handleConfirmHire = async () => {
+    if (!canMutate()) return false
     if (!window.confirm('이 지원자의 채용을 확정하시겠습니까? 확정 후에는 양측이 서명할 수 있습니다.')) {
-      return
+      return false
     }
-    setConfirmingHire(true)
-    try {
-      await api.post(`/rooms/${roomId}/confirm-hire`, {})
-      await loadAll()
-      toast.success('채용이 확정되었습니다. 이제 서명할 수 있습니다.')
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setConfirmingHire(false)
-    }
+    return writeAndRefresh(setConfirmingHire, () => api.post(`/rooms/${roomId}/confirm-hire`, {}), '채용이 확정되었습니다. 이제 서명할 수 있습니다.')
   }
 
-  const handleCreateRequest = async ({ field, requestedValue, reason }) => {
-    setRequestBusy(true)
-    try {
-      await api.post(`/rooms/${roomId}/change-requests`, { field, requestedValue, reason })
-      await loadAll()
-      toast.success('수정 요청을 보냈습니다. 회사 측 검토를 기다려주세요.')
-      return true
-    } catch (err) {
-      toast.error(err.message)
-      return false
-    } finally {
-      setRequestBusy(false)
-    }
-  }
+  const handleCreateRequest = ({ field, requestedValue, reason }) => writeAndRefresh(
+    setRequestBusy, () => api.post(`/rooms/${roomId}/change-requests`, { field, requestedValue, reason }),
+    '수정 요청을 보냈습니다. 회사 측 검토를 기다려주세요.'
+  )
 
   const handleRespondRequest = async (requestId, action) => {
+    if (!canMutate()) return false
     const note =
       action === 'decline' ? window.prompt('거절 사유를 입력해주세요. (선택)') ?? '' : ''
-    setRequestBusy(true)
-    try {
-      await api.post(`/rooms/${roomId}/change-requests/${requestId}`, { action, note })
-      await loadAll()
-      toast.success(action === 'accept' ? '요청을 반영했습니다.' : '요청을 반려했습니다.')
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setRequestBusy(false)
-    }
+    return writeAndRefresh(setRequestBusy, () => api.post(`/rooms/${roomId}/change-requests/${requestId}`, { action, note }),
+      action === 'accept' ? '요청을 반영했습니다.' : '요청을 반려했습니다.')
   }
 
   const handleSign = async (imageDataUrl) => {
-    try {
+    if (!canMutate()) throw new Error('최신 계약서 정보를 먼저 불러온 뒤 서명해주세요.')
+    return writeAndRefresh(null, () =>
       // 화면에서 확인 사항을 검토했다고 밝힌 사실을 서버에도 함께 보낸다.
       // 이전에는 이 체크가 화면에만 있어, 서버는 무엇을 확인했는지 알 수 없었다.
-      await api.post(`/rooms/${roomId}/sign`, {
+      api.post(`/rooms/${roomId}/sign`, {
         imageDataUrl,
         acknowledgedIssues: acknowledged,
         // 화면이 보여 준 내용의 지문. 그동안 내용이 바뀌었으면 서버가 막는다.
         documentSha256,
         // 지문에 들어가지 않는 항목(임금 구성항목 등)의 변경까지 잡는다.
         termsUpdatedAt,
-      })
-      setSigningRole(null)
-      await loadAll()
-      toast.success('서명이 완료되었습니다.')
-    } catch (err) {
-      toast.error(err.message)
-    }
+      }), '서명이 완료되었습니다.', () => setSigningRole(null)
+    )
   }
 
   // PDF 생성 라이브러리는 600KB가 넘는데, 계약서를 읽거나 서명만 하는 경우에는
@@ -1111,27 +1119,31 @@ export default function ContractPage() {
   }
 
   const handleExportPdf = async () => {
-    if (blockIfUnsaved()) return
+    if (!canMutate() || blockIfUnsaved()) return
+    const epoch = lifecycle.current.epoch
+    const isCurrent = () => lifecycle.current.active && lifecycle.current.epoch === epoch
     setExporting(true)
     try {
       const pdf = await buildPdf()
+      if (!isCurrent() || !canMutate() || blockIfUnsaved()) return
       pdf.save('근로계약서.pdf')
     } catch (err) {
-      toast.error(err.message)
+      if (isCurrent()) toast.error(err.message)
     } finally {
-      setExporting(false)
+      if (isCurrent()) setExporting(false)
     }
   }
 
   const handleStoreAndSend = async () => {
     if (blockIfUnsaved()) return
-    setStoring(true)
-    try {
+    return runMutation(setStoring, async (isCurrent) => {
       const pdf = await buildPdf()
+      if (!isCurrent() || blockIfUnsaved()) return false
       const blob = pdf.output('blob')
       const fd = new FormData()
       fd.append('pdf', blob, '근로계약서.pdf')
       const data = await api.upload(`/rooms/${roomId}/signed-contract`, fd)
+      if (!isCurrent()) return false
       setSignedContract(data.stored)
       setSignedMeta((m) => ({ ...m, emailConfigured: data.emailConfigured }))
       toast.success(
@@ -1141,14 +1153,10 @@ export default function ContractPage() {
       )
       // 이 요청은 저장만 하는 것이 아니다. 서버가 교부 이력을 남기고 감사추적에
       // '서명 계약서 보관'을 더한다. 다시 읽지 않으면 방금 일어난 교부가 화면에
-      // 없는 것처럼 보인다. 저장은 이미 성공했으므로 재조회 실패로 성공 메시지가
-      // 뒤집히지 않게 따로 감싼다.
-      await loadAll().catch(() => {})
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setStoring(false)
-    }
+      // 없는 것처럼 보인다. 저장 성공은 유지하고 조회 실패도 명시한다.
+      await refreshAfterWrite(isCurrent)
+      return isCurrent()
+    })
   }
 
   // 인쇄되는 계약서에 쓰는 값들.
@@ -1174,11 +1182,30 @@ export default function ContractPage() {
     return `${y}년 ${Number(m)}월 ${Number(d)}일`
   })()
 
-  if (loading) return <p>불러오는 중...</p>
-  if (error && !room) return <p className="error" role="alert">{error}</p>
+  const writeBlocked = loading || !!error || mutating
+  const readStatus = (
+    <>
+      {loading && <p role="status">계약서 정보를 불러오는 중...</p>}
+      {error && (
+        <div role="alert">
+          <p className="error">{error}</p>
+          {room && <p>아래는 이전에 확인한 자료입니다. 최신 조회가 완료될 때까지 변경·서명·문서 생성을 진행할 수 없습니다.</p>}
+          <button type="button" className="btn-sm" disabled={loading || mutating} onClick={retryLoad}>계약서 다시 불러오기</button>
+        </div>
+      )}
+    </>
+  )
+  if (!room) return (
+    <div className="contract-page">
+      <Link to={`/rooms/${roomId}`} className="back-link">← 면접방으로</Link>
+      {readStatus}
+    </div>
+  )
 
   return (
     <div className="contract-page">
+      <UnsavedChangesGuard when={canEdit && (saving || JSON.stringify(form) !== JSON.stringify(savedFormRef.current))} message="저장하지 않은 계약 조건이 있습니다. 이동하면 입력한 변경사항이 사라집니다. 계약 조건 저장 후 이동해주세요." />
+      {readStatus}
       <header className="page-header">
         <Link to={`/rooms/${roomId}`} className="back-link">
           ← 면접방으로
@@ -1213,7 +1240,7 @@ export default function ContractPage() {
               <button
                 type="button"
                 className="btn-primary"
-                disabled={confirmingHire}
+                disabled={confirmingHire || writeBlocked}
                 onClick={handleConfirmHire}
               >
                 {confirmingHire ? '처리 중...' : '채용 확정하기'}
@@ -1332,7 +1359,7 @@ export default function ContractPage() {
         )}
 
         {canEdit && (
-          <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
+          <button type="button" className="btn-primary" onClick={handleSave} disabled={saving || writeBlocked}>
             {saving ? '저장 중...' : '저장'}
           </button>
         )}
@@ -1352,7 +1379,7 @@ export default function ContractPage() {
           hint={aiDocument ? '작성해 둠' : '아직 안 만듦'}
         >
           <p>위에 입력한 조건을 바탕으로 표준근로계약서 형식의 계약서 문장을 AI가 작성합니다.</p>
-          <button type="button" onClick={handleDraftDocument} disabled={drafting}>
+          <button type="button" onClick={handleDraftDocument} disabled={drafting || writeBlocked}>
             {drafting ? 'AI가 계약서를 작성하는 중...' : aiDocument ? 'AI 계약서 다시 작성하기' : 'AI로 계약서 작성하기'}
           </button>
         </Fold>
@@ -1456,7 +1483,7 @@ export default function ContractPage() {
         canLink={myRole === 'company' && !isSigned && !frozen}
         onLink={handleLinkPrevious}
         onUnlink={handleUnlinkPrevious}
-        busy={linking}
+        busy={linking || writeBlocked}
         employmentEnd={employmentEnd}
         canRecordEnd={myRole === 'company' && isSigned && !frozen}
         onRecordEnd={handleRecordEmploymentEnd}
@@ -1469,7 +1496,7 @@ export default function ContractPage() {
         languages={languages}
         canTranslate={myRole === 'company' && !frozen}
         onTranslate={handleTranslate}
-        busy={translating}
+        busy={translating || writeBlocked}
       />
 
       {(myRole === 'company' || myRole === 'candidate') && (
@@ -1480,7 +1507,7 @@ export default function ContractPage() {
           canRespond={!frozen}
           onCreate={handleCreateRequest}
           onRespond={handleRespondRequest}
-          busy={requestBusy}
+          busy={requestBusy || writeBlocked}
           prefill={requestPrefill}
         />
       )}
@@ -1548,7 +1575,7 @@ export default function ContractPage() {
             {preSign?.ready && (
               <PreSignCheck
                 check={preSign}
-                redrafting={drafting}
+                redrafting={drafting || writeBlocked}
                 onRedraft={
                   canEdit && (user.isAdmin || user.isRecruiter) ? handleDraftDocument : null
                 }
@@ -1580,7 +1607,7 @@ export default function ContractPage() {
               className="btn-primary"
               onClick={() => setSigningRole(myRole)}
               disabled={
-                frozen || !contractMeta.hireConfirmed || (preSign?.hasBlocking && !acknowledged)
+                writeBlocked || frozen || !contractMeta.hireConfirmed || (preSign?.hasBlocking && !acknowledged)
               }
             >
               서명하기
@@ -1615,6 +1642,7 @@ export default function ContractPage() {
                 <button
                   type="button"
                   className="document-download-link"
+                  disabled={writeBlocked}
                   onClick={() => void downloadApiFile(`/rooms/${roomId}/signed-contract-file`).catch((err) => toast.error(err.message))}
                 >
                   저장된 계약서 PDF 다운로드 →
@@ -1651,7 +1679,7 @@ export default function ContractPage() {
               type="button"
               className="btn-primary"
               onClick={handleStoreAndSend}
-              disabled={storing || frozen}
+              disabled={storing || frozen || writeBlocked}
             >
               {storing
                 ? '처리 중...'
@@ -1667,7 +1695,7 @@ export default function ContractPage() {
           체결 사실을 제3자에게 확인시키는 출구다. */}
       <AuditCertificate
         roomId={roomId}
-        canIssue={Boolean(myRole)}
+        canIssue={Boolean(myRole) && !writeBlocked}
         hasSignature={signatures.length > 0}
         initial={certificates}
       />
@@ -1706,7 +1734,7 @@ export default function ContractPage() {
         </Fold>
       )}
 
-      <button type="button" onClick={handleExportPdf} disabled={exporting}>
+      <button type="button" onClick={handleExportPdf} disabled={exporting || writeBlocked}>
         {exporting ? 'PDF 생성 중...' : 'PDF 다운로드'}
       </button>
 

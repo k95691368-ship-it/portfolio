@@ -47,7 +47,7 @@ describe('녹화 파일의 코드 신원 selector', () => {
       selectedUser(filePath, 'session=account-token; room_session=code-token')
     ).resolves.toEqual({ userId: 'candidate-1' })
     await expect(selectedUser(filePath, 'session=account-token')).resolves.toEqual({
-      userId: 'account-1',
+      error: '면접방 입장이 만료되었습니다. 초대코드로 다시 입장해주세요.',
     })
   })
 

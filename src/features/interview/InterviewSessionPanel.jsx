@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, roomDoorFor } from '../../api/client.js'
 import {
   formatScheduledAt,
@@ -13,6 +13,9 @@ import {
 import './interview.css'
 import InterviewSlotPicker from './InterviewSlotPicker.jsx'
 
+const DEFINITE_WRITE_REJECTIONS = new Set([400, 401, 403, 404, 409, 410, 413, 415, 422, 429])
+const usableSession = value => value && typeof value.id === 'string' && value.id && typeof value.title === 'string'
+
 function formatRetentionDate(value) {
   if (!value) return ''
   const normalized = String(value).replace(' ', 'T')
@@ -26,12 +29,14 @@ function formatRetentionDate(value) {
   }).format(date)
 }
 
-function RecordingResult({ roomId, session, onRecordingChanged }) {
+function RecordingResult({ roomId, session, onRecordingChanged, writeLocked = false }) {
   const [retrying, setRetrying] = useState(false)
   const [retryError, setRetryError] = useState('')
   const [videoUrl, setVideoUrl] = useState('')
   const [fileError, setFileError] = useState('')
   const [downloading, setDownloading] = useState(false)
+  const writeLockedRef = useRef(writeLocked)
+  writeLockedRef.current = writeLocked
   const recording = session?.recording
   const expired = recording?.expired || recording?.status === 'deleted'
   const storageFailed = recording?.storageStatus === 'copy_failed'
@@ -83,7 +88,7 @@ function RecordingResult({ roomId, session, onRecordingChanged }) {
   if (!recording?.id || recording.status === 'idle') return null
 
   const retryStorage = async () => {
-    if (!recording?.id || retrying) return
+    if (writeLockedRef.current || !recording?.id || retrying) return
     setRetrying(true)
     setRetryError('')
     try {
@@ -146,7 +151,7 @@ function RecordingResult({ roomId, session, onRecordingChanged }) {
       {fileError && <p className="interview-member-error" role="alert">{fileError}</p>}
       {storageFailed && session.myRole === 'host' && (
         <div className="interview-recording-retry">
-          <button type="button" disabled={retrying} onClick={retryStorage}>
+          <button type="button" disabled={writeLocked || retrying} onClick={retryStorage}>
             {retrying ? '보관 확인 중…' : '녹화 보관 다시 확인'}
           </button>
           {retryError && <p role="alert">{retryError}</p>}
@@ -161,10 +166,15 @@ export default function InterviewSessionPanel({
   roomTitle = '',
   myRole,
   disabled = false,
+  writeLocked = false,
 }) {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [hasLoaded, setHasLoaded] = useState(false)
   const [error, setError] = useState('')
+  const [readError, setReadError] = useState('')
+  const [readUncertain, setReadUncertain] = useState(true)
+  const [notice, setNotice] = useState('')
   const [creating, setCreating] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
   const [title, setTitle] = useState(roomTitle ? `${roomTitle} 화상 면접` : '화상 면접')
@@ -176,49 +186,128 @@ export default function InterviewSessionPanel({
   const [memberError, setMemberError] = useState('')
   const [copyState, setCopyState] = useState('')
   const [cancelling, setCancelling] = useState(false)
-  const loadedRoomRef = useRef('')
   const createRequestIdRef = useRef('')
+  const lifetime = useRef(null)
+  const readGeneration = useRef(0)
+  const readUncertainRef = useRef(true)
+  const pendingWrite = useRef(null)
+  const unknownWrite = useRef(false)
+  const unknownCreateVersion = useRef(null)
+  const draftVersion = useRef(0)
+  // Archival closes the workflow; a transient room refresh only pauses it.
+  // Keep form DOM/state mounted, but captured handlers must see the latest lock.
+  const actionsLockedRef = useRef(disabled || writeLocked)
+  actionsLockedRef.current = disabled || writeLocked
 
   const isCompany = myRole === 'company'
 
-  const loadSessionDetail = async (summary) => {
-    if (!summary?.id) return summary
-    const detail = await api.get(`/rooms/${roomId}/interviews/${summary.id}`)
-    return normalizeSession(detail) ?? summary
-  }
-
-  const loadSessions = async () => {
+  const loadSessions = useCallback(async ({ knownSession } = {}) => {
+    const scope = lifetime.current
+    if (!scope) return null
+    const generation = ++readGeneration.current
+    const current = () => lifetime.current === scope && readGeneration.current === generation
     setLoading(true)
-    setError('')
+    setReadError('')
+    readUncertainRef.current = true
+    setReadUncertain(true)
     try {
-      const data = await api.get(`/rooms/${roomId}/interviews`)
-      const summary = latestSession(data)
-      const next = await loadSessionDetail(summary)
+      let summary = knownSession
+      if (!summary) {
+        const data = await api.get(`/rooms/${roomId}/interviews`)
+        if (!current()) return null
+        if (!Array.isArray(data?.sessions) || !data.sessions.every(row => usableSession(normalizeSession(row)))) {
+          throw new Error('일정 목록 응답을 확인하지 못했습니다.')
+        }
+        summary = latestSession(data)
+      }
+      let next = null
+      if (summary) {
+        if (!usableSession(summary)) throw new Error('일정 응답을 확인하지 못했습니다.')
+        next = normalizeSession(await api.get(`/rooms/${roomId}/interviews/${summary.id}`))
+        if (!current()) return null
+        if (!usableSession(next) || next.id !== summary.id) throw new Error('일정 상세 응답을 확인하지 못했습니다.')
+      }
+      if (!current()) return null
       setSession(next)
+      setHasLoaded(true)
+      setReadError('')
+      readUncertainRef.current = false
+      setReadUncertain(false)
+      if (unknownWrite.current) {
+        unknownWrite.current = false
+        createRequestIdRef.current = ''
+        if (next && unknownCreateVersion.current !== null && draftVersion.current === unknownCreateVersion.current) setFormOpen(false)
+        unknownCreateVersion.current = null
+        setNotice('최신 일정을 다시 확인했습니다.')
+      }
       if (!next && isCompany) setFormOpen(true)
+      return next
     } catch (err) {
-      setError(err.message)
+      if (!current()) return null
+      setReadError(err?.message || '일정을 불러오지 못했습니다.')
+      readUncertainRef.current = true
+      setReadUncertain(true)
+      throw err
     } finally {
-      setLoading(false)
+      if (current()) setLoading(false)
     }
-  }
+  }, [isCompany, roomId])
 
   useEffect(() => {
-    if (!roomId || loadedRoomRef.current === roomId) return
-    loadedRoomRef.current = roomId
-    void loadSessions()
-  }, [roomId]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!roomId) return undefined
+    const scope = {}
+    lifetime.current = scope
+    setSession(null)
+    setHasLoaded(false)
+    setFormOpen(false)
+    setError('')
+    setNotice('')
+    void loadSessions().catch(() => {})
+    return () => {
+      if (lifetime.current === scope) lifetime.current = null
+      readGeneration.current += 1
+      pendingWrite.current = null
+    }
+  }, [loadSessions, roomId])
+
+  const beginWrite = () => {
+    if (!lifetime.current || actionsLockedRef.current || readUncertainRef.current || pendingWrite.current) return null
+    const ticket = { scope: lifetime.current }
+    pendingWrite.current = ticket
+    readGeneration.current += 1
+    setLoading(false)
+    setError('')
+    setNotice('')
+    return ticket
+  }
+  const currentWrite = ticket => lifetime.current === ticket.scope && pendingWrite.current === ticket
+  const writeError = err => {
+    if (DEFINITE_WRITE_REJECTIONS.has(err?.status)) {
+      setError(err.message)
+      return
+    }
+    readGeneration.current += 1
+    setLoading(false)
+    readUncertainRef.current = true
+    setReadUncertain(true)
+    unknownWrite.current = true
+    setReadError('처리 결과를 확인하지 못했습니다. 같은 작업을 다시 보내지 말고 일정을 다시 불러와 확인해주세요.')
+  }
+  const controlsLocked = disabled || writeLocked || readUncertain
 
   const createSession = async (event) => {
     event.preventDefault()
+    if (actionsLockedRef.current || readUncertainRef.current || pendingWrite.current) return
     const cleanTitle = title.trim()
     if (!cleanTitle) {
       setError('면접 제목을 입력해주세요.')
       return
     }
 
+    const ticket = beginWrite()
+    if (!ticket) return
+    const submittedVersion = draftVersion.current
     setCreating(true)
-    setError('')
     try {
       if (!createRequestIdRef.current) {
         createRequestIdRef.current = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`
@@ -230,24 +319,34 @@ export default function InterviewSessionPanel({
         recordingRequired,
         clientRequestId: createRequestIdRef.current,
       })
+      if (!currentWrite(ticket)) return
       const next = normalizeSession(created)
-      if (!next?.id) throw new Error('생성된 화상 면접 정보를 확인하지 못했습니다.')
-      setSession(await loadSessionDetail(next))
-      setFormOpen(false)
+      if (!usableSession(next)) throw new Error('생성된 화상 면접 정보를 확인하지 못했습니다.')
+      // The write is already confirmed. A later detail GET must never turn this
+      // into a failed creation or erase a different draft entered meanwhile.
+      setSession(next)
+      setHasLoaded(true)
+      if (draftVersion.current === submittedVersion) setFormOpen(false)
       createRequestIdRef.current = ''
+      setNotice('일정은 생성되었습니다.')
+      await loadSessions({ knownSession: next }).catch(() => {})
     } catch (err) {
-      setError(err.message)
+      if (currentWrite(ticket)) {
+        if (DEFINITE_WRITE_REJECTIONS.has(err?.status)) createRequestIdRef.current = ''
+        else unknownCreateVersion.current = submittedVersion
+        writeError(err)
+      }
     } finally {
-      setCreating(false)
+      if (currentWrite(ticket)) { pendingWrite.current = null; setCreating(false) }
     }
   }
 
-  const canEnter = session && !disabled && !isClosedInterviewStatus(session.status)
+  const canEnter = session && !controlsLocked && !isClosedInterviewStatus(session.status)
   const isSessionHost = isCompany && session?.myRole === 'host'
   const canCancel = Boolean(
     (isSessionHost || (session?.myRole === 'candidate' && session?.bookingSlotId)) && !disabled && ['scheduled', 'waiting'].includes(session?.status)
   )
-  const memberChangesLocked = Boolean(
+  const memberChangesUnavailable = Boolean(
     disabled ||
       !session ||
       session.status === 'live' ||
@@ -256,7 +355,8 @@ export default function InterviewSessionPanel({
   )
 
   const updateMembers = (response) => {
-    const members = Array.isArray(response?.members) ? response.members : []
+    if (!Array.isArray(response?.members)) throw new Error('면접관 목록 응답을 확인하지 못했습니다.')
+    const members = response.members
     setSession((previous) =>
       previous ? normalizeSession({ ...previous, members }) ?? previous : previous
     )
@@ -281,7 +381,10 @@ export default function InterviewSessionPanel({
   const addInterviewer = async (event) => {
     event.preventDefault()
     const email = memberEmail.trim()
-    if (!email || !session?.id || memberBusy) return
+    if (memberChangesUnavailable || !email || !session?.id) return
+    const ticket = beginWrite()
+    if (!ticket) return
+    const submittedEmail = memberEmail
     setMemberBusy('add')
     setMemberError('')
     try {
@@ -289,17 +392,23 @@ export default function InterviewSessionPanel({
         `/rooms/${roomId}/interviews/${session.id}/members`,
         { email }
       )
+      if (!currentWrite(ticket)) return
       updateMembers(response)
-      setMemberEmail('')
+      setMemberEmail(current => current === submittedEmail ? '' : current)
     } catch (err) {
-      setMemberError(err.message)
+      if (currentWrite(ticket)) {
+        if (DEFINITE_WRITE_REJECTIONS.has(err?.status)) setMemberError(err.message)
+        else writeError(err)
+      }
     } finally {
-      setMemberBusy('')
+      if (currentWrite(ticket)) { pendingWrite.current = null; setMemberBusy('') }
     }
   }
 
   const removeInterviewer = async (userId) => {
-    if (!session?.id || memberBusy) return
+    if (memberChangesUnavailable || !session?.id) return
+    const ticket = beginWrite()
+    if (!ticket) return
     setMemberBusy(userId)
     setMemberError('')
     try {
@@ -307,16 +416,20 @@ export default function InterviewSessionPanel({
         `/rooms/${roomId}/interviews/${session.id}/members`,
         { userId }
       )
+      if (!currentWrite(ticket)) return
       updateMembers(response)
     } catch (err) {
-      setMemberError(err.message)
+      if (currentWrite(ticket)) {
+        if (DEFINITE_WRITE_REJECTIONS.has(err?.status)) setMemberError(err.message)
+        else writeError(err)
+      }
     } finally {
-      setMemberBusy('')
+      if (currentWrite(ticket)) { pendingWrite.current = null; setMemberBusy('') }
     }
   }
 
   const copyInterviewerLink = async () => {
-    if (!session?.id) return
+    if (actionsLockedRef.current || readUncertainRef.current || !session?.id) return
     setCopyState('')
     try {
       const path = interviewerPagePath(roomId, session.id)
@@ -328,24 +441,26 @@ export default function InterviewSessionPanel({
   }
 
   const cancelSession = async () => {
-    if (!canCancel || cancelling || !session?.id) return
+    if (actionsLockedRef.current || readUncertainRef.current || pendingWrite.current || !canCancel || !session?.id) return
     if (!window.confirm('이 화상 면접 일정을 취소하시겠습니까? 기존 참석 링크도 사용할 수 없게 됩니다.')) {
       return
     }
 
+    const ticket = beginWrite()
+    if (!ticket) return
     setCancelling(true)
-    setError('')
     try {
       const response = await api.patch(`/rooms/${roomId}/interviews/${session.id}`, {
         status: 'cancelled',
       })
+      if (!currentWrite(ticket)) return
       const next = normalizeSession(response)
-      if (!next) throw new Error('취소된 화상 면접 정보를 확인하지 못했습니다.')
+      if (!usableSession(next) || next.id !== session.id) throw new Error('취소된 화상 면접 정보를 확인하지 못했습니다.')
       setSession(next)
     } catch (err) {
-      setError(err.message)
+      if (currentWrite(ticket)) writeError(err)
     } finally {
-      setCancelling(false)
+      if (currentWrite(ticket)) { pendingWrite.current = null; setCancelling(false) }
     }
   }
 
@@ -360,7 +475,8 @@ export default function InterviewSessionPanel({
           <button
             type="button"
             className="interview-text-button"
-            onClick={() => setFormOpen(true)}
+            disabled={controlsLocked || creating}
+            onClick={() => { if (!actionsLockedRef.current && !readUncertainRef.current && !pendingWrite.current) setFormOpen(true) }}
           >
             새 일정 만들기
           </button>
@@ -369,10 +485,13 @@ export default function InterviewSessionPanel({
 
       {loading && <p className="interview-panel-status" role="status">일정을 불러오는 중입니다.</p>}
       {error && <p className="interview-inline-error" role="alert">{error}</p>}
+      {notice && <p className="interview-panel-status" role="status">{notice}</p>}
+      {readError && <div role="alert"><p className="interview-inline-error">{readError}</p><button type="button" className="interview-text-button" disabled={loading} onClick={() => { void loadSessions().catch(() => {}) }}>일정 다시 불러오기</button></div>}
+      {(writeLocked || (hasLoaded && readUncertain)) && !disabled && <p className="interview-panel-status" role="status">면접방 상태 확인 중에는 일정 변경과 입장이 잠시 잠깁니다. 작성 중인 내용은 유지됩니다.</p>}
 
-      {!loading && (isCompany || myRole === 'candidate') && <InterviewSlotPicker roomId={roomId} isCompany={isCompany} session={session} disabled={disabled} onChanged={loadSessions} />}
+      {hasLoaded && (isCompany || myRole === 'candidate') && <InterviewSlotPicker roomId={roomId} isCompany={isCompany} session={session} disabled={disabled} writeLocked={controlsLocked || creating || Boolean(memberBusy) || cancelling} onChanged={loadSessions} />}
 
-      {!loading && session && !formOpen && (
+      {hasLoaded && session && !formOpen && (
         <article className="interview-session-card">
           <div className="interview-session-card__main">
             <div className="interview-session-card__copy">
@@ -398,20 +517,21 @@ export default function InterviewSessionPanel({
                 <a
                   className="interview-enter-link"
                   href={interviewPagePath(roomId, session.id)}
+                  onClick={event => { if (actionsLockedRef.current || readUncertainRef.current) event.preventDefault() }}
                 >
                   화상 면접 열기
                   <span aria-hidden="true">↗</span>
                 </a>
               ) : (
                 <span className="interview-session-card__closed">
-                  {disabled ? '면접방이 잠겨 있어 입장할 수 없습니다.' : '입장할 수 없는 일정입니다.'}
+                  {disabled ? '면접방이 잠겨 있어 입장할 수 없습니다.' : controlsLocked ? '면접방 상태 확인 후 입장할 수 있습니다.' : '입장할 수 없는 일정입니다.'}
                 </span>
               )}
               {canCancel && (
                 <button
                   type="button"
                   className="interview-cancel-button"
-                  disabled={cancelling}
+                  disabled={controlsLocked || cancelling || creating || Boolean(memberBusy)}
                   onClick={cancelSession}
                 >
                   {cancelling ? '취소 중…' : '일정 취소'}
@@ -424,6 +544,7 @@ export default function InterviewSessionPanel({
             roomId={roomId}
             session={session}
             onRecordingChanged={updateRecording}
+            writeLocked={controlsLocked}
           />
 
           {isSessionHost && (
@@ -455,10 +576,10 @@ export default function InterviewSessionPanel({
                         <strong>{member.displayName}</strong>
                         <small>{member.role === 'host' ? '진행자' : '면접관'}</small>
                       </span>
-                      {member.role === 'interviewer' && !memberChangesLocked && (
+                      {member.role === 'interviewer' && !memberChangesUnavailable && (
                         <button
                           type="button"
-                          disabled={Boolean(memberBusy)}
+                          disabled={controlsLocked || Boolean(memberBusy) || cancelling || creating}
                           onClick={() => removeInterviewer(member.userId)}
                         >
                           {memberBusy === member.userId ? '제외 중…' : '제외'}
@@ -468,13 +589,14 @@ export default function InterviewSessionPanel({
                   ))}
               </ul>
 
-              {!memberChangesLocked ? (
+              {!memberChangesUnavailable ? (
                 <form className="interview-member-form" onSubmit={addInterviewer}>
                   <label htmlFor="interview-member-email">회사 계정 이메일</label>
                   <div>
                     <input
                       id="interview-member-email"
                       type="email"
+                      disabled={controlsLocked}
                       value={memberEmail}
                       onChange={(event) => setMemberEmail(event.target.value)}
                       maxLength={254}
@@ -482,7 +604,7 @@ export default function InterviewSessionPanel({
                       placeholder="name@company.com"
                       required
                     />
-                    <button type="submit" disabled={Boolean(memberBusy)}>
+                    <button type="submit" disabled={controlsLocked || Boolean(memberBusy) || cancelling || creating}>
                       {memberBusy === 'add' ? '추가 중…' : '면접관 추가'}
                     </button>
                   </div>
@@ -500,7 +622,7 @@ export default function InterviewSessionPanel({
         </article>
       )}
 
-      {!loading && !session && !formOpen && (
+      {hasLoaded && !session && !formOpen && (
         <p className="interview-panel-status">예정된 화상 면접이 없습니다.</p>
       )}
 
@@ -510,7 +632,8 @@ export default function InterviewSessionPanel({
             <span>면접 제목</span>
             <input
               value={title}
-              onChange={(event) => setTitle(event.target.value)}
+              disabled={controlsLocked}
+              onChange={(event) => { draftVersion.current += 1; setTitle(event.target.value) }}
               maxLength={120}
               autoComplete="off"
               required
@@ -520,16 +643,18 @@ export default function InterviewSessionPanel({
             <span>예정 시간</span>
             <input
               type="datetime-local"
+              disabled={controlsLocked}
               value={scheduledAt}
-              onChange={(event) => setScheduledAt(event.target.value)}
+              onChange={(event) => { draftVersion.current += 1; setScheduledAt(event.target.value) }}
             />
           </label>
-          <label><span>소요 시간</span><select value={durationMinutes} onChange={event => setDurationMinutes(Number(event.target.value))}>{[15,30,45,60,90,120].map(minutes => <option key={minutes} value={minutes}>{minutes}분</option>)}</select></label>
+          <label><span>소요 시간</span><select disabled={controlsLocked} value={durationMinutes} onChange={event => { draftVersion.current += 1; setDurationMinutes(Number(event.target.value)) }}>{[15,30,45,60,90,120].map(minutes => <option key={minutes} value={minutes}>{minutes}분</option>)}</select></label>
           <label className="interview-recording-option">
             <input
               type="checkbox"
+              disabled={controlsLocked}
               checked={recordingRequired}
-              onChange={(event) => setRecordingRequired(event.target.checked)}
+              onChange={(event) => { draftVersion.current += 1; setRecordingRequired(event.target.checked) }}
             />
             <span>
               <strong>녹화 면접</strong>
@@ -538,11 +663,11 @@ export default function InterviewSessionPanel({
           </label>
           <div className="interview-session-form__actions">
             {session && (
-              <button type="button" onClick={() => setFormOpen(false)} disabled={creating}>
+              <button type="button" onClick={() => { if (!actionsLockedRef.current && !readUncertainRef.current && !pendingWrite.current) setFormOpen(false) }} disabled={controlsLocked || creating}>
                 취소
               </button>
             )}
-            <button type="submit" className="interview-primary-button" disabled={creating}>
+            <button type="submit" className="interview-primary-button" disabled={controlsLocked || creating || Boolean(memberBusy) || cancelling}>
               {creating ? '만드는 중…' : '일정 만들기'}
             </button>
           </div>

@@ -35,11 +35,12 @@ export async function onRequestPost({ request, env, data }) {
   if (!valid) return jsonError('현재 비밀번호가 올바르지 않습니다.', 401)
 
   const { hash, salt } = await hashPassword(newPassword)
-  await env.DB.prepare(
-    'UPDATE users SET password_hash = ?, password_salt = ?, must_change_password = 0 WHERE id = ?'
+  const updated = await env.DB.prepare(
+    'UPDATE users SET password_hash = ?, password_salt = ?, must_change_password = 0 WHERE id = ? AND password_hash = ?'
   )
-    .bind(hash, salt, data.user.id)
+    .bind(hash, salt, data.user.id, data.user.password_hash)
     .run()
+  if (!updated.meta?.changes) return jsonError('로그인 정보가 변경되었습니다. 다시 로그인해주세요.', 409)
 
   // 비밀번호를 바꾸는 이유의 대부분은 "누가 알고 있을지 모른다"이다. 그런데
   // 세션은 그대로 살아 있었다. 관리자가 발급한 임시 비밀번호로 다른 사람이
@@ -56,7 +57,9 @@ export async function onRequestPost({ request, env, data }) {
   //
   // 원래 세션이 하루보다 길게 잡혔으면 유지를 고른 로그인이다.
   const persistent = wasPersistentSession(data.user)
-  const { token, expiresAt } = await createSession(env.DB, data.user.id, { persistent })
+  const session = await createSession(env.DB, data.user.id, { persistent, expectedPasswordHash: hash })
+  if (!session) return jsonError('로그인 정보가 변경되었습니다. 다시 로그인해주세요.', 409)
+  const { token, expiresAt } = session
 
   return jsonResponse({
     ok: true,

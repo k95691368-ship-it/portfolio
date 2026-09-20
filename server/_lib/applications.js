@@ -36,3 +36,15 @@ export function parseCareer(careerJson) {
     return []
   }
 }
+
+// A reviewer must acknowledge the currently displayed applicant revision.
+// Legacy clients are only compatible with never-edited (revision zero) rows.
+export async function reviewRevisionError(request, application) {
+  const body = request?.json ? await request.json().catch(() => null) : null
+  const expected = body?.revision
+  if (expected === undefined && application.revision === 0) return null
+  if (!Number.isSafeInteger(expected) || expected !== application.revision) {
+    return jsonError('지원서가 수정되었습니다. 최신 내용을 다시 불러와 확인한 뒤 심사해주세요.', 409)
+  }
+  return null
+}

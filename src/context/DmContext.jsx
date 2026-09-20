@@ -4,6 +4,16 @@ import { useAuth } from './AuthContext.jsx'
 
 const DmContext = createContext(null)
 
+function isInbox(data) {
+  return Number.isSafeInteger(data?.unreadTotal) && data.unreadTotal >= 0 &&
+    Array.isArray(data.threads) && data.threads.every(thread =>
+      typeof thread?.partner?.id === 'string' && thread.partner.id.length > 0 &&
+      typeof thread.partner.displayName === 'string' &&
+      (thread.partner.companyName == null || typeof thread.partner.companyName === 'string') &&
+      typeof thread.lastBody === 'string' && typeof thread.lastAt === 'string' &&
+      typeof thread.lastFromMe === 'boolean' && Number.isSafeInteger(thread.unread) && thread.unread >= 0)
+}
+
 // 쪽지함의 상태를 한 곳에 둔다.
 //
 // 창을 여는 쪽(관리자 패널의 이름)과 창을 그리는 쪽(오른쪽 아래 팝업)이
@@ -11,8 +21,18 @@ const DmContext = createContext(null)
 // 건드릴 방법이 없다.
 export function DmProvider({ children }) {
   const { user } = useAuth()
+  // Replacing one logged-in account with another must discard the entire inbox,
+  // open conversation and alert history, not just wait for the next poll.
+  return <DmSessionProvider key={user?.id || 'guest'} user={user}>{children}</DmSessionProvider>
+}
+
+function DmSessionProvider({ children, user }) {
+  const userId = user?.id
   const [threads, setThreads] = useState([])
   const [unreadTotal, setUnreadTotal] = useState(0)
+  const [inboxLoading, setInboxLoading] = useState(!!userId)
+  const [inboxLoaded, setInboxLoaded] = useState(false)
+  const [inboxError, setInboxError] = useState('')
   // null 이면 창이 닫힌 것, 그 외에는 지금 열려 있는 상대.
   const [open, setOpen] = useState(null)
   const [listOpen, setListOpen] = useState(false)
@@ -21,13 +41,26 @@ export function DmProvider({ children }) {
   // 이미 알린 쪽지는 다시 알리지 않는다. 20초마다 목록을 다시 받는데
   // 표시가 없으면 읽지 않은 쪽지를 볼 때마다 계속 튀어나온다.
   const seen = useRef(null)
+  const lifetime = useRef(null)
+  const generation = useRef(0)
+  const reading = useRef(null)
 
-  const refresh = useCallback(async () => {
-    if (!user) return
+  const refresh = useCallback(async ({ background = false } = {}) => {
+    const scope = lifetime.current
+    if (!userId || !scope || (background && reading.current?.scope === scope)) return false
+    const request = ++generation.current
+    const read = { scope, request }
+    reading.current = read
+    const isCurrent = () => lifetime.current === scope && generation.current === request
+    setInboxLoading(true)
     try {
       const data = await api.get('/dm')
+      if (!isCurrent()) return false
+      if (!isInbox(data)) throw new Error('Invalid inbox response')
       setThreads(data.threads)
       setUnreadTotal(data.unreadTotal)
+      setInboxLoaded(true)
+      setInboxError('')
 
       // 처음 열었을 때도 알린다.
       //
@@ -39,43 +72,55 @@ export function DmProvider({ children }) {
       // 열 때는 최근 세 사람까지만 알린다. 나머지는 배지가 말해 준다.
       const arrived = data.threads.filter((t) => t.unread > 0 && !t.lastFromMe)
       const first = seen.current === null
-      if (first) seen.current = new Set()
-      const fresh = arrived.filter((t) => !seen.current.has(`${t.partner.id}:${t.lastAt}`))
-      for (const t of fresh) seen.current.add(`${t.partner.id}:${t.lastAt}`)
+      const fresh = arrived.filter((t) => seen.current?.get(t.partner.id) !== t.lastAt)
+      // Keep one timestamp per current conversation, not every message ever
+      // observed during a long-running tab.
+      seen.current = new Map(data.threads.map((t) => [t.partner.id, t.lastAt]))
       const show = first ? fresh.slice(0, 3) : fresh
       if (show.length > 0) {
         setAlerts((prev) => [
           ...prev,
           ...show.map((t) => ({ key: `${t.partner.id}:${t.lastAt}`, partner: t.partner })),
-        ])
+        ].slice(-3))
       }
+      return true
     } catch {
-      // 쪽지함을 못 읽는 것으로 화면을 막지 않는다.
+      if (isCurrent()) setInboxError('쪽지함을 불러오지 못했습니다. 표시된 내용은 최신 상태가 아닐 수 있습니다.')
+      return false
+    } finally {
+      if (reading.current === read) reading.current = null
+      if (isCurrent()) setInboxLoading(false)
     }
-  }, [user])
+  }, [userId])
 
   useEffect(() => {
-    if (!user) {
+    const scope = {}
+    lifetime.current = scope
+    if (!userId) {
       setThreads([])
       setUnreadTotal(0)
+      setInboxLoading(false)
+      setInboxLoaded(false)
+      setInboxError('')
       setOpen(null)
       setListOpen(false)
       setAlerts([])
       seen.current = null
-      return undefined
+      return () => { if (lifetime.current === scope) lifetime.current = null }
     }
     refresh()
     // 보고 있지 않은 탭은 두드리지 않는다. 돌아오면 그때 한 번 받는다.
     const tick = () => {
-      if (document.visibilityState === 'visible') refresh()
+      if (document.visibilityState === 'visible') refresh({ background: true })
     }
     const timer = setInterval(tick, 20000)
     document.addEventListener('visibilitychange', tick)
     return () => {
+      if (lifetime.current === scope) lifetime.current = null
       clearInterval(timer)
       document.removeEventListener('visibilitychange', tick)
     }
-  }, [user, refresh])
+  }, [userId, refresh])
 
   const dismissAlert = useCallback((key) => {
     setAlerts((prev) => prev.filter((a) => a.key !== key))
@@ -93,6 +138,9 @@ export function DmProvider({ children }) {
   const value = useMemo(() => ({
     threads,
     unreadTotal,
+    inboxLoading,
+    inboxLoaded,
+    inboxError,
     open,
     listOpen,
     alerts,
@@ -101,7 +149,7 @@ export function DmProvider({ children }) {
     toggleList,
     dismissAlert,
     refresh,
-  }), [threads, unreadTotal, open, listOpen, alerts, openDm, closeDm, toggleList, dismissAlert, refresh])
+  }), [threads, unreadTotal, inboxLoading, inboxLoaded, inboxError, open, listOpen, alerts, openDm, closeDm, toggleList, dismissAlert, refresh])
 
   return <DmContext.Provider value={value}>{children}</DmContext.Provider>
 }
@@ -112,6 +160,9 @@ export function DmProvider({ children }) {
 const NOOP = {
   threads: [],
   unreadTotal: 0,
+  inboxLoading: false,
+  inboxLoaded: false,
+  inboxError: '',
   open: null,
   listOpen: false,
   alerts: [],

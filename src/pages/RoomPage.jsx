@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
@@ -34,6 +34,23 @@ const CLOSE_REASONS = [
 // 닫을 수 있는 상태 (서버의 _lib/roomLifecycle.js와 같은 목록).
 // 여기서 잘못 판단해도 서버가 409로 거절하므로, 화면은 안내만 맡는다.
 const CLOSABLE_STATUSES = ['open', 'active', 'contract_pending']
+const DEFINITE_WRITE_REJECTIONS = new Set([400, 401, 403, 404, 409, 410, 413, 415, 422, 429])
+
+// A successful HTTP status alone is not a usable room snapshot. In particular,
+// malformed collection data must not replace the last readable view and crash
+// the render before the user can retry the GET.
+function validRoomView(data, roomId) {
+  const object = value => value !== null && typeof value === 'object' && !Array.isArray(value)
+  const records = value => Array.isArray(value) && value.every(object)
+  return object(data) && object(data.room) && data.room.id === roomId &&
+    ['title', 'status', 'myRole'].every(key => typeof data.room[key] === 'string') &&
+    records(data.room.participants) && data.room.participants.every(person =>
+      ['id', 'displayName', 'role'].every(key => typeof person[key] === 'string')) &&
+    records(data.messages) && data.messages.every(message =>
+      (typeof message.id === 'number' || typeof message.id === 'string') &&
+      ['senderId', 'senderName', 'body', 'createdAt'].every(key => typeof message[key] === 'string')) &&
+    records(data.documents)
+}
 
 export default function RoomPage() {
   const { roomId } = useParams()
@@ -49,6 +66,85 @@ export default function RoomPage() {
   // 확인 창을 종료와 보관이 함께 쓴다. 무엇을 하려던 것인지 기억하지 않으면
   // 보관을 눌렀는데 종료가 실행된다.
   const [withdrawalMode, setWithdrawalMode] = useState('close')
+  const [refreshing, setRefreshing] = useState(false)
+  const [viewUncertain, setViewUncertain] = useState(false)
+  const [writeResultUnknown, setWriteResultUnknown] = useState(false)
+  const lifetime = useRef(null)
+  const viewGeneration = useRef(0)
+  const mutation = useRef(null)
+  const uncertain = useRef(false)
+
+  // A pathname key remounts other rooms, but same-room refreshes and StrictMode
+  // setup replay can still finish out of order. Only the latest live read wins.
+  const loadView = useCallback(async () => {
+    const scope = lifetime.current
+    if (!scope) return null
+    const generation = ++viewGeneration.current
+    const current = () => lifetime.current === scope && viewGeneration.current === generation
+    setRefreshing(true)
+    try {
+      const data = await api.get(`/rooms/${roomId}/view`)
+      if (!current()) return null
+      if (!validRoomView(data, roomId)) throw new Error('면접방 응답을 확인하지 못했습니다. 다시 불러와주세요.')
+      setView(data)
+      setError('')
+      setWriteResultUnknown(false)
+      uncertain.current = false
+      setViewUncertain(false)
+      return data
+    } catch (err) {
+      if (!current()) return null
+      setError(err.message || '면접방을 불러오지 못했습니다.')
+      uncertain.current = true
+      setViewUncertain(true)
+      throw err
+    } finally {
+      if (current()) setRefreshing(false)
+    }
+  }, [roomId])
+
+  const refreshAfterWrite = useCallback(async () => {
+    const scope = lifetime.current
+    if (!scope) return null
+    uncertain.current = true
+    setViewUncertain(true)
+    try {
+      return await loadView()
+    } catch {
+      if (lifetime.current === scope) toast.info('변경은 저장되었지만 최신 면접방을 불러오지 못했습니다. 화면의 다시 불러오기를 눌러주세요.')
+      return null
+    }
+  }, [loadView, toast])
+
+  const beginMutation = () => {
+    if (!lifetime.current || mutation.current || uncertain.current) return null
+    const ticket = { scope: lifetime.current }
+    mutation.current = ticket
+    // A read begun before this write must not later restore the old state.
+    viewGeneration.current += 1
+    setRefreshing(false)
+    return ticket
+  }
+  const isCurrentMutation = ticket => lifetime.current === ticket.scope && mutation.current === ticket
+  const retryView = () => { void loadView().catch(() => {}) }
+  const handleWriteError = err => {
+    if (!lifetime.current || err?.code === 'STALE_AUTH_RESPONSE') return
+    if (DEFINITE_WRITE_REJECTIONS.has(err?.status)) {
+      toast.error(err.message)
+      return
+    }
+    // A timed-out/lost response may follow a committed write. Do not claim it
+    // failed or let the old screen immediately submit it again. A read started
+    // before this outcome also cannot settle this uncertainty.
+    viewGeneration.current += 1
+    setRefreshing(false)
+    uncertain.current = true
+    setViewUncertain(true)
+    setWriteResultUnknown(true)
+    setWithdrawalOpen(false)
+    setError('요청의 처리 결과를 확인하지 못했습니다.')
+    toast.info('요청의 처리 결과를 확인하지 못했습니다. 같은 작업을 다시 보내지 말고 면접방을 다시 불러와 확인해주세요.')
+  }
 
   // 보관 — 지금 상태 그대로 잠근다. 대화도 계약서도 손댈 수 없게 된다.
   //
@@ -56,6 +152,7 @@ export default function RoomPage() {
   // 종료와 같은 확인 창을 띄운다 — 보관은 지원자가 받아야 할 계약서에 서명할
   // 길을 막는 일이라, 그 자리에서 무엇을 하는 것인지 알아야 한다.
   const handleArchive = async (acknowledged = false) => {
+    if (mutation.current || uncertain.current) return
     if (
       !acknowledged &&
       !window.confirm(
@@ -64,15 +161,19 @@ export default function RoomPage() {
     ) {
       return
     }
+    const ticket = beginMutation()
+    if (!ticket) return
     setArchiving(true)
     try {
       await api.post(`/rooms/${roomId}/archive`, acknowledged ? { acknowledgedDismissal: true } : {})
       // 보관은 이미 끝났다. 뒤이은 재조회가 실패했다고 보관이 실패한 것처럼
       // 말하면, 사용자는 다시 누르고 그때는 "이미 보관됨" 오류를 받는다.
-      await loadView().catch(() => {})
+      if (!isCurrentMutation(ticket)) return
       toast.success('면접방을 보관했습니다.')
       setWithdrawalOpen(false)
+      await refreshAfterWrite()
     } catch (err) {
+      if (!isCurrentMutation(ticket)) return
       // 409 를 전부 "채용 확정이라 확인이 필요하다"로 읽고 있었다. 그래서
       // 이미 보관된 방을 한 번 더 보관하려 해도, 그 사이 상태가 바뀌었어도
       // "채용이 확정된 전형입니다"라는 가장 무거운 경고창이 떴다. 확정된 적
@@ -87,32 +188,28 @@ export default function RoomPage() {
         setWithdrawalMode('archive')
         setWithdrawalOpen(true)
       } else {
-        toast.error(err.message)
+        handleWriteError(err)
       }
     } finally {
-      setArchiving(false)
+      if (isCurrentMutation(ticket)) { mutation.current = null; setArchiving(false) }
     }
   }
 
   const handleUnarchive = async () => {
+    const ticket = beginMutation()
+    if (!ticket) return
     setArchiving(true)
     try {
       await api.delete(`/rooms/${roomId}/archive`)
-      await loadView().catch(() => {})
+      if (!isCurrentMutation(ticket)) return
       toast.success('보관을 해제했습니다.')
+      await refreshAfterWrite()
     } catch (err) {
-      toast.error(err.message)
+      if (isCurrentMutation(ticket)) handleWriteError(err)
     } finally {
-      setArchiving(false)
+      if (isCurrentMutation(ticket)) { mutation.current = null; setArchiving(false) }
     }
   }
-
-  // 이 화면에 필요한 모든 정보를 한 번의 요청으로 받는다.
-  const loadView = useCallback(async () => {
-    const data = await api.get(`/rooms/${roomId}/view`)
-    setView(data)
-    return data
-  }, [roomId])
 
   // 채용이 확정된 뒤의 종료는 전형 종료가 아니라 해고다.
   //
@@ -120,6 +217,7 @@ export default function RoomPage() {
   // 무슨 법이 걸리는지도, 지원자가 무엇을 할 수 있는지도 담기지 않아서
   // 담당자는 "예"를 누르고 지나간다. 사실을 앞에 놓는 창을 따로 띄운다.
   const requestClose = () => {
+    if (mutation.current || uncertain.current) return
     if (view?.offer?.established) {
       setWithdrawalMode('close')
       setWithdrawalOpen(true)
@@ -130,6 +228,8 @@ export default function RoomPage() {
   }
 
   const submitClose = async (acknowledgedDismissal) => {
+    const ticket = beginMutation()
+    if (!ticket) return
     setClosing(true)
     try {
       await api.post(`/rooms/${roomId}/close`, {
@@ -137,37 +237,51 @@ export default function RoomPage() {
         note: closeNote,
         acknowledgedDismissal: acknowledgedDismissal ? true : undefined,
       })
+      if (!isCurrentMutation(ticket)) return
       setWithdrawalOpen(false)
-      await loadView()
       toast.success(
         acknowledgedDismissal
           ? '채용내정 취소로 기록했습니다.'
           : '전형을 종료했습니다. 지원자에게 안내되었습니다.'
       )
+      await refreshAfterWrite()
     } catch (err) {
-      toast.error(err.message)
+      if (isCurrentMutation(ticket)) handleWriteError(err)
     } finally {
-      setClosing(false)
+      if (isCurrentMutation(ticket)) { mutation.current = null; setClosing(false) }
     }
   }
 
   const handleReopen = async () => {
+    const ticket = beginMutation()
+    if (!ticket) return
     setClosing(true)
     try {
       await api.delete(`/rooms/${roomId}/close`)
-      await loadView()
+      if (!isCurrentMutation(ticket)) return
       toast.success('전형을 다시 진행합니다.')
+      await refreshAfterWrite()
     } catch (err) {
-      toast.error(err.message)
+      if (isCurrentMutation(ticket)) handleWriteError(err)
     } finally {
-      setClosing(false)
+      if (isCurrentMutation(ticket)) { mutation.current = null; setClosing(false) }
     }
   }
 
   useEffect(() => {
+    const scope = {}
+    lifetime.current = scope
     setView(null)
     setError('')
-    loadView().catch((err) => setError(err.message))
+    uncertain.current = false
+    setViewUncertain(false)
+    setWriteResultUnknown(false)
+    loadView().catch(() => {})
+    return () => {
+      if (lifetime.current === scope) lifetime.current = null
+      viewGeneration.current += 1
+      mutation.current = null
+    }
   }, [loadView])
 
   // 대화의 첫 묶음은 위 요청에 이미 들어 있다. 그다음부터만 증분으로 확인한다.
@@ -214,33 +328,46 @@ export default function RoomPage() {
         ((sent?.offerSignal?.strong?.length ?? 0) > 0 ||
           (sent?.offerSignal?.weak?.length ?? 0) > 0)
       const termsRecorded = (sent?.negotiationAdded?.length ?? 0) > 0
-      if (offerCouldChange || termsRecorded) await loadView().catch(() => {})
+      if (offerCouldChange || termsRecorded) await refreshAfterWrite()
       return sent
     },
-    [postMessage, loadView, view?.offer?.established]
+    [postMessage, refreshAfterWrite, view?.offer?.established]
   )
 
   const handleAnalyze = async () => {
+    const ticket = beginMutation()
+    if (!ticket) return
     setAnalyzing(true)
     try {
       const data = await api.post(`/rooms/${roomId}/analyze`, {})
+      if (!isCurrentMutation(ticket)) return
       setView((prev) => (prev ? { ...prev, contract: data } : prev))
       toast.success('채용 조건이 정리되었습니다.')
+      await refreshAfterWrite()
     } catch (err) {
-      toast.error(err.message)
+      if (isCurrentMutation(ticket)) handleWriteError(err)
     } finally {
-      setAnalyzing(false)
+      if (isCurrentMutation(ticket)) { mutation.current = null; setAnalyzing(false) }
     }
   }
 
-  if (error) return <p className="error" role="alert">{error}</p>
-  if (!view) return <p>불러오는 중...</p>
+  if (!view) return (
+    <section className="room-page">
+      <h1>면접방</h1>
+      {error ? <>
+        <p className="error" role="alert">면접방을 불러오지 못했습니다. {error}</p>
+        <button type="button" onClick={retryView} disabled={refreshing}>{refreshing ? '불러오는 중...' : '면접방 다시 불러오기'}</button>
+      </> : <p role="status">불러오는 중...</p>}
+      <Link to="/dashboard">대시보드로 돌아가기</Link>
+    </section>
+  )
 
   const room = view.room
   const offer = view.offer
   const contract = view.contract
   const candidate = room.participants.find((participant) => participant.role === 'candidate')
   const company = room.participants.find((participant) => participant.role === 'company')
+  const writeLocked = viewUncertain || closing || archiving || analyzing
 
   return (
     <div className="room-page">
@@ -257,6 +384,16 @@ export default function RoomPage() {
           {roomStatusInfo(room.status).label}
         </span>
       </header>
+
+      {viewUncertain && (
+        <section className="notice" role="status">
+          <p>{writeResultUnknown ? '요청의 처리 결과를 확인하지 못했습니다. 같은 작업을 다시 보내지 말고 면접방을 다시 불러와 확인해주세요.' : error ? '최신 면접방을 불러오지 못했습니다. 이전에 확인한 내용을 표시합니다.' : '변경 후 최신 면접방을 확인하고 있습니다.'}</p>
+          <p>최신 상태를 확인할 때까지 추가 작업은 잠시 잠깁니다. 작성 중인 내용은 유지됩니다.</p>
+          {error && <button type="button" onClick={retryView} disabled={refreshing}>{refreshing ? '불러오는 중...' : '면접방 다시 불러오기'}</button>}
+        </section>
+      )}
+
+      <fieldset className="room-write-boundary" disabled={writeLocked} style={{ display: 'contents' }}>
 
       {/* 보관은 잠금이다. 무엇이 잠겼는지 말하지 않으면, 대화창이 왜 사라졌는지
           모른 채 상대가 답을 안 한다고 생각하게 된다. */}
@@ -298,6 +435,7 @@ export default function RoomPage() {
         roomTitle={room.title}
         myRole={room.myRole}
         disabled={!!room.archivedAt || room.status === 'closed'}
+        writeLocked={writeLocked}
       />
 
       {/* 종료 기능은 서버에만 있고 화면에는 없었다. 부를 수 없는 기능은
@@ -434,7 +572,7 @@ export default function RoomPage() {
 
       {/* 막아야 할 순간은 취소할 때가 아니라 말할 때다. 대화 바로 위에 둔다. */}
       {room.myRole === 'company' && (
-        <OfferWatch offer={offer} roomId={roomId} archived={!!room.archivedAt} onChanged={loadView} />
+        <OfferWatch offer={offer} roomId={roomId} archived={!!room.archivedAt} onChanged={refreshAfterWrite} onWriteError={handleWriteError} />
       )}
 
       {room.myRole === 'company' && <NegotiationLog negotiation={view.negotiation} />}
@@ -515,7 +653,8 @@ export default function RoomPage() {
           // 두되, 새로 쓰는 버튼은 내린다.
           canWrite={!room.archivedAt && room.myRole === 'company'}
           messageCount={messages.length}
-          onChanged={loadView}
+          onChanged={refreshAfterWrite}
+          onWriteError={handleWriteError}
         />
       )}
 
@@ -538,6 +677,7 @@ export default function RoomPage() {
           />
         </>
       )}
+      </fieldset>
     </div>
   )
 }

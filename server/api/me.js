@@ -15,6 +15,7 @@ export async function onRequestGet({ data }) {
       isRecruiter: !!is_recruiter,
       isDeveloper: !!is_developer,
       mustChangePassword: !!must_change_password,
+      emailVerified: !!data.user.email_verified_at,
       developerTrial: !!data.user.developer_trial,
       trialExpiresAt: data.user.developer_trial ? data.user.session_expires_at : null,
     },

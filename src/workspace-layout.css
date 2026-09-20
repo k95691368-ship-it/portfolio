@@ -1,0 +1,177 @@
+/* Wide workspaces use the viewport; reading and authentication remain bounded.
+   This file changes layout only. Fluent colors and typography stay in redesign.css. */
+.app-shell { min-height: 100svh; display: flex; flex-direction: column; }
+.app-shell > #main { flex: 1; min-width: 0; }
+.app-shell--interview { display: block; }
+.app-shell--interview > #main { margin: 0; }
+.app-shell > .app-bar { padding-inline: 24px; }
+.app-shell > .app-legal-footer { padding: 24px 32px; margin: 0; }
+
+.app-shell :is(.landing-page, .dashboard-page, .room-page, .contract-page,
+  .admin-page, .jobs-page, .job-detail-page, .apply-page, .status-page,
+  .verify-page, .tech-page, .recruit-page) {
+  width: 100%; max-width: none; margin: 0; padding: 36px 32px 64px;
+}
+.app-shell .auth-page { width: min(100%, 560px); max-width: 560px; padding-top: 64px; }
+.app-shell .page-header { gap: 12px; padding-bottom: 24px; }
+.app-shell :is(.page-header, .dashboard-header) h1 { font-size: clamp(2rem, 2.6vw, 2.75rem); }
+.app-shell .dashboard-header { gap: 20px; }
+.app-shell :is(.jobs-results, .jobs-entry, .dashboard-tools, .dashboard-rooms,
+  .job-detail-body, .job-detail-actions, .landing-intro, .landing-support) { min-width: 0; }
+
+/* Landing: purpose selection and supporting destinations occupy distinct columns. */
+.app-shell .landing-page { gap: 24px; }
+.app-shell .landing-hero {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, .65fr);
+  gap: 48px; align-items: center; padding: clamp(32px, 4vw, 64px);
+  min-height: 330px;
+}
+.app-shell .landing-hero h1 { font-size: clamp(2.5rem, 3.5vw, 3.75rem); }
+.app-shell .landing-hero h1 span { display: block; }
+.app-shell .landing-hero h1 span + span::before { content: none; }
+.app-shell .landing-choices { display: grid; grid-template-columns: 1fr; width: 100%; gap: 16px; margin: 0; }
+.app-shell .landing-choice { width: 100%; min-height: 72px; justify-content: space-between; border-radius: var(--r-md); padding: 20px 24px; }
+.landing-support { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: stretch; }
+.app-shell .landing-actions { grid-template-columns: 1fr; gap: 16px; }
+.app-shell .landing-actions a { min-height: 92px; padding: 24px; }
+.app-shell .landing-page .developer-trial-entry { margin: 0; max-width: none; display: flex; flex-direction: column; justify-content: center; gap: 16px; }
+.app-shell .landing-page .developer-trial-entry p { margin: 0; }
+.app-shell .developer-trial-entry button { align-self: flex-start; max-width: 100%; white-space: normal; }
+
+/* Listings keep auxiliary actions alongside, not below a tall centered feed. */
+.jobs-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; align-items: start; }
+.app-shell .jobs-page .job-list { grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 20px; }
+.app-shell .jobs-page .job-card { padding: 24px; grid-template-columns: minmax(0, 1fr); }
+.app-shell :is(.job-card-title, .job-card-meta, .job-card-deadline, .room-meta, .my-app-headline, .my-app-meta) { min-width: 0; overflow-wrap: anywhere; }
+.jobs-entry { position: sticky; top: 32px; }
+.jobs-entry .room-enter { margin: 0; gap: 16px; padding: 24px; }
+.jobs-entry .room-enter h2 { margin: 0; font-size: 1.375rem; }
+.jobs-entry .room-enter p { margin: 0; font-size: .875rem; }
+.jobs-entry .room-enter-form { display: grid; gap: 16px; }
+.jobs-entry input { width: 100%; }
+.job-detail-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 24px; align-items: start; }
+.job-detail-workspace .job-detail-actions { position: sticky; top: 32px; padding: 24px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); }
+.job-detail-workspace .job-detail-actions button { width: 100%; }
+
+.dashboard-workspace { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 24px; align-items: start; }
+.dashboard-tools { display: grid; gap: 16px; }
+.dashboard-tools > form { display: grid; gap: 20px; padding: 24px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-alt); }
+.dashboard-tools > form label { display: grid; gap: 8px; }
+.dashboard-tools input { width: 100%; }
+.dashboard-rooms > h2 { margin: 0 0 20px; font-size: 1.5rem; }
+.app-shell .dashboard-rooms .room-list,
+.app-shell .my-app-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 16px; border: 0; border-radius: 0; overflow: visible; background: transparent; }
+.app-shell .dashboard-rooms .room-list > li,
+.app-shell .my-app-list > .my-app-card { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); min-width: 0; }
+.app-shell .dashboard-rooms .room-link { height: 100%; min-height: 128px; padding: 24px; border-radius: var(--r-md); }
+.dashboard-rooms .room-info { min-width: 0; }
+.dashboard-rooms .room-title { overflow-wrap: anywhere; }
+
+/* Forms and long record views: distribute sections, not individual reading lines. */
+.app-shell .apply-form { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 24px; }
+.app-shell .apply-form > :not(.apply-section) { grid-column: 1 / -1; }
+.app-shell .apply-section { min-width: 0; }
+.app-shell .apply-done { width: min(100%, 720px); max-width: 720px; margin: 0; text-align: left; align-items: stretch; }
+.app-shell .apply-done .btn-primary { align-self: flex-start; }
+.app-shell .apply-section .form-grid { grid-template-columns: 1fr; }
+.app-shell .status-form, .app-shell .verify-form { width: min(100%, 680px); margin: 0; }
+.app-shell .tech-steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.app-shell .tech-steps > li { margin: 0; min-width: 0; }
+.app-shell .tech-tab { flex: 1; }
+.app-shell .table-scroll { max-width: 100%; min-width: 0; }
+.posting-management-list { display: grid; gap: 16px; list-style: none; padding: 0; margin: 0; }
+.posting-management-list > li { min-width: 0; padding: 20px; border: 1px solid var(--border); border-radius: var(--r-md); }
+.posting-management-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.posting-management-heading h3 { margin: 0; font-size: 1.125rem; overflow-wrap: anywhere; }
+.posting-management-heading .badge { flex-shrink: 0; }
+.posting-management-meta { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: 16px 0; font-size: .8125rem; }
+.posting-management-meta dt { color: var(--text-muted); }
+.posting-management-meta dd { margin: 4px 0 0; }
+.posting-management-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.posting-management-actions button { max-width: 100%; white-space: normal; }
+
+@media (min-width: 1024px) {
+  .app-shell:not(.app-shell--interview) { display: grid; grid-template-columns: 232px minmax(0, 1fr); grid-template-rows: 1fr auto; grid-template-areas: 'navigation main' 'navigation footer'; align-items: start; }
+  .app-shell > .app-bar { grid-area: navigation; position: sticky; top: 0; height: 100svh; min-height: 0; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 32px; padding: 24px 16px; border: 0; border-right: 1px solid var(--border); background: var(--surface-alt); overflow-y: auto; }
+  .app-shell > #main { grid-area: main; min-height: 0; width: 100%; }
+  .app-shell > .app-legal-footer { grid-area: footer; }
+  .app-shell .brand { gap: 8px; min-height: 40px; margin: 0; padding-inline: 8px; }
+  .app-shell .brand-name { display: inline; font-size: .9375rem; }
+  .app-shell .brand-mark { width: 22px; height: 22px; }
+  .app-shell .global-nav { display: flex; flex-direction: column; align-items: stretch; gap: 8px; white-space: normal; }
+  .app-shell .global-nav > a { min-height: 48px; padding: 12px 16px; border: 0; border-left: 3px solid transparent; border-radius: var(--r-sm); color: var(--text-muted); }
+  .app-shell .global-nav > a:hover { background: var(--surface-hover); }
+  .app-shell .global-nav > a[aria-current='page'] { border-left-color: var(--accent); background: var(--accent-bg); color: var(--accent); }
+  .app-shell .app-bar-right { margin-top: auto; flex-wrap: wrap; }
+  .app-shell .mobile-nav { display: none; }
+  .app-shell .auth-page { margin-left: clamp(24px, 6vw, 100px); margin-right: 0; }
+  .app-shell .recruit-page { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); grid-template-rows: auto min-content 1fr auto; align-items: start; }
+  .app-shell .recruit-page > * { grid-column: 1 / -1; min-width: 0; }
+  .app-shell .recruit-page > .recruit-section:nth-of-type(1) { grid-column: 1; grid-row: 2 / span 2; }
+  .app-shell .recruit-page > .recruit-section:nth-of-type(2) { grid-column: 2; }
+  .app-shell .recruit-page > .recruit-section:nth-of-type(3) { grid-column: 2; }
+  .app-shell .recruit-page > .recruit-section:nth-of-type(1) .career-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .app-shell .recruit-page > .recruit-section { margin: 0; }
+  .app-shell .room-page { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: start; }
+  .app-shell .room-page > *, .app-shell .room-page > .room-write-boundary > * { grid-column: 1 / -1; min-width: 0; }
+  .app-shell .room-page > .chat-panel, .app-shell .room-page > .room-write-boundary > .chat-panel { grid-column: 1; }
+  .app-shell .room-page > .ai-analysis, .app-shell .room-page > .room-write-boundary > .ai-analysis { grid-column: 2; }
+  .app-shell .contract-page { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .app-shell .contract-page > * { grid-column: 1 / -1; min-width: 0; }
+  .app-shell .contract-page > :is(.contract-period, .contract-lifecycle, .contract-delivery, .contract-history, .contract-translation, .contract-explainer, .worker-rights) { grid-column: auto; }
+  .app-shell .admin-create-account > form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; align-items: end; }
+}
+
+@media (min-width: 1600px) {
+  .app-shell:not(.app-shell--interview) { grid-template-columns: 248px minmax(0, 1fr); }
+  .app-shell :is(.landing-page, .dashboard-page, .room-page, .contract-page, .admin-page, .jobs-page, .job-detail-page, .apply-page, .status-page, .verify-page, .tech-page, .recruit-page) { padding-inline: 48px; }
+  .jobs-workspace { grid-template-columns: minmax(0, 1fr) 340px; gap: 32px; }
+  .app-shell .tech-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 1279px) {
+  .app-shell .landing-hero { grid-template-columns: minmax(0, 1fr) 220px; gap: 24px; padding: 32px; }
+  .jobs-workspace, .dashboard-workspace { grid-template-columns: minmax(0, 1fr); }
+  .jobs-entry { position: static; }
+  .jobs-entry .room-enter-form { grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
+  .dashboard-tools > form { grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
+  .app-shell .recruit-page > .recruit-section:nth-of-type(n) { grid-column: 1 / -1; grid-row: auto; }
+  .app-shell .recruit-page { grid-template-rows: none; }
+}
+
+@media (max-width: 1023px) {
+  .app-shell .global-nav { display: none; }
+  .app-shell .brand-name { display: inline; }
+  .app-shell .mobile-nav { display: block; position: relative; }
+  .app-shell .mobile-nav > summary { display: grid; place-items: center; width: 44px; height: 44px; cursor: pointer; }
+  .app-shell .mobile-nav > nav { position: fixed; inset: var(--nav-h) 0 auto; display: grid; padding: 16px 24px; max-height: calc(100svh - var(--nav-h)); overflow-y: auto; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .app-shell .mobile-nav > nav a { min-height: 48px; padding: 12px; border-radius: var(--r-sm); }
+  .app-shell .mobile-nav > nav a[aria-current='page'] { background: var(--accent-bg); font-weight: 600; }
+  .job-detail-workspace { grid-template-columns: minmax(0, 1fr); }
+  .job-detail-workspace .job-detail-actions { position: static; padding: 0; border: 0; }
+  .job-detail-workspace .job-detail-actions button { width: auto; }
+}
+
+@media (max-width: 767px) {
+  .app-shell > .app-bar { padding-inline: 16px; }
+  .app-shell :is(.landing-page, .dashboard-page, .room-page, .contract-page, .admin-page, .jobs-page, .job-detail-page, .apply-page, .status-page, .verify-page, .tech-page, .recruit-page) { padding: 24px 16px 48px; }
+  .app-shell > .app-legal-footer { padding: 24px 16px; }
+  .app-shell .auth-page { margin: 0 auto; padding: 32px 16px 48px; }
+  .app-shell .auth-page > form { padding: 24px; }
+  .app-shell .landing-hero { grid-template-columns: minmax(0, 1fr); min-height: 0; padding: 28px 24px; gap: 28px; }
+  .app-shell .landing-hero h1 { font-size: clamp(2rem, 7vw, 2.75rem); }
+  .app-shell .landing-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .app-shell .landing-choice { min-width: 0; min-height: 56px; padding: 12px 16px; gap: 8px; }
+  .app-shell .landing-support, .app-shell .apply-form, .app-shell .tech-steps { grid-template-columns: minmax(0, 1fr); }
+  .app-shell .landing-page .developer-trial-entry { padding: 24px; }
+  .app-shell .jobs-page .job-list, .app-shell .dashboard-rooms .room-list, .app-shell .my-app-list { grid-template-columns: minmax(0, 1fr); }
+  .jobs-entry .room-enter-form, .dashboard-tools > form { grid-template-columns: minmax(0, 1fr); }
+  .app-shell .dashboard-header { align-items: flex-start; }
+  .app-shell .header-actions { gap: 8px; }
+}
+
+@media print {
+  .app-shell { display: block !important; min-height: 0; }
+  .app-shell > .app-bar, .app-shell > .app-legal-footer { display: none !important; }
+  .app-shell .contract-page { display: block; width: 100%; margin: 0; padding: 0; }
+}

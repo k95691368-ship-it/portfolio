@@ -1,5 +1,6 @@
 import { jsonResponse, jsonError } from '../../_lib/http.js'
 import { canManageRecruiting } from '../../_lib/recruiter.js'
+import { applicationStatus } from '../../_lib/applicationAccess.js'
 
 const MAX_ROWS = 500
 
@@ -10,7 +11,7 @@ function mapRow(row) {
     postingTitle: row.posting_title,
     applicantName: row.applicant_name,
     applicantEmail: row.applicant_email,
-    status: row.status,
+    status: applicationStatus(row),
     createdAt: row.created_at,
   }
 }
@@ -35,14 +36,16 @@ export async function onRequestGet({ env, data, request }) {
     where.push('a.posting_id = ?')
     binds.push(postingFilter)
   }
-  if (statusFilter && ['submitted', 'passed', 'rejected'].includes(statusFilter)) {
+  if (statusFilter === 'withdrawn') where.push('a.withdrawn_at IS NOT NULL')
+  else if (statusFilter && ['submitted', 'passed', 'rejected'].includes(statusFilter)) {
     where.push('a.status = ?')
+    where.push('a.withdrawn_at IS NULL')
     binds.push(statusFilter)
   }
 
   const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : ''
   const { results } = await env.DB.prepare(
-    `SELECT a.id, a.posting_id, a.applicant_name, a.applicant_email, a.status, a.created_at,
+    `SELECT a.id, a.posting_id, a.applicant_name, a.applicant_email, a.status, a.withdrawn_at, a.created_at,
             p.title AS posting_title
      FROM applications a
      JOIN job_postings p ON p.id = a.posting_id

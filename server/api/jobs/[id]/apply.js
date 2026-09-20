@@ -4,6 +4,8 @@ import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
 import { parseBool, validateApplication, normalizeCareer } from '../../../_lib/application.js'
 import { fileExt, mimeForExt, validateUploadFile, validateFileContent } from '../../../_lib/uploads.js'
 import { CONSENT_VERSION, CONSENT_SNAPSHOT } from '../../../../src/lib/consentText.js'
+import { submissionHash, applicationStatus } from '../../../_lib/applicationAccess.js'
+import { stageApplicationUpload, settleApplicationUpload } from '../../../_lib/applicationUploadCleanup.js'
 
 const NAME_MAX = 100
 const PHONE_MAX = 40
@@ -21,6 +23,15 @@ function genLookupCode() {
 
 // 공개: 특정 채용 공고에 지원. 로그인 불필요, multipart(파일 포함) 한 번의 요청.
 export async function onRequestPost({ request, env, params, data }) {
+  const form = await request.formData().catch(() => null)
+  if (!form) return jsonError('잘못된 요청입니다.', 400)
+  const operationToken = form.get('operationToken')
+  const operationHash = operationToken ? await submissionHash(params.id, operationToken) : null
+  if (operationToken && !operationHash) return jsonError('접수 확인 정보가 올바르지 않습니다.', 400)
+  const priorReceipt = async () => operationHash ? env.DB.prepare(`SELECT id, lookup_code, status, withdrawn_at FROM applications
+    WHERE posting_id = ? AND submission_key_hash = ? AND purged_at IS NULL`).bind(params.id, operationHash).first() : null
+  const previous = await priorReceipt()
+  if (previous) return jsonResponse({ ok: true, applicationId: previous.id, lookupCode: previous.lookup_code, status: applicationStatus(previous), recovered: true })
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
   const bucket = `apply:${ip}`
   const ticket = await checkRateLimit(env, bucket, 5, 3600)
@@ -46,9 +57,6 @@ export async function onRequestPost({ request, env, params, data }) {
   if (!posting || posting.status !== 'open' || posting.expired) {
     return fail('마감되었거나 존재하지 않는 채용 공고입니다.', 404)
   }
-
-  const form = await request.formData().catch(() => null)
-  if (!form) return fail('잘못된 요청입니다.', 400)
 
   const name = (form.get('applicantName') || '').toString().trim().slice(0, NAME_MAX)
   const email = (form.get('applicantEmail') || '').toString().trim().toLowerCase()
@@ -87,11 +95,15 @@ export async function onRequestPost({ request, env, params, data }) {
   // 같은 공고에 같은 이메일로 심사 대기 중인 지원이 있으면 중복 차단
   const dup = await env.DB.prepare(
     `SELECT id FROM applications
-     WHERE posting_id = ? AND applicant_email = ? AND status = 'submitted'`
+     WHERE posting_id = ? AND applicant_email = ? AND status = 'submitted' AND withdrawn_at IS NULL`
   )
     .bind(params.id, email)
     .first()
-  if (dup) return fail('이미 이 공고에 지원하셨습니다. 심사 결과를 기다려주세요.', 409)
+  if (dup) {
+    const saved = await priorReceipt()
+    if (saved) return jsonResponse({ ok: true, applicationId: saved.id, lookupCode: saved.lookup_code, status: applicationStatus(saved), recovered: true })
+    return fail('이미 이 공고에 지원하셨습니다. 심사 결과를 기다려주세요.', 409)
+  }
 
   const appId = genId()
 
@@ -105,7 +117,7 @@ export async function onRequestPost({ request, env, params, data }) {
       const ext = fileExt(file.name)
       const contentType = mimeForExt(ext)
       const r2Key = `applications/${appId}/${docType}-${Date.now()}.${ext}`
-      await env.DOCUMENTS.put(r2Key, file.stream(), { httpMetadata: { contentType } })
+      await stageApplicationUpload(env, r2Key)
       uploads.push({
         id: genId(),
         docType,
@@ -114,11 +126,12 @@ export async function onRequestPost({ request, env, params, data }) {
         size: file.size,
         contentType,
       })
+      await env.DOCUMENTS.put(r2Key, file.stream(), { httpMetadata: { contentType } })
     }
   } catch (err) {
     console.error(`Application upload failed (posting ${params.id}):`, err)
     // 이미 올라간 파일 정리 시도
-    await Promise.allSettled(uploads.map((u) => env.DOCUMENTS.delete(u.r2Key)))
+    await Promise.allSettled(uploads.map((u) => settleApplicationUpload(env, u.r2Key)))
     return fail('파일 업로드에 실패했습니다. 잠시 후 다시 시도해주세요.', 502)
   }
 
@@ -129,8 +142,8 @@ export async function onRequestPost({ request, env, params, data }) {
          id, posting_id, applicant_name, applicant_email, applicant_phone,
          career_json, application_source, cover_letter,
          consent_required, consent_optional, consent_third_party, consented_at, lookup_code,
-         consent_version, consent_snapshot, created_user_id
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, ?)`
+         consent_version, consent_snapshot, created_user_id, submission_key_hash
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, ?, ?)`
     ).bind(
       appId,
       params.id,
@@ -146,7 +159,8 @@ export async function onRequestPost({ request, env, params, data }) {
       lookupCode,
       CONSENT_VERSION,
       CONSENT_SNAPSHOT,
-      data?.user?.role === 'candidate' && data.user.email === email && !data.user.session_scoped_room_id ? data.user.id : null
+      data?.user?.role === 'candidate' && data.user.email === email && !data.user.session_scoped_room_id ? data.user.id : null,
+      operationHash
     ),
     ...uploads.map((u) =>
       env.DB.prepare(
@@ -160,13 +174,28 @@ export async function onRequestPost({ request, env, params, data }) {
     await env.DB.batch(statements)
   } catch (err) {
     console.error(`Application insert failed (posting ${params.id}):`, err)
-    await Promise.allSettled(uploads.map((u) => env.DOCUMENTS.delete(u.r2Key)))
+    // Confirm the commit before deleting anything: a transport error does not
+    // prove the transaction was rolled back.
+    let committed
+    try { committed = await env.DB.prepare('SELECT id, lookup_code, status, withdrawn_at FROM applications WHERE id = ?').bind(appId).first() }
+    catch { return fail('접수 결과를 확인하지 못했습니다. 같은 화면에서 다시 제출하거나 이메일로 접수를 확인해주세요.', 503) }
+    if (committed) {
+      await Promise.allSettled(uploads.map((u) => settleApplicationUpload(env, u.r2Key)))
+      return jsonResponse({ ok: true, applicationId: committed.id, lookupCode: committed.lookup_code, status: applicationStatus(committed), recovered: true })
+    }
     // 동시 제출 경쟁으로 부분 유니크 인덱스를 위반한 경우 중복 안내로 응답
     if (String(err?.message || err).includes('UNIQUE')) {
+      await Promise.allSettled(uploads.map((u) => settleApplicationUpload(env, u.r2Key)))
+      const saved = await priorReceipt()
+      if (saved) return jsonResponse({ ok: true, applicationId: saved.id, lookupCode: saved.lookup_code, status: applicationStatus(saved), recovered: true })
       return fail('이미 이 공고에 지원하셨습니다. 심사 결과를 기다려주세요.', 409)
     }
-    return fail('지원서 저장에 실패했습니다. 잠시 후 다시 시도해주세요.', 500)
+    // An unresolved request may still commit after this read. Keep its upload
+    // staging records for delayed retention cleanup instead of deleting now.
+    return fail('접수 결과를 확인하지 못했습니다. 같은 화면에서 다시 제출하거나 이메일로 접수를 확인해주세요.', 503)
   }
 
-  return jsonResponse({ ok: true, applicationId: appId, lookupCode }, 201)
+  await Promise.allSettled(uploads.map((u) => settleApplicationUpload(env, u.r2Key)))
+
+  return jsonResponse({ ok: true, applicationId: appId, lookupCode, status: 'submitted' }, 201)
 }

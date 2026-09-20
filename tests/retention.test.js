@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, it, expect, vi } from 'vitest'
 import { sqliteApp, seedUser } from './helpers/sqliteApp.js'
-import { runRetention } from '../server/_lib/retention.js'
+import { runRetention, cleanExpiredRecoveryData } from '../server/_lib/retention.js'
 import { serializeRecording } from '../server/_lib/interviews.js'
 let db, env
 beforeEach(() => {
@@ -42,4 +42,17 @@ it('cleans expired incomplete uploads while excluding an active recording', asyn
   expect(await runRetention(env)).toMatchObject({ recordings: 1 })
   db.sql.exec("UPDATE interview_recordings SET status = 'recording'")
   expect(await runRetention(env)).toMatchObject({ recordings: 0 })
+})
+it('bounds cleanup of expired or long-consumed proofs, preserving active and in-flight proofs', async () => {
+  for (const [id, expiry, consumed] of [['expired','2000-01-01',null],['used','2099-01-01','2000-01-01'],['active','2099-01-01',null],['inflight','2099-01-01',new Date().toISOString()]]) {
+    db.sql.prepare('INSERT INTO application_access_tokens(token_hash,email,expires_at,used_at) VALUES(?,?,?,?)').run(id,'test@example.invalid',expiry,consumed)
+    db.sql.prepare('INSERT INTO application_access_sessions(token_hash,email,expires_at) VALUES(?,?,?)').run(id,'test@example.invalid',expiry)
+    db.sql.prepare("INSERT INTO account_recovery_tokens(token_hash,user_id,purpose,email,password_snapshot,expires_at,consumed_at) VALUES(?,'host','reset_password','test@example.invalid','fixture',?,?)").run(id,expiry,consumed)
+  }
+  expect(await cleanExpiredRecoveryData(env)).toMatchObject({ pending: 5, deleted: 0 })
+  expect(await cleanExpiredRecoveryData(env, { dryRun:false, limit:1 })).toMatchObject({ pending:3, deleted:3 })
+  expect(await cleanExpiredRecoveryData(env, { dryRun:false })).toMatchObject({ pending:2, deleted:2 })
+  for (const table of ['application_access_tokens','account_recovery_tokens']) {
+    expect(db.sql.prepare(`SELECT token_hash FROM ${table} ORDER BY token_hash`).all().map(row=>row.token_hash)).toEqual(['active','inflight'])
+  }
 })

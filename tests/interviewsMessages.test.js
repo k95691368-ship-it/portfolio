@@ -89,7 +89,7 @@ describe('화상 면접 공개 채팅 권한', () => {
     })
     const query = db.calls.find((call) => call.sql.includes('FROM chat_messages m'))
     expect(query.sql).toContain('m.interview_session_id = ?')
-    expect(query.values).toEqual(['room-1', 20, 'session-1', 'session-1'])
+    expect(query.values).toEqual(['room-1', '20', 'session-1', 'session-1'])
   })
 
   it('세션 모드 POST는 세션 ID를 저장하면서 기존 처우 추출 흐름을 그대로 탄다', async () => {

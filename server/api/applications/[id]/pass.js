@@ -2,21 +2,23 @@ import { genId } from '../../../_lib/db.js'
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { hashPassword } from '../../../_lib/auth.js'
 import { genTempPassword } from '../../../_lib/tempPassword.js'
-import { requireManageableApplication } from '../../../_lib/applications.js'
+import { requireManageableApplication, reviewRevisionError } from '../../../_lib/applications.js'
 import { seedTermsFromApplication } from '../../../_lib/seedTerms.js'
 import { logAdminAction } from '../../../_lib/auditLog.js'
-import { isEmailConfigured, sendApplicationResultEmail } from '../../../_lib/email.js'
+import { sendApplicationResultNotification } from '../../../_lib/applicationResultEmail.js'
 import { notifyUser } from '../../../_lib/notify.js'
 import { genInviteCode } from '../../../_lib/inviteCode.js'
 
 // 관리: 서류합격 처리 — 지원 이메일로 candidate 계정(임시 비밀번호) 생성 +
 // 면접방 자동 생성 후 채용자·지원자 착석. 기존 계정이 있으면 재사용.
-export async function onRequestPost({ env, data, params }) {
+export async function onRequestPost({ env, data, params, request }) {
   const access = await requireManageableApplication(env, data.user, params.id)
   if (access.error) return access.error
   const application = access.application
+  const revisionError = await reviewRevisionError(request, application)
+  if (revisionError) return revisionError
 
-  if (application.status !== 'submitted') {
+  if (application.status !== 'submitted' || application.withdrawn_at) {
     return jsonError('이미 심사가 완료된 지원서입니다.', 409)
   }
   // 면접방을 회사 측으로 생성하므로 company 계정이어야 한다.
@@ -63,10 +65,12 @@ export async function onRequestPost({ env, data, params }) {
   // 동시 요청으로 인한 고아 면접방을 막기 위해, 먼저 지원서를 원자적으로 '선점'한다.
   const claim = await env.DB.prepare(
     `UPDATE applications
-     SET status = 'passed', reviewed_by_user_id = ?, reviewed_at = datetime('now')
-     WHERE id = ? AND status = 'submitted'`
+     SET status = 'passed', reviewed_by_user_id = ?, reviewed_at = datetime('now'),
+         result_email_status = 'pending', result_email_attempted_at = NULL,
+         result_email_sent_at = NULL, result_email_error = NULL
+     WHERE id = ? AND status = 'submitted' AND withdrawn_at IS NULL AND revision = ?`
   )
-    .bind(data.user.id, params.id)
+    .bind(data.user.id, params.id, application.revision)
     .run()
   if (claim.meta.changes === 0) {
     return jsonError('이미 심사가 완료된 지원서입니다.', 409)
@@ -133,7 +137,9 @@ export async function onRequestPost({ env, data, params }) {
       console.error(`Application pass failed (application ${params.id}):`, err)
       // 선점만 되고 계정·면접방 생성이 실패했으면 지원서 상태를 되돌린다.
       await env.DB.prepare(
-        `UPDATE applications SET status = 'submitted', reviewed_by_user_id = NULL, reviewed_at = NULL WHERE id = ?`
+        `UPDATE applications SET status = 'submitted', reviewed_by_user_id = NULL, reviewed_at = NULL,
+          result_email_status = NULL, result_email_attempted_at = NULL,
+          result_email_sent_at = NULL, result_email_error = NULL WHERE id = ?`
       )
         .bind(params.id)
         .run()
@@ -160,27 +166,7 @@ export async function onRequestPost({ env, data, params }) {
     detail: `${application.applicant_email} · ${application.posting_title}`,
   }).catch(() => {})
 
-  // 지원자에게 합격 안내 이메일 (설정된 경우에만, 실패해도 무시)
-  let emailStatus = 'not_sent'
-  let emailError = null
-  if (isEmailConfigured(env)) {
-    try {
-      await sendApplicationResultEmail(env, {
-        idempotencyKey: `application:${params.id}:passed`,
-        to: application.applicant_email,
-        applicantName: application.applicant_name,
-        companyName,
-        result: 'passed',
-        // 지원자가 그 자리에서 들어올 수 있게 코드를 메일에 담는다.
-        inviteCode,
-      })
-      emailStatus = 'sent'
-    } catch (err) {
-      emailStatus = err.deliveryState === 'unknown' ? 'unknown' : 'failed'
-      emailError = String(err?.message || err).slice(0, 300)
-      console.error(`Pass result email failed (application ${params.id}):`, emailError)
-    }
-  }
+  const resultEmail = await sendApplicationResultNotification(env, params.id)
 
   return jsonResponse(
     {
@@ -193,8 +179,9 @@ export async function onRequestPost({ env, data, params }) {
       // 그런데 지원자에게는 로그인할 이유도, 로그인 화면으로 가는 길도 없다.
       // 코드만 있으면 공고 화면에서 바로 들어온다.
       inviteCode,
-      emailStatus,
-      emailError,
+      emailStatus: resultEmail.status,
+      emailError: resultEmail.status === 'sent' ? null : resultEmail.message,
+      resultEmail,
       account: {
         email: application.applicant_email,
         alreadyExisted,

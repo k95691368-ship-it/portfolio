@@ -1,0 +1,18 @@
+.application-manage-page .application-access-request { width: min(100%, 680px); }
+.application-manage-page .application-access-request .apply-form { grid-template-columns: minmax(0, 1fr); }
+.application-manage-page .application-edit-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.application-manage-page .application-edit-form > fieldset { display: grid; gap: 16px; min-width: 0; margin: 0; padding: 20px; border: 1px solid var(--border); border-radius: var(--r-md); }
+.application-manage-page .application-edit-form legend { padding-inline: 8px; font-size: 1.125rem; font-weight: 600; }
+.application-manage-page .application-edit-form label:not(.checkbox-label) { display: grid; gap: 8px; min-width: 0; }
+.application-manage-page :is(input:not([type='checkbox']), textarea) { width: 100%; min-width: 0; }
+.application-manage-page .checkbox-label { display: flex; align-items: flex-start; gap: 8px; }
+.application-manage-page .checkbox-label input { flex: 0 0 auto; margin-top: 4px; }
+.application-manage-page .career-entry { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding-block: 8px 20px; border-bottom: 1px solid var(--border); }
+.application-manage-page :is(p, code, button, legend) { overflow-wrap: anywhere; }
+.application-manage-page button { max-width: 100%; white-space: normal; }
+.application-manage-page .modal-actions { flex-wrap: wrap; }
+.application-manage-page .my-app-card { display: grid; align-content: start; gap: 12px; padding: 20px; }
+@media (max-width: 767px) {
+  .application-manage-page .application-edit-form { grid-template-columns: minmax(0, 1fr); }
+  .application-manage-page .application-edit-form > fieldset { padding: 16px; }
+}

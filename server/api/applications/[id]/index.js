@@ -1,6 +1,8 @@
 import { jsonResponse } from '../../../_lib/http.js'
 import { requireManageableApplication, parseCareer } from '../../../_lib/applications.js'
 import { offerStatusForApplication } from '../../../_lib/offerFromEmail.js'
+import { getApplicationResultEmail } from '../../../_lib/applicationResultEmail.js'
+import { applicationStatus } from '../../../_lib/applicationAccess.js'
 
 // 관리: 지원서 상세 (경력·동의·첨부파일 포함).
 export async function onRequestGet({ env, data, params }) {
@@ -15,7 +17,7 @@ export async function onRequestGet({ env, data, params }) {
   // 것이 목적이라면 누르기 전에 보여야 한다.
   const [docsResult, offer] = await Promise.all([
     env.DB.prepare(
-      `SELECT id, doc_type, filename, size_bytes FROM application_documents WHERE application_id = ?`
+      `SELECT id, doc_type, filename, size_bytes FROM application_documents WHERE application_id = ? AND superseded_at IS NULL`
     )
       .bind(params.id)
       .all(),
@@ -49,10 +51,13 @@ export async function onRequestGet({ env, data, params }) {
         thirdParty: !!a.consent_third_party,
         consentedAt: a.consented_at,
       },
-      status: a.status,
+      status: applicationStatus(a),
+      revision: a.revision,
+      withdrawnAt: a.withdrawn_at,
       roomId: a.room_id,
       createdUserId: a.created_user_id,
       reviewedAt: a.reviewed_at,
+      resultEmail: getApplicationResultEmail(a),
       createdAt: a.created_at,
       // 심사 결과가 깨져 있어도 지원서 자체는 열려야 한다.
       aiScreening: (() => {

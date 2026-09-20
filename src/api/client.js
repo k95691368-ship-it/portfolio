@@ -1,4 +1,5 @@
 import { withRequestDeadline } from './requestDeadline.js'
+import { assertVerifiedAccount } from '../utils/verifiedAccount.js'
 
 export const API_BASE =
   import.meta.env.VITE_API_BASE ||
@@ -15,10 +16,24 @@ const SUPABASE_PUBLISHABLE_KEY =
 
 const SESSION_KEY = 'portfolioSession'
 const ROOM_SESSION_KEY = 'portfolioRoomSessions'
+const SIGNED_OUT_KEY = 'portfolioSessionSignedOut'
+let signedOutInThisTab = false
+
+function availableStorage(name) {
+  try { return globalThis[name] || null } catch { return null }
+}
+
+function sessionStorageError(code = 'SESSION_STORAGE_WRITE_FAILED') {
+  const error = new Error(code === 'SESSION_STORAGE_CLEAR_FAILED'
+    ? '브라우저에 저장된 로그인 정보를 지우지 못했습니다. 사이트 데이터를 삭제해주세요.'
+    : '브라우저에 로그인 정보를 저장하지 못했습니다. 사이트 저장소 설정을 확인한 뒤 다시 로그인해주세요.')
+  error.code = code
+  return error
+}
 
 function parseStored(storage, key) {
   try {
-    const value = JSON.parse(storage.getItem(key) || 'null')
+    const value = JSON.parse(storage?.getItem(key) || 'null')
     if (!value?.token) return null
     if (value.expiresAt && Date.parse(value.expiresAt) <= Date.now()) {
       storage.removeItem(key)
@@ -31,23 +46,100 @@ function parseStored(storage, key) {
 }
 
 function accountSession() {
-  return parseStored(sessionStorage, SESSION_KEY) || parseStored(localStorage, SESSION_KEY)
+  if (signedOutInThisTab) return null
+  try {
+    if (availableStorage('sessionStorage')?.getItem(SIGNED_OUT_KEY) === '1') return null
+  } catch { /* A denied marker read must not break ordinary session restoration. */ }
+  return parseStored(availableStorage('sessionStorage'), SESSION_KEY) ||
+    parseStored(availableStorage('localStorage'), SESSION_KEY)
 }
 
-function storeAccountSession(data) {
+// A token comparison only: callers must still verify the user's identity at /me.
+export function getAccountSessionIdentity() {
+  return accountSession()?.token || null
+}
+
+function requestAccountToken(headers) {
+  const authorization = headers['X-App-Authorization']
+  return typeof authorization === 'string' && authorization.startsWith('Bearer ')
+    ? authorization.slice(7) : null
+}
+
+function storedAccountToken(storage) {
+  // Reads during mutation must not hide storage denial as an empty store.
+  const raw = storage.getItem(SESSION_KEY)
+  try { return JSON.parse(raw || 'null')?.token || null } catch { return null }
+}
+
+function markAccountSignedOut() {
+  signedOutInThisTab = true
+  try {
+    const storage = availableStorage('sessionStorage')
+    if (!storage) throw sessionStorageError('SESSION_STORAGE_CLEAR_FAILED')
+    storage.setItem(SIGNED_OUT_KEY, '1')
+    return null
+  } catch {
+    return sessionStorageError('SESSION_STORAGE_CLEAR_FAILED')
+  }
+}
+
+function storeAccountSession(data, previousToken) {
   if (!data?.sessionToken) return
-  const target = data.sessionPersistent === false ? sessionStorage : localStorage
-  const other = target === localStorage ? sessionStorage : localStorage
-  other.removeItem(SESSION_KEY)
-  target.setItem(
-    SESSION_KEY,
-    JSON.stringify({ token: data.sessionToken, expiresAt: data.sessionExpiresAt || null })
-  )
+  const persistent = data.sessionPersistent !== false
+  const target = availableStorage(persistent ? 'localStorage' : 'sessionStorage')
+  const other = availableStorage(persistent ? 'sessionStorage' : 'localStorage')
+  const tabStorage = availableStorage('sessionStorage')
+  let previousValue
+  let previousOtherValue
+  let previousMarker
+  let installed = false
+  let removedOther = false
+  try {
+    if (!target || !other || !tabStorage) throw sessionStorageError()
+    previousValue = target.getItem(SESSION_KEY)
+    previousOtherValue = other.getItem(SESSION_KEY)
+    previousMarker = tabStorage.getItem(SIGNED_OUT_KEY)
+    const previousOtherToken = storedAccountToken(other)
+    // Do not discard a usable previous session if the selected store is full or
+    // disabled. Never silently change a persistent login into a tab-only login.
+    target.setItem(SESSION_KEY, JSON.stringify({ token: data.sessionToken, expiresAt: data.sessionExpiresAt || null }))
+    installed = true
+    // A previous failed logout can leave a hidden token in this tab's store.
+    // Persistent login must not let it shadow the newly committed account.
+    if ((persistent && previousOtherValue !== null) || (previousToken && previousOtherToken === previousToken)) {
+      other.removeItem(SESSION_KEY)
+      removedOther = true
+    }
+    tabStorage.removeItem(SIGNED_OUT_KEY)
+    signedOutInThisTab = false
+  } catch {
+    if (installed) {
+      try {
+        if (previousValue === null) target.removeItem(SESSION_KEY)
+        else target.setItem(SESSION_KEY, previousValue)
+      } catch { /* Report failure without another storage fallback. */ }
+    }
+    if (removedOther) {
+      try { other.setItem(SESSION_KEY, previousOtherValue) } catch { /* Preserve the storage error. */ }
+    }
+    if (previousMarker === '1') {
+      try { tabStorage.setItem(SIGNED_OUT_KEY, previousMarker) } catch { /* Memory remains signed out. */ }
+    }
+    throw sessionStorageError()
+  }
 }
 
-function clearAccountSession() {
-  localStorage.removeItem(SESSION_KEY)
-  sessionStorage.removeItem(SESSION_KEY)
+function clearAccountSession(token) {
+  if (!token) return null
+  let failed = false
+  for (const name of ['localStorage', 'sessionStorage']) {
+    const storage = availableStorage(name)
+    try {
+      if (!storage) throw sessionStorageError('SESSION_STORAGE_CLEAR_FAILED')
+      if (storedAccountToken(storage) === token) storage.removeItem(SESSION_KEY)
+    } catch { failed = true }
+  }
+  return failed ? sessionStorageError('SESSION_STORAGE_CLEAR_FAILED') : null
 }
 
 // Update only the token used for this request: a late response must not extend
@@ -55,7 +147,9 @@ function clearAccountSession() {
 function acceptRenewal(res, headers) {
   const expiresAt = res.headers.get('X-App-Session-Expires-At')
   if (!expiresAt || !Number.isFinite(Date.parse(expiresAt)) || Date.parse(expiresAt) <= Date.now()) return
-  for (const storage of [localStorage, sessionStorage]) {
+  for (const name of ['localStorage', 'sessionStorage']) {
+    const storage = availableStorage(name)
+    if (!storage) continue
     try {
       const saved = JSON.parse(storage.getItem(SESSION_KEY) || 'null')
       if (saved?.token && headers['X-App-Authorization'] === `Bearer ${saved.token}` &&
@@ -155,8 +249,10 @@ function authHeaders(path) {
   return headers
 }
 
-const ACCOUNT_AUTH_PATHS = new Set(['/login', '/signup', '/demo/login', '/change-password', '/logout'])
+const ACCOUNT_AUTH_PATHS = new Set(['/login', '/account/verify-email', '/account/reset-password', '/demo/login', '/change-password', '/logout'])
 let authGeneration = 0
+// Other scoped browser capabilities also discard responses after explicit auth changes.
+export function getAccountAuthRevision() { return authGeneration }
 
 function identitySnapshot(path) {
   const headers = authHeaders(path)
@@ -165,6 +261,10 @@ function identitySnapshot(path) {
     headers['X-App-Authorization'] || null,
     headers['X-Room-Authorization'] || null,
     roomIdentityHeader(path)?.['X-Room-Identity'] || null,
+    // Logout suppresses effective auth in this tab, but a newer raw stored
+    // account must still invalidate its late response rather than be ignored.
+    path === '/logout' ? ['localStorage', 'sessionStorage'].map((name) =>
+      parseStored(availableStorage(name), SESSION_KEY)?.token || null) : null,
   ])
 }
 
@@ -178,10 +278,10 @@ function assertCurrentIdentity(path, snapshot, response) {
   throw error
 }
 
-function acceptAuthResponse(path, data) {
-  if (ACCOUNT_AUTH_PATHS.has(path)) storeAccountSession(data)
+function acceptAuthResponse(path, data, headers) {
+  if (path === '/account/verify-email') assertVerifiedAccount(data)
+  if (ACCOUNT_AUTH_PATHS.has(path) && path !== '/logout') storeAccountSession(data, requestAccountToken(headers))
   if (path === '/rooms/enter') storeRoomSession(data)
-  if (path === '/logout') clearAccountSession()
 }
 
 // 서버 응답을 사용자에게 보여줄 오류로 변환한다.
@@ -204,7 +304,7 @@ function toUserError(res, data) {
 const pendingReads = new Map()
 let writeGeneration = 0
 
-async function performRequest(path, options, headers, timeoutMs = 120_000) {
+async function performRequest(path, options, headers, timeoutMs = 120_000, completionError = null) {
   const snapshot = identitySnapshot(path)
   return withRequestDeadline(async (signal) => {
     const res = await fetch(`${API_BASE}${path}`, {
@@ -219,10 +319,21 @@ async function performRequest(path, options, headers, timeoutMs = 120_000) {
     if (signal.aborted) throw signal.reason
     assertCurrentIdentity(path, snapshot, res)
     acceptRenewal(res, headers)
+    if (path === '/me' && (res.status === 401 || (res.ok && data?.user === null))) {
+      const storageError = clearAccountSession(requestAccountToken(headers))
+      if (storageError) throw storageError
+    }
     if (!res.ok) throw toUserError(res, data)
-    acceptAuthResponse(path, data)
+    acceptAuthResponse(path, data, headers)
+    if (completionError) throw completionError
     return data
-  }, { signal: options.signal, timeoutMs })
+  }, { signal: options.signal, timeoutMs }).catch((error) => {
+    // Even when local deletion failed, still attempt server-side revocation.
+    // A later login remains authoritative and should not surface an old error.
+    if (path === '/logout') assertCurrentIdentity(path, snapshot)
+    if (completionError && error?.code !== 'STALE_AUTH_RESPONSE') throw completionError
+    throw error
+  })
 }
 
 function request(path, options = {}) {
@@ -235,7 +346,24 @@ function request(path, options = {}) {
   if ((options.method || 'GET') !== 'GET') {
     if (ACCOUNT_AUTH_PATHS.has(path) || path === '/rooms/enter') authGeneration += 1
     writeGeneration += 1
-    return performRequest(path, options, headers).finally(() => { writeGeneration += 1 })
+    // Revoke the captured token remotely, but end this browser's session now.
+    // The request snapshot is taken after clearing, so a late logout cannot
+    // erase a new login and a failed/offline request cannot resurrect this one.
+    let storageError = null
+    if (path === '/logout') {
+      storageError = clearAccountSession(requestAccountToken(headers))
+      try {
+        const storage = availableStorage('sessionStorage')
+        if (!storage) throw sessionStorageError('SESSION_STORAGE_CLEAR_FAILED')
+        storage.removeItem('portfolioApplicationAccess')
+      } catch { storageError ||= sessionStorageError('SESSION_STORAGE_CLEAR_FAILED') }
+      // Do not fall back to another tab's surviving remembered account after
+      // explicit logout. This non-secret marker applies to this tab only.
+      const markerError = markAccountSignedOut()
+      storageError ||= markerError
+    }
+    return performRequest(path, options, headers, path === '/logout' ? 10_000 : 120_000, storageError)
+      .finally(() => { writeGeneration += 1 })
   }
   // 진행 중인 동일 조회만 공유한다. 인증·방 신원·쓰기 전후를 구별하며
   // 완료 응답은 저장하지 않아 다음 조회가 오래된 내용을 받지 않는다.

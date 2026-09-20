@@ -1,14 +1,16 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
-import { requireManageableApplication } from '../../../_lib/applications.js'
+import { requireManageableApplication, reviewRevisionError } from '../../../_lib/applications.js'
 import { offerStatusForApplication } from '../../../_lib/offerFromEmail.js'
 import { logAdminAction } from '../../../_lib/auditLog.js'
-import { isEmailConfigured, sendApplicationResultEmail } from '../../../_lib/email.js'
+import { sendApplicationResultNotification } from '../../../_lib/applicationResultEmail.js'
 
 // 관리: 서류 불합격 처리. 결과 안내 이메일(설정 시) + 감사 로그.
-export async function onRequestPost({ env, data, params }) {
+export async function onRequestPost({ env, data, params, request }) {
   const access = await requireManageableApplication(env, data.user, params.id)
   if (access.error) return access.error
   const application = access.application
+  const revisionError = await reviewRevisionError(request, application)
+  if (revisionError) return revisionError
 
   // 채용내정이 성립한 사람은 '탈락'시킬 수 없다.
   //
@@ -45,16 +47,18 @@ export async function onRequestPost({ env, data, params }) {
   // 막히는 결과는 같았지만 돌아가는 말이 달랐다. 담당자는 "이미 심사가
   // 완료되었다"는 절차 안내를 받았고, 왜 이 사람만은 되돌릴 수 없는지는
   // 듣지 못했다. 알려 주지 않으면 담당자는 다른 길을 찾는다.
-  if (application.status !== 'submitted') {
+  if (application.status !== 'submitted' || application.withdrawn_at) {
     return jsonError('이미 심사가 완료된 지원서입니다.', 409)
   }
 
   const claim = await env.DB.prepare(
     `UPDATE applications
-     SET status = 'rejected', reviewed_by_user_id = ?, reviewed_at = datetime('now')
-     WHERE id = ? AND status = 'submitted'`
+     SET status = 'rejected', reviewed_by_user_id = ?, reviewed_at = datetime('now'),
+         result_email_status = 'pending', result_email_attempted_at = NULL,
+         result_email_sent_at = NULL, result_email_error = NULL
+     WHERE id = ? AND status = 'submitted' AND withdrawn_at IS NULL AND revision = ?`
   )
-    .bind(data.user.id, params.id)
+    .bind(data.user.id, params.id, application.revision)
     .run()
   if (claim.meta.changes === 0) {
     return jsonError('이미 심사가 완료된 지원서입니다.', 409)
@@ -66,25 +70,8 @@ export async function onRequestPost({ env, data, params }) {
     detail: `${application.applicant_email} · ${application.posting_title}`,
   }).catch(() => {})
 
-  const companyName = data.user.company_name || data.user.display_name
-  let emailStatus = 'not_sent'
-  let emailError = null
-  if (isEmailConfigured(env)) {
-    try {
-      await sendApplicationResultEmail(env, {
-        idempotencyKey: `application:${params.id}:rejected`,
-        to: application.applicant_email,
-        applicantName: application.applicant_name,
-        companyName,
-        result: 'rejected',
-      })
-      emailStatus = 'sent'
-    } catch (err) {
-      emailStatus = err.deliveryState === 'unknown' ? 'unknown' : 'failed'
-      emailError = String(err?.message || err).slice(0, 300)
-      console.error(`Reject result email failed (application ${params.id}):`, emailError)
-    }
-  }
+  const resultEmail = await sendApplicationResultNotification(env, params.id)
 
-  return jsonResponse({ ok: true, status: 'rejected', emailStatus, emailError })
+  return jsonResponse({ ok: true, status: 'rejected', emailStatus: resultEmail.status,
+    emailError: resultEmail.status === 'sent' ? null : resultEmail.message, resultEmail })
 }

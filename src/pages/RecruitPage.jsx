@@ -1,12 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatKstDate, formatKst } from '../lib/formatTime.js'
 import { Link } from 'react-router-dom'
 import { api, downloadApiFile, markRoomDoor } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
+import { useCreateRequest } from '../hooks/useCreateRequest.js'
 import NotificationBell from '../components/NotificationBell.jsx'
 import ApplicantCompare from '../components/ApplicantCompare.jsx'
+import ApplicationResultEmailStatus from '../components/ApplicationResultEmailStatus.jsx'
 import Modal from '../components/Modal.jsx'
+import UnsavedChangesGuard from '../components/UnsavedChangesGuard.jsx'
 import PostingEditor from '../components/PostingEditor.jsx'
 import PostingQrModal from '../components/PostingQrModal.jsx'
 import { EXAMPLE_POSTING } from '../../shared/jobPostingTemplate.js'
@@ -31,6 +34,7 @@ const STATUS_LABEL = {
   submitted: { label: '심사 대기', badge: 'badge-warning' },
   passed: { label: '서류합격', badge: 'badge-success' },
   rejected: { label: '불합격', badge: 'badge-danger' },
+  withdrawn: { label: '지원 철회', badge: 'badge-neutral' },
 }
 
 const FIT_LABEL = {
@@ -40,28 +44,33 @@ const FIT_LABEL = {
   unknown: { label: '판단 보류', badge: 'badge-neutral' },
 }
 
-function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
+export function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
   const toast = useToast()
   const [detail, setDetail] = useState(null)
   const [working, setWorking] = useState(false)
   const [passResult, setPassResult] = useState(null)
   const [screening, setScreening] = useState(null)
   const [screeningLoading, setScreeningLoading] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const [detailLoading, setDetailLoading] = useState(true)
 
   const load = useCallback(() => {
-    api
+    setLoadError('')
+    setDetailLoading(true)
+    return api
       .get(`/applications/${appId}`)
       .then((data) => {
         setDetail(data.application)
         setScreening(data.application.aiScreening)
       })
-      .catch((err) => toast.error(err.message))
-  }, [appId, toast])
+      .catch((err) => setLoadError(err.message || '지원서를 불러오지 못했습니다.'))
+      .finally(() => setDetailLoading(false))
+  }, [appId])
 
   const handleScreen = async () => {
     setScreeningLoading(true)
     try {
-      const data = await api.post(`/applications/${appId}/screen`, {})
+      const data = await api.post(`/applications/${appId}/screen`, { revision: detail?.revision ?? 0 })
       setScreening(data.screening)
       toast.success('AI 서류 검토가 완료되었습니다.')
     } catch (err) {
@@ -75,64 +84,76 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
     load()
   }, [load])
 
+  const notifyResultEmail = (result, outcome = '') => {
+    const status = result?.resultEmail?.status || result?.emailStatus || 'unknown'
+    const prefix = outcome ? `${outcome} 처리되었습니다. ` : ''
+    if (status === 'sent') {
+      toast.success(`${prefix}Gmail이 결과 안내 이메일을 접수했습니다.`)
+    } else if (['failed', 'not_sent', 'not_configured'].includes(status)) {
+      toast.error(`${prefix}결과 안내 이메일은 발송되지 않았습니다. 발송 상태와 설정을 확인해주세요.`)
+    } else {
+      toast.info(`${prefix}이메일 발송이 완료됐는지 아직 확인할 수 없습니다. 발송 상태를 확인하고 중복 전송하지 마세요.`)
+    }
+  }
+
+  const refreshEmailStatus = async () => {
+    if (working) return
+    setWorking(true)
+    try { await load() }
+    finally { setWorking(false) }
+  }
+
   const handlePass = async () => {
-    if (!window.confirm('서류합격 처리하시겠습니까? 지원자 계정과 면접방이 자동 생성됩니다.')) return
+    if (working || !window.confirm('서류합격을 확정하시겠습니까? 지원자 계정과 면접방이 생성되고, 지원자에게 합격 결과와 면접방 입장 안내 이메일이 자동 발송됩니다.')) return
     setWorking(true)
     try {
-      const result = await api.post(`/applications/${appId}/pass`, {})
+      const result = await api.post(`/applications/${appId}/pass`, { revision: detail?.revision ?? 0 })
       setPassResult(result)
-      // 결과 통보 이메일이 실패해도 '처리되었습니다'만 뜨고 있었다. 채용절차법
-      // 제10조는 구직자에게 채용 여부를 알리도록 한다. 알림이 실패한 것을
-      // 알리지 않으면 담당자는 통보가 끝났다고 믿고 넘어간다.
-      toast.success(
-        result?.emailStatus === 'unknown'
-          ? '서류합격 처리되었습니다. 이메일 발송 결과는 확인 중입니다. 보낸메일함 확인 전 재전송하지 마세요.'
-          : result?.emailStatus === 'failed'
-          ? '서류합격 처리되었습니다. 다만 결과 안내 이메일 발송에 실패했습니다 — 지원자에게 따로 연락해주세요.'
-          : '서류합격 처리되었습니다. 지원자 계정과 면접방이 생성되었습니다.'
-      )
-      load()
+      setDetail((current) => ({ ...current, status: 'passed', resultEmail: result.resultEmail }))
+      notifyResultEmail(result, '서류합격')
+      await load()
       onChanged()
     } catch (err) {
       toast.error(err.message)
+      await load()
     } finally {
       setWorking(false)
     }
   }
 
-  // 입장 코드를 지원자에게 보낸다.
-  //
-  // 서류합격 처리 때 한 번 자동으로 나가지만 그것뿐이었다. 메일이 막혀 있거나
-  // 지원자가 못 받았으면 다시 보낼 방법이 없었고, 코드가 전해지지 않으면
-  // 지원자는 면접방에 들어올 수 없다.
-  const handleSendCode = async () => {
+  const handleSendResultEmail = async () => {
+    const email = detail?.resultEmail
+    if (working || email?.canRetry !== true || !['pending', 'not_sent', 'failed'].includes(email.status)) return
+    if (!window.confirm(`${detail.applicantName}님(${detail.applicantEmail})에게 서류 ${detail.status === 'passed' ? '합격' : '불합격'} 결과 안내 이메일을 실제로 발송하시겠습니까?`)) return
     setWorking(true)
     try {
-      const result = await api.post(`/applications/${appId}/send-code`, {})
-      toast.success(`${result.sentTo} 로 면접방 입장 코드를 보냈습니다.`)
+      const result = await api.post(`/applications/${appId}/send-result-email`, {})
+      setDetail((current) => ({ ...current, resultEmail: result.resultEmail }))
+      notifyResultEmail(result)
+      await load()
     } catch (err) {
+      // A lost response is not proof of a failed send. Disable retry until a
+      // successful detail lookup tells us the persisted delivery state.
+      setDetail((current) => ({ ...current, resultEmail: { status: 'unknown', canRetry: false } }))
       toast.error(err.message)
+      await load()
     } finally {
       setWorking(false)
     }
   }
 
   const handleReject = async () => {
-    if (!window.confirm('불합격 처리하시겠습니까?')) return
+    if (working || !window.confirm('서류 불합격을 확정하시겠습니까? 지원자에게 불합격 결과 안내 이메일이 자동 발송됩니다.')) return
     setWorking(true)
     try {
-      const result = await api.post(`/applications/${appId}/reject`, {})
-      toast.success(
-        result?.emailStatus === 'unknown'
-          ? '불합격 처리되었습니다. 이메일 발송 결과는 확인 중입니다. 보낸메일함 확인 전 재전송하지 마세요.'
-          : result?.emailStatus === 'failed'
-          ? '불합격 처리되었습니다. 다만 결과 안내 이메일 발송에 실패했습니다 — 지원자에게 따로 연락해주세요.'
-          : '불합격 처리되었습니다.'
-      )
-      load()
+      const result = await api.post(`/applications/${appId}/reject`, { revision: detail?.revision ?? 0 })
+      setDetail((current) => ({ ...current, status: 'rejected', resultEmail: result.resultEmail }))
+      notifyResultEmail(result, '서류 불합격')
+      await load()
       onChanged()
     } catch (err) {
       toast.error(err.message)
+      await load()
     } finally {
       setWorking(false)
     }
@@ -145,8 +166,13 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
       className="application-modal"
     >
       <>
-        {!detail ? (
-          <p>불러오는 중...</p>
+        {loadError ? (
+          <div>
+            <p className="error" role="alert">지원서 상세를 불러오지 못했습니다. {loadError}</p>
+            <button type="button" className="btn-secondary" onClick={load} disabled={working}>지원서 다시 불러오기</button>
+          </div>
+        ) : !detail || detailLoading ? (
+          <p role="status">불러오는 중...</p>
         ) : (
           <>
             <div className="modal-head">
@@ -175,13 +201,8 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
                   </button>
                 </p>
                 <p>
-                  <em>
-                    {passResult.emailStatus === 'sent'
-                      ? '합격 안내 메일에 이 코드를 함께 보냈습니다. 지원자는 채용 공고 화면에서 코드를 넣어 로그인 없이 들어옵니다.'
-                      : passResult.emailStatus === 'unknown'
-                        ? '메일이 발송되었을 수 있습니다. 보낸메일함 확인 전 재전송하지 마세요.'
-                        : '메일이 나가지 않았습니다 — 이 코드를 지원자에게 직접 전달해주세요. 지원자는 채용 공고 화면에서 코드를 넣어 로그인 없이 들어옵니다.'}
-                  </em>
+                  지원자는 채용 공고 화면에서 입장 코드를 입력해 면접방으로 들어올 수 있습니다.
+                  이메일 처리 결과는 아래 발송 상태에서 확인해주세요.
                 </p>
                 {passResult.roomId && (
                   <p>
@@ -212,6 +233,15 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
                 </span>
               </dd>
             </dl>
+
+            {['passed', 'rejected'].includes(detail.status) && (
+              <ApplicationResultEmailStatus
+                resultEmail={detail.resultEmail}
+                working={working}
+                onRetry={handleSendResultEmail}
+                onRefresh={refreshEmailStatus}
+              />
+            )}
 
             {detail.career.length > 0 && (
               <div className="application-block">
@@ -281,7 +311,7 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
             <div className="application-block ai-screening">
               <div className="ai-screening-head">
                 <h3>AI 서류 검토</h3>
-                <button type="button" className="btn-sm" onClick={handleScreen} disabled={screeningLoading}>
+                <button type="button" className="btn-sm" onClick={handleScreen} disabled={screeningLoading || detail.status !== 'submitted'}>
                   {screeningLoading ? 'AI가 검토하는 중...' : screening ? '다시 검토' : 'AI로 검토하기'}
                 </button>
               </div>
@@ -392,8 +422,8 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
             )}
             {detail.status === 'passed' && detail.roomId && !passResult && (
               <div className="invite-code-block">
-                {/* 코드가 전해지지 않으면 지원자는 면접방에 들어올 수 없다.
-                    언제든 다시 보고 다시 보낼 수 있어야 한다. */}
+                {/* 입장 코드는 다시 확인할 수 있지만, 이메일 재발송 여부는
+                    위의 저장된 결과 상태로만 판단한다. */}
                 <p>
                   면접방 입장 코드: <code>{detail.inviteCode || '-'}</code>{' '}
                   {detail.inviteCode && (
@@ -407,9 +437,6 @@ function ApplicationDetail({ appId, onClose, onChanged, canPass }) {
                   )}
                 </p>
                 <div className="modal-actions">
-                  <button type="button" onClick={handleSendCode} disabled={working}>
-                    {working ? '보내는 중...' : '1차 서류합격 안내 · 입장 코드 메일 보내기'}
-                  </button>
                   <Link
                     to={`/rooms/${detail.roomId}`}
                     className="btn-nav"
@@ -432,7 +459,11 @@ export default function RecruitPage() {
   const toast = useToast()
   const [postings, setPostings] = useState([])
   const [applications, setApplications] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [postingsLoading, setPostingsLoading] = useState(true)
+  const [applicationsLoading, setApplicationsLoading] = useState(true)
+  const [postingsError, setPostingsError] = useState('')
+  const [applicationsError, setApplicationsError] = useState('')
+  const readGeneration = useRef({ postings: 0, applications: 0 })
   const [selectedApp, setSelectedApp] = useState(null)
   const [comparePosting, setComparePosting] = useState(null)
   const [qrPosting, setQrPosting] = useState(null)
@@ -441,6 +472,7 @@ export default function RecruitPage() {
   const [form, setForm] = useState(EMPTY_POSTING)
 
   const [creating, setCreating] = useState(false)
+  const createRequest = useCreateRequest('/postings')
   const [drafts, setDrafts] = useState([])
   const [draftId, setDraftId] = useState(null)
   const [draftRevision, setDraftRevision] = useState(0)
@@ -450,7 +482,7 @@ export default function RecruitPage() {
   const [loadingDraft, setLoadingDraft] = useState(false)
   const [draftsLoading, setDraftsLoading] = useState(true)
   const [draftsError, setDraftsError] = useState('')
-  const draftBusy = creating || savingDraft || loadingDraft
+  const draftBusy = creating || savingDraft || loadingDraft || createRequest.unconfirmed
   const unsaved = JSON.stringify(form) !== savedForm
 
   const loadDrafts = useCallback(async () => {
@@ -535,34 +567,61 @@ export default function RecruitPage() {
 
   const [appsTruncated, setAppsTruncated] = useState(null)
 
-  const loadAll = useCallback(async () => {
-    const [p, a] = await Promise.all([api.get('/postings'), api.get('/applications')])
-    setPostings(p.postings)
-    setApplications(a.applications)
-    // 상한에 걸려 일부만 받았으면 화면에서도 그 사실을 밝힌다. 검색·통계가
-    // 받아 온 범위 안에서만 계산되기 때문이다.
-    setAppsTruncated(a.truncated ? a.limit : null)
+  const loadPostings = useCallback(async () => {
+    const generation = ++readGeneration.current.postings
+    setPostingsLoading(true)
+    setPostingsError('')
+    try {
+      const data = await api.get('/postings')
+      if (generation === readGeneration.current.postings) setPostings(data.postings)
+    } catch (err) {
+      if (generation === readGeneration.current.postings) setPostingsError(err.message || '공고 목록을 불러오지 못했습니다.')
+    } finally {
+      if (generation === readGeneration.current.postings) setPostingsLoading(false)
+    }
   }, [])
 
+  const loadApplications = useCallback(async () => {
+    const generation = ++readGeneration.current.applications
+    setApplicationsLoading(true)
+    setApplicationsError('')
+    try {
+      const data = await api.get('/applications')
+      if (generation !== readGeneration.current.applications) return
+      setApplications(data.applications)
+      // 검색·통계는 받아 온 범위 안에서만 계산한다.
+      setAppsTruncated(data.truncated ? data.limit : null)
+    } catch (err) {
+      if (generation === readGeneration.current.applications) setApplicationsError(err.message || '지원서 목록을 불러오지 못했습니다.')
+    } finally {
+      if (generation === readGeneration.current.applications) setApplicationsLoading(false)
+    }
+  }, [])
+
+  // Each resource owns its failure state: a failed application lookup must not
+  // hide successfully loaded postings or turn a completed write into a failure.
+  const loadAll = useCallback(() => Promise.all([loadPostings(), loadApplications()]), [loadPostings, loadApplications])
+
   useEffect(() => {
-    loadAll()
-      .catch((err) => toast.error(err.message))
-      .finally(() => setLoading(false))
-  }, [loadAll, toast])
+    void loadAll()
+    const generations = readGeneration.current
+    return () => { generations.postings += 1; generations.applications += 1 }
+  }, [loadAll])
 
   const handleCreate = async (e) => {
     e.preventDefault()
-    if (draftBusy) return
+    if (creating || savingDraft || loadingDraft || createRequest.inFlight()) return
     setCreating(true)
     try {
-      await api.post('/postings', { ...form, ...(draftId ? { draftId, draftRevision } : {}) })
+      const result = await createRequest.run({ ...form, ...(draftId ? { draftId, draftRevision } : {}) })
+      if (!result) return
       // 한 곳에 모아 둔 초기값을 그대로 쓴다. 예전에는 여기서 필드를 빠뜨려
       // 그 칸이 제어를 벗어났고, 화면에는 앞 공고의 값이 남아 있는데 다음 공고는
       // 비어 있는 채로 저장됐다.
       resetDraftForm()
+      toast.success('공고가 정상 등록되었습니다.')
       await loadDrafts()
       await loadAll()
-      toast.success('공고가 정상 등록되었습니다.')
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -574,8 +633,8 @@ export default function RecruitPage() {
     const next = posting.status === 'open' ? 'closed' : 'open'
     try {
       await api.patch(`/postings/${posting.id}`, { status: next })
-      await loadAll()
       toast.success(next === 'closed' ? '공고를 마감했습니다.' : '공고를 다시 모집합니다.')
+      await loadAll()
     } catch (err) {
       toast.error(err.message)
     }
@@ -585,8 +644,8 @@ export default function RecruitPage() {
     if (!window.confirm(`'${posting.title}' 공고를 삭제하시겠습니까?`)) return
     try {
       await api.delete(`/postings/${posting.id}`)
-      await loadAll()
       toast.success('공고가 삭제되었습니다.')
+      await loadAll()
     } catch (err) {
       toast.error(err.message)
     }
@@ -594,6 +653,9 @@ export default function RecruitPage() {
 
   return (
     <div className="recruit-page">
+      <UnsavedChangesGuard when={unsaved || draftBusy} message={createRequest.unconfirmed
+        ? '공고 등록 결과가 아직 확인되지 않았습니다. 이 화면에서 같은 요청으로 다시 시도해 결과를 확인해주세요. 지금 이동하면 재시도 정보가 사라집니다.'
+        : '작성 중인 공고가 있습니다. 내용을 보관하려면 먼저 임시저장해주세요. 저장하지 않고 이동하면 변경사항이 사라집니다.'} />
       <header className="dashboard-header">
         <h1>채용 관리</h1>
         <div className="header-actions">
@@ -609,6 +671,14 @@ export default function RecruitPage() {
         <p className="muted" role="status">
           {draftSavedAt ? `${formatKst(draftSavedAt)} 임시저장${unsaved ? ' · 저장하지 않은 변경사항' : ''}` : '임시저장한 공고는 본인에게만 보입니다.'}
         </p>
+        {createRequest.unconfirmed && (
+          <div className="notice" role="alert">
+            <p>공고 등록 결과를 확인하지 못했습니다. 입력은 보존했으며, 중복 등록을 막기 위해 같은 요청으로 다시 시도합니다. 이 화면을 닫거나 새로고침하기 전에 결과를 확인해주세요.</p>
+            <button type="button" className="btn-secondary" disabled={creating} onClick={handleCreate}>
+              {creating ? '등록 확인 중...' : '같은 요청으로 등록 다시 시도'}
+            </button>
+          </div>
+        )}
         <form id="new-posting-form" onSubmit={handleCreate} className="posting-form">
           <fieldset className="posting-draft-fields" disabled={draftBusy}>
           <label>
@@ -744,60 +814,48 @@ export default function RecruitPage() {
         </div>
         {draftsLoading ? <p role="status">불러오는 중...</p> : draftsError ? <p role="alert" className="error">{draftsError}</p> : drafts.length === 0 ?
           <p className="notice">임시저장한 공고가 없습니다.</p> :
-          <div className="table-scroll" tabIndex={0}>
-            <table className="admin-table">
-              <caption className="sr-only">내 임시저장 공고 {drafts.length}건</caption>
-              <thead><tr><th scope="col">제목</th><th scope="col">저장 시각</th><th scope="col">관리</th></tr></thead>
-              <tbody>{drafts.map(draft => <tr key={draft.id}>
-                <th scope="row" className="cell-rowhead">{draft.title || '제목 없는 공고'}{draft.id === draftId ? ' · 작성 중' : ''}</th>
-                <td>{formatKst(draft.updatedAt)}</td>
-                <td><button type="button" className="btn-sm" onClick={() => openDraft(draft.id)} disabled={draftBusy}
-                  aria-label={`${draft.title || '제목 없는 공고'} 불러오기`}>불러오기</button></td>
-              </tr>)}</tbody>
-            </table>
-          </div>}
+          <ul className="posting-management-list" aria-label={`내 임시저장 공고 ${drafts.length}건`}>
+            {drafts.map(draft => <li key={draft.id}>
+              <div className="posting-management-heading">
+                <h3>{draft.title || '제목 없는 공고'}</h3>
+                {draft.id === draftId && <span className="badge badge-neutral">작성 중</span>}
+              </div>
+              <dl className="posting-management-meta"><div><dt>저장 시각</dt><dd>{formatKst(draft.updatedAt)}</dd></div></dl>
+              <div className="posting-management-actions">
+                <button type="button" className="btn-sm" onClick={() => openDraft(draft.id)} disabled={draftBusy}
+                  aria-label={`${draft.title || '제목 없는 공고'} 불러오기`}>불러오기</button>
+              </div>
+            </li>)}
+          </ul>}
       </section>
 
       <section className="recruit-section">
         <h2>내 채용 공고</h2>
-        {loading ? (
-          <p>불러오는 중...</p>
+        {postingsLoading ? (
+          <p role="status">불러오는 중...</p>
+        ) : postingsError ? (
+          <div>
+            <p className="error" role="alert">공고 목록을 불러오지 못했습니다. 저장·처리 결과와는 별개로 목록을 다시 확인해주세요. {postingsError}</p>
+            <button type="button" className="btn-secondary" onClick={loadPostings}>공고 다시 불러오기</button>
+          </div>
         ) : postings.length === 0 ? (
           <p className="notice">등록된 공고가 없습니다.</p>
         ) : (
-          <div className="table-scroll" tabIndex={0}>
-            <table className="admin-table">
-              <caption className="sr-only">내가 등록한 채용 공고 {postings.length}건</caption>
-              <thead>
-                <tr>
-                  <th scope="col">제목</th>
-                  <th scope="col">상태</th>
-                  <th scope="col">마감일</th>
-                  <th scope="col">지원자</th>
-                  <th scope="col">등록일</th>
-                  <th scope="col">관리</th>
-                </tr>
-              </thead>
-              <tbody>
+          <ul className="posting-management-list" aria-label={`내가 등록한 채용 공고 ${postings.length}건`}>
                 {postings.map((p) => (
-                  <tr key={p.id}>
-                    <th scope="row" className="cell-rowhead">
-                      {/* 제목이 그냥 글자였다. 표에서 이름을 누르면 그것으로
-                          가는 것은 설명이 필요 없는 동작인데, 여기서만 아무
-                          일도 일어나지 않았다. 지원자에게 보이는 바로 그
-                          화면으로 보낸다 — 공고와 계약 조건이 어긋났는지
-                          따지는 판정의 기준이 이 화면의 내용이다. */}
-                      <Link to={`/jobs/${p.id}`}>{p.title}</Link>
-                    </th>
-                    <td>
+                  <li key={p.id}>
+                    <div className="posting-management-heading">
+                      <h3><Link to={`/jobs/${p.id}`}>{p.title}</Link></h3>
                       <span className={`badge ${p.status === 'open' ? 'badge-success' : 'badge-neutral'}`}>
                         {p.status === 'open' ? '모집 중' : '마감'}
                       </span>
-                    </td>
-                    <td>{p.deadline || '상시'}</td>
-                    <td>{p.applicationCount}명</td>
-                    <td>{formatKstDate(p.createdAt)}</td>
-                    <td>
+                    </div>
+                    <dl className="posting-management-meta">
+                      <div><dt>마감일</dt><dd>{p.deadline || '상시'}</dd></div>
+                      <div><dt>지원자</dt><dd>{p.applicationCount}명</dd></div>
+                      <div><dt>등록일</dt><dd>{formatKstDate(p.createdAt)}</dd></div>
+                    </dl>
+                    <div className="posting-management-actions" role="group" aria-label={`${p.title} 관리`}>
                       {p.canReuse && <><button type="button" className="btn-sm" disabled={draftBusy} onClick={() => reusePosting(p)}>복사해 새 공고 작성</button>{' '}</>}
                       <button type="button" className="btn-sm" disabled={p.status !== 'open' || Boolean(p.deadline && p.deadline < formatKstDate(new Date().toISOString()))} onClick={() => setQrPosting(p)}>QR 코드 만들기</button>{' '}
                       <button
@@ -818,12 +876,10 @@ export default function RecruitPage() {
                       >
                         삭제
                       </button>
-                    </td>
-                  </tr>
+                    </div>
+                  </li>
                 ))}
-              </tbody>
-            </table>
-          </div>
+          </ul>
         )}
       </section>
 
@@ -839,8 +895,13 @@ export default function RecruitPage() {
 
       <section className="recruit-section">
         <h2>지원서</h2>
-        {loading ? (
-          <p>불러오는 중...</p>
+        {applicationsLoading ? (
+          <p role="status">불러오는 중...</p>
+        ) : applicationsError ? (
+          <div>
+            <p className="error" role="alert">지원서 목록을 불러오지 못했습니다. {applicationsError}</p>
+            <button type="button" className="btn-secondary" onClick={loadApplications}>지원서 목록 다시 불러오기</button>
+          </div>
         ) : applications.length === 0 ? (
           <p className="notice">아직 접수된 지원서가 없습니다.</p>
         ) : (
@@ -868,6 +929,7 @@ export default function RecruitPage() {
                 <option value="submitted">심사 대기</option>
                 <option value="passed">서류합격</option>
                 <option value="rejected">불합격</option>
+                <option value="withdrawn">지원 철회</option>
               </select>
               <span className="filter-count">{filteredApps.length}건</span>
             </div>
@@ -927,6 +989,7 @@ export default function RecruitPage() {
 
       {selectedApp && (
         <ApplicationDetail
+          key={selectedApp}
           appId={selectedApp}
           onClose={() => setSelectedApp(null)}
           onChanged={loadAll}

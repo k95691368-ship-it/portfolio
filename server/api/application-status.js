@@ -1,5 +1,6 @@
 import { jsonResponse, jsonError } from '../_lib/http.js'
 import { checkRateLimit } from '../_lib/rateLimit.js'
+import { applicationStatus } from '../_lib/applicationAccess.js'
 
 function maskName(name) {
   const s = String(name || '')
@@ -20,7 +21,7 @@ export async function onRequestGet({ request, env }) {
   }
 
   const row = await env.DB.prepare(
-    `SELECT a.applicant_name, a.status, a.created_at, a.reviewed_at, p.title AS posting_title
+    `SELECT a.applicant_name, a.status, a.withdrawn_at, a.created_at, a.reviewed_at, p.title AS posting_title
      FROM applications a
      JOIN job_postings p ON p.id = a.posting_id
      WHERE a.lookup_code = ?`
@@ -33,7 +34,7 @@ export async function onRequestGet({ request, env }) {
   return jsonResponse({
     postingTitle: row.posting_title,
     applicantName: maskName(row.applicant_name),
-    status: row.status,
+    status: applicationStatus(row),
     submittedAt: row.created_at,
     reviewedAt: row.reviewed_at,
   })

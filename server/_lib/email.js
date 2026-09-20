@@ -72,7 +72,7 @@ export async function sendRoomInviteEmail(env, { to, subject, bodyText, companyN
 // 서류 전형 결과(합격/불합격)를 지원자에게 안내.
 export async function sendApplicationResultEmail(
   env,
-  { to, applicantName, companyName, result, inviteCode, idempotencyKey }
+  { to, applicantName, companyName, postingTitle, result, inviteCode, idempotencyKey }
 ) {
   const passed = result === 'passed'
   const subject = passed
@@ -90,6 +90,7 @@ export async function sendApplicationResultEmail(
     ? `안녕하세요, ${applicantName}님.
 
 ${companyName} 1차 서류 전형에 합격하셨습니다.
+${postingTitle ? `지원 공고: ${postingTitle}\n` : ''}
 
 면접방 입장 코드: ${inviteCode ? formatInviteCode(inviteCode) : '(담당자에게 문의)'}
 
@@ -101,6 +102,7 @@ ${companyName} 1차 서류 전형에 합격하셨습니다.
     : `안녕하세요, ${applicantName}님.
 
 ${companyName} 서류 전형에 지원해 주셔서 진심으로 감사드립니다.
+${postingTitle ? `지원 공고: ${postingTitle}\n` : ''}
 아쉽게도 이번 전형에서는 함께하지 못하게 되었음을 안내드립니다.
 지원자님의 앞날에 좋은 결과가 있기를 응원하겠습니다.
 
@@ -112,6 +114,8 @@ ${companyName} 서류 전형에 지원해 주셔서 진심으로 감사드립니
     bodyText,
     companyName,
     details: [
+      ['회사', companyName],
+      ...(postingTitle ? [['지원 공고', postingTitle]] : []),
       ['지원자', applicantName],
       ['전형', '서류 전형'],
       ['결과', passed ? '합격' : '불합격'],

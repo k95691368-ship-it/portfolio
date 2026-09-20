@@ -6,11 +6,12 @@ import { useToast } from '../context/ToastContext.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 
 const STATUS_INFO = {
+  withdrawn: { label: '지원 철회', badge: 'badge-neutral', desc: '본인 요청으로 지원이 철회되었습니다.' },
   submitted: { label: '심사 대기 중', badge: 'badge-warning', desc: '제출하신 지원서를 검토하고 있습니다. 조금만 기다려주세요.' },
   passed: {
     label: '서류 합격',
     badge: 'badge-success',
-    desc: '축하합니다! 지원하신 이메일을 아이디로 로그인해 면접 절차를 진행해주세요. (임시 비밀번호는 담당자가 안내합니다)',
+    desc: '서류 전형에 합격했습니다. 결과 이메일의 입장 코드를 채용 공고 화면에 입력해 면접 절차를 진행해주세요.',
   },
   rejected: {
     label: '불합격',
@@ -75,6 +76,7 @@ export default function ApplicationStatusPage() {
         </Link>
         <h1>지원 현황 조회</h1>
         <p>지원 완료 시 발급된 접수번호로 심사 상태를 확인할 수 있습니다.</p>
+        <Link to="/application-manage">접수번호 찾기 · 제출 내용 확인·수정 · 지원 철회</Link>
       </header>
 
       {/* 안내 문구만 칸 안에 넣어 두면, 입력을 시작하는 순간 이 칸이 무엇을
@@ -109,8 +111,8 @@ export default function ApplicationStatusPage() {
             ? <button type="button" className="btn-secondary" disabled={loading} onClick={claim}>접수번호로 내 계정에 연결</button>
             : <Link to="/login" className="back-link">기존 지원자 계정이 있다면 로그인 후 접수번호로 연결해주세요.</Link>)}
           {result.status === 'passed' && (
-            <Link to="/login" className="btn-primary status-login-btn">
-              로그인하러 가기
+            <Link to="/jobs" className="btn-primary status-login-btn">
+              면접방 입장 코드 입력하기
             </Link>
           )}
         </div>

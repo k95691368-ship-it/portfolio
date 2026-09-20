@@ -63,7 +63,7 @@ export async function onRequestPost({ env, request, data, params }) {
     return jsonError('요청을 읽지 못했습니다.', 400)
   }
 
-  const text = String(body ?? '').trim()
+  const text = typeof body === 'string' ? body.trim() : ''
   if (!text) return jsonError('내용을 입력하세요.', 400)
   if (text.length > MAX_BODY) return jsonError(`${MAX_BODY}자를 넘을 수 없습니다.`, 400)
 

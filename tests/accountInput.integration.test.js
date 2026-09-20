@@ -1,4 +1,8 @@
-import { afterEach, beforeEach, expect, it } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+vi.mock('../server/_lib/gmail.js', () => ({ isGmailConfigured: () => true }))
+vi.mock('../server/_lib/emailOutbox.js', () => ({ sendTrackedEmail: vi.fn(async () => ({ id: 'mock-message' })) }))
+import { sendTrackedEmail } from '../server/_lib/emailOutbox.js'
+import { verifyAccountEmail } from '../server/_lib/accountRecovery.js'
 import { sqliteApp, seedUser } from './helpers/sqliteApp.js'
 import { onRequestPost as signup } from '../server/api/signup.js'
 import { onRequestPost as login } from '../server/api/login.js'
@@ -44,8 +48,12 @@ it('does not coerce credentials during login or in the password primitives', asy
 
 it('keeps signup, login, and password change functional with valid credentials', async () => {
   const signupResponse = await signup({ env: { DB: db }, request: request({ ...valid, email: ' VALID@EXAMPLE.INVALID ', remember: false }) })
-  expect(signupResponse.status).toBe(201)
-  expect((await signupResponse.json()).sessionPersistent).toBe(false)
+  expect(signupResponse.status).toBe(202)
+  expect((await signupResponse.json()).verificationRequired).toBe(true)
+  const token = sendTrackedEmail.mock.calls.at(-1)[1].text.match(/#token=([A-Za-z0-9_-]{43})/)[1]
+  const verified = await verifyAccountEmail({ env: { DB: db }, request: request({ token, password: valid.password }) })
+  expect(verified.status).toBe(200)
+  expect((await verified.json()).sessionPersistent).toBe(false)
   expect((await login({ env: { DB: db }, request: request({ email: valid.email, password: valid.password }) })).status).toBe(200)
   const user = db.sql.prepare('SELECT * FROM users WHERE email=?').get(valid.email)
   const changed = await changePassword({ env: { DB: db }, data: { user }, request: request({ currentPassword: valid.password, newPassword: 'a-new-password' }) })

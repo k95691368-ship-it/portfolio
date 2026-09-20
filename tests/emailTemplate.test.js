@@ -11,7 +11,7 @@ describe('recruiting HTML email presentation', () => {
   it('uses an image-independent banner, accessible detail table and live CTA', () => {
     const html = buildBrandedEmailHtml(message)
     expect(html).toContain('<h1')
-    expect(html).toContain('bgcolor="#0d1b35"')
+    expect(html).toContain('bgcolor="#0067b8"')
     expect(html).toContain('aria-label="면접방 참여 안내 상세 정보"')
     expect(html).toContain('<th scope="row"')
     expect(html).toContain('면접방 입장 코드 입력')
@@ -28,6 +28,19 @@ describe('recruiting HTML email presentation', () => {
     expect(html).toContain('table-layout:fixed')
     expect(html).toContain('name="viewport"')
     expect(html).not.toMatch(/display:\s*(grid|flex)/)
+  })
+
+  it('uses the Microsoft white, gray and blue system without requiring remote fonts', () => {
+    const html = buildBrandedEmailHtml(message)
+    expect(html).toContain('background-color:#ffffff')
+    expect(html).toContain('background-color:#f5f5f5')
+    expect(html).toContain('color:#1a1a1a')
+    expect(html).toContain('color:#616161')
+    expect(html).toContain("font-family:'Segoe UI Variable','Segoe UI','SUIT Variable','SUIT'")
+    expect(html).toContain('border-radius:20px')
+    expect(html).toContain('border-radius:999px')
+    expect(html).not.toContain('#0d1b35')
+    expect(html).not.toMatch(/@font-face|fonts\.google/)
   })
 
   it.each(['companyName', 'title', 'bodyText'])('escapes untrusted %s', (field) => {

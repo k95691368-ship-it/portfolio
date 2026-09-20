@@ -81,7 +81,7 @@ export async function verifyPassword(password, storedHash, storedSalt) {
   return timingSafeEqual(toBase64(hashBytes), storedHash)
 }
 
-export async function createSession(db, userId, options = {}) {
+export async function createSessionCredentials(options = {}) {
   // 명시하지 않으면 유지한다 — 예전 동작 그대로.
   const persistent = options.persistent !== false
   const ttl = options.authMethod === TRIAL_AUTH_METHOD
@@ -95,6 +95,23 @@ export async function createSession(db, userId, options = {}) {
   const token = toBase64Url(crypto.getRandomValues(new Uint8Array(32)))
   const tokenHash = await sha256Hex(token)
   const expiresAt = new Date(Date.now() + ttl * 1000).toISOString()
+  return { token, tokenHash, expiresAt, authMethod, scopedRoomId }
+}
+
+export async function createSession(db, userId, options = {}) {
+  const { token, tokenHash, expiresAt, authMethod, scopedRoomId } = await createSessionCredentials(options)
+  if (options.expectedPasswordHash) {
+    // Password verification and session issuance can straddle a reset. Lock the
+    // account and compare the credential again in the insertion transaction.
+    const results = await db.batch([
+      db.prepare('UPDATE users SET password_hash = password_hash WHERE id = ?').bind(userId),
+      db.prepare(`INSERT INTO sessions (token_hash, user_id, expires_at, auth_method, scoped_room_id)
+        SELECT ?, id, ?, ?, ? FROM users WHERE id = ? AND password_hash = ?
+          AND is_suspended = 0 AND account_status <> 'pending'`)
+        .bind(tokenHash, expiresAt, authMethod, scopedRoomId, userId, options.expectedPasswordHash),
+    ])
+    return results[1]?.meta?.changes ? { token, expiresAt } : null
+  }
 
   // 만료된 세션 행은 아무도 지우지 않아 영원히 쌓이고 있었다. 새 세션을 만들
   // 때 이 사용자의 죽은 행을 함께 치운다 — 따로 도는 청소 작업이 없는 환경이라,
@@ -139,7 +156,8 @@ export function parseCookie(request, name) {
   if (bearer) return bearer
   const header = request.headers.get('Cookie') || ''
   const match = header.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`))
-  return match ? decodeURIComponent(match[1]) : null
+  try { return match ? decodeURIComponent(match[1]) : null }
+  catch { return null }
 }
 
 // Max-Age 를 붙이지 않으면 브라우저를 닫을 때 쿠키가 사라진다(세션 쿠키).
@@ -193,7 +211,7 @@ export async function getRoomSessionUser(db, request, roomId) {
     )
     .bind(tokenHash, roomId)
     .first()
-  if (!row || row.is_suspended) return null
+  if (!row || row.is_suspended || row.account_status === 'pending') return null
   return applyTrialCapabilities(row)
 }
 
@@ -232,7 +250,7 @@ export async function getSessionUser(db, request) {
     )
     .bind(tokenHash)
     .first()
-  if (!row || row.is_suspended) return null
+  if (!row || row.is_suspended || row.account_status === 'pending') return null
   return applyTrialCapabilities(row)
 }
 

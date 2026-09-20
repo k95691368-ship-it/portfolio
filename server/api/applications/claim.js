@@ -10,7 +10,7 @@ export async function onRequestPost({ request, env, data }) {
   const code = String(body?.code || '').trim().toUpperCase()
   if (!/^[A-Z2-9]{10}$/.test(code)) return jsonError('접수번호를 확인해주세요.', 400)
   const result = await env.DB.prepare(`UPDATE applications SET created_user_id = ?
-    WHERE lookup_code = ? AND applicant_email = ? AND status = 'submitted'
+    WHERE lookup_code = ? AND applicant_email = ? AND status = 'submitted' AND withdrawn_at IS NULL
       AND (created_user_id IS NULL OR created_user_id = ?)`)
     .bind(user.id, code, user.email, user.id).run()
   if (!result.meta?.changes) return jsonError('계정 이메일과 접수번호를 확인해주세요. 심사가 완료된 지원서는 새로 연결할 수 없습니다.', 409)

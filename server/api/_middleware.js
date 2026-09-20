@@ -43,6 +43,16 @@ export async function onRequest(context) {
     return jsonError('다른 사이트에서 보낸 요청은 처리하지 않습니다.', 403)
   }
 
+  const roomId = roomIdFromApiPath(requestUrl.pathname)
+  const isRecordingFileGet = request.method === 'GET' &&
+    /^\/api\/rooms\/[^/]+\/interviews\/[^/]+\/recordings\/[^/]+\/file\/?$/.test(requestUrl.pathname)
+  // Explicit headers take precedence over the media-link selector. Never switch
+  // to a different identity merely because the selected session expired.
+  const identity = request.headers.get('X-Room-Identity') ||
+    (isRecordingFileGet ? requestUrl.searchParams.get('identity') : null)
+  const wantsCodeIdentity = identity === 'code'
+  const wantsAccountIdentity = identity === 'account'
+
   // 세션 조회 하나가 실패하면 전원이 로그아웃된다.
   //
   // 이 줄은 보호 없이 await 하고 있었다. D1 이 한 번 흔들리면 미들웨어가
@@ -50,12 +60,12 @@ export async function onRequest(context) {
   // 화면은 그 실패를 "로그인 안 됨"으로 읽어 로그인 화면으로 보낸다 —
   // 쿠키는 멀쩡한데 로그인이 풀린 것처럼 보이는 자리다.
   //
-  // 읽지 못한 것은 "세션 없음"으로 떨어뜨리되 조용히 넘기지는 않는다.
+  // 조회 장애는 로그아웃이나 다른 신원으로 처리하지 않는다.
   try {
-    context.data.user = await getSessionUser(context.env.DB, request)
-  } catch (err) {
-    console.error('session lookup failed:', err)
-    context.data.user = null
+    context.data.user = roomId && wantsCodeIdentity ? null : await getSessionUser(context.env.DB, request)
+  } catch {
+    console.error('session lookup failed')
+    return jsonError('로그인 상태를 확인할 수 없습니다. 잠시 후 다시 시도해주세요.', 503)
   }
 
   // 방 안에서는 어느 문으로 들어왔느냐로 신원이 갈린다.
@@ -72,7 +82,6 @@ export async function onRequest(context) {
   //
   // 여기서 정해진 값이 곧 data.user 다. 이 아래 어느 코드도 신원을 다시
   // 판단하지 않는다 — 판정이 여러 층에 흩어졌던 것이 지난번 사고의 원인이다.
-  const roomId = roomIdFromApiPath(requestUrl.pathname)
   if (context.data.user?.developer_trial && requestUrl.pathname === '/api/change-password') {
     return jsonError('체험 계정의 로그인 정보는 변경할 수 없습니다.', 403)
   }
@@ -85,20 +94,9 @@ export async function onRequest(context) {
       return jsonError('요청 데이터를 읽을 수 없습니다.', 400)
     }
   }
-  const isRecordingFileGet =
-    request.method === 'GET' &&
-    /^\/api\/rooms\/[^/]+\/interviews\/[^/]+\/recordings\/[^/]+\/file\/?$/.test(
-      requestUrl.pathname
-    )
   // <video>/<a>는 사용자 정의 헤더를 붙일 수 없다. 비밀값이 아닌 selector를
   // 녹화 파일 GET 한 경로에서만 받되, 실제 신원 전환은 아래 room_session
   // 검증이 성공할 때만 일어난다. 다른 GET에 ?identity=code를 붙여도 무시한다.
-  const wantsCodeIdentity =
-    request.headers.get('X-Room-Identity') === 'code' ||
-    (isRecordingFileGet && requestUrl.searchParams.get('identity') === 'code')
-  const wantsAccountIdentity =
-    request.headers.get('X-Room-Identity') === 'account' ||
-    (isRecordingFileGet && requestUrl.searchParams.get('identity') === 'account')
   let viaRoomCookie = false
   if (roomId && !wantsAccountIdentity && (wantsCodeIdentity || !context.data.user)) {
     try {
@@ -107,9 +105,11 @@ export async function onRequest(context) {
         context.data.user = roomUser
         viaRoomCookie = true
       }
-    } catch (err) {
-      console.error('room session lookup failed:', err)
+    } catch {
+      console.error('room session lookup failed')
+      return jsonError('면접방 입장 상태를 확인할 수 없습니다. 잠시 후 다시 시도해주세요.', 503)
     }
+    if (wantsCodeIdentity && !viaRoomCookie) return jsonError('면접방 입장이 만료되었습니다. 초대코드로 다시 입장해주세요.', 401)
   }
 
   // 쓰고 있는 동안에는 로그인이 끝나지 않게 만료를 미룬다.

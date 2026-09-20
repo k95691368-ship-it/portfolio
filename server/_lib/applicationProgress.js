@@ -35,6 +35,7 @@ function isClosedRoom(roomStatus) {
 
 // row: { status, createdAt, reviewedAt, roomId, roomStatus, signedAt }
 export function describeApplicationProgress(row) {
+  const withdrawn = row?.status === 'withdrawn'
   const rejected = row?.status === 'rejected'
   const passed = row?.status === 'passed'
   const closed = isClosedRoom(row?.roomStatus)
@@ -56,7 +57,7 @@ export function describeApplicationProgress(row) {
 
   // 전형이 멈춘 자리. 불합격은 서류 심사에서, 전형 종료는 그 방이 와 있던
   // 단계에서 멈춘다. 멈춘 단계는 '진행 중'이 아니라 '멈춤'으로 표시한다.
-  const stoppedAt = rejected ? 1 : closed ? reached : null
+  const stoppedAt = withdrawn ? 0 : rejected ? 1 : closed ? reached : null
 
   const steps = STEP_KEYS.map((key, i) => {
     let state
@@ -69,7 +70,8 @@ export function describeApplicationProgress(row) {
   })
 
   let headline
-  if (rejected) headline = '이번 전형에서는 함께하지 못하게 되었습니다.'
+  if (withdrawn) headline = '지원자가 지원을 철회했습니다.'
+  else if (rejected) headline = '이번 전형에서는 함께하지 못하게 되었습니다.'
   else if (closed) headline = '이 전형은 종료되었습니다. 면접방에서 사유와 지금까지의 기록을 볼 수 있습니다.'
   // 보관된 방은 대화도 서명도 잠겨 있다. 그것을 모른 채 "서명해주세요"라고
   // 재촉하면, 지원자는 하라는 대로 눌러 보고 아무 일도 일어나지 않는 것을
@@ -112,7 +114,7 @@ export function describeApplicationProgress(row) {
 // 여러 지원서를 진행 중인 것부터 보여준다. 끝난 건(불합격·체결 완료)은 뒤로.
 export function sortMyApplications(list) {
   const weight = (a) => {
-    if (a.status === 'rejected') return 3
+    if (a.status === 'rejected' || a.status === 'withdrawn') return 3
     if (isClosedRoom(a.roomStatus)) return 3
     if (a.roomStatus === 'signed') return 2
     if (a.roomId) return 0

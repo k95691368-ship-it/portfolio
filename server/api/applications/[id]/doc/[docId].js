@@ -8,7 +8,7 @@ export async function onRequestGet({ env, data, params }) {
 
   const doc = await env.DB.prepare(
     `SELECT filename, r2_key, content_type FROM application_documents
-     WHERE id = ? AND application_id = ?`
+     WHERE id = ? AND application_id = ? AND superseded_at IS NULL`
   )
     .bind(params.docId, params.id)
     .first()

@@ -10,14 +10,19 @@ export default function JobDetailPage() {
   const [posting, setPosting] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [reload, setReload] = useState(0)
 
   useEffect(() => {
+    let active = true
+    setLoading(true)
+    setError('')
     api
       .get(`/jobs/${id}`)
-      .then((data) => setPosting(data.posting))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
-  }, [id])
+      .then((data) => { if (active) setPosting(data.posting) })
+      .catch((err) => { if (active) setError(err.message || '공고를 불러오지 못했습니다.') })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [id, reload])
 
   if (loading) return <p>불러오는 중...</p>
 
@@ -34,6 +39,7 @@ export default function JobDetailPage() {
         <p className="error" role="alert">
           {error}
         </p>
+        <button type="button" className="btn-secondary" onClick={() => setReload(value => value + 1)}>공고 다시 불러오기</button>
         <p>
           <Link to="/jobs">모집 중인 다른 공고 보기 →</Link>
         </p>
@@ -71,6 +77,7 @@ export default function JobDetailPage() {
         </p>
       )}
 
+      <div className="job-detail-workspace">
       <div className="job-detail-body"><PostingDescription value={posting.description} /></div>
 
       {posting.open !== false && (
@@ -84,6 +91,7 @@ export default function JobDetailPage() {
           </button>
         </div>
       )}
+      </div>
     </div>
   )
 }

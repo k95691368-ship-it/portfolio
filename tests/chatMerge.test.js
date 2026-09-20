@@ -9,8 +9,26 @@ import {
   roomMessageBody,
   roomMessagesPath,
 } from '../src/hooks/useChatPolling.js'
+import { messageIdKey } from '../src/lib/messageId.js'
 
 describe('mergeById', () => {
+  it('orders decimal-string IDs numerically when an earlier peer message arrives after my POST', () => {
+    expect(mergeById([{ id: '10' }], [{ id: '9' }]).map(message => message.id)).toEqual(['9', '10'])
+  })
+  it('deduplicates numeric and decimal-string representations of the same ID', () => {
+    const previous = [{ id: 9, body: 'already acknowledged' }]
+    expect(mergeById(previous, [{ id: '9', body: 'polled copy' }])).toBe(previous)
+  })
+  it('orders adjacent BIGINT IDs without converting them to imprecise Numbers', () => {
+    expect(mergeById([{ id: '9007199254740993' }], [{ id: '9007199254740992' }]).map(message => message.id))
+      .toEqual(['9007199254740992', '9007199254740993'])
+  })
+  it.each([null, 'malformed', [null], [{ id: 'not-an-id' }], [{ id: 9007199254740992 }]])('rejects malformed message batches before merging: %j', incoming => {
+    expect(() => mergeById([{ id: 1 }], incoming)).toThrow()
+  })
+  it('deduplicates repeated IDs within a single incoming batch', () => {
+    expect(mergeById([{ id: 1 }], [{ id: 2 }, { id: 2 }, { id: 3 }]).map((m) => m.id)).toEqual([1, 2, 3])
+  })
   it('새 메시지를 뒤에 붙인다', () => {
     const merged = mergeById([{ id: 1 }, { id: 2 }], [{ id: 3 }])
     expect(merged.map((m) => m.id)).toEqual([1, 2, 3])
@@ -66,4 +84,14 @@ describe('roomMessagesPath', () => {
     })
     expect(roomMessageBody('기존 방 메시지')).toEqual({ body: '기존 방 메시지' })
   })
+})
+
+it('normalizes safe IDs and preserves the complete signed BIGINT range without accepting malformed values', () => {
+  expect(messageIdKey(9)).toBe('9')
+  expect(messageIdKey('9007199254740993')).toBe('9007199254740993')
+  expect(messageIdKey('9223372036854775807')).toBe('9223372036854775807')
+  expect(messageIdKey('0', { allowZero: true })).toBe('0')
+  for (const invalid of ['9223372036854775808', '-1', '01', '1.5', '1e2', '', null, {}, 9007199254740992, '0']) {
+    expect(messageIdKey(invalid)).toBeNull()
+  }
 })

@@ -4,6 +4,8 @@ import { canManageRecruiting } from '../../_lib/recruiter.js'
 import { logAdminAction } from '../../_lib/auditLog.js'
 import { normalizePostingConditions } from '../../_lib/postingConditions.js'
 import { validDraftId } from '../../_lib/postingDrafts.js'
+import { postingInputError } from '../../_lib/postingInput.js'
+import { runCreateOperation } from '../../_lib/createOperation.js'
 
 const TITLE_MAX = 150
 const SHORT_MAX = 100
@@ -35,7 +37,7 @@ export async function onRequestGet({ env, data }) {
   const base = `
     SELECT p.id, p.created_by_user_id, p.title, p.department, p.employment_type, p.location, p.status, p.deadline, p.created_at,
            u.display_name AS created_by_display_name,
-           (SELECT COUNT(*) FROM applications a WHERE a.posting_id = p.id) AS application_count
+           (SELECT COUNT(*) FROM applications a WHERE a.posting_id = p.id AND a.withdrawn_at IS NULL) AS application_count
     FROM job_postings p
     JOIN users u ON u.id = p.created_by_user_id
   `
@@ -55,6 +57,8 @@ export async function onRequestPost({ request, env, data }) {
   if (!canManageRecruiting(data.user)) return jsonError('채용 공고를 등록할 권한이 없습니다.', 403)
 
   const body = await request.json().catch(() => null)
+  const inputError = postingInputError(body)
+  if (inputError) return jsonError(inputError, 400)
   const title = (body?.title || '').toString().trim().slice(0, TITLE_MAX)
   const description = (body?.description || '').toString().trim().slice(0, DESC_MAX)
   const department = (body?.department || '').toString().trim().slice(0, SHORT_MAX)
@@ -75,6 +79,36 @@ export async function onRequestPost({ request, env, data }) {
     return jsonError('임시저장 공고를 저장하거나 다시 불러온 뒤 등록해주세요.', 400)
   }
 
+  const response = await runCreateOperation({
+    env, userId: data.user.id, kind: 'posting', operationId: body?.operationId,
+    payload: [title, description, department || null, employmentType || null, location || null, deadline || null,
+      conditions.wageType, conditions.wageMin, conditions.wageMax, conditions.workHoursStart, conditions.workHoursEnd,
+      conditions.workDays, draftId ?? null, draftId ? body.draftRevision : null],
+    create: scopedEnv => createPosting(scopedEnv, data.user.id, {
+      title, description, department, employmentType, location, deadline, conditions, draftId, draftRevision: body.draftRevision,
+    }),
+    recover: async (scopedEnv, resourceId) => {
+      const posting = await scopedEnv.DB.prepare('SELECT id, created_by_user_id FROM job_postings WHERE id = ?')
+        .bind(resourceId).first()
+      if (!posting) return jsonError('이 요청으로 만든 공고는 삭제되었습니다. 다시 생성하지 않았습니다.', 410)
+      if (posting.created_by_user_id !== data.user.id) return jsonError('이 공고에 접근할 권한이 없습니다.', 403)
+      return jsonResponse({ ok: true, id: posting.id, recovered: true })
+    },
+  })
+
+  // Logging remains best-effort and outside the creation transaction. A failed
+  // audit INSERT must not abort PostgreSQL's transaction after creation succeeds.
+  if (response.status === 201) {
+    await logAdminAction(env, {
+      actorId: data.user.id,
+      action: 'posting_create',
+      detail: title,
+    }).catch(() => {})
+  }
+  return response
+}
+
+async function createPosting(env, userId, { title, description, department, employmentType, location, deadline, conditions, draftId, draftRevision }) {
   const id = genId()
   const insertSql =
     `INSERT INTO job_postings
@@ -83,7 +117,7 @@ export async function onRequestPost({ request, env, data }) {
      ${draftId ? 'SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM posting_drafts WHERE id = ? AND user_id = ? AND published_posting_id = ?' : 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'}`
   const values = [
       id,
-      data.user.id,
+      userId,
       title,
       department || null,
       employmentType || null,
@@ -103,19 +137,13 @@ export async function onRequestPost({ request, env, data }) {
     const results = await env.DB.batch([
       env.DB.prepare(`UPDATE posting_drafts SET published_at = ?, published_posting_id = ?, revision = revision + 1
         WHERE id = ? AND user_id = ? AND revision = ? AND published_at IS NULL`)
-        .bind(new Date().toISOString(), id, draftId, data.user.id, body.draftRevision),
-      env.DB.prepare(insertSql).bind(...values, draftId, data.user.id, id),
+        .bind(new Date().toISOString(), id, draftId, userId, draftRevision),
+      env.DB.prepare(insertSql).bind(...values, draftId, userId, id),
     ])
     if (!results[0].meta.changes) return jsonError('이미 등록되었거나 다른 창에서 변경된 공고입니다. 임시저장 목록을 새로고침해주세요.', 409)
   } else {
     await env.DB.prepare(insertSql).bind(...values).run()
   }
-
-  await logAdminAction(env, {
-    actorId: data.user.id,
-    action: 'posting_create',
-    detail: title,
-  }).catch(() => {})
 
   return jsonResponse({ ok: true, id }, 201)
 }

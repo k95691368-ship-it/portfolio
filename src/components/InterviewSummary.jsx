@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { formatKst } from '../lib/formatTime.js'
@@ -9,20 +9,38 @@ import { formatKst } from '../lib/formatTime.js'
 // 근거로 쓴 요약인지 알 수 있도록 작성자·작성 시점·그때까지의 대화 수를
 // 함께 보여준다. 대화가 더 오갔으면 다시 정리할 수 있다.
 // record: 면접방 화면이 한 번의 요청으로 함께 받아 온 기록 (없으면 null)
-export default function InterviewSummary({ roomId, record, canWrite, messageCount, onChanged }) {
+export default function InterviewSummary({ roomId, record, canWrite, messageCount, onChanged, onWriteError }) {
   const toast = useToast()
   const [busy, setBusy] = useState(false)
+  const lifetime = useRef(null)
+  const pending = useRef(false)
+  useEffect(() => {
+    const scope = {}
+    lifetime.current = scope
+    pending.current = false
+    setBusy(false)
+    return () => { if (lifetime.current === scope) lifetime.current = null }
+  }, [roomId])
 
   const handleWrite = async () => {
+    const scope = lifetime.current
+    if (!scope || pending.current || !canWrite) return
+    pending.current = true
     setBusy(true)
     try {
       await api.post(`/rooms/${roomId}/interview-summary`, {})
-      await onChanged()
+      if (lifetime.current !== scope) return
       toast.success('면접 요약이 기록되었습니다.')
+      try { await onChanged() } catch {
+        if (lifetime.current === scope) toast.info('요약은 저장되었지만 최신 면접방을 불러오지 못했습니다. 다시 불러오기를 눌러주세요.')
+      }
     } catch (err) {
-      toast.error(err.message)
+      if (lifetime.current === scope) {
+        if (onWriteError) onWriteError(err)
+        else toast.error(err.message)
+      }
     } finally {
-      setBusy(false)
+      if (lifetime.current === scope) { pending.current = false; setBusy(false) }
     }
   }
 

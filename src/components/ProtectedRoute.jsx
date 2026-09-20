@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
+import SessionRecovery from './SessionRecovery.jsx'
 
 const ROLE_LABEL = { company: '회사', candidate: '구직자' }
 
@@ -25,19 +26,21 @@ export default function ProtectedRoute({
   requireRecruiter,
   allowMustChangePassword,
 }) {
-  const { user, loading } = useAuth()
+  const { user, loading, connectionError } = useAuth()
   const toast = useToast()
 
   const mustChange = !!user?.mustChangePassword && !allowMustChangePassword
   const denial =
-    !loading && user && !mustChange ? denialReason(user, { role, requireAdmin, requireRecruiter }) : null
+    !loading && !connectionError && user && !mustChange
+      ? denialReason(user, { role, requireAdmin, requireRecruiter }) : null
 
   // 알림은 렌더 중이 아니라 커밋 후에 띄운다.
   useEffect(() => {
     if (denial) toast.error(denial)
   }, [denial, toast])
 
-  if (loading) return <p>불러오는 중...</p>
+  if (loading) return <p role="status">로그인 상태 확인 중...</p>
+  if (connectionError) return <SessionRecovery />
   if (!user) return <Navigate to="/login" replace />
   if (mustChange) return <Navigate to="/change-password" replace />
   if (denial) return <Navigate to="/dashboard" replace />

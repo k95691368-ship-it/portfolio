@@ -30,7 +30,9 @@ const PRIVATE_HEADERS = {
 }
 
 export function jsonResponse(data, status = 200, extraHeaders = {}) {
-  return new Response(JSON.stringify(data), {
+  // Drivers can return BIGINT as bigint instead of a decimal string. Preserve
+  // its exact value without rounding normal numbers or changing global JSON.
+  return new Response(JSON.stringify(data, (_key, value) => typeof value === 'bigint' ? value.toString() : value), {
     status,
     headers: { ...PRIVATE_HEADERS, ...extraHeaders },
   })

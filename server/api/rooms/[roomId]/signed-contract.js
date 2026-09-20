@@ -10,6 +10,7 @@ import {
 } from '../../../_lib/email.js'
 import { notifyUser } from '../../../_lib/notify.js'
 import { recordDelivery } from '../../../_lib/delivery.js'
+import { matchesSignature } from '../../../_lib/uploads.js'
 
 const MAX_PDF_SIZE = 8 * 1024 * 1024 // 8MB
 
@@ -89,9 +90,13 @@ export async function onRequestPost({ request, env, data, params }) {
   const form = await request.formData().catch(() => null)
   const file = form?.get('pdf')
   if (!file || typeof file === 'string') return jsonError('계약서 파일이 없습니다.', 400)
+  if (file.size === 0) return jsonError('빈 계약서 파일은 저장할 수 없습니다.', 400)
   if (file.size > MAX_PDF_SIZE) return jsonError('계약서 파일이 너무 큽니다. (8MB 이하)', 400)
 
   const buffer = await file.arrayBuffer()
+  if (!matchesSignature(new Uint8Array(buffer, 0, Math.min(buffer.byteLength, 8)), 'pdf')) {
+    return jsonError('PDF 형식의 계약서만 저장할 수 있습니다.', 400)
+  }
   // 위변조 방지: 저장 시점의 문서 지문(SHA-256). 다운로드한 PDF를 다시 해시해
   // 비교하면 이후 변경되지 않았음을 증명할 수 있다.
   const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
@@ -102,7 +107,7 @@ export async function onRequestPost({ request, env, data, params }) {
   // 영원히 "변조됨"으로 나온다 — 아무도 손대지 않았는데.
   //
   // 저장할 때마다 새 키를 쓴다. 기록이 새 파일을 가리킨 뒤에 옛 파일을 지운다.
-  const r2Key = `contracts/${params.roomId}/signed-${Date.now()}.pdf`
+  const r2Key = `contracts/${params.roomId}/signed-${genId()}.pdf`
   const filename = `근로계약서_${params.roomId.slice(0, 8)}.pdf`
 
   const existing = await env.DB.prepare('SELECT r2_key FROM signed_contracts WHERE room_id = ?')
@@ -166,9 +171,9 @@ export async function onRequestPost({ request, env, data, params }) {
       `UPDATE signed_contracts
        SET email_status = ?, email_error = ?, emailed_at = CASE WHEN ? = 'sent' THEN datetime('now') ELSE NULL END,
            updated_at = datetime('now')
-       WHERE room_id = ?`
+       WHERE room_id = ? AND r2_key = ?`
     )
-      .bind(emailStatus, emailError, emailStatus, params.roomId)
+      .bind(emailStatus, emailError, emailStatus, params.roomId, r2Key)
       .run()
 
     // 교부 이력에도 남긴다. PDF를 다시 저장하면 signed_contracts 의 emailed_at 이

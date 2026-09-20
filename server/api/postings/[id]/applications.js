@@ -28,7 +28,7 @@ export async function onRequestGet({ env, data, params }) {
   const { results } = await env.DB.prepare(
     `SELECT id, applicant_name, status, created_at, career_json, ai_screening_json
        FROM applications
-      WHERE posting_id = ?
+      WHERE posting_id = ? AND withdrawn_at IS NULL
       ORDER BY created_at DESC
       LIMIT ?`
   )

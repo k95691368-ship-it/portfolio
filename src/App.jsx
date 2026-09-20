@@ -1,21 +1,28 @@
-import { Suspense, lazy } from 'react'
-import { Routes, Route, Link, NavLink, useLocation } from 'react-router-dom'
+import { Suspense, lazy, useEffect, useRef } from 'react'
+import { Routes, Route, NavLink, ScrollRestoration, useLocation } from 'react-router-dom'
 import { holdsPersonalData } from './lib/analytics.js'
 import { useAuth } from './context/AuthContext.jsx'
 import LandingPage from './pages/LandingPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
+import NotFoundPage from './pages/NotFoundPage.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import BrandLogo from './components/BrandLogo.jsx'
 import PageViewTracker from './components/PageViewTracker.jsx'
 import DmLink from './components/DmLink.jsx'
 import DemoMenu from './components/DemoMenu.jsx'
+import DeferredScrollRestoration from './components/DeferredScrollRestoration.jsx'
 import './App.css'
 import './redesign.css'
 import './posting-tools.css'
+import './workspace-layout.css'
 
 // 첫 화면(랜딩·로그인)만 즉시 포함하고 나머지는 필요할 때 불러온다.
 // 공고를 보러 온 방문자가 대시보드·면접방·관리자 화면까지 받을 이유가 없다.
 const SignupPage = lazy(() => import('./pages/SignupPage.jsx'))
+const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage.jsx'))
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage.jsx'))
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage.jsx'))
+const ApplicationManagePage = lazy(() => import('./pages/ApplicationManagePage.jsx'))
 const DmDock = lazy(() => import('./components/DmDock.jsx'))
 const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage.jsx'))
 const DashboardPage = lazy(() => import('./pages/DashboardPage.jsx'))
@@ -39,9 +46,20 @@ const Loading = (
 )
 
 function App() {
-  const { pathname } = useLocation()
-  const { user } = useAuth()
+  const { pathname, key: locationKey } = useLocation()
+  const { user, sessionEpoch } = useAuth()
   const isInterview = /^\/rooms\/[^/]+\/interview\/[^/]+\/?$/.test(pathname)
+  const mobileNavRef = useRef(null)
+  const previousLocation = useRef(locationKey)
+
+  useEffect(() => {
+    if (previousLocation.current === locationKey) return
+    previousLocation.current = locationKey
+    // Close only after navigation succeeds. When a dirty form blocks navigation,
+    // its cancel action can restore focus to the still-visible menu link.
+    mobileNavRef.current?.removeAttribute('open')
+    document.getElementById('main')?.focus({ preventScroll: true })
+  }, [locationKey])
 
   // 개인정보가 뜨는 화면은 녹화에서 통째로 가린다.
   //
@@ -54,7 +72,7 @@ function App() {
   const masked = holdsPersonalData(pathname)
 
   return (
-    <>
+    <div className={isInterview ? 'app-shell app-shell--interview' : 'app-shell'}>
       {/* 화면이 바뀔 때마다 방문 기록을 보낸다(주소의 id 는 가린다). */}
       {!isInterview && <PageViewTracker />}
       {/* 키보드로 들어온 사람이 매번 머리말을 지나치지 않아도 되게 한다. */}
@@ -63,15 +81,12 @@ function App() {
           본문으로 건너뛰기
         </a>
       )}
-      {/* 어느 화면에 있든 왼쪽 위에 표지가 있다.
-          면접방이나 계약서 화면에 코드로 바로 들어온 사람은 자기가 어느
-          서비스에 있는지 알 방법이 없었다.
-
-          검은 화면 하나만 사용하므로 화면 색 전환은 두지 않는다. */}
+      {/* PC는 왼쪽 탐색 영역, 작은 화면은 상단 메뉴로 같은 목적지를 제공한다. */}
       {!isInterview && (
         <header className="app-bar">
           <BrandLogo />
           <nav className="global-nav" aria-label="주요 메뉴">
+            <NavLink to="/" end>처음으로</NavLink>
             <NavLink to="/jobs">채용 공고</NavLink>
             <NavLink to="/application-status">지원 현황</NavLink>
             <NavLink to="/verify">증명서 확인</NavLink>
@@ -79,30 +94,13 @@ function App() {
             <NavLink to={user ? '/dashboard' : '/login'}>
               {user ? '대시보드' : '회사 로그인'}
             </NavLink>
+            {(user?.isAdmin || user?.isRecruiter) && <NavLink to="/recruit">채용 관리</NavLink>}
+            {user?.isAdmin && <NavLink to="/admin">관리자 패널</NavLink>}
           </nav>
           <div className="app-bar-right">
           {/* 평가자용 체험. 접어 두고 올리거나 누르면 펴진다. */}
           <DemoMenu />
-          {/* 관리자만 보이는 문. 관리자 패널로 가려면 대시보드를 거쳐야 했는데,
-              면접방이나 계약서 화면에서는 그 길이 아예 보이지 않았다.
-
-              없는 사람에게는 그리지 않는다. 눌러도 막히는 버튼을 보여 주면
-              "여기 뭔가 있는데 나는 못 들어간다"는 것만 알려 주는 셈이고,
-              누가 관리자인지도 화면 밖으로 새어 나간다.
-
-              첫 화면에서도 그리지 않는다. 거기는 "당신은 회사인가 지원자인가"를
-              묻는 자리라, 그 물음과 상관없는 문이 함께 서 있으면 고르는 일이
-              흐려진다. 관리자는 어느 화면으로든 들어간 뒤에 이 문을 만난다. */}
-          {user?.isAdmin && pathname !== '/' && (
-            <Link
-              to="/admin"
-              className="app-bar-link"
-              aria-current={pathname === '/admin' ? 'page' : undefined}
-            >
-              관리자 패널
-            </Link>
-          )}
-          <details className="mobile-nav">
+          <details className="mobile-nav" ref={mobileNavRef}>
             <summary aria-label="메뉴">
               <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
                 <path className="mobile-nav-line mobile-nav-line--top" d="M5 9h14" />
@@ -111,8 +109,8 @@ function App() {
             </summary>
             <nav
               aria-label="모바일 주요 메뉴"
-              onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}
             >
+              <NavLink to="/" end>처음으로</NavLink>
               <NavLink to="/jobs">채용 공고</NavLink>
               <NavLink to="/application-status">지원 현황</NavLink>
               <NavLink to="/verify">증명서 확인</NavLink>
@@ -120,6 +118,8 @@ function App() {
               <NavLink to={user ? '/dashboard' : '/login'}>
                 {user ? '대시보드' : '회사 로그인'}
               </NavLink>
+              {(user?.isAdmin || user?.isRecruiter) && <NavLink to="/recruit">채용 관리</NavLink>}
+              {user?.isAdmin && <NavLink to="/admin">관리자 패널</NavLink>}
             </nav>
           </details>
           </div>
@@ -132,15 +132,19 @@ function App() {
         {...(masked ? { 'data-clarity-mask': 'true' } : {})}
       >
         <Suspense fallback={Loading}>
-          <Routes>
+          <Routes key={sessionEpoch}>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/application-manage" element={<ApplicationManagePage />} />
 
             {/* 공개: 채용 공고 · 지원 (로그인 불필요) */}
             <Route path="/jobs" element={<JobsPage />} />
-            <Route path="/jobs/:id" element={<JobDetailPage />} />
-            <Route path="/jobs/:id/apply" element={<ApplyPage />} />
+            <Route path="/jobs/:id" element={<JobDetailPage key={pathname} />} />
+            <Route path="/jobs/:id/apply" element={<ApplyPage key={pathname} />} />
             <Route path="/application-status" element={<ApplicationStatusPage />} />
             {/* 증명서는 계약 당사자가 아닌 사람에게 제시된다. 계정을 만들어야만
                 확인할 수 있다면 증명서로서 쓸모가 없다. */}
@@ -163,16 +167,22 @@ function App() {
                 곧바로 로그인 화면으로 튕기고, 임시 비밀번호를 바꾸라는 화면으로
                 보내진다 — 지원자는 그 임시 비밀번호를 받은 적이 없으므로
                 막다른 길이다. 누가 무엇을 할 수 있는지는 서버가 판정한다. */}
-            <Route path="/rooms/:roomId" element={<RoomPage />} />
-            <Route path="/rooms/:roomId/interview/:sessionId" element={<InterviewPage />} />
-            <Route path="/rooms/:roomId/contract" element={<ContractPage />} />
+            <Route path="/rooms/:roomId" element={<RoomPage key={pathname} />} />
+            <Route path="/rooms/:roomId/interview/:sessionId" element={<InterviewPage key={pathname} />} />
+            <Route path="/rooms/:roomId/contract" element={<ContractPage key={pathname} />} />
             <Route element={<ProtectedRoute requireRecruiter />}>
               <Route path="/recruit" element={<RecruitPage />} />
             </Route>
             <Route element={<ProtectedRoute requireAdmin />}>
               <Route path="/admin" element={<AdminPage />} />
             </Route>
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
+          {/* Wait for lazy page content before restoring its scroll position.
+              The router keeps history positions and hash targets, unlike an
+              unconditional scroll-to-top effect on every location change. */}
+          <ScrollRestoration storageKey="portfolio-scroll-positions" />
+          <DeferredScrollRestoration />
         </Suspense>
       </main>
       {!isInterview && (
@@ -185,7 +195,7 @@ function App() {
       )}
       {/* 오른쪽 아래 쪽지함. 로그인하지 않았으면 스스로 아무것도 그리지 않는다. */}
       {!isInterview && user && <Suspense fallback={null}><DmDock /></Suspense>}
-    </>
+    </div>
   )
 }
 

@@ -11,7 +11,7 @@ export async function onRequestPost({ request, env, data }) {
   if (!allowed) return jsonError('시도가 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)
 
   const body = await request.json().catch(() => null)
-  const inviteCode = body?.inviteCode?.trim()?.toUpperCase()
+  const inviteCode = typeof body?.inviteCode === 'string' ? body.inviteCode.trim().toUpperCase() : ''
   if (!inviteCode) return jsonError('초대코드를 입력해주세요.', 400)
 
   const room = await env.DB.prepare('SELECT * FROM interview_rooms WHERE invite_code = ?')

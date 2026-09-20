@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { api } from '../api/client.js'
+import { compareMessageIds, messageIdKey } from '../lib/messageId.js'
 
 // 대화가 오갈 때는 빠르게, 조용해지면 점점 느리게 확인한다.
 // 화면을 보고 있지 않을 때는 아예 확인하지 않는다.
@@ -9,16 +10,39 @@ const BACKOFF_AFTER = 6 // 이만큼 연속으로 새 메시지가 없으면 간
 // 배터리와 서버 양쪽에 부담이 된다.
 const HIDDEN_IDLE_MS = 20000
 
+function validateMessages(messages, requireBody = false) {
+  if (!Array.isArray(messages) || messages.some(message => !message || !messageIdKey(message.id)
+    || (requireBody && (typeof message.body !== 'string'
+      || (message.senderName != null && typeof message.senderName !== 'string')
+      || (message.senderId != null && typeof message.senderId !== 'string'))))) {
+    throw new Error('메시지 응답을 확인하지 못했습니다. 기존 대화는 유지하고 다시 확인합니다.')
+  }
+  return messages
+}
+
 // 이미 가진 것과 새로 받은 것을 id 기준으로 합친다.
 //
 // 내가 보낸 메시지는 응답을 받자마자 화면에 붙이고, 그 뒤 폴링이 같은 것을 다시
 // 가져온다. 중복을 지우고 id 순서를 지켜야 대화 순서가 어긋나지 않는다
 // (낙관적으로 붙인 내 메시지가 그보다 먼저 온 상대 메시지 앞에 놓일 수 있다).
 export function mergeById(existing, incoming) {
-  const seen = new Set(existing.map((m) => m.id))
-  const fresh = incoming.filter((m) => !seen.has(m.id))
+  validateMessages(existing)
+  validateMessages(incoming)
+  const seen = new Set(existing.map((m) => messageIdKey(m.id)))
+  const fresh = incoming.filter((m) => {
+    const id = messageIdKey(m.id)
+    if (seen.has(id)) return false
+    seen.add(id)
+    return true
+  })
   if (fresh.length === 0) return existing
-  return [...existing, ...fresh].sort((a, b) => a.id - b.id)
+  // The normal polling path is already chronological. Avoid sorting the whole
+  // conversation every time a new page arrives; only late arrivals need a sort.
+  const lastId = existing.at(-1)?.id ?? '0'
+  if (compareMessageIds(fresh[0].id, lastId) > 0 && fresh.every((m, i) => i === 0 || compareMessageIds(m.id, fresh[i - 1].id) > 0)) {
+    return [...existing, ...fresh]
+  }
+  return [...existing, ...fresh].sort((a, b) => compareMessageIds(a.id, b.id))
 }
 
 export function roomMessagesPath(roomId, { after, interviewSessionId } = {}) {
@@ -48,11 +72,12 @@ export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null
   // 말할 수 있어야 화면이 멈춘 것인지 상대가 조용한 것인지 구분된다.
   const [lastSyncedAt, setLastSyncedAt] = useState(null)
   const [ready, setReady] = useState(false)
-  const lastIdRef = useRef(0)
+  const lastIdRef = useRef('0')
   const fetchingRef = useRef(false)
   const emptyRunsRef = useRef(0)
   const timerRef = useRef(null)
   const seededRef = useRef(false)
+  const scopeRef = useRef(null)
   // 콜백이 바뀔 때마다 폴링을 다시 걸면 타이머가 끊긴다. 최신 것만 들고 있는다.
   const optsRef = useRef(options)
   optsRef.current = options
@@ -60,26 +85,34 @@ export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null
 
   // 다른 면접방으로 옮기면 처음 상태로 되돌린다.
   useEffect(() => {
+    const scope = { roomId, interviewSessionId }
+    scopeRef.current = scope
+    fetchingRef.current = false
     seededRef.current = false
-    lastIdRef.current = 0
+    lastIdRef.current = '0'
     emptyRunsRef.current = 0
     setMessages([])
     setReady(false)
+    setError('')
+    setLastSyncedAt(null)
+    return () => { if (scopeRef.current === scope) scopeRef.current = null }
   }, [interviewSessionId, roomId])
 
   // 첫 묶음은 화면이 받아 온 것을 그대로 쓴다. 한 번만 받는다.
   useEffect(() => {
-    if (seededRef.current || !initialMessages) return
+    if (seededRef.current || initialMessages == null) return
     seededRef.current = true
-    if (initialMessages.length > 0) {
-      lastIdRef.current = initialMessages[initialMessages.length - 1].id
-      setMessages(initialMessages)
-    }
+    try {
+      const seed = mergeById([], validateMessages(initialMessages, true))
+      lastIdRef.current = seed.length ? messageIdKey(seed.at(-1).id) : '0'
+      setMessages(seed)
+    } catch (err) { setError(err.message) }
     setReady(true)
   }, [initialMessages, interviewSessionId, roomId])
 
   const poll = useCallback(async () => {
-    if (fetchingRef.current) return
+    const scope = scopeRef.current
+    if (!scope || scope.roomId !== roomId || scope.interviewSessionId !== interviewSessionId || fetchingRef.current) return
     fetchingRef.current = true
     try {
       const data = await api.get(
@@ -88,17 +121,21 @@ export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null
           interviewSessionId,
         })
       )
-      if (data.messages.length > 0) {
-        lastIdRef.current = data.messages[data.messages.length - 1].id
+      if (scopeRef.current !== scope) return
+      // Validate before scheduling a React updater or moving the cursor. A bad
+      // batch must be retried in full, never partially skipped or rendered.
+      const batch = validateMessages(data?.messages, true)
+      if (batch.length > 0) {
+        lastIdRef.current = batch.reduce((cursor, message) => compareMessageIds(message.id, cursor) > 0 ? messageIdKey(message.id) : cursor, lastIdRef.current)
         // 내가 보낸 메시지는 화면에 먼저 붙여 두었으므로 다시 받아도 한 번만 남긴다.
-        setMessages((prev) => mergeById(prev, data.messages))
+        setMessages((prev) => mergeById(prev, batch))
         emptyRunsRef.current = 0
         // 상대가 보낸 것만 알린다. 내가 방금 보낸 것이 되돌아온 것까지 알리면
         // 내 말에 내가 알림을 받는다.
         const viewerId = optsRef.current.viewerId
         const fromOther = viewerId
-          ? data.messages.filter((m) => m.senderId !== viewerId)
-          : data.messages
+          ? batch.filter((m) => m.senderId !== viewerId)
+          : batch
         if (fromOther.length > 0) optsRef.current.onIncoming?.(fromOther)
       } else {
         emptyRunsRef.current += 1
@@ -106,9 +143,11 @@ export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null
       setError('')
       setLastSyncedAt(new Date().toISOString())
     } catch (err) {
+      if (scopeRef.current !== scope) return
+      emptyRunsRef.current += 1
       setError(err.message)
     } finally {
-      fetchingRef.current = false
+      if (scopeRef.current === scope) fetchingRef.current = false
     }
   }, [interviewSessionId, roomId])
 
@@ -157,10 +196,20 @@ export function useChatPolling(roomId, intervalMs = 2500, initialMessages = null
 
   const sendMessage = useCallback(
     async (body) => {
+      const scope = scopeRef.current
+      const assertScope = () => {
+        if (scope && scopeRef.current === scope && scope.roomId === roomId && scope.interviewSessionId === interviewSessionId) return
+        const error = new Error('대화 화면이 변경되었습니다. 전송 결과는 원래 면접방에서 확인해주세요.')
+        error.code = 'STALE_CHAT_RESPONSE'
+        throw error
+      }
+      assertScope()
       const message = await api.post(
         roomMessagesPath(roomId, { interviewSessionId }),
         roomMessageBody(body, interviewSessionId)
       )
+      assertScope()
+      validateMessages([message], true)
       // 수신 커서(lastIdRef)는 폴링이 실제로 받아 온 것만 반영해야 한다.
       //
       // 예전에는 여기서 커서를 내 메시지 id로 앞당겼다. 그러면 상대가 방금

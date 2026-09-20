@@ -10,6 +10,12 @@ import { formatKst, formatKstDate } from '../lib/formatTime.js'
 import { describeAuditDetail } from '../lib/auditDetail.js'
 
 const EMPTY_NEW_ACCOUNT = { email: '', displayName: '', role: 'candidate', companyName: '', isRecruiter: false }
+const ADMIN_RESOURCES = {
+  users: { path: '/admin/users', field: 'users', label: '사용자' },
+  rooms: { path: '/admin/rooms', field: 'rooms', label: '면접방' },
+  audit: { path: '/admin/audit-log', field: 'entries', label: '감사 로그' },
+  contracts: { path: '/admin/contracts', field: 'contracts', label: '근로계약서' },
+}
 
 const AUDIT_ACTION_LABELS = {
   create_user: '계정 생성',
@@ -34,12 +40,18 @@ export default function AdminPage() {
   const toast = useToast()
   const [users, setUsers] = useState([])
   const [rooms, setRooms] = useState([])
-  const [loading, setLoading] = useState(true)
   const [pendingId, setPendingId] = useState('')
   const [revealed, setRevealed] = useState({})
+  const [resources, setResources] = useState(() => Object.fromEntries(
+    Object.keys(ADMIN_RESOURCES).map((key) => [key, { loading: true, loaded: false, error: '' }])
+  ))
+  const resourceRef = useRef(resources)
+  const generations = useRef({ users: 0, rooms: 0, audit: 0, contracts: 0 })
+  const lifecycle = useRef({ active: false, epoch: 0 })
+  const mutation = useRef(null)
 
   const [newAccount, setNewAccount] = useState(EMPTY_NEW_ACCOUNT)
-  const [creating, setCreating] = useState(false)
+  const creating = pendingId === 'create-account'
 
   const [viewingRoom, setViewingRoom] = useState(null)
   const [roomMessages, setRoomMessages] = useState([])
@@ -47,6 +59,7 @@ export default function AdminPage() {
   const [messagesLoading, setMessagesLoading] = useState(false)
   // 지금 열려 있는 방. 늦게 도착한 응답을 버리는 기준이다.
   const openedRoomRef = useRef(null)
+  const messagesGeneration = useRef(0)
   const [messagesError, setMessagesError] = useState('')
 
   const [auditLog, setAuditLog] = useState([])
@@ -54,39 +67,99 @@ export default function AdminPage() {
   const [contracts, setContracts] = useState([])
   // 아직 보관되지 않은 체결 계약. 이 기능을 붙이기 전에 체결된 것들이다.
   const [pendingContracts, setPendingContracts] = useState(0)
-  const [archiving, setArchiving] = useState(false)
+  const archiving = pendingId === 'archive-contracts'
   const [caps, setCaps] = useState({ users: null, rooms: null, contracts: null })
 
-  const loadAll = useCallback(async () => {
-    const [usersData, roomsData, auditData, contractData] = await Promise.all([
-      api.get('/admin/users'),
-      api.get('/admin/rooms'),
-      api.get('/admin/audit-log'),
-      api.get('/admin/contracts'),
-    ])
-    setUsers(usersData.users)
-    setRooms(roomsData.rooms)
-    setAuditLog(auditData.entries)
-    setContracts(contractData.contracts)
-    setPendingContracts(contractData.pendingCount || 0)
-    setCaps({
-      users: usersData.truncated ? usersData.limit : null,
-      rooms: roomsData.truncated ? roomsData.limit : null,
-      contracts: contractData.truncated ? contractData.limit : null,
-    })
+  const updateResource = useCallback((key, patch) => {
+    resourceRef.current = { ...resourceRef.current, [key]: { ...resourceRef.current[key], ...patch } }
+    setResources(resourceRef.current)
   }, [])
 
+  const loadResource = useCallback(async (key) => {
+    if (!lifecycle.current.active) return null
+    const generation = ++generations.current[key]
+    const epoch = lifecycle.current.epoch
+    const isCurrent = () => lifecycle.current.active && lifecycle.current.epoch === epoch && generations.current[key] === generation
+    updateResource(key, { loading: true, error: '' })
+    try {
+      const data = await api.get(ADMIN_RESOURCES[key].path)
+      if (!isCurrent()) return null
+      if (!Array.isArray(data?.[ADMIN_RESOURCES[key].field])) throw new Error('Invalid resource response')
+      if (key === 'users') setUsers(data.users)
+      else if (key === 'rooms') setRooms(data.rooms)
+      else if (key === 'audit') setAuditLog(data.entries)
+      else {
+        setContracts(data.contracts)
+        setPendingContracts(data.pendingCount || 0)
+      }
+      if (key !== 'audit') setCaps((previous) => ({ ...previous, [key]: data.truncated ? data.limit : null }))
+      updateResource(key, { loading: false, loaded: true, error: '' })
+      return true
+    } catch {
+      if (!isCurrent()) return null
+      updateResource(key, { loading: false, error: '연결 상태를 확인한 뒤 다시 불러와주세요.' })
+      return false
+    }
+  }, [updateResource])
+
+  const loadAll = useCallback(async () => {
+    const results = await Promise.all(Object.keys(ADMIN_RESOURCES).map(loadResource))
+    return results.includes(false) ? false : results.every((result) => result === true) ? true : null
+  }, [loadResource])
+
   useEffect(() => {
+    const currentLifecycle = lifecycle.current
+    const currentGenerations = generations.current
+    currentLifecycle.active = true
     loadAll()
-      .catch((err) => toast.error(err.message))
-      .finally(() => setLoading(false))
-  }, [loadAll, toast])
+    return () => {
+      currentLifecycle.active = false
+      currentLifecycle.epoch += 1
+      for (const key of Object.keys(ADMIN_RESOURCES)) currentGenerations[key] += 1
+      openedRoomRef.current = null
+      messagesGeneration.current += 1
+      mutation.current = null
+    }
+  }, [loadAll])
+
+  const canMutate = (key) => {
+    const state = resourceRef.current[key]
+    return lifecycle.current.active && !mutation.current && state.loaded && !state.loading && !state.error
+  }
+  const runMutation = async (key, id, action) => {
+    if (!canMutate(key)) return
+    const operation = { epoch: lifecycle.current.epoch }
+    mutation.current = operation
+    setPendingId(id)
+    const isCurrent = () => lifecycle.current.active && lifecycle.current.epoch === operation.epoch && mutation.current === operation
+    try {
+      await action(isCurrent)
+    } catch (err) {
+      if (!isCurrent()) return
+      const uncertain = !err?.status || err.status >= 500
+      if (uncertain) updateResource(key, { error: '변경 결과를 확인하지 못했습니다. 다시 불러와 현재 상태를 확인해주세요.' })
+      toast.error(uncertain
+        ? '변경 결과를 확인하지 못했습니다. 목록을 다시 불러와 확인해주세요.'
+        : '요청을 처리하지 못했습니다. 입력값과 현재 권한을 확인해주세요.')
+    } finally {
+      if (isCurrent()) {
+        mutation.current = null
+        setPendingId('')
+      }
+    }
+  }
+  const refreshAfterMutation = async (isCurrent) => {
+    if (!isCurrent()) return
+    if (await loadAll() === false && isCurrent()) {
+      toast.info('변경은 완료됐지만 일부 목록을 갱신하지 못했습니다. 해당 목록의 다시 불러오기를 눌러주세요.')
+    }
+  }
 
   // 빠진 계약서를 지금 보관한다.
   const archivePending = async () => {
-    setArchiving(true)
-    try {
+    await runMutation('contracts', 'archive-contracts', async (isCurrent) => {
       const res = await api.post('/admin/contracts', {})
+      if (!isCurrent()) return
       // 실패한 건을 조용히 넘기지 않는다. 보존 의무가 있는 계약서가
       // 밖에 남아 있다는 뜻이라, 몇 건인지 말해야 한다.
       if (res.failed?.length > 0) {
@@ -94,12 +167,8 @@ export default function AdminPage() {
       } else {
         toast.success(`${res.stored}건을 보관했습니다.`)
       }
-      await loadAll()
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setArchiving(false)
-    }
+      await refreshAfterMutation(isCurrent)
+    })
   }
 
   const dismissRevealed = (id) =>
@@ -115,76 +184,67 @@ export default function AdminPage() {
 
   const handleCreateAccount = async (e) => {
     e.preventDefault()
-    setCreating(true)
-    try {
+    const submitted = newAccount
+    await runMutation('users', 'create-account', async (isCurrent) => {
       const res = await api.post('/admin/users', {
-        email: newAccount.email,
-        displayName: newAccount.displayName,
-        role: newAccount.role,
-        companyName: newAccount.role === 'company' ? newAccount.companyName : undefined,
-        isRecruiter: newAccount.isRecruiter,
+        email: submitted.email,
+        displayName: submitted.displayName,
+        role: submitted.role,
+        companyName: submitted.role === 'company' ? submitted.companyName : undefined,
+        isRecruiter: submitted.isRecruiter,
       })
-      setRevealed((prev) => ({ ...prev, [res.user.id]: res.tempPassword }))
-      setNewAccount(EMPTY_NEW_ACCOUNT)
-      await loadAll()
+      if (!isCurrent()) return
+      // 일회성 값은 목록 조회 결과와 분리하며 현재 화면 메모리에만 둔다.
+      setRevealed((prev) => ({ ...prev, [res.user.id]: { email: res.user.email, password: res.tempPassword } }))
+      setNewAccount((current) => JSON.stringify(current) === JSON.stringify(submitted) ? EMPTY_NEW_ACCOUNT : current)
       toast.success('계정이 생성되었습니다. 임시 비밀번호를 확인하세요.')
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setCreating(false)
-    }
+      await refreshAfterMutation(isCurrent)
+    })
   }
 
   const handleToggleSuspend = async (target) => {
+    if (!canMutate('users')) return
     const action = target.isSuspended ? '정지 해제' : '정지'
     if (!window.confirm(`${target.email} 계정을 ${action}하시겠습니까?`)) return
-    setPendingId(target.id)
-    try {
+    await runMutation('users', target.id, async (isCurrent) => {
       await api.patch(`/admin/users/${target.id}`, { isSuspended: !target.isSuspended })
-      await loadAll()
+      if (!isCurrent()) return
       toast.success(`계정을 ${action}했습니다.`)
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setPendingId('')
-    }
+      await refreshAfterMutation(isCurrent)
+    })
   }
 
   const handleToggleRecruiter = async (target) => {
+    if (!canMutate('users')) return
     const action = target.isRecruiter ? '채용자 등급 해제' : '채용자 등급 지정'
     if (!window.confirm(`${target.email} 계정을 ${action}하시겠습니까?`)) return
-    setPendingId(target.id)
-    try {
+    await runMutation('users', target.id, async (isCurrent) => {
       await api.patch(`/admin/users/${target.id}`, { isRecruiter: !target.isRecruiter })
-      await loadAll()
+      if (!isCurrent()) return
       toast.success(`${action} 처리되었습니다.`)
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setPendingId('')
-    }
+      await refreshAfterMutation(isCurrent)
+    })
   }
 
   const handleResetPassword = async (target) => {
+    if (!canMutate('users')) return
     if (
       !window.confirm(
         `${target.email} 계정의 비밀번호를 임시 비밀번호로 재설정하시겠습니까? 해당 계정은 즉시 로그아웃됩니다.`
       )
     )
       return
-    setPendingId(target.id)
-    try {
+    await runMutation('users', target.id, async (isCurrent) => {
       const res = await api.post(`/admin/users/${target.id}/reset-password`, {})
-      setRevealed((prev) => ({ ...prev, [target.id]: res.tempPassword }))
+      if (!isCurrent()) return
+      setRevealed((prev) => ({ ...prev, [target.id]: { email: target.email, password: res.tempPassword } }))
       toast.success('임시 비밀번호가 발급되었습니다. 확인하세요.')
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setPendingId('')
-    }
+      await refreshAfterMutation(isCurrent)
+    })
   }
 
   const handleDelete = async (target) => {
+    if (!canMutate('users')) return
     const typed = window.prompt(
       `이 작업은 되돌릴 수 없습니다. 삭제하려면 이메일(${target.email})을 정확히 입력하세요.`
     )
@@ -193,53 +253,43 @@ export default function AdminPage() {
       toast.error('입력한 이메일이 일치하지 않아 삭제를 취소했습니다.')
       return
     }
-    setPendingId(target.id)
-    try {
+    await runMutation('users', target.id, async (isCurrent) => {
       await api.delete(`/admin/users/${target.id}`)
+      if (!isCurrent()) return
       dismissRevealed(target.id)
-      await loadAll()
       toast.success('계정이 삭제되었습니다.')
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setPendingId('')
-    }
+      await refreshAfterMutation(isCurrent)
+    })
   }
 
   const handleDeleteRoom = async (room) => {
+    if (!canMutate('rooms')) return
     if (
       !window.confirm(
         `"${room.title}" 면접방을 영구 삭제하시겠습니까? 채팅/서명/계약 조건이 모두 사라지며 되돌릴 수 없습니다.`
       )
     )
       return
-    setPendingId(room.id)
-    try {
-      await api.delete(`/admin/rooms/${room.id}`)
-      await loadAll()
-      toast.success('면접방이 삭제되었습니다.')
-    } catch (err) {
-      // 보존 의무가 남은 계약서는 서버가 한 번 막는다 (근로기준법 제42조).
-      // 무엇을 지우는지 알린 뒤에만 다시 요청한다.
-      if (err.status === 409 && err.message.includes('보존')) {
-        if (window.confirm(`${err.message}\n\n보존 의무를 확인했으며 그래도 삭제하시겠습니까? 이 사실은 감사 로그에 남습니다.`)) {
-          try {
-            await api.delete(`/admin/rooms/${room.id}`, { acknowledgeRetention: true })
-            await loadAll()
-            toast.success('보존 의무 확인 후 면접방이 삭제되었습니다.')
-          } catch (retryErr) {
-            toast.error(retryErr.message)
-          }
-        }
-      } else {
-        toast.error(err.message)
+    await runMutation('rooms', room.id, async (isCurrent) => {
+      let acknowledged = false
+      try {
+        await api.delete(`/admin/rooms/${room.id}`)
+      } catch (err) {
+        if (!isCurrent()) return
+        // 보존 확인은 삭제 요청의 409에만 적용한다. 후속 조회 오류는 재삭제하지 않는다.
+        if (err.status !== 409 || !err.message?.includes('보존')) throw err
+        if (!window.confirm(`${err.message}\n\n보존 의무를 확인했으며 그래도 삭제하시겠습니까? 이 사실은 감사 로그에 남습니다.`)) return
+        await api.delete(`/admin/rooms/${room.id}`, { acknowledgeRetention: true })
+        acknowledged = true
       }
-    } finally {
-      setPendingId('')
-    }
+      if (!isCurrent()) return
+      toast.success(acknowledged ? '보존 의무 확인 후 면접방이 삭제되었습니다.' : '면접방이 삭제되었습니다.')
+      await refreshAfterMutation(isCurrent)
+    })
   }
 
   const handleViewMessages = async (room) => {
+    if (!lifecycle.current.active) return
     setViewingRoom(room)
     setRoomMessages([])
     setMessagesCap(null)
@@ -249,21 +299,45 @@ export default function AdminPage() {
     // 덮어쓴다. 관리자 화면에서 남의 면접 대화가 다른 방 제목 아래 보이는
     // 것이므로, 화면만 어긋나는 문제가 아니다.
     const requested = room.id
+    const generation = ++messagesGeneration.current
     openedRoomRef.current = requested
+    const isCurrent = () => lifecycle.current.active && openedRoomRef.current === requested && messagesGeneration.current === generation
     try {
       const data = await api.get(`/admin/rooms/${requested}/messages`)
-      if (openedRoomRef.current !== requested) return
+      if (!isCurrent()) return
+      if (!Array.isArray(data?.messages)) throw new Error('Invalid chat response')
       setRoomMessages(data.messages)
       setMessagesCap(data.truncated ? data.limit : null)
-    } catch (err) {
-      if (openedRoomRef.current !== requested) return
-      setMessagesError(err.message)
+    } catch {
+      if (!isCurrent()) return
+      setMessagesError('채팅 내역을 불러오지 못했습니다. 다시 시도해주세요.')
     } finally {
-      if (openedRoomRef.current === requested) setMessagesLoading(false)
+      if (isCurrent()) setMessagesLoading(false)
     }
   }
 
-  if (loading) return <p>불러오는 중...</p>
+  const closeMessages = () => {
+    openedRoomRef.current = null
+    messagesGeneration.current += 1
+    setViewingRoom(null)
+  }
+  const resourceReady = (key) => resources[key].loaded && !resources[key].loading && !resources[key].error
+  const resourceNotice = (key) => (
+    <>
+      {resources[key].loading && <p role="status">{ADMIN_RESOURCES[key].label} 불러오는 중...</p>}
+      {resources[key].error && (
+        <div role="alert">
+          <p className="error">
+            {ADMIN_RESOURCES[key].label}{key === 'rooms' ? '을' : '를'} 불러오지 못했습니다. {resources[key].error}
+            {resources[key].loaded && ' 아래는 이전에 확인한 자료입니다.'}
+          </p>
+          <button type="button" className="btn-sm" disabled={!!pendingId || resources[key].loading} onClick={() => loadResource(key)}>
+            {ADMIN_RESOURCES[key].label} 다시 불러오기
+          </button>
+        </div>
+      )}
+    </>
+  )
 
   return (
     <div className="admin-page">
@@ -312,20 +386,41 @@ export default function AdminPage() {
             <input type="checkbox" checked={newAccount.isRecruiter} onChange={toggleNewAccountRecruiter} />
             채용자 등급 부여
           </label>
-          <button type="submit" className="btn-primary" disabled={creating}>
+          <button type="submit" className="btn-primary" disabled={!!pendingId || !resourceReady('users')}>
             {creating ? '생성 중...' : '계정 만들기'}
           </button>
         </form>
         <p className="notice">
-          생성된 계정의 임시 비밀번호는 아래 사용자 목록의 해당 계정 행에 한 번만 표시됩니다.
+          발급된 임시 비밀번호는 아래 일회성 계정 안내에 표시됩니다. 화면을 나가면 다시 확인할 수 없습니다.
         </p>
       </section>
 
-      <h2>사용자 ({users.length})</h2>
+      {Object.keys(revealed).length > 0 && (
+        <section aria-label="일회성 계정 안내">
+          <h2>일회성 계정 안내</h2>
+          {Object.entries(revealed).map(([id, result]) => (
+            <div key={id} className="temp-password-banner">
+              <p>{result.email}</p>
+              <p>임시 비밀번호: <code>{result.password}</code></p>
+              <p>이 값은 현재 화면에서만 확인할 수 있습니다. 필요한 곳에 전달한 뒤 닫아주세요.</p>
+              <div>
+                <button type="button" className="btn-sm" onClick={async () => {
+                  try { await navigator.clipboard.writeText(result.password) }
+                  catch { if (lifecycle.current.active) toast.error('복사하지 못했습니다. 화면에서 직접 선택해 복사해주세요.') }
+                }}>복사</button>
+                <button type="button" className="btn-sm" onClick={() => dismissRevealed(id)}>닫기</button>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      <h2>사용자{resourceReady('users') ? ` (${users.length})` : ''}</h2>
+      {resourceNotice('users')}
       {caps.users && (
         <p className="notice">계정이 많아 최근 {caps.users}건만 불러왔습니다.</p>
       )}
-      <div className="table-scroll" tabIndex={0}>
+      {resources.users.loaded && <div className="table-scroll" tabIndex={0}>
       <table className="admin-table">
         <caption className="sr-only">등록된 사용자 {users.length}명의 권한과 상태</caption>
         <thead>
@@ -403,7 +498,7 @@ export default function AdminPage() {
                     <button
                       type="button"
                       className="btn-sm"
-                      disabled={pendingId === u.id}
+                      disabled={!!pendingId || !resourceReady('users')}
                       onClick={() => handleToggleRecruiter(u)}
                     >
                       {u.isRecruiter ? '채용자 해제' : '채용자 지정'}
@@ -411,7 +506,7 @@ export default function AdminPage() {
                     <button
                       type="button"
                       className="btn-sm"
-                      disabled={pendingId === u.id}
+                      disabled={!!pendingId || !resourceReady('users')}
                       onClick={() => handleToggleSuspend(u)}
                     >
                       {u.isSuspended ? '정지 해제' : '정지'}
@@ -419,7 +514,7 @@ export default function AdminPage() {
                     <button
                       type="button"
                       className="btn-sm"
-                      disabled={pendingId === u.id}
+                      disabled={!!pendingId || !resourceReady('users')}
                       onClick={() => handleResetPassword(u)}
                     >
                       비밀번호 재설정
@@ -427,42 +522,27 @@ export default function AdminPage() {
                     <button
                       type="button"
                       className="btn-danger btn-sm"
-                      disabled={pendingId === u.id}
+                      disabled={!!pendingId || !resourceReady('users')}
                       onClick={() => handleDelete(u)}
                     >
                       영구 삭제
                     </button>
                   </>
                 )}
-                {revealed[u.id] && (
-                  <div className="temp-password-banner">
-                    <p>
-                      임시 비밀번호: <code>{revealed[u.id]}</code>
-                    </p>
-                    <p>이 비밀번호는 지금만 표시되며 다시 확인할 수 없습니다. 지금 복사하세요.</p>
-                    <div>
-                      <button type="button" className="btn-sm" onClick={() => navigator.clipboard.writeText(revealed[u.id])}>
-                        복사
-                      </button>
-                      <button type="button" className="btn-sm" onClick={() => dismissRevealed(u.id)}>
-                        닫기
-                      </button>
-                    </div>
-                  </div>
-                )}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
-      </div>
+      </div>}
 
       {/* 근로계약서 영구 보관소.
           체결된 계약서는 면접방에 매달려 있었다. 방을 지우면 조건도 서명도
           증명서도 함께 사라졌는데, 근로기준법 제42조가 보존하라는 것은 방이
           아니라 계약서다. 이제 체결되는 순간 서버가 정본을 만들어 방 바깥에
           보관하고, 방이 지워져도 여기 남는다. */}
-      <h2>근로계약서 저장소 ({contracts.length})</h2>
+      <h2>근로계약서 저장소{resourceReady('contracts') ? ` (${contracts.length})` : ''}</h2>
+      {resourceNotice('contracts')}
       <p className="section-lead">
         양측 서명이 끝나는 순간 서버가 정본을 만들어 보관합니다. 면접방을 삭제해도 이곳의
         계약서는 삭제되지 않습니다. 보존 기간은 근로관계가 끝난 날부터 3년입니다(근로기준법
@@ -476,13 +556,13 @@ export default function AdminPage() {
         // 그것도 보존 대상이므로 눌러서 마저 채운다.
         <p className="notice">
           아직 보관되지 않은 체결 계약이 {pendingContracts}건 있습니다.{' '}
-          <button type="button" className="btn-sm" onClick={archivePending} disabled={archiving}>
+          <button type="button" className="btn-sm" onClick={archivePending} disabled={!!pendingId || !resourceReady('contracts')}>
             {archiving ? '보관하는 중...' : '지금 보관하기'}
           </button>
         </p>
       )}
       {contracts.length === 0 ? (
-        <p className="notice">아직 보관된 근로계약서가 없습니다.</p>
+        resourceReady('contracts') && <p className="notice">아직 보관된 근로계약서가 없습니다.</p>
       ) : (
         <div className="table-scroll" tabIndex={0}>
           <table className="admin-table">
@@ -548,11 +628,12 @@ export default function AdminPage() {
         </div>
       )}
 
-      <h2>면접방 ({rooms.length})</h2>
+      <h2>면접방{resourceReady('rooms') ? ` (${rooms.length})` : ''}</h2>
+      {resourceNotice('rooms')}
       {caps.rooms && (
         <p className="notice">면접방이 많아 최근 {caps.rooms}건만 불러왔습니다.</p>
       )}
-      <div className="table-scroll" tabIndex={0}>
+      {resources.rooms.loaded && <div className="table-scroll" tabIndex={0}>
       <table className="admin-table">
         <caption className="sr-only">모든 면접방 {rooms.length}개의 참여자와 진행 상태</caption>
         <thead>
@@ -589,7 +670,7 @@ export default function AdminPage() {
                   <button
                     type="button"
                     className="btn-danger btn-sm"
-                    disabled={pendingId === r.id}
+                    disabled={!!pendingId || !resourceReady('rooms')}
                     onClick={() => handleDeleteRoom(r)}
                   >
                     삭제
@@ -600,10 +681,11 @@ export default function AdminPage() {
           })}
         </tbody>
       </table>
-      </div>
+      </div>}
 
-      <h2>감사 로그 (최근 {auditLog.length}건)</h2>
-      <div className="table-scroll" tabIndex={0}>
+      <h2>감사 로그{resourceReady('audit') ? ` (최근 ${auditLog.length}건)` : ''}</h2>
+      {resourceNotice('audit')}
+      {resources.audit.loaded && <div className="table-scroll" tabIndex={0}>
       <table className="admin-table">
         <caption className="sr-only">
           관리자 작업 기록 최근 {auditLog.length}건 — 언제 누가 무엇을 했는지
@@ -619,7 +701,7 @@ export default function AdminPage() {
         </thead>
         <tbody>
           {auditLog.length === 0 ? (
-            <tr>
+            resourceReady('audit') && <tr>
               <td colSpan={5}>기록이 없습니다.</td>
             </tr>
           ) : (
@@ -635,16 +717,17 @@ export default function AdminPage() {
           )}
         </tbody>
       </table>
-      </div>
+      </div>}
 
       {viewingRoom && (
-        <Modal title={`${viewingRoom.title} 채팅 내역`} onClose={() => setViewingRoom(null)}>
+        <Modal title={`${viewingRoom.title} 채팅 내역`} onClose={closeMessages}>
           <h3>{viewingRoom.title} — 채팅 내역</h3>
           {messagesLoading && <p>불러오는 중...</p>}
           {messagesError && (
-            <p className="error" role="alert">
-              {messagesError}
-            </p>
+            <div role="alert">
+              <p className="error">{messagesError}</p>
+              <button type="button" className="btn-sm" disabled={messagesLoading} onClick={() => handleViewMessages(viewingRoom)}>채팅 다시 불러오기</button>
+            </div>
           )}
           {messagesCap && (
             <p className="notice">
@@ -668,7 +751,7 @@ export default function AdminPage() {
             </div>
           )}
           <div className="modal-actions">
-            <button type="button" onClick={() => setViewingRoom(null)}>
+            <button type="button" onClick={closeMessages}>
               닫기
             </button>
           </div>

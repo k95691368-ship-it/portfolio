@@ -17,6 +17,10 @@ const ROUTE_PAGES = [
   ['/recruit', 'RecruitPage.jsx'],
   ['/admin', 'AdminPage.jsx'],
   ['/signup', 'SignupPage.jsx'],
+  ['/verify-email', 'VerifyEmailPage.jsx'],
+  ['/forgot-password', 'ForgotPasswordPage.jsx'],
+  ['/reset-password', 'ResetPasswordPage.jsx'],
+  ['/application-manage', 'ApplicationManagePage.jsx'],
   ['/change-password', 'ChangePasswordPage.jsx'],
   // 아래 넷은 주소에 id 가 붙는다. 앞부분만 맞으면 된다.
   ['/rooms/', 'RoomPage.jsx'],
@@ -243,6 +247,13 @@ function securityHeaders() {
         // Pages 기본값이 화면 문서까지 아무나 읽어 가게 열어 둔다. 지운다.
         '  ! Access-Control-Allow-Origin',
         '',
+        ...['/verify-email', '/forgot-password', '/reset-password', '/application-manage'].flatMap((path) => [
+          path,
+          '  ! Referrer-Policy',
+          '  Referrer-Policy: no-referrer',
+          '  Cache-Control: no-store',
+          '',
+        ]),
         // Cloudflare Pages는 겹치는 규칙의 같은 헤더를 쉼표로 합친다. 면접
         // 문서에서는 전역 값을 먼저 떼고, 통화에 필요한 권한만 다시 붙인다.
         '/rooms/:roomId/interview/*',
@@ -272,13 +283,7 @@ export default defineConfig({
       },
     },
   },
-  server: {
-    proxy: {
-      '/api': {
-        target: 'https://obumqkwkvnemkyaahjbn.supabase.co',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api(?=\/|$)/, '/functions/v1/api'),
-      },
-    },
-  },
+  // npm run dev/preview start the isolated full-stack runtime. A directly
+  // invoked Vite server must never silently forward writes to production.
+  server: { host: '127.0.0.1' },
 })

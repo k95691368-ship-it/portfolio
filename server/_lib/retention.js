@@ -1,7 +1,32 @@
+import { cleanStagedApplicationUploads } from './applicationUploadCleanup.js'
+
+// Ephemeral proof records contain email addresses and password snapshots. Keep
+// their cleanup bounded and part of the existing retention job, not permanent.
+export async function cleanExpiredRecoveryData(env, { dryRun = true, limit = 25 } = {}) {
+  const batchSize = Math.max(1, Math.min(25, Number(limit) || 25))
+  const definitions = [
+    ['application_access_tokens', "datetime(expires_at) <= datetime('now') OR (used_at IS NOT NULL AND used_at <= datetime('now', '-5 minutes'))"],
+    ['application_access_sessions', "datetime(expires_at) <= datetime('now')"],
+    ['account_recovery_tokens', "datetime(expires_at) <= datetime('now') OR (consumed_at IS NOT NULL AND consumed_at <= datetime('now', '-5 minutes'))"],
+  ]
+  const report = { pending: 0, deleted: 0 }
+  for (const [table, condition] of definitions) {
+    const { results } = await env.DB.prepare(`SELECT token_hash FROM ${table} WHERE ${condition} ORDER BY expires_at LIMIT ?`).bind(batchSize).all()
+    report.pending += results.length
+    if (!dryRun && results.length) {
+      const deleted = await env.DB.batch(results.map(row => env.DB.prepare(`DELETE FROM ${table} WHERE token_hash = ? AND (${condition})`).bind(row.token_hash)))
+      report.deleted += deleted.reduce((count, row) => count + (row.meta?.changes || 0), 0)
+    }
+  }
+  return report
+}
+
 // Bounded, restartable deletion. Storage keys remain in the database until
 // deletion succeeds; no expired object is represented as physically deleted.
 export async function runRetention(env, { dryRun = true, limit = 25 } = {}) {
   const batchSize = Math.max(1, Math.min(25, Number(limit) || 25))
+  const uploadCleanup = await cleanStagedApplicationUploads(env, { dryRun, limit: batchSize })
+  const recoveryCleanup = await cleanExpiredRecoveryData(env, { dryRun, limit: batchSize })
   const { results: recordings } = await env.DB.prepare(`SELECT id, r2_key FROM interview_recordings
     WHERE retention_until IS NOT NULL AND datetime(retention_until) <= datetime('now')
       AND deleted_at IS NULL AND retention_hold_reason IS NULL
@@ -11,8 +36,8 @@ export async function runRetention(env, { dryRun = true, limit = 25 } = {}) {
     WHERE datetime(created_at) <= datetime('now', '-3 years') AND purged_at IS NULL
       AND retention_hold_reason IS NULL ORDER BY created_at LIMIT ?`).bind(batchSize).all()
   const candidates = [...(recordings || []).map((r) => ({ ...r, kind: 'recording' })), ...(applications || []).map((r) => ({ ...r, kind: 'application' }))]
-  if (dryRun) return { dryRun: true, recordings: recordings?.length || 0, applications: applications?.length || 0 }
-  const report = { dryRun: false, deleted: 0, failed: 0, skipped: 0 }
+  if (dryRun) return { dryRun: true, recordings: recordings?.length || 0, applications: applications?.length || 0, uploadCleanup, recoveryCleanup }
+  const report = { dryRun: false, deleted: 0, failed: 0, skipped: 0, uploadCleanup, recoveryCleanup }
   for (const target of candidates) {
     const key = `${target.kind}:${target.id}`
     const token = crypto.randomUUID()

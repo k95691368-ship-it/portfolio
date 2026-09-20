@@ -50,3 +50,6 @@ dist-ssr
 # 포함될 수 있으므로 저장소에 올리지 않는다.
 .tmp-*
 /supabase/.temp/
+
+# Reproducible offline build; local user data lives in the OS temporary directory.
+/.local-runtime/

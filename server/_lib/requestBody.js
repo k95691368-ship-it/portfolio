@@ -2,6 +2,7 @@
 const MiB = 1024 * 1024
 export function requestBodyLimit(pathname) {
   if (/^\/api\/jobs\/[^/]+\/apply\/?$/.test(pathname)) return 21 * MiB // Two 10 MiB files + fields.
+  if (/^\/api\/application-self-service\/[^/]+\/?$/.test(pathname)) return 21 * MiB // Replacement resume and portfolio.
   if (/^\/api\/documents\/upload\/?$/.test(pathname)) return 11 * MiB
   if (/^\/api\/rooms\/[^/]+\/signed-contract\/?$/.test(pathname)) return 9 * MiB
   if (/^\/api\/rooms\/[^/]+\/sign\/?$/.test(pathname)) return 2 * MiB

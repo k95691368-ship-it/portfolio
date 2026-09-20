@@ -28,27 +28,33 @@ describe('전역 UI 글꼴', () => {
     expect(existsSync(suitFont)).toBe(true)
   })
 
-  it('화면용 서체와 한국어 대체 서체를 분리하고 라이선스를 보존한다', () => {
+  it('Segoe 계열을 우선하고 설치되지 않은 환경은 자체 호스팅 한국어 서체로 대체한다', () => {
     const css = read('src', 'index.css')
     const license = read('public', 'licenses', 'SUIT-OFL-1.1.txt')
-    expect(css).toContain("--font-display: 'Plus Jakarta Sans', 'SUIT Variable'")
-    expect(css).toContain("--font-body: Aptos, 'Segoe UI', 'SUIT Variable'")
-    expect(css).toContain("--font-mono: 'Geist Mono', 'SUIT Variable'")
+    const display = css.match(/--font-display:\s*([^;]+);/)?.[1] ?? ''
+    const body = css.match(/--font-body:\s*([^;]+);/)?.[1] ?? ''
+    const mono = css.match(/--font-mono:\s*([^;]+);/)?.[1] ?? ''
+
+    expect(display).toMatch(/^'Segoe UI Variable Display',\s*'Segoe UI Variable',\s*'Segoe UI',\s*'SUIT Variable'/)
+    expect(body).toMatch(/^'Segoe UI Variable',\s*'Segoe UI',\s*'SUIT Variable'/)
+    expect(display).toContain('sans-serif')
+    expect(body).toContain('sans-serif')
+    expect(mono).toContain("'Geist Mono'")
+    expect(mono).toContain('monospace')
     expect(license).toContain('SIL OPEN FONT LICENSE Version 1.1')
     expect(license).toContain('Reserved Font Name SUIT')
   })
 
-  it('Microsoft 기준의 압축된 제목과 선택 영역 위계를 사용한다', () => {
+  it('영웅 제목과 페이지 제목의 크기를 공유 토큰으로 구분한다', () => {
+    const tokens = read('src', 'index.css')
     const css = read('src', 'redesign.css')
     const heading = css.match(/\.landing-hero h1\s*\{([^}]*)\}/)?.[1] ?? ''
-    const choice = css.match(/\.landing-choice\s*\{([^}]*)\}/)?.[1] ?? ''
 
-    expect(heading).toContain('font-weight: 800')
-    expect(heading).toContain('font-size: var(--text-4xl)')
-    expect(heading).toContain('line-height: 1.2')
-    expect(choice).toContain('font-size: var(--text-lg)')
-    expect(choice).toContain('font-weight: 700')
-    expect(choice).toContain('min-height: 76px')
+    expect(tokens).toMatch(/--text-4xl:\s*3\.75rem;/)
+    expect(tokens).toMatch(/--text-3xl:\s*2\.75rem;/)
+    expect(heading).toMatch(/font-size:[^;]*var\(--text-4xl\)/)
+    expect(heading).toContain('word-break: keep-all')
+    expect(css).toContain('font-family: var(--heading)')
   })
 
   it('영문 표시·코드 서체도 CDN 없이 WOFF2와 라이선스를 제공한다', () => {

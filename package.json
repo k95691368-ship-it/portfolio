@@ -4,7 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/local/start.mjs",
+    "local": "node scripts/local/start.mjs",
+    "build:local": "node scripts/local/build.mjs",
     "build": "vite build && npm run build:api && npm run build:retention",
     "build:api": "node scripts/generate-supabase-routes.mjs && esbuild supabase/functions/api/index.ts --bundle --format=esm --platform=neutral --target=es2022 --external:npm:postgres@3.4.7 --outfile=.tmp-supabase-edge-index.js",
     "build:retention": "esbuild supabase/functions/retention/index.ts --bundle --format=esm --platform=neutral --target=es2022 --external:npm:postgres@3.4.7 --outfile=.tmp-supabase-retention.js",
@@ -12,7 +14,8 @@
     "test": "vitest run --exclude tests/smoke.test.js --exclude tests/e2e.test.js",
     "smoke": "vitest run tests/smoke.test.js",
     "e2e": "vitest run tests/e2e.test.js",
-    "preview": "vite preview"
+    "preview": "node scripts/local/start.mjs",
+    "backup": "node scripts/backup-recovery.mjs"
   },
   "dependencies": {
     "@fontsource-variable/geist-mono": "^5.3.0",

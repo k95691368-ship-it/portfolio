@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
 
@@ -15,9 +15,18 @@ import { useToast } from '../context/ToastContext.jsx'
 // 회사 쪽에만 보인다. 지원자에게 "지금 내정이 성립했습니다"라고 알리는 것은
 // 이 도구의 목적이 아니고, 회사가 아직 확정할 뜻이 없었다면 오히려 분쟁을
 // 만든다.
-export default function OfferWatch({ offer, roomId, archived = false, onChanged }) {
+export default function OfferWatch({ offer, roomId, archived = false, onChanged, onWriteError }) {
   const toast = useToast()
   const [saving, setSaving] = useState(false)
+  const lifetime = useRef(null)
+  const pending = useRef(false)
+  useEffect(() => {
+    const scope = {}
+    lifetime.current = scope
+    pending.current = false
+    setSaving(false)
+    return () => { if (lifetime.current === scope) lifetime.current = null }
+  }, [roomId])
 
   if (!offer) return null
   if (!offer.established && !offer.likely) return null
@@ -29,15 +38,24 @@ export default function OfferWatch({ offer, roomId, archived = false, onChanged 
   const phraseOnly = offer.established && offer.basis === 'phrase'
 
   const record = async () => {
+    const scope = lifetime.current
+    if (!scope || pending.current || archived) return
+    pending.current = true
     setSaving(true)
     try {
       await api.post(`/rooms/${roomId}/confirm-hire`, {})
-      await onChanged?.()
+      if (lifetime.current !== scope) return
       toast.success('채용 확정으로 기록했습니다.')
+      try { await onChanged?.() } catch {
+        if (lifetime.current === scope) toast.info('채용 확정은 저장되었지만 최신 면접방을 불러오지 못했습니다. 다시 불러오기를 눌러주세요.')
+      }
     } catch (err) {
-      toast.error(err.message)
+      if (lifetime.current === scope) {
+        if (onWriteError) onWriteError(err)
+        else toast.error(err.message)
+      }
     } finally {
-      setSaving(false)
+      if (lifetime.current === scope) { pending.current = false; setSaving(false) }
     }
   }
 

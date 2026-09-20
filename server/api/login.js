@@ -40,13 +40,18 @@ export async function onRequestPost({ request, env }) {
   if (!valid) return jsonError('이메일 또는 비밀번호가 올바르지 않습니다.', 401)
 
   if (user.is_suspended) return jsonError('정지된 계정입니다. 관리자에게 문의해주세요.', 403)
+  if (user.account_status === 'pending') return jsonResponse({
+    error: '가입 이메일을 확인한 뒤 로그인해주세요.', code: 'EMAIL_VERIFICATION_REQUIRED', verificationRequired: true,
+  }, 403)
 
   // 로그인 유지를 고르지 않았으면 브라우저를 닫을 때 끝난다.
   //
   // 값을 보내지 않는 호출부(예전 클라이언트, 검증 스크립트)는 예전처럼
   // 유지한다. 새 화면은 항상 명시해서 보낸다.
   const persistent = body.remember !== false
-  const { token, expiresAt } = await createSession(env.DB, user.id, { persistent })
+  const session = await createSession(env.DB, user.id, { persistent, expectedPasswordHash: user.password_hash })
+  if (!session) return jsonError('로그인 정보가 변경되었습니다. 다시 로그인해주세요.', 401)
+  const { token, expiresAt } = session
 
   // 성공한 로그인은 한도를 깎지 않는다.
   //
@@ -68,6 +73,7 @@ export async function onRequestPost({ request, env }) {
       isRecruiter: !!user.is_recruiter,
       isDeveloper: !!user.is_developer,
       mustChangePassword: !!user.must_change_password,
+      emailVerified: !!user.email_verified_at,
       sessionToken: token,
       sessionExpiresAt: expiresAt,
       sessionPersistent: persistent,

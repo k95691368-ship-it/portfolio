@@ -8,6 +8,7 @@ import { getRoomAccess, getRoomParticipation } from '../../../_lib/rooms.js'
 import { extractTermsFromMessage, selectNewEntries } from '../../../_lib/termsNegotiation.js'
 import { scanForOfferSignals } from '../../../_lib/jobOffer.js'
 import { alertCandidate, alertCompany } from '../../../_lib/messageAlert.js'
+import { messageIdKey } from '../../../../src/lib/messageId.js'
 
 function sessionRoleAsRoomRole(role) {
   if (role === 'host' || role === 'interviewer') return 'company'
@@ -38,7 +39,8 @@ async function getSessionMessageAccess(env, roomId, sessionId, user) {
 export async function onRequestGet({ request, env, data, params }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
   const url = new URL(request.url)
-  const after = Number(url.searchParams.get('after') || 0)
+  const after = messageIdKey(url.searchParams.get('after') || '0', { allowZero: true })
+  if (after === null) return jsonError('메시지 조회 기준이 올바르지 않습니다.', 400)
   const interviewSessionId = url.searchParams.get('interviewSessionId')?.trim() || null
 
   if (interviewSessionId) {
@@ -62,7 +64,7 @@ export async function onRequestGet({ request, env, data, params }) {
      FROM chat_messages m
      JOIN users u ON u.id = m.sender_user_id
      WHERE m.room_id = ? AND m.id > ?
-       AND (? IS NULL OR m.interview_session_id = ?)
+       AND (CAST(? AS TEXT) IS NULL OR m.interview_session_id = ?)
      ORDER BY m.id ASC
      LIMIT 200`
   )
@@ -143,7 +145,7 @@ export async function onRequestPost({ request, env, data, params, waitUntil }) {
   const archived = blockedWhenArchived(room, 'message')
   if (archived) return jsonError(archived, 409)
 
-  const text = body?.body?.trim()
+  const text = typeof body?.body === 'string' ? body.body.trim() : ''
   if (!text) return jsonError('메시지 내용을 입력해주세요.', 400)
   if (text.length > 2000) return jsonError('메시지가 너무 깁니다.', 400)
 

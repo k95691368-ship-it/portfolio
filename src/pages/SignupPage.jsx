@@ -1,18 +1,20 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
+import EmailVerificationPending from '../components/EmailVerificationPending.jsx'
 
 export default function SignupPage() {
   const { signup } = useAuth()
   const toast = useToast()
-  const navigate = useNavigate()
+  const [pendingEmail, setPendingEmail] = useState('')
   const [form, setForm] = useState({
     email: '',
     password: '',
     role: 'candidate',
     displayName: '',
     companyName: '',
+    remember: true,
   })
   const [submitting, setSubmitting] = useState(false)
 
@@ -22,8 +24,11 @@ export default function SignupPage() {
     e.preventDefault()
     setSubmitting(true)
     try {
-      await signup(form)
-      navigate('/dashboard')
+      const result = await signup(form)
+      if (result.verificationRequired) {
+        setPendingEmail(result.email || form.email)
+        setForm((current) => ({ ...current, password: '' }))
+      }
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -31,9 +36,11 @@ export default function SignupPage() {
     }
   }
 
+  if (pendingEmail) return <EmailVerificationPending email={pendingEmail} />
   return (
     <div className="auth-page">
       <h1>회원가입</h1>
+      <p>가입 이메일을 확인해야 계정을 사용할 수 있습니다.</p>
       <form onSubmit={handleSubmit}>
         <label>
           역할
@@ -66,6 +73,8 @@ export default function SignupPage() {
             minLength={8}
           />
         </label>
+        <label className="checkbox-label remember-me"><input type="checkbox" checked={form.remember} onChange={(event) => setForm((current) => ({ ...current, remember: event.target.checked }))} />이메일 확인 후 로그인 유지</label>
+        <p>공용 기기에서는 선택하지 말고 이용 후 로그아웃해주세요.</p>
         <button type="submit" className="btn-primary btn-block" disabled={submitting}>
           가입하기
         </button>

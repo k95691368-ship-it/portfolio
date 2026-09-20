@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useDm } from '../context/DmContext.jsx'
+import { isDirectMessage, mergeDirectMessages } from '../lib/directMessages.js'
 
 function shortTime(value) {
   if (!value) return ''
@@ -21,21 +22,38 @@ function DmWindow({ partner, onClose }) {
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [readError, setReadError] = useState('')
   const [loading, setLoading] = useState(true)
   const { refresh } = useDm()
   const bodyRef = useRef(null)
+  const editVersion = useRef(0)
+  const pending = useRef(null)
+  const lifetime = useRef(null)
+
+  useEffect(() => {
+    const scope = {}
+    lifetime.current = scope
+    return () => { if (lifetime.current === scope) lifetime.current = null }
+  }, [])
 
   useEffect(() => {
     let alive = true
+    let reading = false
     const load = async () => {
+      if (!alive || reading) return
+      reading = true
       try {
         const data = await api.get(`/dm/${partner.id}`)
         if (!alive) return
-        setMessages(data.messages)
-        setError('')
+        if (!Array.isArray(data?.messages) || !data.messages.every(isDirectMessage)) {
+          throw new Error('쪽지 목록을 확인하지 못했습니다.')
+        }
+        setMessages(previous => mergeDirectMessages(previous, data.messages))
+        setReadError('')
       } catch (err) {
-        if (alive) setError(err.message)
+        if (alive) setReadError(err.message || '쪽지 목록을 확인하지 못했습니다.')
       } finally {
+        reading = false
         if (alive) setLoading(false)
       }
     }
@@ -65,19 +83,27 @@ function DmWindow({ partner, onClose }) {
   const send = async (e) => {
     e.preventDefault()
     const text = draft.trim()
-    if (!text || busy) return
+    if (!text || pending.current || !lifetime.current) return
+    const request = { version: editVersion.current, scope: lifetime.current }
+    pending.current = request
+    const isCurrent = () => pending.current === request && lifetime.current === request.scope
     setBusy(true)
+    setError('')
     try {
       const data = await api.post(`/dm/${partner.id}`, { body: text })
-      setMessages((prev) => [...prev, data.message])
-      setDraft('')
-      setError('')
+      if (!isCurrent()) return
+      if (!isDirectMessage(data?.message)) throw new Error('쪽지 전송 결과를 확인하지 못했습니다.')
+      setMessages(previous => mergeDirectMessages(previous, [data.message]))
+      if (editVersion.current === request.version) setDraft('')
       const el = bodyRef.current
-      if (el) requestAnimationFrame(() => { el.scrollTop = el.scrollHeight })
+      if (el) requestAnimationFrame(() => {
+        if (lifetime.current === request.scope && bodyRef.current === el) el.scrollTop = el.scrollHeight
+      })
     } catch (err) {
-      setError(err.message)
+      if (isCurrent()) setError(err.message || '쪽지 전송을 확인하지 못했습니다.')
     } finally {
-      setBusy(false)
+      if (isCurrent()) setBusy(false)
+      if (pending.current === request) pending.current = null
     }
   }
 
@@ -97,7 +123,7 @@ function DmWindow({ partner, onClose }) {
         aria-relevant="additions"
       >
         {loading && <p className="dm-hint">불러오는 중...</p>}
-        {!loading && messages.length === 0 && !error && (
+        {!loading && messages.length === 0 && !readError && (
           <p className="dm-hint">아직 주고받은 쪽지가 없습니다.</p>
         )}
         {messages.map((m) => (
@@ -110,13 +136,14 @@ function DmWindow({ partner, onClose }) {
           </div>
         ))}
       </div>
-      {error && <p className="dm-error">{error}</p>}
+      {readError && <p className="dm-error" role="alert">{readError} 잠시 후 자동으로 다시 조회합니다.</p>}
+      {error && <p className="dm-error" role="alert">{error}</p>}
       <form className="dm-compose" onSubmit={send}>
         <label className="sr-only" htmlFor="dm-draft">쪽지 내용</label>
         <textarea
           id="dm-draft"
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => { editVersion.current++; setDraft(e.target.value) }}
           onKeyDown={(e) => {
             // 엔터로 보내되 줄바꿈은 남긴다.
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -147,7 +174,7 @@ function DmWindow({ partner, onClose }) {
 // 창을 열 때마다 버튼이 위로 밀려 자리가 바뀐다.
 export default function DmDock() {
   const { user } = useAuth()
-  const { threads, unreadTotal, open, listOpen, alerts, openDm, closeDm, toggleList, dismissAlert } =
+  const { threads, unreadTotal, inboxError, inboxLoading, inboxLoaded, refresh, open, listOpen, alerts, openDm, closeDm, toggleList, dismissAlert } =
     useDm()
 
   // 알림은 잠깐 떴다 스스로 사라진다. 쌓이면 화면 오른쪽을 통째로 덮는다.
@@ -180,7 +207,7 @@ export default function DmDock() {
       </div>
       )}
 
-      {user && open && <DmWindow partner={open} onClose={closeDm} />}
+      {user && open && <DmWindow key={open.id} partner={open} onClose={closeDm} />}
 
       {user && listOpen && !open && (
         <section className="dm-window dm-list-window" aria-label="쪽지함">
@@ -191,11 +218,18 @@ export default function DmDock() {
             </button>
           </header>
           <div className="dm-window-body">
-            {threads.length === 0 ? (
+            {inboxError && <div className="dm-inbox-feedback">
+              <p className="dm-error" role="alert">{inboxError}</p>
+              <button type="button" className="btn-ghost btn-sm" disabled={inboxLoading} onClick={refresh} aria-label="쪽지함 다시 불러오기">
+                {inboxLoading ? '불러오는 중…' : '다시 불러오기'}
+              </button>
+            </div>}
+            {!inboxLoaded && inboxLoading && <p className="dm-hint" role="status">쪽지함을 불러오는 중…</p>}
+            {inboxLoaded && !inboxError && threads.length === 0 ? (
               <p className="dm-hint">
                 주고받은 쪽지가 없습니다. 관리자 패널의 이름을 누르면 쪽지를 보낼 수 있습니다.
               </p>
-            ) : (
+            ) : threads.length > 0 && (
               <ul className="dm-thread-list">
                 {threads.map((t) => (
                   <li key={t.partner.id}>
@@ -223,7 +257,7 @@ export default function DmDock() {
         type="button"
         className="dm-launcher"
         onClick={open ? closeDm : toggleList}
-        aria-label={unreadTotal > 0 ? `쪽지함, 안 읽음 ${unreadTotal}개` : '쪽지함'}
+        aria-label={inboxError ? '쪽지함 조회 실패' : unreadTotal > 0 ? `쪽지함, 안 읽음 ${unreadTotal}개` : '쪽지함'}
         aria-expanded={listOpen || !!open}
       >
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
@@ -235,6 +269,7 @@ export default function DmDock() {
             {unreadTotal > 9 ? '9+' : unreadTotal}
           </span>
         )}
+        {inboxError && unreadTotal === 0 && <span className="dm-launcher-badge" aria-hidden="true">!</span>}
       </button>
       )}
     </div>
