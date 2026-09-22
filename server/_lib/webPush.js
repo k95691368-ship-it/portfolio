@@ -230,6 +230,8 @@ export async function sendPush(env, subscription, payload) {
 }
 
 // 한 사람의 모든 기기에 보내고, 죽은 구독은 치운다.
+const PUSH_CONCURRENCY = 4
+
 export async function pushToUser(env, userId, payload) {
   if (!userId || !vapidConfigured(env)) return { sent: 0, removed: 0 }
 
@@ -242,16 +244,23 @@ export async function pushToUser(env, userId, payload) {
 
   let sent = 0
   const dead = []
-  for (const sub of results) {
-    try {
-      const r = await sendPush(env, sub, payload)
-      if (r.ok) sent += 1
-      else if (r.gone) dead.push(sub)
-      else console.error(`push failed (${r.status}): ${r.reason}`)
-    } catch {
-      console.error('push transport failed')
+  let next = 0
+  async function sendNext() {
+    while (next < results.length) {
+      const sub = results[next++]
+      try {
+        const r = await sendPush(env, sub, payload)
+        if (r.ok) sent += 1
+        else if (r.gone) dead.push(sub)
+        else console.error(`push failed (${r.status}): ${r.reason}`)
+      } catch {
+        console.error('push transport failed')
+      }
     }
   }
+  // One slow device must not stall every other device. Bound network and
+  // encryption work instead of launching an unbounded Promise.all.
+  await Promise.all(Array.from({ length: Math.min(PUSH_CONCURRENCY, results.length) }, sendNext))
 
   let removed = 0
   if (dead.length > 0) {

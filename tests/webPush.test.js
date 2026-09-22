@@ -229,4 +229,61 @@ describe('웹 푸시', () => {
       expect(db.sql.prepare('SELECT user_id FROM push_subscriptions').get().user_id).toBe(change === 'owner' ? 'push-after' : 'push-before')
     } finally { db.close() }
   })
+
+  it('sends to devices concurrently with at most four in flight', async () => {
+    const db = sqliteApp()
+    const release = []
+    let flight, autoRelease = false, active = 0, peak = 0
+    try {
+      seedUser(db, 'push-parallel')
+      const vapid = await makeVapid()
+      const sub = await makeSubscription()
+      for (let i = 0; i < 9; i++) db.sql.prepare('INSERT INTO push_subscriptions (endpoint,user_id,p256dh,auth) VALUES (?,?,?,?)')
+        .run(`${sub.endpoint}-${i}`, 'push-parallel', sub.p256dh, sub.auth)
+      const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+        active++; peak = Math.max(peak, active)
+        if (!autoRelease) await new Promise((resolve) => release.push(resolve))
+        active--
+        return new Response(null, { status: 201 })
+      })
+      flight = pushToUser({ DB: db, VAPID_PUBLIC_KEY: vapid.publicKey, VAPID_PRIVATE_KEY: vapid.privateKey }, 'push-parallel', { title: 'x' })
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(4))
+      expect(peak).toBe(4)
+      release.splice(0).forEach((resolve) => resolve())
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(8))
+      expect(peak).toBe(4)
+      autoRelease = true
+      release.splice(0).forEach((resolve) => resolve())
+      expect(await flight).toEqual({ sent: 9, removed: 0 })
+      expect(fetch).toHaveBeenCalledTimes(9)
+    } finally {
+      autoRelease = true
+      release.splice(0).forEach((resolve) => resolve())
+      if (flight) await flight
+      db.close()
+    }
+  })
+
+  it('isolates failed devices and removes only expired subscriptions during parallel sending', async () => {
+    const db = sqliteApp()
+    try {
+      seedUser(db, 'push-mixed')
+      const vapid = await makeVapid()
+      const sub = await makeSubscription()
+      const statuses = [201, 410, 404, 429, 503, 0]
+      for (const status of statuses) db.sql.prepare('INSERT INTO push_subscriptions (endpoint,user_id,p256dh,auth) VALUES (?,?,?,?)')
+        .run(`${sub.endpoint}-${status}`, 'push-mixed', sub.p256dh, sub.auth)
+      const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+        const status = Number(url.split('-').pop())
+        if (!status) throw new Error('Test transport failure')
+        return new Response(null, { status })
+      })
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      expect(await pushToUser({ DB: db, VAPID_PUBLIC_KEY: vapid.publicKey, VAPID_PRIVATE_KEY: vapid.privateKey }, 'push-mixed', { title: 'x' }))
+        .toEqual({ sent: 1, removed: 2 })
+      expect(fetch).toHaveBeenCalledTimes(6)
+      const remaining = db.sql.prepare('SELECT endpoint FROM push_subscriptions').all().map((row) => Number(row.endpoint.split('-').pop())).sort((a, b) => a - b)
+      expect(remaining).toEqual([0, 201, 429, 503])
+    } finally { db.close() }
+  })
 })

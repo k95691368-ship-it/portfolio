@@ -3,6 +3,7 @@ import { createPostgresD1 } from './postgresD1.ts'
 import { createSupabaseStorage } from './supabaseStorage.ts'
 import { onRequest as apiMiddleware } from '../../../server/api/_middleware.js'
 import { onRequest as adminMiddleware } from '../../../server/api/admin/_middleware.js'
+import { jsonError, jsonResponse } from '../../../server/_lib/http.js'
 
 type RuntimeEnv = Record<string, string> & {
   DB: ReturnType<typeof createPostgresD1>
@@ -136,12 +137,15 @@ async function dispatch(request: Request) {
       : externalUrl.pathname.startsWith('/api/')
         ? externalUrl.pathname.slice('/api'.length)
         : externalUrl.pathname
-  const matched = routeFor(routePath)
+  let matched
+  try {
+    matched = routeFor(routePath)
+  } catch (error) {
+    if (error instanceof URIError) return jsonError('잘못된 요청 주소입니다.', 400)
+    throw error
+  }
   if (!matched) {
-    return new Response(JSON.stringify({ error: '요청한 기능을 찾을 수 없습니다.' }), {
-      status: 404,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return jsonError('요청한 기능을 찾을 수 없습니다.', 404)
   }
 
   const requestForHandlers = internalRequest(request, routePath)
@@ -159,9 +163,8 @@ async function dispatch(request: Request) {
   const methodHandler = matched.route.module[`onRequest${request.method[0]}${request.method.slice(1).toLowerCase()}`]
   const handler = methodHandler || matched.route.module.onRequest
   if (typeof handler !== 'function') {
-    return new Response(JSON.stringify({ error: '지원하지 않는 요청 방식입니다.' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json', Allow: 'GET, POST, PUT, PATCH, DELETE' },
+    return jsonResponse({ error: '지원하지 않는 요청 방식입니다.' }, 405, {
+      Allow: 'GET, POST, PUT, PATCH, DELETE',
     })
   }
 
@@ -186,10 +189,7 @@ async function dispatch(request: Request) {
 deno.serve(async (request: Request) => {
   const origin = allowedOrigin(request)
   if (request.headers.has('Origin') && !origin) {
-    return new Response(JSON.stringify({ error: '허용되지 않은 출처입니다.' }), {
-      status: 403,
-      headers: { 'Content-Type': 'application/json', ...Object.fromEntries(corsHeaders(null)) },
-    })
+    return withCors(jsonError('허용되지 않은 출처입니다.', 403), null)
   }
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(origin) })
 
@@ -198,10 +198,7 @@ deno.serve(async (request: Request) => {
   } catch (error) {
     console.error('Unhandled API error:', error)
     return withCors(
-      new Response(JSON.stringify({ error: '요청을 처리하지 못했습니다.' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      }),
+      jsonError('요청을 처리하지 못했습니다.', 500),
       origin
     )
   }

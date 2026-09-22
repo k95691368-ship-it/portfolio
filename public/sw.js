@@ -17,6 +17,22 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim())
 })
 
+function notificationUrl(value) {
+  const fallback = `${self.location.origin}/`
+  if (typeof value !== 'string' || !value || value.length > 4096) return fallback
+  for (const character of value) {
+    const code = character.charCodeAt(0)
+    if (code <= 32 || code === 127) return fallback
+  }
+  try {
+    const url = new URL(value, fallback)
+    if (url.origin !== self.location.origin || !['https:', 'http:'].includes(url.protocol) || url.username || url.password) return fallback
+    return url.href
+  } catch {
+    return fallback
+  }
+}
+
 self.addEventListener('push', (event) => {
   let data = {}
   try {
@@ -24,18 +40,19 @@ self.addEventListener('push', (event) => {
   } catch {
     data = {}
   }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) data = {}
 
-  const title = data.title || '새 메시지'
+  const title = typeof data.title === 'string' && data.title ? data.title : '새 메시지'
   const options = {
-    body: data.body || '면접방에 새 메시지가 도착했습니다.',
+    body: typeof data.body === 'string' && data.body ? data.body : '면접방에 새 메시지가 도착했습니다.',
     // 같은 방의 알림은 같은 자리를 덮어쓴다. 대화가 활발할 때 알림이 쌓이면
     // 정작 무엇을 보라는 것인지 알 수 없다.
-    tag: data.tag || 'room-message',
+    tag: typeof data.tag === 'string' && data.tag ? data.tag : 'room-message',
     renotify: true,
     icon: '/favicon.svg',
     badge: '/favicon.svg',
     // 누르면 어디로 갈지. 알림만 뜨고 갈 곳이 없으면 다시 찾아 들어가야 한다.
-    data: { url: data.url || '/' },
+    data: { url: notificationUrl(data.url) },
     // 자동으로 사라지지 않게 둔다. 자리를 비운 사이 온 알림이 목적이다.
     requireInteraction: true,
   }
@@ -44,17 +61,21 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const target = event.notification.data?.url || '/'
+  // Validate again: an older worker may have created this notification.
+  const target = notificationUrl(event.notification.data?.url)
 
   // 이미 열려 있는 창이 있으면 그것을 쓴다. 누를 때마다 새 창이 쌓이면
   // 같은 방이 여러 개 열린다.
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (list) => {
       for (const client of list) {
-        if ('focus' in client) {
-          client.navigate?.(target)
-          return client.focus()
-        }
+        if (typeof client.focus !== 'function') continue
+        try {
+          if (client.url === target) return await client.focus()
+          if (typeof client.navigate !== 'function') continue
+          const navigated = await client.navigate(target)
+          if (navigated) return await navigated.focus()
+        } catch { /* A closed tab must not prevent opening the destination. */ }
       }
       return self.clients.openWindow(target)
     })

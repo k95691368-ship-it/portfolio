@@ -26,20 +26,37 @@ describe.each([
     expect(css).toContain("@import './index.css'")
   })
 
-  it('uses the shared light typography and responsive policy layout', () => {
+  it('uses one Microsoft token system and a responsive contents rail', () => {
     const css = read('src/legal.css')
     const title = css.match(/\.policy-main h1\s*\{([^}]*)\}/)?.[1] ?? ''
     const toc = css.match(/\.policy-toc\s*\{([^}]*)\}/)?.[1] ?? ''
     expect(title).toContain('font-family: var(--font-display)')
     expect(title).toContain('font-size: 44px')
     expect(title).toContain('font-weight: 600')
-    expect(toc).toContain('padding: 32px')
+    expect(title).toContain('line-height: 1.08')
+    expect(toc).toContain('position: sticky')
     expect(toc).toContain('border-radius: 20px')
-    expect(toc).toContain('background: var(--surface-alt)')
-    expect(css).toContain('@media (max-width: 640px)')
+    expect(toc).toContain('background: var(--surface-low)')
+    expect(css).toContain("grid-template-areas: 'intro intro' 'toc content'")
+    expect(css).toContain('grid-template-columns: 256px minmax(0, 1fr)')
+    expect(css).toContain('@media (max-width: 1023px)')
+    expect(css).toContain('@media (max-width: 767px)')
     expect(css).toContain('grid-template-columns: 1fr')
     expect(css).toContain('min-height: 44px')
     expect(css).toContain('@media print')
+    expect(css).not.toMatch(/backdrop-filter|Apple|SF Pro|prefers-color-scheme:\s*dark/i)
+  })
+
+  it('separates the introductory band, contents navigation and legal text without scripting', () => {
+    expect(html).toContain('<div class="policy-intro">')
+    expect(html).toContain('<div class="policy-content">')
+    const introAt = html.indexOf('class="policy-intro"')
+    const contentsAt = html.indexOf('class="policy-toc"')
+    const documentAt = html.indexOf('class="policy-content"')
+    expect(introAt).toBeLessThan(contentsAt)
+    expect(contentsAt).toBeLessThan(documentAt)
+    expect(html.match(/<section\b/g)).toHaveLength(10)
+    expect(html.match(/<div\b/g)).toHaveLength(html.match(/<\/div>/g).length)
   })
 
   it('has working section anchors with unique IDs and links to both policies', () => {

@@ -666,7 +666,8 @@ export default function RecruitPage() {
         </div>
       </header>
 
-      <section className="recruit-section">
+      <div className="recruit-posting-workspace">
+      <section className="recruit-section recruit-posting-editor">
         <h2>채용 공고 등록</h2>
         <p className="muted" role="status">
           {draftSavedAt ? `${formatKst(draftSavedAt)} 임시저장${unsaved ? ' · 저장하지 않은 변경사항' : ''}` : '임시저장한 공고는 본인에게만 보입니다.'}
@@ -807,6 +808,7 @@ export default function RecruitPage() {
         </form>
       </section>
 
+      <div className="recruit-posting-sidebar">
       <section className="recruit-section" aria-labelledby="posting-drafts-title">
         <div className="dashboard-header">
           <h2 id="posting-drafts-title">내 임시저장 공고</h2>
@@ -882,6 +884,9 @@ export default function RecruitPage() {
           </ul>
         )}
       </section>
+
+      </div>
+      </div>
 
       {qrPosting && <PostingQrModal posting={qrPosting} onClose={() => setQrPosting(null)} />}
       {comparePosting && (

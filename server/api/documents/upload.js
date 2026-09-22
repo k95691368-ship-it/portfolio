@@ -47,16 +47,18 @@ export async function onRequestPost({ request, env, data }) {
     .first()
 
   const id = genId()
-  const r2Key = `documents/${data.user.id}/${docType}-${Date.now()}.${ext}`
+  // Concurrent uploads must never overwrite or clean up another request's file.
+  const r2Key = `documents/${data.user.id}/${docType}-${id}.${ext}`
   const contentType = EXT_MIME[ext] || 'application/octet-stream'
 
   await env.DOCUMENTS.put(r2Key, file.stream(), {
     httpMetadata: { contentType },
   })
 
+  let saved
   try {
     // documents 에는 UNIQUE(user_id, doc_type) 가 있으므로 한 문장으로 바꾼다.
-    await env.DB.prepare(
+    saved = await env.DB.prepare(
       `INSERT INTO documents (id, user_id, doc_type, filename, r2_key, size_bytes, content_type)
        VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(user_id, doc_type) DO UPDATE SET
@@ -64,16 +66,17 @@ export async function onRequestPost({ request, env, data }) {
          r2_key = excluded.r2_key,
          size_bytes = excluded.size_bytes,
          content_type = excluded.content_type,
-         uploaded_at = datetime('now')`
+         uploaded_at = datetime('now')
+       RETURNING id`
     )
       .bind(id, data.user.id, docType, file.name, r2Key, file.size, contentType)
-      .run()
-  } catch (err) {
-    // 기록이 남지 않았으니 방금 올린 객체는 아무도 가리키지 않는다. 옛 파일은
-    // 그대로 두어 지원자가 잃는 것이 없게 한다.
-    console.error(`Document DB write failed for user ${data.user.id} (${docType}):`, err)
-    await env.DOCUMENTS.delete(r2Key).catch(() => {})
-    return jsonError('파일 저장에 실패했습니다. 잠시 후 다시 시도해주세요.', 500)
+      .first()
+    if (!saved?.id) throw new Error('Missing saved document')
+  } catch {
+    // A lost database response does not prove rollback. The write can already
+    // have committed, so deleting this object could destroy the saved document.
+    console.error('Document save result could not be confirmed')
+    return jsonError('파일 저장 결과를 확인하지 못했습니다. 문서 목록을 다시 확인해주세요.', 503)
   }
 
   // 여기서 실패해도 남는 것은 아무도 가리키지 않는 옛 객체뿐이다.
@@ -81,5 +84,5 @@ export async function onRequestPost({ request, env, data }) {
     await env.DOCUMENTS.delete(existing.r2_key).catch(() => {})
   }
 
-  return jsonResponse({ id, docType, filename: file.name, sizeBytes: file.size }, 201)
+  return jsonResponse({ id: saved.id, docType, filename: file.name, sizeBytes: file.size }, 201)
 }

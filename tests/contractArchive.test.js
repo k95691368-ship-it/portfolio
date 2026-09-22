@@ -102,4 +102,15 @@ describe('보관되는 정본', () => {
     expect(html).not.toMatch(/src="https?:/)
     expect(html).not.toMatch(/<link[^>]+href="https?:/)
   })
+
+  it('Microsoft 문서 스타일과 모바일·인쇄 레이아웃을 사용한다', () => {
+    expect(html).toContain('font-family: "Segoe UI Variable", "Segoe UI", "SUIT Variable"')
+    expect(html).toContain('background: #ffffff; color: #1a1a1a')
+    expect(html).toContain('border: 1px solid #d1d1d1')
+    expect(html).toContain('border-radius: 20px')
+    expect(html).toContain('@media (max-width: 767px)')
+    expect(html).toContain('@media print')
+    expect(html).toContain('break-inside: avoid')
+    expect(html).not.toMatch(/Apple SD|SF Pro|-apple-system/)
+  })
 })

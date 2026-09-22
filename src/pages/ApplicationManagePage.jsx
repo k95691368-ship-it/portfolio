@@ -5,7 +5,6 @@ import { formatKst } from '../lib/formatTime.js'
 import { CONSENT_ITEMS, CONSENT_VERSION } from '../lib/consentText.js'
 import Modal from '../components/Modal.jsx'
 import UnsavedChangesGuard from '../components/UnsavedChangesGuard.jsx'
-import './ApplicationManagePage.css'
 
 const LABELS = { submitted: '심사 대기', passed: '서류합격', rejected: '불합격', withdrawn: '지원 철회' }
 const CAREER_FIELDS = [['companyName', '회사명'], ['employmentType', '고용형태'], ['startDate', '입사일'], ['endDate', '퇴사일'], ['department', '부서'], ['position', '직급'], ['description', '담당 업무']]

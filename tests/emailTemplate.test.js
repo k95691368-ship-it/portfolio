@@ -39,8 +39,12 @@ describe('recruiting HTML email presentation', () => {
     expect(html).toContain("font-family:'Segoe UI Variable','Segoe UI','SUIT Variable','SUIT'")
     expect(html).toContain('border-radius:20px')
     expect(html).toContain('border-radius:999px')
+    expect(html).toContain('min-height:44px')
+    expect(html).toContain('box-shadow:0 10px 24px rgba(0,0,0,0.06)')
+    expect(html).toContain('name="color-scheme" content="light"')
+    expect(html).toContain('class="email-details"')
     expect(html).not.toContain('#0d1b35')
-    expect(html).not.toMatch(/@font-face|fonts\.google/)
+    expect(html).not.toMatch(/@font-face|fonts\.google|Apple SD|SF Pro|-apple-system/)
   })
 
   it.each(['companyName', 'title', 'bodyText'])('escapes untrusted %s', (field) => {

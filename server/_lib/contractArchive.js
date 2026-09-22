@@ -71,28 +71,40 @@ export function renderContractDocument(snapshot) {
 <title>표준근로계약서 — ${esc(terms.employeeName || '')}</title>
 <style>
   /* 글꼴은 이름만 적는다. 파일을 싣지 않아도 어느 컴퓨터에서든 한글이 나온다. */
-  body { font-family: "SUIT Variable", SUIT, -apple-system, BlinkMacSystemFont,
-         "SF Pro Text", "SF Pro Display", "Apple SD Gothic Neo", "Helvetica Neue",
-         "Noto Sans KR", "Malgun Gothic",
-         "맑은 고딕", "Segoe UI", Arial, sans-serif;
-         max-width: 760px; margin: 0 auto; padding: 32px 24px; color: #111; line-height: 1.7; }
-  h1 { font-size: 24px; text-align: center; margin: 0 0 4px; }
-  .sub { text-align: center; color: #555; font-size: 13px; margin: 0 0 28px; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-  th, td { border: 1px solid #ccc; padding: 8px 10px; font-size: 14px; text-align: left;
-           vertical-align: top; word-break: keep-all; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI Variable", "Segoe UI", "SUIT Variable", SUIT,
+         "Helvetica Neue", Arial, sans-serif;
+         max-width: 960px; margin: 0 auto; padding: 48px 32px;
+         background: #ffffff; color: #1a1a1a; line-height: 1.6; }
+  h1 { font-size: 32px; font-weight: 600; line-height: 1.14; letter-spacing: -.01em; margin: 0 0 12px; }
+  .sub { color: #616161; font-size: 14px; margin: 0 0 32px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 32px; }
+  th, td { border: 1px solid #d1d1d1; padding: 12px 16px; font-size: 14px; text-align: left;
+           vertical-align: top; word-break: keep-all; overflow-wrap: anywhere; }
   th { width: 30%; background: #f5f5f5; font-weight: 600; }
-  .article { margin-bottom: 14px; }
-  .article h2 { font-size: 15px; margin: 0 0 3px; }
-  .article p { margin: 0; font-size: 14px; white-space: pre-wrap; }
+  .article { margin-bottom: 24px; }
+  .article h2 { font-size: 18px; font-weight: 600; margin: 0 0 8px; }
+  .article p { margin: 0; font-size: 16px; white-space: pre-wrap; overflow-wrap: anywhere; }
   .signs { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 32px; }
-  .sign { flex: 1 1 240px; border: 1px solid #ccc; padding: 12px; }
+  .sign { flex: 1 1 240px; min-width: 0; border: 1px solid #d1d1d1; border-radius: 20px; padding: 24px; }
   .sign img { max-width: 100%; height: 76px; object-fit: contain; }
-  .sign dt { font-size: 12px; color: #555; margin-top: 6px; }
-  .sign dd { margin: 0; font-size: 13px; word-break: break-all; }
-  .meta { margin-top: 32px; padding-top: 14px; border-top: 1px solid #ddd;
-          font-size: 12px; color: #555; word-break: break-all; }
-  @media print { body { padding: 0; } }
+  .sign dt { font-size: 12px; font-weight: 600; color: #616161; margin-top: 12px; }
+  .sign dd { margin: 4px 0 0; font-size: 14px; overflow-wrap: anywhere; }
+  .meta { margin-top: 32px; padding-top: 24px; border-top: 1px solid #d1d1d1;
+          font-size: 12px; color: #616161; overflow-wrap: anywhere; }
+  @media (max-width: 767px) {
+    body { padding: 24px 16px; }
+    h1 { font-size: 26px; }
+    th, td { padding: 12px; }
+    .sign { padding: 16px; }
+  }
+  @media print {
+    body { max-width: none; padding: 0; color: #000; }
+    h1 { font-size: 24px; }
+    .article h2 { font-size: 15px; break-after: avoid; }
+    .article p { font-size: 14px; }
+    .sign { break-inside: avoid; border-radius: 0; padding: 12px; }
+  }
 </style>
 </head>
 <body>
@@ -230,7 +242,7 @@ export async function archiveContract(env, roomId) {
   // 저장할 때마다 새 키를 쓴다. 같은 키에 덮어썼다가 DB 쓰기가 실패하면
   // 파일은 새것인데 기록된 지문은 옛것이 되고, 그 계약서는 대조할 때마다
   // 영원히 "변조됨" 으로 나온다 -- 아무도 손대지 않았는데.
-  const documentKey = `${ARCHIVE_PREFIX}/${id}/${Date.now()}.html`
+  const documentKey = `${ARCHIVE_PREFIX}/${id}/${genId()}.html`
 
   await env.DOCUMENTS.put(documentKey, bytes, {
     httpMetadata: { contentType: 'text/html; charset=utf-8' },
@@ -238,8 +250,9 @@ export async function archiveContract(env, roomId) {
 
   const employmentEndedAt = terms.employmentEndedAt || null
 
+  let saved
   try {
-    await env.DB.prepare(
+    saved = await env.DB.prepare(
       `INSERT INTO contract_archive
          (id, room_id, room_title, employer_name, employer_user_id,
           employee_name, employee_user_id, employee_email,
@@ -264,7 +277,8 @@ export async function archiveContract(env, roomId) {
          document_key = excluded.document_key,
          document_sha256 = excluded.document_sha256,
          document_bytes = excluded.document_bytes,
-         updated_at = datetime('now')`
+         updated_at = datetime('now')
+       RETURNING id`
     )
       .bind(
         id,
@@ -288,12 +302,13 @@ export async function archiveContract(env, roomId) {
         documentSha,
         bytes.length
       )
-      .run()
-  } catch (err) {
-    console.error(`contract archive write failed (${roomId}):`, err)
-    // 기록이 가리키는 것은 여전히 옛 파일이다. 방금 올린 것만 치운다.
-    await env.DOCUMENTS.delete(documentKey).catch(() => {})
-    return { ok: false, reason: '보관 기록을 남기지 못했습니다.' }
+      .first()
+    if (!saved?.id) throw new Error('Missing saved archive')
+  } catch {
+    console.error('Contract archive save result could not be confirmed')
+    // A transport error can arrive after commit. Keep both versions until the
+    // result is known instead of deleting a possibly referenced signed document.
+    return { ok: false, reason: '보관 결과를 확인하지 못했습니다. 보관함에서 다시 확인해주세요.' }
   }
 
   // 기록이 새 파일을 가리킨 뒤에 옛 파일을 치운다. 여기서 실패해도 남는 것은
@@ -302,7 +317,7 @@ export async function archiveContract(env, roomId) {
     await env.DOCUMENTS.delete(existing.document_key).catch(() => {})
   }
 
-  return { ok: true, id, documentKey, bytes: bytes.length }
+  return { ok: true, id: saved.id, documentKey, bytes: bytes.length }
 }
 
 // 서명이 끝나는 길목에서 부른다. 여기서 던지면 서명이 실패하므로 삼킨다.

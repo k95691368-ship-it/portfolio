@@ -1,0 +1,250 @@
+/* Contract workflows follow the same Microsoft cards. The signed document is paper. */
+:is(.ai-analysis, .contract-form, .contract-fields, .ai-draft, .signature-section,
+  .contract-history, .contract-delivery, .contract-translation, .contract-period,
+  .contract-lifecycle, .contract-explainer, .audit-certificate, .worker-rights,
+  .wage-composition, .pre-contract-review, .signed-contract-section, .posting-compare,
+  .interview-summary, .document-manager, .room-documents, .negotiation-log,
+  .change-requests, .employment-end, .offer-watch, .room-close, .room-archive,
+  .room-closed, .room-archived):not(.fold) {
+  display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 24px;
+  border: 1px solid var(--border); border-radius: 20px; background: var(--surface);
+}
+:is(.ai-analysis, .signature-section, .signed-contract-section, .document-manager,
+  .room-documents, .room-close, .room-archive, .interview-summary, .negotiation-log,
+  .pre-contract-review) > h2 { margin: 0; font-size: 22px; line-height: 1.2; }
+:is(.contract-form, .contract-fields, .signature-section, .signed-contract-section,
+  .document-manager, .room-documents, .room-close, .room-archive, .room-closed,
+  .room-archived, .employment-end, .audit-certificate, .certificate-issued,
+  .pre-contract-review, .negotiation-log, .interview-summary) > button,
+.fold-body > button { align-self: flex-start; }
+.contract-form fieldset { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0; padding: 0; border: 0; }
+.contract-form fieldset > :is(h3, .custom-term-row) { grid-column: 1 / -1; }
+.contract-form fieldset > h3 { padding-top: 24px; font-size: 18px; }
+.contract-form fieldset > h3:first-child { padding-top: 0; }
+.contract-form fieldset > button { justify-self: start; }
+.contract-form label:not(.checkbox-label), .request-form label { display: flex; flex-direction: column; gap: 8px; min-width: 0; font-size: 14px; font-weight: 600; }
+.contract-form label:not(.checkbox-label) input { width: 100%; font-weight: 400; }
+.custom-term-row { display: grid; grid-template-columns: minmax(0, .4fr) minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+.custom-term-row input { width: 100%; min-width: 0; }
+.contract-fields table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.contract-fields :is(th, td) { padding: 12px 16px; border-bottom: 1px solid var(--border); text-align: left; overflow-wrap: anywhere; }
+.contract-fields th { width: 35%; color: var(--text-muted); font-weight: 600; background: var(--surface-alt); }
+.contract-fields tr:last-child > * { border-bottom: 0; }
+.document-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; min-width: 0; padding: 16px 0; border-bottom: 1px solid var(--border); }
+.document-row:last-child { border-bottom: 0; }
+.document-label { flex: 0 0 96px; font-size: 14px; font-weight: 600; }
+.document-row > a, .document-row > span:not(.document-label) { flex: 1 1 160px; min-width: 0; font-size: 14px; overflow-wrap: anywhere; }
+.room-documents ul, .history-list, .request-list, .certificate-list, .delivery-list { display: flex; flex-direction: column; gap: 0; margin: 0; padding: 0; list-style: none; }
+.room-documents li, .history-entry, .request-item, .certificate-list > li, .delivery-list > li { padding: 16px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+:is(.room-documents li, .history-entry, .request-item, .certificate-list > li, .delivery-list > li):last-child { border-bottom: 0; }
+.history-entry, .request-item { display: flex; flex-direction: column; gap: 8px; }
+.history-meta { font-size: 14px; color: var(--text-muted); font-weight: 600; }
+.history-changes { display: grid; gap: 8px; margin: 0; padding-left: 20px; font-size: 14px; }
+.signature-status-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.signature-status-row > div { min-width: 0; padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-alt); }
+.signature-status-row > div > p:first-child { margin-bottom: 12px; color: var(--text-muted); font-size: 14px; font-weight: 600; }
+.signature-thumb { max-width: 100%; max-height: 100px; object-fit: contain; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
+.signature-evidence { margin-top: 8px; font-size: 12px; line-height: 1.5; color: var(--text-muted); overflow-wrap: anywhere; }
+.signature-canvas { display: block; width: 100%; height: 200px; border: 1px solid var(--border-strong); border-radius: 12px; background: #fff; touch-action: none; }
+.signature-typed { display: grid; gap: 8px; font-size: 14px; font-weight: 600; }
+.signature-typed input { width: 100%; font-weight: 400; }
+.revoked-signatures { display: grid; gap: 12px; }
+.revoked-signatures ul { margin: 0; padding-left: 20px; font-size: 14px; color: var(--text-muted); }
+.translation-controls, .translation-tabs, .request-actions, .offer-actions, .certificate-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.translation-tabs .active { background: var(--accent); color: #fff; }
+.translation-body { display: grid; gap: 20px; padding-top: 20px; border-top: 1px solid var(--border); }
+.translation-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+.translation-row:last-child { padding-bottom: 0; border-bottom: 0; }
+.translation-source, .translation-target { display: flex; flex-direction: column; gap: 8px; min-width: 0; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+.translation-source { color: var(--text-muted); }
+.translation-note, .translation-hint, .explain-note, .rights-note, .wage-note, .summary-meta, .hire-confirm-hint { font-size: 14px; color: var(--text-muted); }
+.translation-stale-mark { color: var(--warning-text); }
+.translation-tabs .active .translation-stale-mark { color: #fff; }
+.translation-alert, .form-conflict, .period-alert, .room-archived-note { padding: 16px; border: 1px solid var(--warning-border); border-radius: 12px; background: var(--warning-bg); color: var(--warning-text); font-size: 14px; }
+.form-conflict { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.period-head, .request-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.period-head h2 { font-size: 22px; }
+.period-detail { font-size: 16px; }
+.lifecycle-chain { display: flex; flex-direction: column; gap: 12px; margin: 0; padding-left: 20px; }
+.lifecycle-chain li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+.lifecycle-dates { color: var(--text-muted); font-size: 14px; }
+.lifecycle-link, .hire-confirm-box { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.lifecycle-link select { max-width: 100%; }
+.delivery-list { font-size: 14px; color: var(--text-muted); }
+.certificate-issued { display: flex; flex-direction: column; gap: 12px; padding: 20px; border: 1px solid var(--accent-border); border-radius: 12px; background: var(--accent-bg); }
+.certificate-serial { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: 16px; font-weight: 600; }
+.certificate-fingerprint, .certificate-meta, .certificate-verify-link, .integrity-hash { font-size: 12px; color: var(--text-muted); overflow-wrap: anywhere; }
+.certificate-fingerprint code, .certificate-serial code, .integrity-hash code { overflow-wrap: anywhere; }
+.certificate-list > li { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.certificate-row { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
+.certificate-verify-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); }
+.request-values { font-size: 16px; }
+.request-from, .negotiation-prev { color: var(--text-muted); text-decoration: line-through; }
+.request-to { color: var(--accent); font-weight: 600; }
+.request-reason { font-size: 14px; color: var(--text-muted); }
+.request-item > :is(button, .badge) { align-self: flex-start; }
+.request-form { display: grid; gap: 16px; padding-top: 24px; border-top: 1px solid var(--border); }
+.request-form > button { justify-self: start; }
+
+.presign-check { display: flex; flex-direction: column; gap: 16px; padding: 24px; border: 1px solid var(--danger-border); border-radius: 20px; background: var(--danger-bg); }
+.presign-check.clean { border-color: var(--success-border); background: var(--success-bg); }
+.presign-check h3 { font-size: 22px; }
+.presign-ok { color: var(--success-text); font-weight: 600; }
+.presign-group { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.presign-group-title { font-size: 14px; font-weight: 600; }
+.presign-table { width: 100%; table-layout: fixed; border-collapse: collapse; background: var(--surface); font-size: 14px; }
+.presign-table :is(th, td) { padding: 12px; border-bottom: 1px solid var(--border); text-align: left; overflow-wrap: anywhere; }
+.presign-table th { font-size: 12px; font-weight: 600; color: var(--text-muted); background: var(--surface-alt); }
+.presign-agreed { color: var(--text-muted); text-decoration: line-through; }
+.presign-current { color: var(--danger-text); font-weight: 600; }
+.presign-list, .compare-issue-list { display: grid; gap: 8px; margin: 0; padding-left: 20px; font-size: 14px; }
+.compare-issue-list.matched { color: var(--text-muted); }
+.presign-missing { font-size: 14px; }
+.presign-ack { font-size: 14px; font-weight: 600; }
+.ai-warnings { display: grid; gap: 12px; }
+.ai-warnings h3 { font-size: 18px; }
+.wage-rows, .wage-readonly { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.wage-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 1fr) auto auto; gap: 12px; align-items: center; }
+.wage-row > *, .wage-name, .wage-readonly-name { min-width: 0; overflow-wrap: anywhere; }
+.wage-row :is(input, select) { width: 100%; }
+.wage-amount, .wage-readonly-amount { text-align: right; font-variant-numeric: tabular-nums; }
+.wage-included { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.wage-included.yes { background: var(--success-bg); color: var(--success-text); }
+.wage-included.no { background: var(--warning-bg); color: var(--warning-text); }
+.wage-readonly li { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 1fr) auto; gap: 12px; align-items: center; padding-block: 12px; border-bottom: 1px solid var(--border); font-size: 14px; }
+.wage-readonly-type { color: var(--text-muted); font-size: 12px; }
+.wage-totals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.wage-totals > div { display: flex; flex-direction: column; gap: 8px; padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-alt); }
+.wage-totals strong { font-size: 22px; font-variant-numeric: tabular-nums; }
+.wage-total-label { color: var(--text-muted); font-size: 14px; }
+.wage-totals > .wage-total-diff { border-color: var(--warning-border); background: var(--warning-bg); }
+.wage-excluded-notes { margin: 0; padding-left: 20px; font-size: 14px; color: var(--text-muted); }
+.rights-block { display: grid; gap: 12px; padding-top: 20px; border-top: 1px solid var(--border); }
+.rights-block:first-of-type { padding-top: 0; border-top: 0; }
+.rights-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+.rights-head h3 { font-size: 18px; }
+.rights-law, .rights-rate-name em, .rights-rate-mult { color: var(--text-muted); font-size: 12px; font-style: normal; }
+.rights-upcoming { padding: 16px; border-radius: 12px; background: var(--accent-bg); font-size: 14px; }
+.rights-years, .rights-rates { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none; font-size: 14px; }
+.rights-years li { display: flex; justify-content: space-between; gap: 12px; }
+.rights-rates li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: baseline; padding-block: 12px; border-bottom: 1px solid var(--border); }
+:is(.rights-years, .rights-rates) strong { font-variant-numeric: tabular-nums; }
+.rights-caveat { font-size: 14px; color: var(--warning-text); }
+.explain-body { display: grid; gap: 24px; width: 100%; }
+.explain-section h3 { margin-bottom: 12px; font-size: 18px; }
+.explain-section ul { display: grid; gap: 12px; list-style: none; margin: 0; padding: 0; }
+.explain-section li { display: grid; grid-template-columns: minmax(80px, .3fr) minmax(0, 1fr); gap: 8px 16px; padding: 12px 16px; border-left: 3px solid var(--border); background: var(--surface-alt); font-size: 14px; }
+.explain-label { color: var(--text-muted); }
+.explain-value { font-weight: 600; }
+.explain-reason { grid-column: 2; color: var(--text-muted); font-size: 12px; }
+.explain-section .explain-ok { border-left-color: var(--success); }
+.explain-section .explain-caution { border-left-color: var(--warning); }
+.explain-section .explain-caution .explain-value { color: var(--warning-text); }
+.explain-section li:not(:has(.explain-label)) .explain-value { grid-column: 1 / -1; }
+
+.room-close.room-close-dismissal, .offer-watch.offer-watch-established, .offer-block-notice { border-color: var(--danger-border); background: var(--danger-bg); }
+.room-closed:not(.fold), .room-archived:not(.fold), .offer-watch.offer-watch-near { border-color: var(--warning-border); background: var(--warning-bg); }
+.dismissal-warning { display: grid; gap: 12px; }
+.dismissal-headline, .withdrawal-title, .offer-watch-established h3, .offer-block-title { color: var(--danger-text); font-weight: 600; }
+.offer-watch-near h3 { color: var(--warning-text); }
+.dismissal-excerpt, .offer-excerpt { margin: 0; padding: 16px; border-left: 3px solid var(--danger); background: var(--surface); font-size: 16px; line-height: 1.6; }
+.dismissal-excerpt-label, .offer-excerpt-label { display: block; margin-bottom: 8px; color: var(--text-muted); font-size: 12px; font-weight: 600; }
+.dismissal-grounds ul, .withdrawal-grounds, .offer-signal-list { margin: 8px 0; padding-left: 20px; font-size: 14px; }
+.dismissal-ack { display: flex; align-items: flex-start; gap: 12px; font-size: 14px; }
+.offer-watch h3 { font-size: 18px; }
+.offer-consequence { font-weight: 600; }
+.offer-signal-label { display: inline-block; margin: 0 8px 4px 0; padding: 4px 8px; border-radius: 4px; background: var(--surface); font-size: 12px; font-weight: 600; }
+.offer-hint, .offer-block-detail { font-size: 14px; color: var(--text-muted); }
+.offer-block-notice { display: grid; gap: 12px; margin-block: 16px; padding: 20px; border: 1px solid var(--danger-border); border-radius: 12px; }
+.withdrawal-reason { font-size: 16px; line-height: 1.6; }
+.withdrawal-facts { display: grid; gap: 8px; margin-block: 20px; font-size: 14px; }
+.withdrawal-facts dt { font-weight: 600; margin-top: 8px; }
+.withdrawal-facts dd { margin: 0; }
+.negotiation-entries { display: grid; gap: 16px; margin: 16px 0; padding: 0; list-style: none; }
+.negotiation-entries > li { padding-left: 16px; border-left: 3px solid var(--accent-border); }
+.negotiation-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.negotiation-field { padding: 4px 8px; background: var(--accent-bg); color: var(--accent); border-radius: 4px; font-size: 12px; font-weight: 600; }
+.negotiation-value { font-size: 18px; font-weight: 600; }
+.negotiation-prev, .negotiation-meta { font-size: 14px; color: var(--text-muted); }
+.negotiation-meta { margin-top: 8px; }
+.negotiation-excerpt { margin: 12px 0 0; padding: 12px 16px; border-radius: 12px; background: var(--surface-alt); font-size: 14px; }
+.review-result { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.review-block { min-width: 0; padding-top: 20px; border-top: 1px solid var(--border); }
+.review-block h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 18px; }
+.review-block h4 { margin: 16px 0 8px; font-size: 16px; }
+.review-summary { font-size: 16px; }
+.review-quote { margin: 12px 0; padding: 12px 16px; border-left: 3px solid var(--warning); background: var(--surface-alt); font-size: 14px; }
+.review-law, .review-basis { font-size: 14px; color: var(--text-muted); }
+.summary-overview { font-size: 16px; }
+.summary-block h3 { margin-bottom: 12px; font-size: 18px; }
+.summary-block ul { display: grid; gap: 8px; margin: 0; padding-left: 20px; font-size: 14px; }
+
+/* PDF capture must preserve shaping, black ink and the complete signature image. */
+.contract-print { padding: 32px; border: 1px solid #d1d1d1; border-radius: 12px; background: #fff; color: #111; font-family: var(--font-body); font-size: 14px; line-height: 1.65; letter-spacing: 0; text-align: center; }
+.contract-print :is(h1, h2, h3) { color: #000; }
+.contract-print .print-title { display: inline-block; margin: 0 0 20px; padding: 8px 24px; border: 1px solid #000; font-size: 26px; font-weight: 600; line-height: 1.4; letter-spacing: 0; }
+.contract-print table { width: 100%; margin-top: 16px; border-collapse: collapse; }
+.contract-print :is(th, td) { padding: 8px 12px; border: 1px solid #ccc; text-align: left; font-size: 14px; color: #111; }
+.print-parties, .print-clauses, .print-signatures, .contract-articles, .audit-trail-print { text-align: left; }
+.print-parties { margin-bottom: 16px; line-height: 2; }
+.print-parties u { display: inline-block; min-width: 130px; border-bottom: 1px solid #000; text-decoration: none; text-align: center; }
+.print-clauses { padding-left: 22px; margin: 0; line-height: 1.9; }
+.print-clauses > li { margin-bottom: 8px; }
+.clause-name { display: inline-block; min-width: 108px; }
+.clause-name::after { content: ' :'; }
+.clause-value { overflow-wrap: anywhere; }
+.clause-note { display: block; padding-left: 116px; color: #444; font-size: 13px; }
+.clause-sub { list-style: none; margin: 4px 0 0; padding-left: 116px; }
+.clause-sub > li::before { content: '- '; }
+.print-date { margin: 28px 0 20px; text-align: center; letter-spacing: 0; }
+.print-signatures { display: flex; flex-direction: column; gap: 20px; margin-top: 8px; }
+.print-party { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); align-items: center; gap: 8px 12px; margin: 0; }
+.print-party > div { display: contents; }
+.print-party dt { font-weight: 400; }
+.print-party dt::after { content: ' :'; }
+.print-party dd { min-height: 24px; margin: 0; border-bottom: 1px solid #bbb; overflow-wrap: anywhere; }
+.print-party .print-sign-cell { border-bottom: 0; }
+.print-sign-blank { color: #616161; }
+.print-signatures img { width: 180px; max-width: 100%; height: auto; max-height: 70px; object-fit: contain; }
+.contract-articles { display: flex; flex-direction: column; gap: 16px; margin-top: 20px; }
+.contract-article h3 { margin: 0 0 8px; font-size: 16px; }
+.contract-article p { margin: 0; font-size: 14px; line-height: 1.65; }
+.audit-trail-print { margin-top: 28px; padding-top: 16px; border-top: 1px solid #ccc; }
+.audit-trail-print h3 { margin: 0 0 12px; font-size: 14px; }
+.audit-trail-print td { padding: 4px 8px; font-size: 12px; vertical-align: top; }
+.audit-time { white-space: nowrap; color: #555; }
+.audit-hash { margin-top: 12px; color: #555; font-size: 11px; overflow-wrap: anywhere; }
+
+@media (min-width: 1024px) {
+  .room-page { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); align-items: start; }
+  .room-page > *, .room-page > .room-write-boundary > * { grid-column: 1 / -1; min-width: 0; }
+  .room-page > .chat-panel, .room-page > .room-write-boundary > .chat-panel { grid-column: 1; }
+  .room-page > .ai-analysis, .room-page > .room-write-boundary > .ai-analysis { grid-column: 2; }
+  .contract-page { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .contract-page > * { grid-column: 1 / -1; min-width: 0; }
+  .contract-page > :is(.contract-period, .contract-lifecycle, .contract-delivery, .contract-history, .contract-translation, .contract-explainer, .worker-rights) { grid-column: auto; }
+  .contract-page > .contract-translation .translation-row { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 1023px) {
+  .wage-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .review-result { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 767px) {
+  .contract-form fieldset, .signature-status-row, .translation-row, .wage-totals { grid-template-columns: minmax(0, 1fr); }
+  .custom-term-row { grid-template-columns: minmax(0, 1fr); }
+  .custom-term-row > button { justify-self: start; }
+  .wage-readonly li { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .explain-section li { grid-template-columns: minmax(0, 1fr); }
+  .explain-reason { grid-column: 1; }
+  .presign-check { padding: 20px; }
+  .presign-table :is(th, td) { padding: 8px; font-size: 12px; }
+  .contract-print { padding: 20px 16px; }
+  .clause-note, .clause-sub { padding-left: 0; }
+}
+@media print {
+  .contract-page { display: block; width: 100%; margin: 0; padding: 0; }
+  .contract-page > :not(.contract-print) { display: none !important; }
+  .contract-print { width: 100%; padding: 0; border: 0; border-radius: 0; background: #fff; color: #111; box-shadow: none; letter-spacing: 0; }
+  .contract-print :is(.print-party, .contract-article, tr) { break-inside: avoid; }
+  .contract-print :is(th, td) { background: #fff; }
+}

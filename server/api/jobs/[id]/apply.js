@@ -116,10 +116,11 @@ export async function onRequestPost({ request, env, params, data }) {
     for (const { file, docType } of filesToStore) {
       const ext = fileExt(file.name)
       const contentType = mimeForExt(ext)
-      const r2Key = `applications/${appId}/${docType}-${Date.now()}.${ext}`
+      const fileId = genId()
+      const r2Key = `applications/${appId}/${docType}-${fileId}.${ext}`
       await stageApplicationUpload(env, r2Key)
       uploads.push({
-        id: genId(),
+        id: fileId,
         docType,
         filename: file.name,
         r2Key,

@@ -58,16 +58,17 @@ describe('self-service gateway boundaries', () => {
 })
 
 describe('wide workspace layout integration', () => {
-  it('loads the responsive overrides after all previous layout styles', () => {
+  it('loads purpose-owned styles without legacy override layers', () => {
     const app = readFileSync('src/App.jsx', 'utf8')
-    expect(app.indexOf("import './workspace-layout.css'")).toBeGreaterThan(app.indexOf("import './posting-tools.css'"))
+    expect(app).toContain("import './styles/workspace.css'")
+    expect(app).not.toContain("import './workspace-layout.css'")
     expect(app).toContain("'app-shell app-shell--interview' : 'app-shell'")
     expect(app).toContain('aria-label="모바일 주요 메뉴"')
     expect(app).toContain("removeAttribute('open')")
   })
 
   it('has desktop sidebar, responsive narrow layout and independent print layout', () => {
-    const css = readFileSync('src/workspace-layout.css', 'utf8')
+    const css = readFileSync('src/App.css', 'utf8')
     expect(css).toContain("grid-template-areas: 'navigation main' 'navigation footer'")
     expect(css).toContain('@media (max-width: 1023px)')
     expect(css).toContain('@media (max-width: 767px)')
@@ -78,7 +79,7 @@ describe('wide workspace layout integration', () => {
 
   it('keeps posting management actions in wrapping cards rather than a wide table', () => {
     const recruit = readFileSync('src/pages/RecruitPage.jsx', 'utf8')
-    const css = readFileSync('src/workspace-layout.css', 'utf8')
+    const css = readFileSync('src/styles/workspace.css', 'utf8')
     expect(recruit).toContain('className="posting-management-list"')
     expect(recruit).toContain('className="posting-management-actions"')
     expect(recruit).toContain('aria-label={`내 임시저장 공고 ${drafts.length}건`}')
@@ -88,13 +89,13 @@ describe('wide workspace layout integration', () => {
   })
 
   it('does not force a 320px page wider than the viewport minus its scrollbar', () => {
-    for (const path of ['src/redesign.css', 'index.html']) {
+    for (const path of ['src/index.css', 'src/App.css', 'index.html']) {
       expect(readFileSync(path, 'utf8')).not.toMatch(/min-width:\s*320px/)
     }
   })
 
   it('allows long record text to wrap and keeps the multi-input wage editor full-width', () => {
-    const css = readFileSync('src/workspace-layout.css', 'utf8')
+    const css = readFileSync('src/styles/workspace.css', 'utf8') + readFileSync('src/styles/contracts.css', 'utf8')
     expect(css).toMatch(/\.job-card-title[^}]+overflow-wrap: anywhere/)
     expect(css).toMatch(/\.contract-page > \*\s*\{[^}]+grid-column: 1 \/ -1/)
     expect(css).not.toMatch(/:is\([^)]*\.wage-composition[^)]*\)\s*\{\s*grid-column: auto/)

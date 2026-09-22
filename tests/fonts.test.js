@@ -47,7 +47,7 @@ describe('전역 UI 글꼴', () => {
 
   it('영웅 제목과 페이지 제목의 크기를 공유 토큰으로 구분한다', () => {
     const tokens = read('src', 'index.css')
-    const css = read('src', 'redesign.css')
+    const css = read('src', 'App.css')
     const heading = css.match(/\.landing-hero h1\s*\{([^}]*)\}/)?.[1] ?? ''
 
     expect(tokens).toMatch(/--text-4xl:\s*3\.75rem;/)
@@ -59,12 +59,13 @@ describe('전역 UI 글꼴', () => {
 
   it('영문 표시·코드 서체도 CDN 없이 WOFF2와 라이선스를 제공한다', () => {
     const css = read('src', 'fonts.css')
-    for (const name of ['plus-jakarta-sans', 'geist-mono']) {
+    for (const name of ['geist-mono']) {
       const filename = `${name}-latin-wght-normal.woff2`
       expect(css).toContain(filename)
       expect(existsSync(join(ROOT, 'node_modules', '@fontsource-variable', name, 'files', filename))).toBe(true)
       expect(read('public', 'licenses', `${name}-OFL.txt`)).toContain('SIL OPEN FONT LICENSE')
     }
     expect(css).not.toMatch(/https?:\/\//)
+    expect(css).not.toContain('Plus Jakarta Sans')
   })
 })

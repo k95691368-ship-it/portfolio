@@ -1,7 +1,6 @@
+/* Single Microsoft DESIGN.md token and primitive source; no legacy theme layer. */
 :root {
   color-scheme: light;
-  /* Microsoft-inspired DESIGN.md: white, soft gray, blue and Fluent hierarchy.
-     Segoe is used when installed; Korean keeps the self-hosted SUIT fallback. */
   --bg: #ffffff;
   --surface: #ffffff;
   --surface-alt: #f5f5f5;
@@ -12,17 +11,15 @@
   --text: #1a1a1a;
   --text-h: var(--text);
   --text-muted: #616161;
-  --text-subtle: #707070;
   --muted: var(--text-muted);
   --border: #d1d1d1;
   --border-strong: #858585;
   --brand-deep: #eef6fc;
-  --brand-mid: #005a9e;
   --brand-accent: #0067b8;
-  --primary: #0078d4;
+  --primary: #0067b8;
   --primary-focus: #0078d4;
-  --accent: var(--brand-accent);
-  --accent-hover: #005a9e;
+  --accent: #0067b8;
+  --accent-hover: #0078d4;
   --action-bg: #0067b8;
   --action-hover: #0078d4;
   --accent-bg: #eff6fc;
@@ -32,9 +29,9 @@
   --code-bg: #f5f5f5;
   --btn-face: var(--surface);
   --btn-face-hover: var(--surface-hover);
-  --btn-border: var(--border-strong);
   --danger: #c42b1c;
   --danger-text: #a4262c;
+  --error-text: var(--danger-text);
   --danger-bg: #fdf3f4;
   --danger-border: #e7afb4;
   --success: #107c10;
@@ -50,22 +47,22 @@
   --toast-danger: var(--danger-bg);
   --toast-info: var(--surface);
   --toast-border: var(--border);
-  --overlay: rgba(20, 27, 35, .4);
-  --social-bg: var(--surface-low);
-  --nav-bg: var(--bg);
+  --overlay: rgba(26, 26, 26, .4);
+  --nav-bg: var(--surface);
   --shadow-sm: 0 8px 20px rgba(0, 0, 0, .05);
   --shadow: 0 16px 32px rgba(0, 0, 0, .08);
+  --shadow-card: 0 10px 24px rgba(0, 0, 0, .06);
   --nav-h: 64px;
-  --nav-max: 1280px;
-  --content-max: 1200px;
-  --wide-max: 1360px;
+  --nav-width: 232px;
   --gutter: 32px;
   --tile-gap: 24px;
-  --r-xs: 6px;
+  --r: 20px;
+  --r-xs: 4px;
   --r-sm: 12px;
   --r-md: 20px;
   --r-lg: 20px;
-  --r-xl: 24px;
+  --r-xl: 20px;
+  --r-pill: 999px;
   --radius: 20px;
   --radius-sm: 12px;
   --radius-full: 999px;
@@ -83,7 +80,6 @@
   --tap-lg: 48px;
   --motion-fast: 100ms;
   --motion-ui: 180ms;
-  --motion-panel: 250ms;
   --ease-ui: cubic-bezier(.4, 0, .2, 1);
   --font-display: 'Segoe UI Variable Display', 'Segoe UI Variable', 'Segoe UI', 'SUIT Variable', 'Helvetica Neue', Arial, sans-serif;
   --font-body: 'Segoe UI Variable', 'Segoe UI', 'SUIT Variable', 'Helvetica Neue', Arial, sans-serif;
@@ -106,436 +102,94 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 0; background: var(--bg); color: var(--text); }
+#root { width: 100%; min-height: 100svh; text-align: left; }
+[hidden] { display: none !important; }
+img, svg, canvas, video { max-width: 100%; }
+img { height: auto; }
+h1, h2, h3, h4 { margin: 0; color: var(--text); font-family: var(--heading); font-weight: 600; word-break: keep-all; overflow-wrap: anywhere; }
+h1 { font-size: var(--text-3xl); line-height: 1.08; letter-spacing: -.02em; }
+h2 { font-size: var(--text-2xl); line-height: 1.14; letter-spacing: -.01em; }
+h3 { font-size: var(--text-xl); line-height: 1.2; letter-spacing: -.01em; }
+h4 { font-size: 1.125rem; line-height: 1.4; }
+p { margin: 0; overflow-wrap: anywhere; }
+a { color: var(--accent); text-decoration: none; text-underline-offset: 3px; }
+a:hover { text-decoration: underline; }
+hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+code, pre { font-family: var(--mono); font-size: .875rem; background: var(--code-bg); color: var(--text); }
+code { border-radius: 4px; padding: 2px 6px; overflow-wrap: anywhere; }
+pre { max-width: 100%; overflow: auto; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+pre code { padding: 0; }
+fieldset { min-width: 0; }
+summary { cursor: pointer; min-height: var(--tap); padding: 10px 0; font-weight: 600; }
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible { outline: 2px solid var(--primary-focus); outline-offset: 3px; }
 
-.document-download-link {
-  display: inline;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--accent, #2997ff);
-  font: inherit;
-  text-align: left;
-  text-decoration: none;
-  cursor: pointer;
+/* Actions: one geometry, with fill establishing primary/secondary hierarchy. */
+button, .btn-primary, .btn-secondary, .btn-nav {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: var(--tap); max-width: 100%; padding: 10px 20px;
+  border: 1px solid var(--border); border-radius: var(--radius-full);
+  background: var(--surface); color: var(--text);
+  font: 600 .9375rem/1.5 var(--font-body); text-align: center;
+  cursor: pointer; overflow-wrap: anywhere;
+  transition: background var(--motion-ui), border-color var(--motion-ui), color var(--motion-ui);
 }
+button:hover:not(:disabled), .btn-secondary:hover, .btn-nav:hover { background: var(--surface-hover); text-decoration: none; }
+.btn-primary { background: var(--action-bg); border-color: var(--action-bg); color: var(--on-accent); }
+.btn-primary:hover:not(:disabled) { background: var(--action-hover); border-color: var(--action-hover); color: var(--on-accent); text-decoration: none; }
+.btn-danger { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger-text); }
+.btn-danger:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: var(--on-accent); }
+.btn-ghost { background: transparent; border-color: transparent; color: var(--accent); }
+.btn-sm { font-size: .875rem; padding: 8px 12px; }
+.btn-block { width: 100%; min-height: var(--tap-lg); }
+.btn-stack { display: flex; flex-direction: column; gap: 12px; }
+button:disabled, [aria-disabled='true'] { opacity: .55; cursor: not-allowed; }
+.document-download-link { display: inline; min-height: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--accent); font: inherit; text-align: left; }
+.document-download-link:hover:not(:disabled) { background: transparent; text-decoration: underline; }
 
-.document-download-link:hover {
-  text-decoration: underline;
+input, select, textarea {
+  min-width: 0; max-width: 100%; min-height: var(--tap); padding: 12px 14px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text); font: inherit;
+  transition: border-color var(--motion-ui), box-shadow var(--motion-ui);
 }
+textarea { resize: vertical; line-height: 1.6; }
+input::placeholder, textarea::placeholder { color: var(--text-muted); }
+input:focus, select:focus, textarea:focus { border-color: var(--primary-focus); box-shadow: 0 0 0 4px var(--focus-glow); }
+input:disabled, select:disabled, textarea:disabled { background: var(--surface-hover); color: var(--text-muted); }
+input[type='checkbox'], input[type='radio'] { width: 18px; height: 18px; min-height: 18px; flex: 0 0 auto; padding: 0; accent-color: var(--accent); }
+input[type='range'] { padding: 0; accent-color: var(--accent); }
+input[type='file'] { padding: 8px; }
+input::file-selector-button { min-height: 32px; margin-right: 12px; border: 0; border-radius: 999px; padding: 4px 14px; background: var(--surface-hover); color: var(--text); font: inherit; cursor: pointer; }
+.checkbox-label, .remember-me { display: flex; flex-direction: row; align-items: center; gap: 12px; min-height: var(--tap); font-size: .875rem; }
 
-* {
-  box-sizing: border-box;
+.muted, .hint { color: var(--text-muted); }
+.error, .notice, .signed-banner, .hire-confirmed-banner, .save-message { padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: .875rem; line-height: 1.6; overflow-wrap: anywhere; }
+.notice { color: var(--text-muted); background: var(--surface-alt); }
+.error { color: var(--danger-text); background: var(--danger-bg); border-color: var(--danger-border); }
+.signed-banner, .save-message { color: var(--success-text); background: var(--success-bg); border-color: var(--success-border); }
+.hire-confirmed-banner { color: var(--accent); background: var(--accent-bg); border-color: var(--accent-border); }
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: .75rem; line-height: 1.35; font-weight: 600; white-space: nowrap; }
+.badge-wrap { white-space: normal; word-break: keep-all; overflow-wrap: anywhere; min-width: 0; }
+.badge-neutral { color: var(--text-muted); background: var(--surface-alt); }
+.badge-accent, .badge-developer { color: var(--accent); background: var(--accent-bg); border-color: var(--accent-border); }
+.badge-success { color: var(--success-text); background: var(--success-bg); border-color: var(--success-border); }
+.badge-danger { color: var(--danger-text); background: var(--danger-bg); border-color: var(--danger-border); }
+.badge-warning { color: var(--warning-text); background: var(--warning-bg); border-color: var(--warning-border); }
+.badge-severity { font-weight: 700; padding-right: 8px; border-right: 1px solid currentColor; }
+/* Anchor hidden content horizontally without moving keyboard-focusable file inputs to the page top. */
+.sr-only { position: absolute !important; inset-inline-start: 0 !important; width: 1px !important; min-width: 0 !important; max-width: 1px !important; height: 1px !important; min-height: 0 !important; padding: 0 !important; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.skip-link { position: fixed; left: 16px; top: -100px; z-index: 1000; padding: 12px 20px; border-radius: var(--radius-full); background: var(--accent); color: var(--on-accent); }
+.skip-link:focus { top: 12px; }
+
+@media (max-width: 767px) {
+  :root { --gutter: 16px; }
+  h1 { font-size: 2rem; line-height: 1.2; }
+  h2 { font-size: 1.625rem; line-height: 1.25; }
+  h3 { font-size: 1.25rem; }
 }
-
-/* 움직임을 줄여 달라고 설정한 사람에게는 움직이지 않는다.
-   전정기관 장애가 있으면 미끄러져 들어오는 알림이나 커지고 작아지는 버튼이
-   어지럼과 메스꺼움을 일으킬 수 있다. 완전히 없애지 않고 아주 짧게 남기는 것은,
-   0으로 만들면 애니메이션 종료를 기다리는 코드가 멈춰 버리기 때문이다. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-  /* 눌렀을 때 작아지는 효과는 위치가 흔들리는 것이라 아예 끈다 */
-  button:active:not(:disabled) {
-    transform: none;
-  }
-  /* 알림이 미끄러져 들어오는 대신 제자리에서 나타난다 */
-  .toast {
-    animation: none;
-  }
-}
-
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  /* 사이트 전체를 가운데로 모으고 있었다.
-     제목 한 줄만 놓고 보면 그럴듯한데, 그 아래 설명과 목록까지 가운데로 오면
-     줄마다 시작점이 달라져 눈이 매번 줄 앞을 다시 찾아야 한다. 글이 길수록
-     심해진다 -- 이 앱에는 계약 조건과 법 조문 설명이 문단으로 들어간다.
-     그래서 화면마다 text-align: left 를 따로 적어 되돌리고 있었다.
-     기본을 왼쪽으로 두고, 가운데가 필요한 곳(빈 목록 안내, 토스트)만 지정한다. */
-  text-align: left;
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-  background: var(--bg);
-}
-
-#main {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-}
-/* 건너뛴 뒤 초점이 본문에 있다는 것만 알리고, 마우스 사용자에게는 테두리를 남기지 않는다 */
-#main:focus {
-  outline: none;
-}
-
-/* 키보드로 탭을 눌렀을 때만 나타나는 건너뛰기 링크 */
-.skip-link {
-  position: absolute;
-  left: 12px;
-  top: -100px;
-  z-index: 100;
-  padding: 10px 18px;
-  border-radius: var(--radius-sm);
-  background: var(--accent);
-  color: var(--on-accent);
-  font-weight: 600;
-  transition: top 0.15s ease;
-}
-.skip-link:focus {
-  top: 12px;
-  text-decoration: none;
-}
-
-.theme-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border-radius: var(--radius-full);
-  background: var(--surface);
-  color: var(--text-h);
-  font-size: 17px;
-  line-height: 1;
-}
-.theme-toggle:hover:not(:disabled) {
-  background: var(--border);
-}
-/* 화면 색 버튼은 이제 맨 위 줄에 있다.
-   오른쪽 아래에 동그라미로 떠 있어서 화면 맨 밑의 버튼을 가렸다. 실제로
-   첫 화면의 '기술 구현 보러가기' 위에 겹쳐 있었다.
-   이 클래스는 아직 부르는 곳이 있을 수 있어 남기되, 떠 있지는 않게 한다. */
-.theme-toggle-fixed {
-  position: static;
-}
-
-h1,
-h2,
-h3 {
-  font-family: var(--heading);
-  font-weight: 600;
-  color: var(--text-h);
-}
-
-/* 제목 크기를 줄였다.
-   56px 은 넓은 화면을 전제한 크기다. 휴대폰에서 열면 "어떤 목적으로 방문하셨
-   / 나요?" 처럼 낱말 가운데가 잘려 두 줄이 됐다. 크게 쓴다고 잘 읽히는 것이
-   아니라, 한 줄에 들어가야 읽힌다.
-   자간으로 억지로 당기지 않고 Semibold 굵기로 제목의 위계를 만든다. */
-h1 {
-  font-size: 26px;
-  font-weight: 600;
-  line-height: 1.35;
-  letter-spacing: 0;
-  margin: 0 0 var(--gap-2);
-  word-break: keep-all;
-  @media (min-width: 768px) {
-    font-size: 34px;
-  }
-}
-h2 {
-  font-size: 19px;
-  font-weight: 600;
-  line-height: 1.4;
-  letter-spacing: 0;
-  margin: 0 0 var(--gap-2);
-  word-break: keep-all;
-  @media (min-width: 768px) {
-    font-size: 21px;
-  }
-}
-h3 {
-  font-size: 16px;
-  letter-spacing: 0;
-  margin: 20px 0 4px;
-}
-p {
-  margin: 0;
-}
-
-a {
-  color: var(--accent);
-  text-decoration: none;
-  font-weight: 500;
-}
-a:hover {
-  text-decoration: underline;
-}
-
-code {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
-}
-
-/* 버튼.
-   알약 모양(9999px)에 테두리를 두르고 있었다. 알약은 하나 있을 때는 시원한데
-   여럿이 나란히 서면 전부 똑같이 도드라져, 무엇이 주된 행동인지 사라진다.
-   모서리를 12px 로 낮추고 테두리를 없앤다 -- 면과 글자색만으로 층을 나눈다.
-
-   높이는 손가락에 맞춘다. 예전에는 세로 여백만 9px 이라 실제 높이가 38px
-   안팎이었고, 휴대폰에서 옆 버튼이 함께 눌리기 쉬웠다. */
-button {
-  appearance: none;
-  font: inherit;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.2px;
-  cursor: pointer;
-  border: 0;
-  border-radius: var(--r-md);
-  min-height: var(--tap);
-  padding: 0 18px;
-  color: var(--text-h);
-  background: var(--surface);
-  transition:
-    background 0.15s ease,
-    color 0.15s ease,
-    transform 0.12s ease,
-    opacity 0.15s ease;
-}
-button:hover:not(:disabled) {
-  background: var(--btn-face-hover);
-}
-/* 눌린 느낌은 크기로만 준다. 색까지 함께 바꾸면 화면이 번쩍인다. */
-button:active:not(:disabled) {
-  transform: scale(0.98);
-}
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/* 주된 행동. 한 화면에 하나만 둔다.
-   그림자를 걷어냈다. 파란 면 자체가 이미 충분히 앞으로 나와 있어, 그림자는
-   경계를 흐리기만 한다. */
-.btn-primary {
-  background: var(--accent);
-  color: var(--on-accent);
-}
-.btn-primary:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-/* 되돌릴 수 없는 행동. 옅은 면에 붉은 글자로 두어, 실수로 먼저 눈에 들어오지
-   않게 한다. 정말 누를 때만 붉은 면으로 바뀐다. */
-.btn-danger {
-  background: var(--danger-bg);
-  color: var(--danger-text);
-}
-.btn-danger:hover:not(:disabled) {
-  background: var(--danger);
-  color: var(--on-accent);
-}
-.btn-ghost {
-  background: transparent;
-  color: var(--text);
-}
-.btn-ghost:hover:not(:disabled) {
-  background: var(--surface);
-}
-/* 곁들이는 행동. 목록 안이나 카드 구석에 놓인다. */
-.btn-sm {
-  min-height: 38px;
-  padding: 0 12px;
-  font-size: 14px;
-  border-radius: var(--r-xs);
-}
-
-/* 헤더 내비게이션용 버튼형 링크 (주 버튼과 경쟁하지 않도록 보조 스타일) */
-/* 헤더에 나란히 놓이는 버튼들은 같은 면을 쓴다.
-   알림 종은 --surface, 이동 버튼은 --btn-face 를 써서 한 줄 안에서 회색이
-   두 가지로 보였다. 바탕과 같은 흰 면에 테두리로만 경계를 준다. */
-.btn-nav {
-  display: inline-flex;
-  align-items: center;
-  min-height: 40px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: var(--r-xs);
-  background: var(--surface);
-  color: var(--text-h);
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
-  transition: background 0.15s ease;
-}
-.btn-nav:hover {
-  background: var(--btn-face-hover);
-  text-decoration: none;
-}
-/* 화면 아래에 놓이는 주된 행동. 폭을 꽉 채우고 키를 키운다 -- 손가락이
-   어디를 눌러도 닿게. */
-.btn-block {
-  width: 100%;
-  min-height: var(--tap-lg);
-  font-size: 16px;
-  border-radius: var(--r-md);
-}
-/* 버튼을 세로로 쌓는 자리. 주된 것 하나, 그 아래 보조. */
-.btn-stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-2);
-  width: 100%;
-}
-
-/* 입력칸.
-   테두리를 그려 칸을 표시하는 대신 옅은 면을 깐다. 테두리가 여럿 늘어서면
-   화면이 격자처럼 보이는데, 이 앱의 계약서 화면에는 입력칸이 열 개 넘게
-   이어진다. 면으로 하면 그 줄이 사라진다.
-   글자는 16px 로 둔다 -- 이보다 작으면 아이폰이 입력할 때 화면을 확대한다. */
-input,
-select,
-textarea {
-  font: inherit;
-  font-size: 16px;
-  min-height: 52px;
-  padding: 14px 16px;
-  /* 테두리를 항상 둔다.
-     면만으로 칸을 표시했더니, 같은 회색 카드 안에 들어간 순간 경계가 사라져
-     "어디에 쓰는지" 보이지 않았다. 채용 공고 등록 화면에서는 라벨만 떠 있고
-     칸이 통째로 사라진 것처럼 보였다.
-     담는 면이 무엇이든 칸이 보이려면 테두리가 있어야 한다. */
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  background: var(--bg);
-  color: var(--text-h);
-  transition:
-    border-color 0.15s ease,
-    background 0.15s ease,
-    box-shadow 0.15s ease;
-}
-input::placeholder,
-textarea::placeholder {
-  color: var(--text-muted);
-}
-textarea {
-  line-height: 1.6;
-}
-/* 지금 어디에 쓰고 있는지. 면을 흰색으로 되돌리고 테두리를 세운다. */
-input:focus,
-select:focus,
-textarea:focus {
-  background: var(--bg);
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-bg);
-}
-/* 마우스로 눌렀을 때는 테두리 강조만, 키보드로 왔을 때는 외곽선까지 남긴다.
-   (이 규칙이 위 :focus보다 뒤에 있어야 외곽선이 지워지지 않는다) */
-input:focus:not(:focus-visible),
-select:focus:not(:focus-visible),
-textarea:focus:not(:focus-visible) {
-  outline: none;
-}
-input:disabled,
-select:disabled,
-textarea:disabled {
-  background: var(--surface);
-  color: var(--text-muted);
-}
-input[type='checkbox'] {
-  width: auto;
-  accent-color: var(--accent);
-}
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  margin: 2px 4px 2px 0;
-  border-radius: var(--radius-full);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.4;
-  border: 1px solid transparent;
-  /* 배지는 거의 전부 '일반'·'채용자'·'개발자'·'정상' 같은 짧은 라벨이다.
-     이런 것은 언제나 한 줄로 나와야 한다.
-
-     한 번은 반대로 갔다가 되돌렸다. 심각도 배지가 좁은 화면에서 상자를
-     넘기에 줄바꿈을 열었는데, 그 규칙이 표의 좁은 칸에 들어간 짧은 라벨까지
-     낱자로 끊어 "개/발/자"로 세로로 쌓였다. 예외가 하나뿐인데 기본을 바꾼
-     것이 잘못이었다 — 기본은 한 줄, 감싸야 하는 것만 따로 연다. */
-  white-space: nowrap;
-}
-
-/* 한 문장이 들어가는 배지만 감싼다(심각도 배지). 감싸려면 flex·grid 자식의
-   자동 최소 크기도 함께 풀어야 실제로 줄이 바뀐다. */
-.badge-wrap {
-  white-space: normal;
-  overflow-wrap: break-word;
-  word-break: keep-all;
-  min-width: 0;
-}
-.badge-neutral {
-  background: var(--surface);
-  color: var(--text-muted);
-  border-color: var(--border);
-}
-.badge-accent {
-  background: var(--accent-bg);
-  color: var(--accent);
-  border-color: var(--accent-border);
-}
-.badge-success {
-  background: var(--success-bg);
-  color: var(--success-text);
-  border-color: var(--success-border);
-}
-.badge-danger {
-  background: var(--danger-bg);
-  color: var(--danger-text);
-  border-color: var(--danger-border);
-}
-.badge-warning {
-  background: var(--warning-bg);
-  color: var(--warning-text);
-  border-color: var(--warning-border);
-}
-.badge-developer {
-  background: var(--text-h);
-  color: var(--on-accent);
-  border-color: var(--text-h);
-}
-
-/* 심각도는 색으로만 알리지 않는다. 배지 안에 '심각·주의·참고'를 말로 적고,
-   색을 구분하지 못해도 눈에 들어오도록 옅은 구분선을 둔다. */
-.badge-severity {
-  font-weight: 700;
-  padding-right: 6px;
-  border-right: 1px solid currentColor;
-  border-right-color: color-mix(in srgb, currentColor 35%, transparent);
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
