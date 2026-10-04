@@ -27,6 +27,7 @@ export default function ApplicationManagePage() {
   const [fileVersion, setFileVersion] = useState(0)
   const [recovery, setRecovery] = useState(null)
   const [discard, setDiscard] = useState(null)
+  const lifetime = useRef(null)
   const exchange = useRef(null)
   const busyRef = useRef(false)
   const dirty = !!(verified && detail && original && (draftValue(detail) !== draftValue(original) || resume || portfolio || removePortfolio))
@@ -44,16 +45,22 @@ export default function ApplicationManagePage() {
 
   const fail = err => {
     setError(err.message)
-    if (err.status === 401) endAccess()
+    // A discarded response from before login is not evidence that the current
+    // email proof expired. Still clear sensitive drafts if that proof has ended.
+    if (err.status === 401 && (err.code !== 'STALE_AUTH_RESPONSE' || !hasApplicationAccess())) endAccess()
   }
-  const loadList = async () => {
+  const loadList = async current => {
     const data = await applicationAccess.list()
+    if (!current()) return
     setApplications(data.applications)
     setVerified(true)
     if (data.truncated) setMessage('최근 지원 100건까지 표시됩니다.')
   }
   useEffect(() => {
-    let alive = true
+    const scope = {}
+    lifetime.current = scope
+    const current = () => lifetime.current === scope
+    setBusy(true)
     const token = new URLSearchParams(window.location.hash.slice(1)).get('token')
     if (token && !exchange.current) {
       // Remove the email capability from the address bar before making requests.
@@ -63,30 +70,44 @@ export default function ApplicationManagePage() {
     const start = async () => {
       try {
         if (exchange.current) await exchange.current
-        if (alive && hasApplicationAccess()) await loadList()
-      } catch (err) { if (alive) fail(err) }
-      finally { if (alive) setBusy(false) }
+        if (current() && hasApplicationAccess()) await loadList(current)
+      } catch (err) { if (current()) fail(err) }
+      finally { if (current()) setBusy(false) }
     }
     void start()
-    return () => { alive = false }
+    return () => {
+      if (lifetime.current === scope) {
+        lifetime.current = null
+        busyRef.current = false
+      }
+    }
   }, [])
 
   const run = async action => {
-    if (busyRef.current) return
-    busyRef.current = true; setBusy(true); setError(''); setMessage('')
-    try { await action() } catch (err) { fail(err) }
-    finally { busyRef.current = false; setBusy(false) }
+    if (!lifetime.current || busyRef.current) return
+    const ticket = { scope: lifetime.current }
+    busyRef.current = ticket
+    const current = () => lifetime.current === ticket.scope && busyRef.current === ticket
+    setBusy(true); setError(''); setMessage('')
+    try { await action(current) } catch (err) { if (current()) fail(err) }
+    finally { if (current()) { busyRef.current = false; setBusy(false) } }
   }
   const requestLink = event => {
     event.preventDefault()
-    void run(async () => setMessage((await applicationAccess.request(email)).message))
+    void run(async current => {
+      const result = await applicationAccess.request(email)
+      if (current()) setMessage(result.message)
+    })
   }
   const discardThen = action => {
-    if (busyRef.current) return
+    if (!lifetime.current || busyRef.current) return
     if (dirty) setDiscard({ action })
     else void action()
   }
-  const open = id => discardThen(() => run(async () => installDetail((await applicationAccess.get(id)).application)))
+  const open = id => discardThen(() => run(async current => {
+    const result = await applicationAccess.get(id)
+    if (current()) installDetail(result.application)
+  }))
   const change = (field, value) => {
     if (!busyRef.current && !recovery) setDetail(previous => ({ ...previous, [field]: value }))
   }
@@ -99,20 +120,24 @@ export default function ApplicationManagePage() {
     }
     setFile(file)
   }
-  const recoverMutation = async err => {
+  const recoverMutation = async (err, current) => {
+    if (!current()) return
     // Validation/rate-limit responses are definite rejections: keep the draft.
     if (err.status === 401 || UNCHANGED_REJECTIONS.has(err.status)) throw err
     let latest = null
     try { latest = (await applicationAccess.get(detail.id)).application }
     catch (readError) { if (readError.status === 401) throw readError }
+    if (!current()) return
     // A timeout can still commit. Freeze mutations and preserve the visible
     // draft until the applicant explicitly accepts a fresh server snapshot.
     setRecovery({ latest })
     throw err
   }
-  const refreshAfterMutation = async () => {
-    try { await loadList() }
+  const refreshAfterMutation = async current => {
+    if (!current()) return
+    try { await loadList(current) }
     catch (err) {
+      if (!current()) return
       if (err.status === 401) fail(err)
       else setError('변경 내용은 저장됐지만 지원 목록을 갱신하지 못했습니다. 지원 내역 새로고침을 눌러주세요.')
     }
@@ -120,7 +145,7 @@ export default function ApplicationManagePage() {
   const save = event => {
     event.preventDefault()
     if (recovery || !detail?.canEdit) return
-    void run(async () => {
+    void run(async current => {
       const form = new FormData()
       for (const [key, value] of Object.entries({ applicantName: detail.applicantName, applicantPhone: detail.applicantPhone,
         applicationSource: detail.applicationSource, coverLetter: detail.coverLetter, careerJson: JSON.stringify(detail.career),
@@ -130,26 +155,31 @@ export default function ApplicationManagePage() {
       if (portfolio) form.append('portfolio', portfolio)
       let saved
       try { saved = (await applicationAccess.save(detail.id, form)).application }
-      catch (err) { return recoverMutation(err) }
+      catch (err) { return recoverMutation(err, current) }
+      if (!current()) return
       installDetail(saved)
       setMessage('지원서 수정 내용을 저장했습니다. 수정된 내용으로 심사합니다.')
-      await refreshAfterMutation()
+      await refreshAfterMutation(current)
     })
   }
   const withdraw = () => {
     if (recovery || !detail?.canWithdraw) return
     if (!window.confirm('이 지원을 철회하시겠습니까? 철회하면 서류 심사가 진행되지 않습니다.')) return
-    void run(async () => {
+    void run(async current => {
       try {
         await applicationAccess.withdraw(detail.id, detail.revision)
-        installDetail((await applicationAccess.get(detail.id)).application)
-      } catch (err) { return recoverMutation(err) }
+        if (!current()) return
+        const result = await applicationAccess.get(detail.id)
+        if (!current()) return
+        installDetail(result.application)
+      } catch (err) { return recoverMutation(err, current) }
       setMessage('지원을 철회했습니다.')
-      await refreshAfterMutation()
+      await refreshAfterMutation(current)
     })
   }
-  const download = doc => run(async () => {
+  const download = doc => run(async current => {
     const blob = await applicationAccess.file(detail.id, doc.id)
+    if (!current()) return
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url; anchor.download = doc.filename; anchor.click()
@@ -192,8 +222,9 @@ export default function ApplicationManagePage() {
             <ul>{recovery.latest.documents.map(doc => <li key={doc.id}>{doc.filename}</li>)}</ul>
           </details> : <p>현재 제출 내용을 불러오지 못했습니다. 연결을 확인한 후 다시 확인해주세요.</p>}
           <div className="modal-actions">
-            <button type="button" disabled={busy} onClick={() => void run(async () => {
+            <button type="button" disabled={busy} onClick={() => void run(async current => {
               const latest = (await applicationAccess.get(detail.id)).application
+              if (!current()) return
               setRecovery({ latest }); setMessage('현재 제출 내용을 확인했습니다. 내용을 비교한 뒤 다시 열어주세요.')
             })}>저장 결과 다시 확인</button>
             <button type="button" disabled={busy || !recovery.latest} onClick={() => discardThen(() => {

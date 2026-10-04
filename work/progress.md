@@ -269,3 +269,15 @@ PGlite의 다중 연결 한계를 보완하기 위해 공식 portable PostgreSQL
 결과 이메일 안내는 '지원서에 제출된 이메일'로 표시하고 기존 접수 재확인/페이지 재개에서는 현재 입력 변경의 저장을 보장하지 않는 지속 안내와 기존 제출 내용 확인·수정 링크를 보여준다. 철회 후 명시적 새 지원은 복구 안내를 초기화한다. 신규6개 검사 모두 수정 전 실패, 수정 후 통과했다. 독립3파일/19개 검토도 차단 사유 없이 통과했다. 최종 전체183파일/2,379개(19:27:24 시작,43.18초), 일반·로컬403모듈/API101 빌드 성공이며 이 수치는 앞선 실행과 단순 속도 비교하지 않는다.
 
 실제 ApplyPage+React StrictMode+memory data router/현재 CSS로 합성 접수 조회 재개를 확인했다. 넓은1265px 및390×844에서 문서 가로 넘침0, persistent role=status 경고 및 /application-manage 링크가 일치했다. screenshot apply-receipt-recovered-wide.jpg/mobile.jpg는 ignored 회차 폴더의 합성 화면 증거이며 실제 제출·본인 확인·메일 도착의 증거가 아니다. localhost5196은 DB/메일/파일업로드 없음, 합성 receipt 조회 POST만 허용하고 다른 쓰기는 차단했다. health는 조회4회/거부된쓰기0, 자체 서버 exit0·탭 종료·viewport 원복을 확인했다. 현재 새 수정은 운영 반영 준비 단계이며 Goal은 ACTIVE다.
+
+19:38~19:40 반영 완료:5파일241추가/9삭제를dc377c4d19cb76efa2a7d8c14fa94b4160809d3d로 GitHub master에 푸시했다. 배포 전 lint/좁은6모듈 typecheck/diff 검사와 추가 줄 비밀 패턴 검사 후보0개를 확인했다. 마지막 전체검사 이후 업무 소스는 변경하지 않았고 기록만 추가했다. CI37196009143/check·Pages31773160-1cb6-45f3-991b-507a70c66803·Supabase check 성공, 공개56자산/55바이트 및 index 줄바꿈 제외 일치·entry app-D9mCjDPA.js, 운영 읽기38통과/쓰기31건너뜀(19:39:37 시작,11.66초)을 확인했다. 수동 Edge 배포는 생략했고 기존 연동이19:38:52.981에 API37/retention16/storage-cleanup4 ACTIVE로 갱신했다. 삭제 예약 비밀/실행 플래그는 여전히 비활성, 두 worker 미인증GET403, migration12·queue0/RLS/공개권한 및 계정1/공고1/지원서0/방0/객체0은 동일했다. 실제 메일·지원/계약 생성·삭제를 시험하지 않았다.
+
+다음 필수 후보: 실제 API client/자기서비스/관리 컴포넌트의 합성 실행에서 이전 상세GET 대기→관리페이지 이탈→일반 계정 로그인→관리페이지 재진입/유효 이메일 확인 목록 조회→늦은 이전GET의STALE_AUTH_RESPONSE401이 현재 이메일 확인을 지우는 경로를 재현했다. 지연 요청이 없는 정상 대조는 확인 유지였다. 최초 새 이메일 link의 SPA 재교환 가정은 일반 a href의 전체 문서 교체와 맞지 않아 폐기하고, 기본 LoginPage의 실제 SPA Navigate 흐름으로 재현을 교정했다. 새 메일 교환0·외부HTTP/DB쓰기0인 대리 증거이며 운영 사용자 장애 빈도·시간은 미측정이다. 화면 수명/늦은 실패가 현재 본인 확인을 종료하지 못하는 좁은 경계를 필수로 선정한다. 새 인증 저장소·교환 프로토콜·전면 요청 framework는 제외하고 실제401 만료/403/409초안 보존은 유지한다.
+
+### 10월 4일 19:44~19:48 — 관리 화면의 현재 본인 확인 보존
+
+관리 페이지의 effect 수명 scope와 이벤트 ticket을 적용했다. 이전 화면의 catch/finally는 현재 이메일 확인이나 새 UI를 변경하지 못하고, 늦은 수정/철회 뒤 후속 GET·복구·목록 조회·파일 다운로드도 시작하지 않는다. 현재 유효한 proof의STALE_AUTH_RESPONSE401은 만료로 처리하지 않되 실제 현재401 및 로컬만료/종료이면 민감초안과proof를 제거한다.403/409의 초안 보존·불확실 결과 확인·정상 저장 뒤 목록 실패 안내·동기 중복 방지는 유지한다.
+
+새18개 회귀는 baseline에서12실패/정상대조6통과, 수정 후 통과했다. 실제 두 클라이언트+컴포넌트와 합성 transport/hooks를 사용하는 독립3파일/44개도 통과했다. 마지막 전체 검사184파일/2,397개 통과(19:44:46 시작,95.61초), lint/좁은6모듈 typecheck/diff 성공, 일반·로컬403모듈/API101 빌드 성공이다. 격리 미리보기와 함께 실행한 단일 측정이며 이전 실행과 검사 수·부하가 달라 성능 저하/향상으로 단정하지 않는다.
+
+실제 React StrictMode 및 memory data router에서 상세GET 지연→다른 화면→합성 일반로그인1회→관리 재진입/목록→이전응답 전달→현재 본인 확인 유지→새 상세GET 성공을 확인했다. 실제 api/client 및 applicationSelfService를 사용하며 VITE_API_BASE는 localhost fixture로만 고정했다. 캡처의 가상 지원자는합성자료이고 canEdit/canWithdraw=false·첨부0으로 업무수정을 못 하게 했다.390×844에서client/scroll375px·이메일 재확인 alert없음·제출내용표시, 넓은 화면도 확인했다. health는list4/detail2/합성login1/거부된쓰기0/남은지연0이며 실제DB·메일·사용자자료는 없다. 자신의5197서버exit0·리스너없음·탭종료·viewport원복을 확인했다. 실제 사용자 로그인/이메일확인교환/운영쓰기·다운로드는 이번 화면검증 범위 밖이다. screenshot application-manage-lifetime-wide/mobile.jpg 및 detail-mobile.jpg는 ignored 회차 폴더에 남겼다. 새 수정은 다음 운영 반영 준비 단계다.
