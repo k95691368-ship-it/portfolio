@@ -413,3 +413,23 @@ daf17d1c74f44e5aa014c6e42e28321a788c9807를 정확한portfolio/master에푸시�
 root 실제 StrictMode/AuthProvider/현재 apiClient/AdminPage DOM의 합성 HTTP는 정상 가상P1→가상P2 변경 후503→GET-only 복구→명시 재설정 가상P3를 확인했다. 최종 재설정POST3/사용자GET4/다른쓰기0이며1265/390px 넘침0, 대기/불확실 시 이전값·복사 없음, GET 뒤 안내 지속, 마지막 명시 요청 뒤만 새 값·복사 표시다. helper의 최초 auth 준비 gate 누락은 root fixture 오류로 고쳤으며 제품 결함으로 세지 않는다. Playwright focus 지연은 문서화된 AX 대안으로 관찰했고 같은 동작을 무작정 반복하지 않았다. 임시 탭/viewport override와5203 helper를 종료했다. 증거 PNG는 ignored `.tmp-release-audit-20261004/admin-password-uncertain-{wide,mobile}.png`에 보존했다.
 
 최종 전체195파일/2,681개가22:28:39 시작·50.72초에 통과했다. lint/좁은6모듈 typecheck/일반·격리403모듈/API101 빌드도 성공했다. 별도 fresh local runtime(port58133) HTTP20개가22:31:08/1.69초에 통과, 외부요청false·실제메일false·로컬메일3통·합성admin1명 남음/close 성공이며 Temp5Nv4Ym은 보존했다. 이는 기존 HTTP 계약 회귀이고 실제 채용·법적 서명·외부메일·새 파일 제공자 race의 end-to-end 증거로 확대하지 않는다. 스키마/설정/기존 자료/다른 프로젝트 변경 없이 승인 대상 반영을 준비한다.
+
+### 10월 4일 22:33~22:36 — 반영 확인과 실제 다중 연결 보완
+
+78a2d5983d0d48cd9aa26f17858144456547d5c6를portfolio/master에푸시했다. CI37206010803/job111447221035는린트/좁은타입/전체시험/빌드모두성공(1분18초), Pages a4e619cc-3388-4605-801c-69f3d634d8ae·Supabase check도성공했다. 공개56자산 중55개바이트일치/index줄바꿈제외일치·entry app-BY2ooQJF.js 확인.22:34:12 운영읽기38통과/업무쓰기31건너뜀(10.48초). 자동연동API45/retention24/storage-cleanup12 ACTIVE이며점검/보존삭제0·정리execute/jobsecret·retentionjobsecret없음·두worker미인증403유지다. 최초설정확인에서APP_MAINTENANCE_MODE라는추정이름을써false가나온것은설정변경이아니다. 실제소스PORTFOLIO_MAINTENANCE_MODE와이름/disabled boolean을읽어0임을대조했다. 함수bundle metadata hash를직접전체소스일치증거로쓰지않는다.
+
+독립 담당자가 공식 PostgreSQL17.11과production PostgresD1/실제upload·delete handler를새mkdtemp/nativelocalhost49308에서검증했다. 앱연결backend3572/3644+fixture제어연결이서로독립이며A의parentUPDATE보유중B의Lock/transactionid대기를pg_stat_activity에서확인했다. 기존문서없는경우/있는경우둘다201/201뒤최종B와정확ID·A늦은ACK뒤B가재할당한retiredkey1/2개영수증을보존했다. 모의Storage복구후기존processor는retired1/2개만정리하고B객체1/queue0을유지했다. 별도Acommit→다른연결의actualdelete200+newupload201→A응답에서도자기RETURNINGID와후속Bbytes보존을확인했다. 일회성3경계이며운영pooler/Deno/실제Storage/강제종료/성능측정은아니다.
+
+초기새검증서버의TCPready를SQLready로가정해57P03이발생한것은제품결함이아니라시험준비오류다. 해당소유PID26280/58249를안전종료한뒤ready로그대기로교정했다. 최종서버22868은postmaster.pid소유대조후pg_ctlstop0/서버exit0/pid파일·리스너부재를확인했고기존다른프로세스는종료하지않았다. Temp portfolio-next-native-documents-kopWCH와ignored `.tmp-next-native-documents.mjs`는보존했다. 원격업무쓰기/메일/정리예약활성화는없다. CI의Node action runtime·향후ubuntu-latest변경안내는현재검사실패가아니며무근거환경전면교체를하지않는다.
+
+### 10월 4일 22:38~22:49 — 본인 비밀번호 변경 불확실 결과의 작은 복구 안내
+
+최초 변경의 실제 handler·SQLite·현재 API client·JSX hook host를 연결한 기준선은 DB 새 hash/must_change_password0·기존 세션 폐기 뒤 응답이 유실돼도 일반 오류/이전 폼만 남았다. 기존 전체 새로고침→GET user:null→새 비밀번호 명시 로그인은 복구 가능하므로 영구 잠금이나 자동 재전송 결함으로 확대하지 않고 선택적 작은 보완으로 선정했다. 신규 최초20개는12실패/8정상 대조였고 실제 POST 후 응답/headers·body deadline/불완전 성공/stale identity·page lifetime/같은 tick 중복을 포함한26개와 관련7파일207개가 통과했다.
+
+독립 검토가 password UPDATE·세션 폐기 후 createSession(expectedPasswordHash)의 조건부 INSERT가 다른 변경에 의해0행이 돼도 일반409를 반환한다는 반증을 제시했다. 실제 hash 경합과 실제 INSERT를 실행하는 추가 회귀1실패/25통과를 확인하고 status409를 불확실 안내 분류에 포함해26통과로 교정했다. 오류 코드만 보고 항상 prewrite라고 가정하지 않는다. 안내는 성공/새 비밀번호 유효성을 단정하지 않으며 폼 수정·명시 재시도 유지, 이전 불확실 안내는 후속400/401/403/429로 지우지 않는다. 정상ok:true의 입력 초기화·세션확인과 초기 확정 거절은 유지한다. 자동 POST/로그인/GET·새 API·강제잠금·저장·서버정책 변경은 없다.
+
+root는 StrictMode/AuthProvider/ProtectedRoute/ChangePasswordPage/LoginPage/client와 합성 HTTP의 실제 DOM에서 기준선과 보완 후를 대조했다. 최초503 뒤 로그인 링크/지속 안내, 직접 재시도401 뒤 안내 유지, 실제 anchor 전체 탐색 뒤 초기 GET과 명시 로그인으로 가상 보호 화면을 복구했다. 최종 변경POST2/로그인POST1/세션GET2/다른쓰기0,1265/390px 넘침0이며 ignored PNG 두 개에 증거를 보존했다. 이 링크는 SPA context에 남은 임시계정 상태를 넘기기 위한 전체 문서 탐색이고 커밋 전 실패에서 이전 세션이 유효하면 기존 설정 route로 돌아갈 수 있다. 새 비밀번호가 반드시 유효하다거나 항상 로그인 폼이 열린다고 보장하지 않는다. 합성 값·HTTP이며 실제 계정/DB/비밀번호/메일을 변경하지 않았다.
+
+로컬 전체196파일/2,707개가22:46:48 시작·120.02초에 통과했다. lint/좁은6런타임 모듈 typecheck/일반·격리403모듈/API101 빌드도 성공했다. 최초 전체 검사·lint의 관찰은 자동 goal continuation 때 tool output이 유실됐고 handle이 소멸한 상태를 확인한 뒤 재실행했다. 이전 실패나 성공으로 추정하지 않고 위 최종 출력만 증거로 쓴다. 병렬 빌드/브라우저·독립 검사가 포함된 실행시간을 실사용 속도/과거 실행과 단순 비교하지 않는다. 별도 새 격리 runtime59788의 HTTP20개가22:49:10/2.02초에 통과, 외부요청false·실제메일false·로컬메일3통·합성admin1명과 close 성공을 확인했다. Temp lme8uJ는 보존했다. 기존 HTTP 계약 회귀이며 새 불확실 응답의 실제 원격 제공자 end-to-end 증거는 아니다.5204 UI helper handle 소멸/리스너 부재·탭 종료/viewport 원복 확인 완료다.
+
+22:52 독립 최종 검토는Approve/차단 문제 없음, 별도 관련7파일196개·변경두파일oxlint PASS다. 일반409의prewrite와postcommit모두가능한보수적분류,지속안내·정상초기화·lifetime·실제anchor의보장범위도대조했다. 같은시각추가reviewer를시작한직후기존승인메시지가도착해중복검사확대를중지하고이미시작한최소검토만요청했다. 검토응답지연을결함이나추가수정의근거로삼지않는다.현재범위는UI/test와근거기록이며DBschema/서버정책/운영업무쓰기는없다.

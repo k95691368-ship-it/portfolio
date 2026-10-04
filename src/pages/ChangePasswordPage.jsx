@@ -14,6 +14,7 @@ export default function ChangePasswordPage() {
   const [submitting, setSubmitting] = useState(false)
   const [changed, setChanged] = useState(false)
   const [sessionError, setSessionError] = useState('')
+  const [uncertain, setUncertain] = useState(false)
   const lifetime = useRef(null)
   const pending = useRef(null)
   const completed = useRef(false)
@@ -66,11 +67,20 @@ export default function ChangePasswordPage() {
       if (result?.ok !== true) throw new Error('비밀번호 변경 결과를 확인하지 못했습니다. 새 비밀번호로 로그인해 확인해주세요.')
       completed.current = true
       setChanged(true)
+      setUncertain(false)
       setCurrentPassword(''); setNewPassword(''); setConfirmPassword('')
       toast.success('비밀번호가 변경되었습니다.')
       await finishSessionCheck(operation)
     } catch (err) {
-      if (current(operation)) toast.error(err?.message || '비밀번호 변경 결과를 확인하지 못했습니다.')
+      if (current(operation)) {
+        // A rejected retry cannot disprove an earlier unacknowledged change.
+        // The handler can also return 409 after changing the password if the
+        // replacement session loses an expected-password-hash race.
+        if (err?.code === 'STALE_AUTH_RESPONSE' || !err?.status || err.status === 408 || err.status === 409 || err.status >= 500) {
+          setUncertain(true)
+        }
+        toast.error(err?.message || '비밀번호 변경 결과를 확인하지 못했습니다.')
+      }
     } finally {
       release(operation)
     }
@@ -89,6 +99,10 @@ export default function ChangePasswordPage() {
       {user?.mustChangePassword && (
         <p className="notice">관리자가 생성한 계정입니다. 계속 사용하려면 새 비밀번호를 설정해주세요.</p>
       )}
+      {uncertain && <div className="notice" role="status">
+        <p>비밀번호가 변경됐을 수 있습니다. 새 비밀번호로 로그인해 변경 여부를 확인해주세요.</p>
+        <p><a href="/login">새 비밀번호로 로그인</a></p>
+      </div>}
       <form onSubmit={handleSubmit}>
         <label>
           현재 비밀번호(임시 비밀번호)
