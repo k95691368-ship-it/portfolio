@@ -10,27 +10,38 @@ const REQUEST_STATUS = {
 
 // 계약 조건 수정 요청 — 지원자가 보내고 회사가 수락·거절한다.
 export default function ChangeRequests({ requests, myRole, canRequest, canRespond, onCreate, onRespond, busy, prefill }) {
-  const [field, setField] = useState('')
-  const [value, setValue] = useState('')
-  const [reason, setReason] = useState('')
+  const [draft, setDraft] = useState({ field: '', requestedValue: '', reason: '' })
+  const [submissionScope] = useState(() => ({ active: true, generation: 0, pending: null }))
+
+  useEffect(() => {
+    submissionScope.active = true
+    return () => {
+      submissionScope.active = false
+      submissionScope.generation++
+      submissionScope.pending = null
+    }
+  }, [submissionScope])
 
   // 점검 결과에서 "이 값으로 수정 요청"을 누르면 폼이 채워진 채로 열린다.
   useEffect(() => {
     if (!prefill) return
-    setField(prefill.field)
-    setValue(prefill.requestedValue)
-    setReason(prefill.reason)
+    setDraft({ field: prefill.field, requestedValue: prefill.requestedValue, reason: prefill.reason })
   }, [prefill])
 
   const submit = async (e) => {
     e.preventDefault()
-    // 실패해도 입력을 지우고 있었다. 오류 토스트는 몇 초 뒤 사라지고 폼은
-    // 비어 있으므로, 보낸 것으로 착각하고 회사의 답을 기다리게 된다.
-    const sent = await onCreate({ field, requestedValue: value, reason })
-    if (!sent) return
-    setField('')
-    setValue('')
-    setReason('')
+    if (busy || !canRequest || !submissionScope.active || submissionScope.pending) return
+    const attempt = { generation: submissionScope.generation }
+    submissionScope.pending = attempt
+    try {
+      const sent = await onCreate({ ...draft })
+      if (!sent || !submissionScope.active || submissionScope.generation !== attempt.generation
+        || submissionScope.pending !== attempt) return
+      // 성공한 요청의 초안만 지운다. 대기 중 편집/새 점검값은 별도 초안이다.
+      setDraft(current => current === draft ? { field: '', requestedValue: '', reason: '' } : current)
+    } finally {
+      if (submissionScope.pending === attempt) submissionScope.pending = null
+    }
   }
 
   const pending = requests.filter((r) => r.status === 'pending')
@@ -125,7 +136,10 @@ export default function ChangeRequests({ requests, myRole, canRequest, canRespon
           <div className="career-row">
             <label>
               항목
-              <select value={field} onChange={(e) => setField(e.target.value)} required>
+              <select value={draft.field} onChange={(e) => {
+                const field = e.target.value
+                setDraft(current => ({ ...current, field }))
+              }} required>
                 <option value="">선택</option>
                 {[...IDENTITY_FIELDS, ...TERM_FIELDS].map((f) => (
                   <option key={f.key} value={f.key}>
@@ -136,14 +150,20 @@ export default function ChangeRequests({ requests, myRole, canRequest, canRespon
             </label>
             <label>
               요청하는 값
-              <input value={value} onChange={(e) => setValue(e.target.value)} maxLength={500} required />
+              <input value={draft.requestedValue} onChange={(e) => {
+                const requestedValue = e.target.value
+                setDraft(current => ({ ...current, requestedValue }))
+              }} maxLength={500} required />
             </label>
           </div>
           <label>
             사유 (선택)
             <input
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
+              value={draft.reason}
+              onChange={(e) => {
+                const reason = e.target.value
+                setDraft(current => ({ ...current, reason }))
+              }}
               maxLength={500}
               placeholder="예: 면접에서 합의한 금액과 다릅니다."
             />

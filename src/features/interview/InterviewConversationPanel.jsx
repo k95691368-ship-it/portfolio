@@ -66,6 +66,22 @@ export default function InterviewConversationPanel({
   const [privateError, setPrivateError] = useState('')
   const [privateMessages, setPrivateMessages] = useState([])
   const [joinedParticipants, setJoinedParticipants] = useState([])
+  const publicEditVersion = useRef(0)
+  const privateEditVersion = useRef(0)
+  const publicPending = useRef(null)
+  const privatePending = useRef(null)
+  const lifetime = useRef(null)
+
+  useEffect(() => {
+    const scope = {}
+    lifetime.current = scope
+    publicPending.current = null
+    privatePending.current = null
+    setPublicBusy(false)
+    setPrivateBusy(false)
+    return () => { if (lifetime.current === scope) lifetime.current = null }
+  }, [])
+
   const {
     messages: publicMessages,
     error: publicError,
@@ -136,37 +152,48 @@ export default function InterviewConversationPanel({
   const submitPublic = async (event) => {
     event.preventDefault()
     const text = publicDraft.trim()
-    if (!text || publicBusy) return
+    if (!text || publicPending.current || !lifetime.current) return
+    const request = { version: publicEditVersion.current, scope: lifetime.current }
+    publicPending.current = request
+    const isCurrent = () => publicPending.current === request && lifetime.current === request.scope
     setPublicBusy(true)
     setPublicSendError('')
     try {
       await sendMessage(text)
-      setPublicDraft('')
+      if (!isCurrent()) return
+      // 내용이 A로 되돌아왔더라도 새 편집은 전송한 A와 다른 작성 의도다.
+      if (publicEditVersion.current === request.version) setPublicDraft('')
     } catch (error) {
-      setPublicSendError(error.message)
+      if (isCurrent()) setPublicSendError(error.message)
     } finally {
-      setPublicBusy(false)
+      if (isCurrent()) setPublicBusy(false)
+      if (publicPending.current === request) publicPending.current = null
     }
   }
 
   const submitPrivate = async (event) => {
     event.preventDefault()
     const text = privateDraft.trim()
-    if (!staffView || !text || privateBusy) return
+    if (!staffView || !text || privatePending.current || !lifetime.current) return
     if (!meeting?.chat?.sendTextMessage || privatePeerIds.length === 0) {
       setPrivateError('현재 연결된 다른 면접관이 없습니다.')
       return
     }
 
+    const request = { version: privateEditVersion.current, scope: lifetime.current }
+    privatePending.current = request
+    const isCurrent = () => privatePending.current === request && lifetime.current === request.scope
     setPrivateBusy(true)
     setPrivateError('')
     try {
       await meeting.chat.sendTextMessage(text, [...privatePeerIds])
-      setPrivateDraft('')
+      if (!isCurrent()) return
+      if (privateEditVersion.current === request.version) setPrivateDraft('')
     } catch {
-      setPrivateError('면접관 대화를 보내지 못했습니다. 연결 상태를 확인해주세요.')
+      if (isCurrent()) setPrivateError('면접관 대화를 보내지 못했습니다. 연결 상태를 확인해주세요.')
     } finally {
-      setPrivateBusy(false)
+      if (isCurrent()) setPrivateBusy(false)
+      if (privatePending.current === request) privatePending.current = null
     }
   }
 
@@ -217,7 +244,7 @@ export default function InterviewConversationPanel({
             <textarea
               id="interview-public-message"
               value={publicDraft}
-              onChange={(event) => setPublicDraft(event.target.value)}
+              onChange={(event) => { publicEditVersion.current++; setPublicDraft(event.target.value) }}
               maxLength={2000}
               rows={2}
               placeholder="모든 참가자에게 보낼 메시지"
@@ -244,7 +271,7 @@ export default function InterviewConversationPanel({
             <textarea
               id="interview-private-message"
               value={privateDraft}
-              onChange={(event) => setPrivateDraft(event.target.value)}
+              onChange={(event) => { privateEditVersion.current++; setPrivateDraft(event.target.value) }}
               maxLength={Math.min(Number(meeting?.chat?.maxTextLimit) || 2000, 2000)}
               rows={2}
               placeholder="연결된 면접관에게만 보낼 메시지"
