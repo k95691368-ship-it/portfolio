@@ -32,13 +32,32 @@ it('reuses the provider receipt without sending twice', async () => {
   expect(await sendTrackedEmail(env(), message)).toEqual({ id: 'receipt' })
   expect(network).toHaveBeenCalledTimes(2)
 })
-it('never retries after provider acceptance and a failed database update', async () => {
+it.each([new Error('database unavailable'), null])('never retries after provider acceptance and a failed database update: %s', async (failure) => {
   const network = vi.fn().mockResolvedValueOnce(ok({ access_token: 'fixture' })).mockResolvedValueOnce(ok({ id: 'receipt' }))
   vi.stubGlobal('fetch', network)
   const prepare = db.prepare.bind(db)
   db.prepare = (sql) => sql.includes("status = 'accepted'")
-    ? { bind: () => ({ run: async () => { throw new Error('database unavailable') } }) } : prepare(sql)
+    ? { bind: () => ({ run: async () => { throw failure } }) } : prepare(sql)
   await expect(sendTrackedEmail(env(), message)).rejects.toMatchObject({ deliveryState: 'unknown' })
   await expect(sendTrackedEmail(env(), message)).rejects.toMatchObject({ deliveryState: 'unknown' })
+  expect(network).toHaveBeenCalledTimes(2)
+})
+
+it.each([null, 'database unavailable', { message: 'database unavailable' }])('records a retryable failure for a non-Error rejection before sending: %s', async (failure) => {
+  const network = vi.fn()
+  vi.stubGlobal('fetch', network)
+  const prepare = db.prepare.bind(db)
+  db.prepare = (sql) => sql.includes('INSERT INTO rate_limit_hits')
+    ? { bind: () => ({ run: async () => { throw failure } }) } : prepare(sql)
+
+  await expect(sendTrackedEmail(env(), message)).rejects.toMatchObject({
+    name: 'EmailDeliveryError', deliveryState: 'failed', message: '이메일을 발송하지 못했습니다.',
+  })
+  expect(network).not.toHaveBeenCalled()
+  expect(db.sql.prepare('SELECT status FROM email_outbox').get().status).toBe('failed')
+
+  db.prepare = prepare
+  network.mockResolvedValueOnce(ok({ access_token: 'fixture' })).mockResolvedValueOnce(ok({ id: 'receipt' }))
+  expect(await sendTrackedEmail(env(), message)).toEqual({ id: 'receipt' })
   expect(network).toHaveBeenCalledTimes(2)
 })

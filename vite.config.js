@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import { createHash } from 'node:crypto'
 import { readFileSync, writeFileSync, appendFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { availableParallelism } from 'node:os'
 
 // 경로에 필요한 화면 조각은 문서를 읽는 즉시 미리 받는다.
 // CSS는 해시가 붙은 별도 자산으로 유지해 반복 방문과 배포 사이에 캐시한다.
@@ -286,4 +287,13 @@ export default defineConfig({
   // npm run dev/preview start the isolated full-stack runtime. A directly
   // invoked Vite server must never silently forward writes to production.
   server: { host: '127.0.0.1' },
+  // PGlite를 여는 검사는 CPU뿐 아니라 메모리도 사용한다. 모든 코어를
+  // 동시에 쓰면 준비 단계가 제한 시간을 넘길 수 있으므로 작업자를 제한한다.
+  test: {
+    // Release snapshots and scratch copies must never execute a second copy
+    // of network-facing smoke/E2E tests during an ordinary unit-test run.
+    include: ['tests/**/*.{test,spec}.{js,jsx,ts,tsx,mjs,cjs,mts,cts}'],
+    pool: 'threads',
+    maxWorkers: Math.min(4, availableParallelism()),
+  },
 })

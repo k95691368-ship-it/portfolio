@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": [],
+    "allowJs": true,
+    "checkJs": true,
+    "strict": true,
+    "noEmit": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "files": [
+    "src/api/requestDeadline.js",
+    "server/_lib/requestBody.js",
+    "server/_lib/http.js",
+    "server/_lib/gmail.js",
+    "server/_lib/emailOutbox.js",
+    "server/_lib/rateLimit.js",
+    "typecheck/core.contracts.ts"
+  ]
+}

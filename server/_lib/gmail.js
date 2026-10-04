@@ -5,6 +5,7 @@ const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024
 const encoder = new TextEncoder()
 
 export class EmailDeliveryError extends Error {
+  /** @param {string} message @param {import('../../typecheck/core.js').DeliveryFailureState} [deliveryState] */
   constructor(message, deliveryState = 'failed') {
     super(message)
     this.name = 'EmailDeliveryError'
@@ -12,6 +13,7 @@ export class EmailDeliveryError extends Error {
   }
 }
 
+/** @param {unknown} value */
 function mailbox(value) {
   const email = String(value || '').trim()
   // One ASCII mailbox, not a display name or recipient list. Header injection
@@ -22,6 +24,11 @@ function mailbox(value) {
   return email
 }
 
+/**
+ * @template {import('../../typecheck/core.js').MailEnvironment} Env
+ * @param {Env} env
+ * @returns {env is Env & import('../../typecheck/core.js').ConfiguredMailEnvironment}
+ */
 export function isGmailConfigured(env) {
   if (env.EMAIL_ENABLED !== '1') return false
   if (![env.GMAIL_CLIENT_ID, env.GMAIL_CLIENT_SECRET, env.GMAIL_REFRESH_TOKEN].every(
@@ -35,6 +42,7 @@ export function isGmailConfigured(env) {
   }
 }
 
+/** @param {Uint8Array} bytes */
 function base64(bytes) {
   let binary = ''
   for (let i = 0; i < bytes.length; i += 0x8000) {
@@ -43,6 +51,7 @@ function base64(bytes) {
   return btoa(binary)
 }
 
+/** @param {string | undefined} value */
 function header(value) {
   const text = String(value || '')
   if (Array.from(text).some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)) {
@@ -62,10 +71,12 @@ function header(value) {
   return words.join(`${CRLF} `)
 }
 
+/** @param {string} value */
 function wrappedBase64(value) {
   return value.match(/.{1,76}/g)?.join(CRLF) || ''
 }
 
+/** @param {string} type @param {string} content */
 function textPart(type, content) {
   return [
     `Content-Type: ${type}; charset=UTF-8`,
@@ -74,6 +85,7 @@ function textPart(type, content) {
   ].join(CRLF)
 }
 
+/** @param {import('../../typecheck/core.js').EmailAttachment} attachment */
 function attachmentPart(attachment) {
   const filename = String(attachment.filename || 'attachment.pdf')
   header(filename) // Validate before interpolating encoded filename parameters.
@@ -104,6 +116,7 @@ function attachmentPart(attachment) {
   ].join(CRLF)
 }
 
+/** @param {import('../../typecheck/core.js').EmailMessage & { from: string }} message */
 function rawMessage({ from, fromName, to, subject, text, html, attachments = [], messageId }) {
   if (!Array.isArray(attachments) || attachments.length > 1) throw new Error('계약서 첨부는 1개까지 가능합니다.')
   const alternative = `alternative_${crypto.randomUUID()}`
@@ -129,13 +142,21 @@ function rawMessage({ from, fromName, to, subject, text, html, attachments = [],
   return base64(encoder.encode(message)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
+/** @param {unknown} value @returns {value is Record<string, unknown>} */
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+/** @param {string} url @param {RequestInit} init @param {'인증' | '발송'} stage */
 async function googleRequest(url, init, stage) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 20_000)
   try {
     const response = await fetch(url, { ...init, signal: controller.signal, redirect: 'error' })
     // Do not surface provider response text: routes store errors in delivery logs.
-    const data = await response.json().catch(() => null)
+    /** @type {unknown} */
+    const payload = await response.json().catch(() => null)
+    const data = isRecord(payload) ? payload : null
     if (!response.ok) {
       if (stage === '발송' && response.status >= 500) throw new EmailDeliveryError('Gmail 발송 결과를 확인하지 못했습니다. 보낸메일함을 확인해주세요.', 'unknown')
       if (stage === '인증' && data?.error === 'invalid_grant') {
@@ -159,6 +180,11 @@ async function googleRequest(url, init, stage) {
   }
 }
 
+/**
+ * @param {import('../../typecheck/core.js').MailEnvironment} env
+ * @param {import('../../typecheck/core.js').EmailMessage} message
+ * @returns {Promise<import('../../typecheck/core.js').EmailReceipt>}
+ */
 export async function sendGmailEmail(env, message) {
   // Also gate direct callers; checking only at the route is not sufficient.
   if (!isGmailConfigured(env)) throw new Error('Gmail 발송 설정이 완료되지 않았거나 EMAIL_ENABLED가 꺼져 있습니다.')

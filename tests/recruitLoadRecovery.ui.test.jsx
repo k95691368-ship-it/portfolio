@@ -186,3 +186,111 @@ it('offers a GET-only recovery instead of an endless spinner after application d
   expect(button('불합격')).toBeDefined()
   expect(api.post).not.toHaveBeenCalled()
 })
+
+it('sends search, state, and posting filters to the whole server list without losing a posting draft', async () => {
+  render(); await settle()
+  input('공고 제목').props.onChange({ target: { value: 'Unrelated draft' } }); render()
+  walk(tree).find(node => node.type === 'input' && node.props.type === 'search').props.onChange({ target: { value: 'Old person' } })
+  walk(tree).find(node => node.type === 'select' && node.props['aria-label'] === '지원 상태로 거르기').props.onChange({ target: { value: 'submitted' } })
+  walk(tree).find(node => node.type === 'select' && node.props['aria-label'] === '채용 공고로 거르기').props.onChange({ target: { value: 'posting' } }); render()
+  api.get.mockImplementation(path => path.startsWith('/applications?') ? Promise.resolve({ applications: [{ ...application, applicantName: 'Old person' }], nextCursor: null }) : responses(path))
+  walk(tree).find(node => node.type === 'form' && node.props.className === 'filter-row').props.onSubmit({ preventDefault() {} }); render(); await settle()
+  expect(api.get.mock.calls.map(([path]) => path)).toContain('/applications?q=Old+person&status=submitted&posting=posting')
+  expect(text(tree)).toContain('Old person')
+  expect(input('공고 제목').props.value).toBe('Unrelated draft')
+  button('검색 조건 초기화').props.onClick(); render(); await settle()
+  expect(walk(tree).find(node => node.type === 'input' && node.props.type === 'search').props.value).toBe('')
+  expect(text(tree)).toContain('Synthetic candidate')
+  expect(api.post).not.toHaveBeenCalled()
+})
+
+it.each([['마감하기', 'patch'], ['삭제', 'delete']])('keeps the latest application filters when an earlier %s write eventually completes', async (label, method) => {
+  render(); await settle()
+  let completeWrite
+  api[method].mockImplementationOnce(() => new Promise(resolve => { completeWrite = resolve }))
+  const write = button(label).props.onClick()
+  walk(tree).find(node => node.type === 'input' && node.props.type === 'search').props.onChange({ target: { value: 'Latest' } })
+  walk(tree).find(node => node.type === 'select' && node.props['aria-label'] === '지원 상태로 거르기').props.onChange({ target: { value: 'submitted' } })
+  walk(tree).find(node => node.type === 'select' && node.props['aria-label'] === '채용 공고로 거르기').props.onChange({ target: { value: 'posting' } }); render()
+  const latestPath = '/applications?q=Latest&status=submitted&posting=posting'
+  api.get.mockImplementation(path => path === latestPath
+    ? Promise.resolve({ applications: [{ ...application, applicantName: 'Latest candidate' }], nextCursor: null }) : responses(path))
+  walk(tree).find(node => node.type === 'form' && node.props.className === 'filter-row').props.onSubmit({ preventDefault() {} }); render(); await settle()
+  expect(text(tree)).toContain('Latest candidate')
+  const previousReads = api.get.mock.calls.length
+  completeWrite({}); await write; await settle()
+  const readsAfterWrite = api.get.mock.calls.slice(previousReads).map(([path]) => path).filter(path => path.startsWith('/applications'))
+  expect(readsAfterWrite).toEqual([latestPath])
+  expect(text(tree)).toContain('Latest candidate')
+  expect(text(tree)).not.toContain('Synthetic candidate')
+  expect(walk(tree).find(node => node.type === 'input' && node.props.type === 'search').props.value).toBe('Latest')
+})
+
+it('uses the current application filters when an old detail-change callback refreshes the parent', async () => {
+  render(); await settle()
+  walk(tree).find(node => node.type === 'button' && node.props['aria-label'] === 'Synthetic candidate 지원서 상세').props.onClick(); render()
+  const previousDetailRefresh = walk(tree).find(node => node.type === ApplicationDetail).props.onChanged
+  walk(tree).find(node => node.type === 'input' && node.props.type === 'search').props.onChange({ target: { value: 'Latest' } }); render()
+  api.get.mockImplementation(path => path === '/applications?q=Latest'
+    ? Promise.resolve({ applications: [{ ...application, applicantName: 'Latest candidate' }], nextCursor: null }) : responses(path))
+  walk(tree).find(node => node.type === 'form' && node.props.className === 'filter-row').props.onSubmit({ preventDefault() {} }); render(); await settle()
+  const previousReads = api.get.mock.calls.length
+  await previousDetailRefresh(); await settle()
+  expect(api.get.mock.calls.slice(previousReads).map(([path]) => path).filter(path => path.startsWith('/applications'))).toEqual(['/applications?q=Latest'])
+  expect(text(tree)).toContain('Latest candidate')
+  expect(text(tree)).not.toContain('Synthetic candidate')
+})
+
+it('retains the first page on a next-page GET failure, retries the same cursor once, and appends without duplicates', async () => {
+  const old = { ...application, id: 'old', applicantName: 'Old candidate' }
+  api.get.mockImplementation(path => path === '/applications'
+    ? Promise.resolve({ applications: [application], nextCursor: 'page-two', truncated: true }) : responses(path))
+  render(); await settle()
+  api.get.mockImplementation(path => path.startsWith('/applications?') ? fail() : responses(path))
+  await button('지원서 더 불러오기').props.onClick(); await settle()
+  expect(text(tree)).toContain('Synthetic candidate')
+  expect(text(tree)).toContain('지원서 목록을 불러오지 못했습니다.')
+  expect(button('지원서 더 불러오기').props.disabled).toBe(true)
+  api.get.mockResolvedValueOnce({ applications: [application, old], nextCursor: null, truncated: false })
+  await button('지원서 목록 다시 불러오기').props.onClick(); await settle()
+  expect(text(tree)).toContain('Old candidate')
+  expect(text(tree)).toContain('표시된 지원서 2건')
+  expect(button('지원서 더 불러오기')).toBeUndefined()
+  expect(api.get.mock.calls.filter(([path]) => path === '/applications?cursor=page-two')).toHaveLength(2)
+  expect(api.post).not.toHaveBeenCalled()
+})
+
+it('ignores the previous filter result after the new search and coalesces repeated next-page clicks', async () => {
+  let resolveOld, resolvePage
+  const previous = new Promise(resolve => { resolveOld = resolve })
+  const page = new Promise(resolve => { resolvePage = resolve })
+  api.get.mockImplementation(path => path === '/applications' ? previous
+    : path === '/applications?q=Latest' ? Promise.resolve({ applications: [{ ...application, applicantName: 'Latest candidate' }], nextCursor: 'next' })
+      : path === '/applications?q=Latest&cursor=next' ? page : responses(path))
+  render()
+  const firstSignal = api.get.mock.calls.find(([path]) => path === '/applications')[1].signal
+  walk(tree).find(node => node.type === 'input' && node.props.type === 'search').props.onChange({ target: { value: 'Latest' } }); render()
+  walk(tree).find(node => node.type === 'form' && node.props.className === 'filter-row').props.onSubmit({ preventDefault() {} }); render(); await settle()
+  expect(firstSignal.aborted).toBe(true)
+  resolveOld({ applications: [{ ...application, applicantName: 'Outdated candidate' }], nextCursor: null }); await settle()
+  expect(text(tree)).toContain('Latest candidate')
+  expect(text(tree)).not.toContain('Outdated candidate')
+  const next = button('지원서 더 불러오기').props.onClick
+  next(); next(); render()
+  expect(api.get.mock.calls.filter(([path]) => path === '/applications?q=Latest&cursor=next')).toHaveLength(1)
+  resolvePage({ applications: [], nextCursor: null }); await settle()
+  expect(text(tree)).toContain('조회 결과를 모두 표시했습니다.')
+})
+
+it('distinguishes a filtered empty result and refuses a truncated response without a continuation', async () => {
+  render(); await settle()
+  walk(tree).find(node => node.type === 'input' && node.props.type === 'search').props.onChange({ target: { value: 'Absent' } }); render()
+  api.get.mockResolvedValueOnce({ applications: [], nextCursor: null, truncated: false })
+  walk(tree).find(node => node.type === 'form' && node.props.className === 'filter-row').props.onSubmit({ preventDefault() {} }); render(); await settle()
+  expect(text(tree)).toContain('조건에 맞는 지원서가 없습니다.')
+  expect(text(tree)).not.toContain('아직 접수된 지원서가 없습니다.')
+  api.get.mockResolvedValueOnce({ applications: [], truncated: true, limit: 100 })
+  walk(tree).find(node => node.type === 'form' && node.props.className === 'filter-row').props.onSubmit({ preventDefault() {} }); await settle()
+  expect(text(tree)).toContain('지원서 목록 응답을 확인하지 못했습니다.')
+  expect(text(tree)).not.toContain('조건에 맞는 지원서가 없습니다.')
+})

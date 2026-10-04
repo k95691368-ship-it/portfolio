@@ -81,11 +81,18 @@ export async function onRequestPost({ env, data, params }) {
   const storageKey = `interviews/${params.sessionId}/${localId}.webm`
   const filename = `${localId}.webm`
   try {
-    await env.DB.prepare(
+    const claimed = await env.DB.batch([
+      env.DB.prepare('UPDATE interview_rooms SET id = id WHERE id = ?').bind(params.roomId),
+      env.DB.prepare(
       `INSERT INTO interview_recordings
          (id, session_id, provider_recording_id, provider_session_id, status,
           storage_status, r2_key, content_type, filename, started_at, created_by_user_id)
-       VALUES (?, ?, ?, ?, 'recording', 'pending', ?, 'video/webm', ?, datetime('now'), ?)`
+       SELECT ?, ?, ?, ?, 'recording', 'pending', ?, 'video/webm', ?, datetime('now'), ?
+       WHERE NOT EXISTS (
+         SELECT 1 FROM interview_room_deletion_locks
+         WHERE room_id = ? AND datetime(created_at) > datetime('now', '-10 minutes')
+       )
+         AND EXISTS (SELECT 1 FROM interview_sessions WHERE id = ? AND room_id = ? AND status IN ('waiting','live'))`
     )
       .bind(
         localId,
@@ -94,9 +101,13 @@ export async function onRequestPost({ env, data, params }) {
         session.provider_meeting_id,
         storageKey,
         filename,
-        data.user.id
-      )
-      .run()
+        data.user.id,
+        params.roomId,
+        params.sessionId,
+        params.roomId
+      ),
+    ])
+    if (!claimed[1].meta?.changes) return jsonError('면접방이 삭제 중이거나 면접이 종료되어 녹화를 시작하지 않았습니다.', 409)
   } catch {
     const raced = await activeRecording(env, params.sessionId)
     if (raced) return jsonResponse({ recording: serializeRecording(raced), idempotent: true })

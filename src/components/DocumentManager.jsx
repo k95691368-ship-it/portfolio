@@ -54,7 +54,7 @@ export default function DocumentManager() {
     }
   }, [load])
 
-  const change = async (key, action, successMessage) => {
+  const change = async (key, action, successMessage, pendingMessage) => {
     // Refs also stop duplicate/cross-document writes before disabled UI commits.
     if (!mounted.current || writing.current || !trusted.current) return
     writing.current = true
@@ -64,10 +64,13 @@ export default function DocumentManager() {
     setChanging(key)
     setChangeNotice('')
     try {
-      await action()
+      const result = await action()
       if (!isCurrent()) return
-      setChangeNotice(successMessage)
-      toast.success(successMessage)
+      const pending = pendingMessage && result?.cleanupPending === true
+      const message = pending ? pendingMessage : successMessage
+      setChangeNotice(message)
+      if (pending) toast.info(message)
+      else toast.success(message)
       // A confirmed mutation stays successful even if the following read fails.
       const refreshed = await load()
       if (isCurrent() && refreshed === false) toast.info('변경은 완료되었지만 서류 목록을 갱신하지 못했습니다. 목록을 다시 불러와 확인해주세요.')
@@ -90,7 +93,8 @@ export default function DocumentManager() {
     }, `${LABELS[docType]} 업로드가 완료되었습니다.`)
   }
 
-  const handleDelete = id => change(`delete:${id}`, () => api.delete(`/documents/${id}`), '파일이 삭제되었습니다.')
+  const handleDelete = id => change(`delete:${id}`, () => api.delete(`/documents/${id}`),
+    '파일이 삭제되었습니다.', '서류 목록에서 삭제되었습니다. 저장 파일 정리는 대기 중입니다.')
   const retry = () => { if (!writing.current) return load() }
   const docFor = type => docs?.find(doc => doc.docType === type)
   const disabled = loading || !!loadError || docs === null || !!changing

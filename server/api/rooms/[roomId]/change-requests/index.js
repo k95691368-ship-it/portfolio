@@ -54,10 +54,15 @@ export async function onRequestPost({ request, env, data, params }) {
 
   const body = await request.json().catch(() => null)
   const field = body?.field
-  const requestedValue = (body?.requestedValue ?? '').toString().trim().slice(0, VALUE_MAX)
-  const reason = (body?.reason ?? '').toString().trim().slice(0, REASON_MAX)
-
-  if (!field || !EDITABLE_FIELDS[field]) return jsonError('수정을 요청할 수 없는 항목입니다.', 400)
+  // Only explicit allowlist entries may become SQL column names.
+  if (typeof field !== 'string' || !Object.hasOwn(EDITABLE_FIELDS, field)) {
+    return jsonError('수정을 요청할 수 없는 항목입니다.', 400)
+  }
+  if (typeof body.requestedValue !== 'string' || (body.reason != null && typeof body.reason !== 'string')) {
+    return jsonError('요청할 값과 사유는 글로 입력해주세요.', 400)
+  }
+  const requestedValue = body.requestedValue.trim().slice(0, VALUE_MAX)
+  const reason = (body.reason ?? '').trim().slice(0, REASON_MAX)
   if (!requestedValue) return jsonError('요청할 값을 입력해주세요.', 400)
 
   const column = EDITABLE_FIELDS[field]

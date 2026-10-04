@@ -1,12 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
-  InterviewDeletionError,
   acquireInterviewRoomDeletionLocks,
   prepareInterviewRoomDeletion,
 } from '../server/_lib/interviewDeletion.js'
 import { onRequestDelete as deleteAdminRoom } from '../server/api/admin/rooms/[roomId]/index.js'
 
-function deletionDb({ activeSessions = 0, activeRecordings = 0, files = [] } = {}) {
+function deletionDb({ activeSessions = 0, activeRecordings = 0, heldRecordings = 0, files = [] } = {}) {
   return {
     prepare(sql) {
       const statement = {
@@ -18,6 +17,7 @@ function deletionDb({ activeSessions = 0, activeRecordings = 0, files = [] } = {
             return {
               active_sessions: activeSessions,
               active_recordings: activeRecordings,
+              held_recordings: heldRecordings,
             }
           }
           return null
@@ -50,8 +50,9 @@ describe('화상 면접이 있는 방 삭제 준비', () => {
       },
     }
     await acquireInterviewRoomDeletionLocks({ DB: db }, ['room-1'], 'lock-1')
-    expect(statements[0]).toContain("datetime('now', '-10 minutes')")
-    expect(statements[1]).toContain('INSERT INTO interview_room_deletion_locks')
+    expect(statements[0]).toContain('UPDATE interview_rooms SET id = id')
+    expect(statements[1]).toContain("datetime('now', '-10 minutes')")
+    expect(statements[2]).toContain('INSERT INTO interview_room_deletion_locks')
   })
 
   it('관리자 방 삭제는 화상 preflight 차단 전에 계약 기록·PDF·D1을 변경하지 않는다', async () => {
@@ -128,25 +129,22 @@ describe('화상 면접이 있는 방 삭제 준비', () => {
     }))
   })
 
-  it('R2 객체 삭제가 하나라도 실패하면 fail-closed 한다', async () => {
-    const remove = vi
-      .fn()
-      .mockResolvedValueOnce(undefined)
-      .mockRejectedValueOnce(new Error('r2 unavailable'))
+  it('보존 지정된 녹화가 있으면 파일이나 DB를 삭제하지 않는다', async () => {
+    const remove = vi.fn()
     await expect(
       prepareInterviewRoomDeletion(
         {
-          DB: deletionDb({ files: ['interviews/a.mp4', 'interviews/b.mp4'] }),
+          DB: deletionDb({ heldRecordings: 1, files: ['interviews/a.mp4'] }),
           INTERVIEW_RECORDINGS: { delete: remove },
         },
         ['room-1']
       )
-    ).rejects.toBeInstanceOf(InterviewDeletionError)
-    expect(remove).toHaveBeenCalledTimes(2)
+    ).rejects.toMatchObject({ name: 'InterviewDeletionError', status: 409 })
+    expect(remove).not.toHaveBeenCalled()
   })
 
-  it('모든 R2 객체 삭제가 끝난 경우에만 D1 삭제를 계속할 수 있다', async () => {
-    const remove = vi.fn(async () => undefined)
+  it('준비 단계는 DB와 함께 정리 요청을 남길 키만 반환하며 파일을 먼저 지우지 않는다', async () => {
+    const remove = vi.fn().mockRejectedValue(new Error('storage unavailable'))
     await expect(
       prepareInterviewRoomDeletion(
         {
@@ -155,6 +153,7 @@ describe('화상 면접이 있는 방 삭제 준비', () => {
         },
         ['room-1']
       )
-    ).resolves.toEqual({ recordingsDeleted: 1 })
+    ).resolves.toEqual({ ids: ['room-1'], files: [{ r2_key: 'interviews/a.mp4' }] })
+    expect(remove).not.toHaveBeenCalled()
   })
 })

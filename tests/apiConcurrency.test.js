@@ -58,6 +58,48 @@ describe('진행 중인 API 조회 공유', () => {
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 
+  it('starts a fresh same-tick GET after another caller aborts without sharing its cancellation', async () => {
+    const firstController = new AbortController(), nextController = new AbortController()
+    fetch.mockReturnValueOnce(new Promise(() => {}))
+    const first = api.get('/applications', { signal: firstController.signal })
+    const firstOutcome = Promise.allSettled([first])
+    firstController.abort()
+    fetch.mockResolvedValueOnce(response({ applications: ['fresh'] }))
+    const next = api.get('/applications', { signal: nextController.signal })
+    expect(first).not.toBe(next)
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect((await firstOutcome)[0].reason.name).toBe('AbortError')
+    expect(await next).toEqual({ applications: ['fresh'] })
+    expect(nextController.signal.aborted).toBe(false)
+    expect(fetch.mock.calls[1][1].signal.aborted).toBe(false)
+  })
+
+  it('isolates a cancellable GET while preserving coalescing for callers without a signal', async () => {
+    const controller = new AbortController(), sharedResponse = deferred()
+    fetch.mockReturnValueOnce(new Promise(() => {})).mockReturnValueOnce(sharedResponse.promise)
+    const owned = api.get('/jobs', { signal: controller.signal })
+    const outcome = Promise.allSettled([owned])
+    const one = api.get('/jobs'), two = api.get('/jobs')
+    expect(one).toBe(two)
+    expect(owned).not.toBe(one)
+    controller.abort()
+    sharedResponse.resolve(response({ postings: [] }))
+    expect((await outcome)[0].reason.name).toBe('AbortError')
+    expect(await Promise.all([one, two])).toEqual([{ postings: [] }, { postings: [] }])
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('rejects an already cancelled GET even while an uncancelled read is shared', async () => {
+    const controller = new AbortController(), pending = deferred()
+    fetch.mockReturnValueOnce(pending.promise)
+    const shared = api.get('/jobs')
+    controller.abort()
+    await expect(api.get('/jobs', { signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' })
+    expect(fetch).toHaveBeenCalledTimes(1)
+    pending.resolve(response({ postings: [] }))
+    expect(await shared).toEqual({ postings: [] })
+  })
+
   it('계정 토큰이 바뀌면 이전 계정 조회를 공유하지 않는다', async () => {
     const pending = deferred()
     sessionStorage.setItem('portfolioSession', JSON.stringify({ token: 'first' }))

@@ -193,6 +193,16 @@ deno.serve(async (request: Request) => {
   }
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(origin) })
 
+  // Backup consistency requires blocking reads too: authenticated GETs can
+  // renew sessions or record delivery. This flag never pauses other workers
+  // or independently signed Storage uploads; operators verify those separately.
+  if (environment.PORTFOLIO_MAINTENANCE_MODE === '1') {
+    return withCors(jsonResponse({
+      error: '자료 보호 점검 중입니다. 잠시 후 다시 시도해주세요.',
+      code: 'MAINTENANCE',
+    }, 503, { 'Retry-After': '60' }), origin)
+  }
+
   try {
     return withCors(await dispatch(request), origin)
   } catch (error) {

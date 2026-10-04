@@ -37,11 +37,14 @@ async function mutate({ request, env, data, scheduleAccess: access }) {
   catch (error) { return jsonError(error.message, 400) }
   if (typeof body.recordingRequired !== 'boolean') return jsonError('녹화 여부를 선택해주세요.', 400)
   const endsAt = new Date(Date.parse(startsAt) + duration * 60000).toISOString()
-  const overlap = await env.DB.prepare(`SELECT id FROM interview_slots WHERE company_user_id = ? AND active = 1
+  // 겹침 확인과 등록 개수 확인은 서로 기대지 않으므로 함께 읽는다. 판정 순서는 그대로다.
+  const [overlap, count] = await Promise.all([
+    env.DB.prepare(`SELECT id FROM interview_slots WHERE company_user_id = ? AND active = 1
     AND datetime(starts_at) < datetime(?) AND datetime(starts_at, '+' || duration_minutes || ' minutes') > datetime(?) LIMIT 1`)
-    .bind(data.user.id, endsAt, startsAt).first()
+      .bind(data.user.id, endsAt, startsAt).first(),
+    env.DB.prepare("SELECT COUNT(*) AS n FROM interview_slots WHERE company_user_id = ? AND active = 1 AND datetime(starts_at) > datetime('now')").bind(data.user.id).first(),
+  ])
   if (overlap) return jsonError('이미 등록한 시간과 겹칩니다.', 409)
-  const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM interview_slots WHERE company_user_id = ? AND active = 1 AND datetime(starts_at) > datetime('now')").bind(data.user.id).first()
   if (count.n >= 100) return jsonError('예정 시간은 최대 100개까지 등록할 수 있습니다.', 409)
   const id = genId()
   await env.DB.prepare('INSERT INTO interview_slots (id, company_user_id, starts_at, duration_minutes, recording_required) VALUES (?, ?, ?, ?, ?)')

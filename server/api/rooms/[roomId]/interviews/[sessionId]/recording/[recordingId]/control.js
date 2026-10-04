@@ -59,14 +59,19 @@ export async function onRequestPut({ request, env, data, params }) {
   }
 
   const nextStatus = { pause: 'paused', resume: 'recording', stop: 'processing', abort: 'failed' }[action]
-  await env.DB.prepare(
-    `UPDATE interview_recordings
+  const claimed = await env.DB.batch([
+    env.DB.prepare('UPDATE interview_rooms SET id = id WHERE id = ?').bind(params.roomId),
+    env.DB.prepare(`UPDATE interview_recordings
         SET status = ?, stopped_at = CASE WHEN ? = 'stop' THEN datetime('now') ELSE stopped_at END,
             updated_at = datetime('now')
-      WHERE id = ?`
-  )
-    .bind(nextStatus, action, recording.id)
-    .run()
+      WHERE id = ? AND status = ? AND deleted_at IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM interview_room_deletion_locks
+          WHERE room_id = ? AND datetime(created_at) > datetime('now', '-10 minutes')
+        )`)
+      .bind(nextStatus, action, recording.id, recording.status, params.roomId),
+  ])
+  if (!claimed[1].meta?.changes) return jsonError('면접방이 삭제 중이거나 녹화 상태가 변경되었습니다. 다시 확인해주세요.', 409)
 
   await logInterviewEvent(env, {
     sessionId: params.sessionId,

@@ -254,10 +254,11 @@ export default function AdminPage() {
       return
     }
     await runMutation('users', target.id, async (isCurrent) => {
-      await api.delete(`/admin/users/${target.id}`)
+      const result = await api.delete(`/admin/users/${target.id}`)
       if (!isCurrent()) return
       dismissRevealed(target.id)
-      toast.success('계정이 삭제되었습니다.')
+      if (result?.cleanupPending === true) toast.info('계정이 삭제되었습니다. 연결된 저장 파일 정리는 대기 중입니다.')
+      else toast.success('계정이 삭제되었습니다.')
       await refreshAfterMutation(isCurrent)
     })
   }
@@ -272,18 +273,21 @@ export default function AdminPage() {
       return
     await runMutation('rooms', room.id, async (isCurrent) => {
       let acknowledged = false
+      let result
       try {
-        await api.delete(`/admin/rooms/${room.id}`)
+        result = await api.delete(`/admin/rooms/${room.id}`)
       } catch (err) {
         if (!isCurrent()) return
         // 보존 확인은 삭제 요청의 409에만 적용한다. 후속 조회 오류는 재삭제하지 않는다.
         if (err.status !== 409 || !err.message?.includes('보존')) throw err
         if (!window.confirm(`${err.message}\n\n보존 의무를 확인했으며 그래도 삭제하시겠습니까? 이 사실은 감사 로그에 남습니다.`)) return
-        await api.delete(`/admin/rooms/${room.id}`, { acknowledgeRetention: true })
+        result = await api.delete(`/admin/rooms/${room.id}`, { acknowledgeRetention: true })
         acknowledged = true
       }
       if (!isCurrent()) return
-      toast.success(acknowledged ? '보존 의무 확인 후 면접방이 삭제되었습니다.' : '면접방이 삭제되었습니다.')
+      const message = acknowledged ? '보존 의무 확인 후 면접방이 삭제되었습니다.' : '면접방이 삭제되었습니다.'
+      if (result?.cleanupPending === true) toast.info(`${message} 연결된 저장 파일 정리는 대기 중입니다.`)
+      else toast.success(message)
       await refreshAfterMutation(isCurrent)
     })
   }

@@ -1,6 +1,13 @@
 // 허용되면 방금 기록한 시도의 id를, 한도를 넘었으면 0을 돌려준다.
 // 두 값 모두 조건문에서 그대로 쓸 수 있고(0은 거짓), 이 id를 releaseRateLimit에
 // 넘기면 다른 요청의 기록을 건드리지 않고 내 것만 되돌릴 수 있다.
+/**
+ * @param {{ DB: import('../../typecheck/core.js').RateLimitDatabase }} env
+ * @param {string} bucket
+ * @param {number} maxHits
+ * @param {number} windowSeconds
+ * @returns {Promise<import('../../typecheck/core.js').RateLimitTicket>}
+ */
 export async function checkRateLimit(env, bucket, maxHits, windowSeconds) {
   if (!Number.isInteger(maxHits) || maxHits < 1 || !Number.isInteger(windowSeconds) || windowSeconds < 1) return 0
   // PostgreSQL serializes this whole operation across edge instances. SQLite
@@ -11,13 +18,24 @@ export async function checkRateLimit(env, bucket, maxHits, windowSeconds) {
   return reserve(env.DB, bucket, maxHits, windowSeconds)
 }
 
+/**
+ * @param {import('../../typecheck/core.js').RateLimitDatabase} db
+ * @param {string} bucket
+ * @param {number} maxHits
+ * @param {number} windowSeconds
+ */
 async function reserve(db, bucket, maxHits, windowSeconds) {
   const env = { DB: db }
-  await env.DB.prepare(
-    `DELETE FROM rate_limit_hits WHERE bucket = ? AND created_at < datetime('now', '-' || ? || ' seconds')`
-  )
-    .bind(bucket, windowSeconds)
-    .run()
+  // 창 밖의 기록은 아래 개수 세기가 시간 범위로 거르므로 매번 지울 필요가 없다.
+  // 화상 면접 신호처럼 1초마다 오는 요청에서 호출마다 DB 왕복이 한 번 줄어든다.
+  // 표가 불어나지 않게 열 번에 한 번꼴로 이 버킷의 지난 기록을 정리한다.
+  if (Math.random() < 0.1) {
+    await env.DB.prepare(
+      `DELETE FROM rate_limit_hits WHERE bucket = ? AND created_at < datetime('now', '-' || ? || ' seconds')`
+    )
+      .bind(bucket, windowSeconds)
+      .run()
+  }
 
   // 가끔 전역 청소: 다시 조회되지 않는 콜드 버킷(예: 1회성 IP)의 오래된 행이
   // 무한히 누적되는 것을 막는다. 현재 가장 긴 윈도는 이메일 일일 한도(24시간)다.
@@ -29,11 +47,13 @@ async function reserve(db, bucket, maxHits, windowSeconds) {
 
   // Count and reserve in the same statement; failed writes never grant a ticket.
   const inserted = await env.DB.prepare(
-    'INSERT INTO rate_limit_hits (bucket) SELECT ? WHERE (SELECT COUNT(*) FROM rate_limit_hits WHERE bucket = ?) < ?'
+    `INSERT INTO rate_limit_hits (bucket) SELECT ?1
+      WHERE (SELECT COUNT(*) FROM rate_limit_hits
+              WHERE bucket = ?2 AND created_at >= datetime('now', '-' || ?4 || ' seconds')) < ?3`
   )
-    .bind(bucket, bucket, maxHits)
+    .bind(bucket, bucket, maxHits, windowSeconds)
     .run()
-  return inserted.meta?.changes ? inserted.meta.last_row_id : 0
+  return inserted.meta?.changes ? inserted.meta.last_row_id ?? 0 : 0
 }
 
 // 방금 기록한 시도 하나를 되돌린다.
@@ -46,6 +66,11 @@ async function reserve(db, bucket, maxHits, windowSeconds) {
 // ticket은 checkRateLimit이 돌려준 id다. 같은 버킷으로 두 요청이 동시에 들어와
 // 그중 하나만 실패하면, "가장 최근 기록"을 지우는 방식은 성공한 쪽의 기록을
 // 지울 수 있다. 내 것을 정확히 지우기 위해 id로 지운다.
+/**
+ * @param {{ DB: import('../../typecheck/core.js').RateLimitDatabase }} env
+ * @param {string} bucket
+ * @param {import('../../typecheck/core.js').RateLimitTicket | null | undefined} ticket
+ */
 export async function releaseRateLimit(env, bucket, ticket) {
   if (!ticket) return
   const statement = env.DB.prepare('DELETE FROM rate_limit_hits WHERE id = ? AND bucket = ?').bind(ticket, bucket)

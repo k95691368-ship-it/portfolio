@@ -367,6 +367,9 @@ function request(path, options = {}) {
   }
   // 진행 중인 동일 조회만 공유한다. 인증·방 신원·쓰기 전후를 구별하며
   // 완료 응답은 저장하지 않아 다음 조회가 오래된 내용을 받지 않는다.
+  // 호출자별 취소는 공유하지 않는다. 이전 화면의 abort가 새 화면의
+  // 즉시 재조회를 취소하거나, 취소된 요청을 재사용하지 않게 한다.
+  if (options.signal) return performRequest(path, options, headers)
   const key = JSON.stringify([writeGeneration, authGeneration, path, headers])
   if (pendingReads.has(key)) return pendingReads.get(key)
   const pending = performRequest(path, options, headers).finally(() => {
@@ -427,7 +430,7 @@ export async function downloadApiFile(path) {
 }
 
 export const api = {
-  get: (path) => request(path),
+  get: (path, options = {}) => request(path, options),
   post: (path, body, options = {}) => request(path, { ...options, method: 'POST', body: JSON.stringify(body) }),
   put: (path, body) => request(path, { method: 'PUT', body: JSON.stringify(body) }),
   patch: (path, body) => request(path, { method: 'PATCH', body: JSON.stringify(body) }),

@@ -272,6 +272,29 @@ it.each([408, 500, 503])('locks writes after an uncertain HTTP %s until GET veri
   expect(button('저장').props.disabled).toBe(false)
 })
 
+it('recovers an uncertain PDF save through GET and keeps its unsent email visible without retransmitting', async () => {
+  const initial = view()
+  initial.room.status = 'signed'
+  await load(initial)
+  api.upload.mockRejectedValueOnce(Object.assign(new Error('Synthetic lost PDF save acknowledgement'), { status: 503 }))
+  await button('계약서 저장 및 지원자에게 이메일 전송').props.onClick(); await settle()
+  expect(api.upload).toHaveBeenCalledOnce()
+  expect(button('계약서 저장 및 지원자에게 이메일 전송').props.disabled).toBe(true)
+  const recovered = {
+    ...initial,
+    signedContract: { stored: { createdAt: '2026-09-19T00:00:00.000Z', emailStatus: 'not_sent', sha256Hash: 'synthetic' },
+      emailConfigured: true, candidateEmailMasked: 'worker@*****' },
+  }
+  api.get.mockResolvedValueOnce(recovered)
+  await button('계약서 다시 불러오기').props.onClick(); await settle()
+  expect(api.get).toHaveBeenLastCalledWith('/rooms/room/contract-view')
+  expect(api.upload).toHaveBeenCalledOnce()
+  expect(text(tree)).toContain('이메일 사본 미전송(저장만 완료)')
+  expect(text(tree)).toContain('지원자에게 이메일 사본을 보내지 않았습니다.')
+  expect(button('계약서 다시 저장·전송').props.disabled).toBe(false)
+  expect(button('저장된 계약서 PDF 다운로드 →').props.disabled).toBe(false)
+})
+
 it('keeps edits available for correction after a definite input rejection', async () => {
   await load()
   input('기본급(원)').props.onChange({ target: { value: 'invalid' } }); render()

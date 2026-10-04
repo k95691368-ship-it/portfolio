@@ -59,6 +59,11 @@ describe('checkRateLimit', () => {
     expect(Boolean(allowed)).toBe(true)
     expect(Boolean(blocked)).toBe(false)
   })
+
+  it('저장소가 예약 id를 반환하지 않으면 허용 티켓을 만들지 않는다', async () => {
+    const ticket = await checkRateLimit(env(fakeDb({ lastRowId: null })), 'b', 5, 60)
+    expect(ticket).toBe(0)
+  })
 })
 
 describe('releaseRateLimit', () => {

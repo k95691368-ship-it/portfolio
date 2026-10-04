@@ -2,6 +2,7 @@ import { jsonResponse, jsonError } from '../../../../_lib/http.js'
 import { deleteAllUserSessions } from '../../../../_lib/auth.js'
 import { logAdminAction } from '../../../../_lib/auditLog.js'
 import { isProtectedDeveloper } from '../../../../_lib/developerTrial.js'
+import { storageCleanupIntent, finishStorageCleanup } from '../../../../_lib/storageCleanup.js'
 import {
   InterviewUserAccessError,
   revokeActiveInterviewAccessForUser,
@@ -167,26 +168,15 @@ export async function onRequestDelete({ env, data, params }) {
     return jsonError('등록한 채용 공고가 있는 계정은 삭제할 수 없습니다. 공고를 먼저 삭제하거나 계정 정지를 이용해주세요.', 409)
   }
 
-  // documents.user_id isn't covered by the room_participants guard above and
-  // isn't referenced by any JOIN elsewhere, but leaving it behind would orphan
-  // an R2 object and a dangling row forever, so clean it up as part of delete.
-  const { results: docs } = await env.DB.prepare('SELECT r2_key FROM documents WHERE user_id = ?')
-    .bind(params.id)
-    .all()
-  const deletions = await Promise.allSettled(docs.map((d) => env.DOCUMENTS.delete(d.r2_key)))
-  deletions.forEach((result, i) => {
-    if (result.status === 'rejected') {
-      console.error(`R2 delete failed for document ${docs[i].r2_key} (user ${params.id}):`, result.reason)
-    }
-  })
-  if (deletions.some((result) => result.status === 'rejected')) {
-    return jsonError('첨부 파일을 모두 삭제하지 못해 계정과 파일 기록을 보존했습니다. 삭제를 다시 시도해주세요.', 503)
-  }
-
   // D1은 외래키를 강제하므로, users 행을 지우기 전에 이 계정을 참조하는
   // 감사 로그·지원서 검토자 참조를 먼저 정리해야 한다 (안 하면 FK 위반으로 500).
+  const operationId = crypto.randomUUID()
   try {
     await env.DB.batch([
+      env.DB.prepare('UPDATE users SET id = id WHERE id = ?').bind(params.id),
+      env.DB.prepare('UPDATE documents SET r2_key = r2_key WHERE user_id = ?').bind(params.id),
+      storageCleanupIntent(env.DB, 'documents', operationId,
+        'SELECT r2_key AS storage_key FROM documents WHERE user_id = ?', [params.id]),
       env.DB.prepare('UPDATE applications SET reviewed_by_user_id = NULL WHERE reviewed_by_user_id = ?').bind(params.id),
       // 서류합격으로 만들어진 계정을 지울 때 지원서가 고아 참조를 남기지 않도록.
       env.DB.prepare('UPDATE applications SET created_user_id = NULL WHERE created_user_id = ?').bind(params.id),
@@ -211,8 +201,10 @@ export async function onRequestDelete({ env, data, params }) {
     ])
   } catch (err) {
     console.error(`User delete failed (${params.id}):`, err)
-    return jsonError('계정 삭제 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', 500)
+    return jsonError('계정 삭제 결과를 확인하지 못했습니다. 계정 목록을 다시 확인해주세요.', 503)
   }
+
+  const cleanup = await finishStorageCleanup(env, operationId)
 
   await logAdminAction(env, {
     actorId: data.user.id,
@@ -220,5 +212,5 @@ export async function onRequestDelete({ env, data, params }) {
     detail: `email=${target.email}`,
   })
 
-  return jsonResponse({ ok: true, deleted: true })
+  return jsonResponse({ ok: true, deleted: true, ...cleanup })
 }

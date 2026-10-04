@@ -27,8 +27,9 @@ afterAll(async () => {
 })
 
 it('applies the real schema without seed accounts and explicitly skips only the remote retention schedule', async () => {
-  expect(runtime.migrations.applied).toHaveLength(9)
-  expect(runtime.migrations.current).toBe(10)
+  expect(runtime.migrations.applied).toHaveLength(11)
+  expect(runtime.migrations.applied).toContain('202609260001_storage_cleanup_intents.sql')
+  expect(runtime.migrations.current).toBe(12)
   expect(runtime.migrations.skipped).toEqual([{
     name: '202609130002_retention_schedule.sql', reason: expect.stringContaining('pg_cron'),
   }])
@@ -36,8 +37,8 @@ it('applies the real schema without seed accounts and explicitly skips only the 
   const { rows: buckets } = await runtime.client.query('SELECT id, public FROM storage.buckets ORDER BY id')
   expect(buckets).toEqual([{ id: 'documents', public: false }, { id: 'interview-recordings', public: false }])
   const { rows: privateTables } = await runtime.client.query(`SELECT relname, relrowsecurity FROM pg_class
-    WHERE relname IN ('users','account_recovery_tokens','application_access_sessions','posting_drafts','interview_slots')`)
-  expect(privateTables).toHaveLength(5)
+    WHERE relname IN ('users','account_recovery_tokens','application_access_sessions','posting_drafts','interview_slots','storage_cleanup_intents')`)
+  expect(privateTables).toHaveLength(6)
   expect(privateTables.every((table) => table.relrowsecurity)).toBe(true)
   for (const role of ['anon', 'authenticated']) {
     const result = await runtime.client.query("SELECT has_table_privilege($1, 'account_recovery_tokens', 'SELECT,INSERT,UPDATE,DELETE') AS allowed", [role])
@@ -164,11 +165,11 @@ it('rejects changed, missing, duplicated, or reordered migration history and rol
     await expect(applyLocalMigrations(runtime.client, { migrationsDir })).rejects.toThrow('precedes recorded history')
     await rm(historicalPath)
 
-    const nextPath = join(migrationsDir, '202609190005_local_failure_proof.sql')
+    const nextPath = join(migrationsDir, '202610040002_local_failure_proof.sql')
     await writeFile(nextPath, 'BEGIN; CREATE TABLE local_failure_proof (id TEXT); INSERT INTO missing_migration_table VALUES (1); COMMIT;')
-    await expect(applyLocalMigrations(runtime.client, { migrationsDir })).rejects.toThrow('Local migration failed: 202609190005_local_failure_proof.sql')
+    await expect(applyLocalMigrations(runtime.client, { migrationsDir })).rejects.toThrow('Local migration failed: 202610040002_local_failure_proof.sql')
     expect((await runtime.client.query("SELECT to_regclass('public.local_failure_proof') AS name")).rows[0].name).toBeNull()
-    expect(Number((await runtime.client.query('SELECT COUNT(*) AS n FROM local_runtime.schema_migrations')).rows[0].n)).toBe(10)
+    expect(Number((await runtime.client.query('SELECT COUNT(*) AS n FROM local_runtime.schema_migrations')).rows[0].n)).toBe(12)
 
     await writeFile(nextPath, 'CREATE TABLE local_failure_proof (id TEXT); COMMIT; SELECT 1;')
     await expect(applyLocalMigrations(runtime.client, { migrationsDir })).rejects.toThrow('Unsupported transaction control')

@@ -129,9 +129,20 @@ export async function onRequestDelete({ env, data, params }) {
     return jsonError('전형 종료는 회사(고용) 측만 할 수 있습니다.', 403)
   }
 
-  const room = await env.DB.prepare('SELECT id, title, status, archived_at FROM interview_rooms WHERE id = ?')
-    .bind(params.roomId)
-    .first()
+  // 방 상태·채용 확정 여부·지원자는 서로 기대지 않으므로 함께 읽는다. 판정 순서는 그대로다.
+  const [room, terms, candidate] = await Promise.all([
+    env.DB.prepare('SELECT id, title, status, archived_at FROM interview_rooms WHERE id = ?')
+      .bind(params.roomId)
+      .first(),
+    env.DB.prepare('SELECT hire_confirmed FROM contract_terms WHERE room_id = ?')
+      .bind(params.roomId)
+      .first(),
+    env.DB.prepare(
+      "SELECT user_id FROM room_participants WHERE room_id = ? AND role_in_room = 'candidate'"
+    )
+      .bind(params.roomId)
+      .first(),
+  ])
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
   const frozen = blockedWhenArchived(room, 'close')
   if (frozen) return jsonError(frozen, 409)
@@ -144,11 +155,6 @@ export async function onRequestDelete({ env, data, params }) {
   // 적만 있어도 — 합의된 것이 하나도 없어도 — 종료를 취소하면 방이
   // contract_pending 이 되고 지원자에게 '계약서를 확인하고 서명해주세요'가
   // 뜬다. 서명할 계약서가 없는데.
-  const terms = await env.DB.prepare(
-    'SELECT hire_confirmed FROM contract_terms WHERE room_id = ?'
-  )
-    .bind(params.roomId)
-    .first()
   const restored = terms?.hire_confirmed ? 'contract_pending' : 'active'
 
   await env.DB.prepare(
@@ -157,11 +163,6 @@ export async function onRequestDelete({ env, data, params }) {
     .bind(restored, params.roomId)
     .run()
 
-  const candidate = await env.DB.prepare(
-    "SELECT user_id FROM room_participants WHERE room_id = ? AND role_in_room = 'candidate'"
-  )
-    .bind(params.roomId)
-    .first()
   if (candidate) {
     await notifyUser(env, candidate.user_id, {
       type: 'room_reopened',

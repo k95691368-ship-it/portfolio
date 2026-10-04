@@ -1,4 +1,4 @@
-// 실제 배포 환경에서 계약 체결까지의 전 과정을 자동으로 돌려보는 테스트.
+// 외부 요청과 메일 발송을 차단한 격리 로컬 환경에서 계약 체결까지 검증한다.
 //
 // 스모크 테스트가 "경로가 살아 있는가"를 본다면, 여기서는 "흐름이 실제로
 // 이어지는가"를 본다. 지금까지 이 과정을 손으로 돌려 확인해 왔는데,
@@ -6,18 +6,16 @@
 // 문제가 실제로 있었다.
 //
 // 데이터를 만들기 때문에 끝나면 스스로 지운다(관리자 계정으로 방·계정 삭제).
-// 관리자 자격이 없으면 건너뛴다.
+// 전용 테스트 관리자 자격과 격리 상태 확인에 실패하면 쓰기 전에 중단한다.
 //
 // 실행:
+//   E2E_API_BASE=http://127.0.0.1:5189/api E2E_ENVIRONMENT=test E2E_ALLOW_WRITES=1
 //   E2E_ADMIN_EMAIL=... E2E_ADMIN_PASSWORD=... npm run e2e
-//   (대상 주소는 SMOKE_URL 로 바꿀 수 있다)
 import { describe, expect, it, beforeAll, afterAll } from 'vitest'
+import { e2ePolicy, e2eRequest, verifyE2eIsolation } from '../scripts/e2e-policy.mjs'
 
-const BASE = process.env.E2E_API_BASE
-if (!BASE || process.env.E2E_ALLOW_WRITES !== '1' || process.env.E2E_ENVIRONMENT !== 'test') {
-  throw new Error('E2E_API_BASE, E2E_ENVIRONMENT=test, E2E_ALLOW_WRITES=1 are required. E2E never defaults to production.')
-}
-if (BASE.includes('obumqkwkvnemkyaahjbn') || BASE.includes('portfolio-epa.pages.dev')) throw new Error('Production E2E writes are prohibited.')
+const policy = e2ePolicy()
+const BASE = policy.apiBase
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD
 // 가입은 IP당 시간당 10회로 제한된다. 그 한도에 걸렸거나 계정을 새로 만들고
@@ -47,7 +45,7 @@ function makeClient() {
       headers['X-Room-Identity'] = 'code'
     }
     if (body && !raw) headers['Content-Type'] = 'application/json'
-    const res = await fetch(`${BASE.replace(/\/$/, '')}${path.replace(/^\/api/, '')}`, {
+    const res = await e2eRequest(policy, path, {
       method,
       headers,
       body: raw ? body : body ? JSON.stringify(body) : undefined,
@@ -83,6 +81,7 @@ if (!hasAdmin) throw new Error('Dedicated test administrator credentials are req
 
 describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
   beforeAll(async () => {
+    await verifyE2eIsolation(policy)
     const res = await admin('/api/login', {
       method: 'POST',
       body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },

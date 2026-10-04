@@ -21,10 +21,11 @@ export async function onRequestPost({ env, request, data, params }) {
       .bind(params.sessionId, data.user.id, self.provider_participant_id).run()
     return jsonResponse({ ok: true })
   }
-  await env.DB.prepare(`UPDATE interview_session_members SET signaling_seen_at = datetime('now')
+  const seen = env.DB.prepare(`UPDATE interview_session_members SET signaling_seen_at = datetime('now')
     WHERE session_id = ? AND user_id = ? AND provider_participant_id = ?`)
     .bind(params.sessionId, data.user.id, self.provider_participant_id).run()
   if (body.action === 'send') {
+    await seen
     if (body.event === 'huddle') {
       await env.DB.prepare('UPDATE interview_sessions SET huddle_active = ? WHERE id = ?')
         .bind(body.payload.active ? 1 : 0, params.sessionId).run()
@@ -38,8 +39,12 @@ export async function onRequestPost({ env, request, data, params }) {
   }
   // Read a recent overlap rather than a sequence cursor: concurrent transaction
   // commits can be observed out of sequence. The browser deduplicates IDs.
-  const { results: messages } = await env.DB.prepare(SIGNAL_INBOX_SQL)
-    .bind(params.sessionId, self.provider_participant_id).all()
+  // 참가자마다 1초에 한 번 오는 heartbeat 다. 내 접속 시각 기록과 받은 신호 조회는
+  // 서로 기대지 않으므로 함께 보내 DB 왕복을 한 단계 줄인다.
+  const [, { results: messages }] = await Promise.all([
+    seen,
+    env.DB.prepare(SIGNAL_INBOX_SQL).bind(params.sessionId, self.provider_participant_id).all(),
+  ])
   const alive = members.filter((m) => m.user_id === self.user_id || Date.parse(String(m.signaling_seen_at || '').replace(' ', 'T').replace(/Z?$/, 'Z')) > Date.now() - 10000)
   return jsonResponse({
     members: alive.map((m) => ({ participantId: m.provider_participant_id, customParticipantId: m.custom_participant_id, role: m.role, displayName: m.display_name })),

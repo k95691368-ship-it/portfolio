@@ -137,6 +137,22 @@ it('reports a completed user deletion and permits GET-only recovery without repe
   expect(api.delete).toHaveBeenCalledExactlyOnceWith(`/admin/users/${target.id}`)
 })
 
+it.each([
+  ['영구 삭제', '/admin/users/target', false, '계정이 삭제되었습니다. 연결된 저장 파일 정리는 대기 중입니다.'],
+  ['삭제', '/admin/rooms/room', false, '면접방이 삭제되었습니다. 연결된 저장 파일 정리는 대기 중입니다.'],
+  ['삭제', '/admin/rooms/room', true, '보존 의무 확인 후 면접방이 삭제되었습니다. 연결된 저장 파일 정리는 대기 중입니다.'],
+])('reports pending physical cleanup after %s at %s (retention acknowledgement: %s)', async (label, path, acknowledged, message) => {
+  render(); await settle()
+  if (acknowledged) api.delete.mockRejectedValueOnce(Object.assign(new Error('보존 확인 필요'), { status: 409 }))
+  api.delete.mockResolvedValueOnce({ ok: true, deleted: true, cleanupPending: true })
+  await button(label).props.onClick(); await settle()
+  expect(toast.success).not.toHaveBeenCalled()
+  expect(toast.info).toHaveBeenCalledWith(message)
+  expect(toast.error).not.toHaveBeenCalled()
+  expect(api.delete).toHaveBeenCalledTimes(acknowledged ? 2 : 1)
+  expect(api.delete.mock.calls.at(-1)[0]).toBe(path)
+})
+
 it.each(['success', 'failure'])('ignores an older resource %s after a newer retry succeeds', async outcome => {
   api.get.mockImplementation(async path => { if (path === '/admin/users') throw new Error('Synthetic outage'); return records[path] })
   render(); await settle()

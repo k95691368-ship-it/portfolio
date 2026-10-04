@@ -20,18 +20,22 @@ import {
   kickAllParticipants,
 } from '../../../../../_lib/supabaseRealtime.js'
 
+// 면접 화면이 5초마다 부르는 자리다. 권한은 호출 전에 이미 확인했고, 세션 행과
+// 참가자·녹화 목록은 서로 기대지 않으므로 함께 읽는다. 세션이 없으면 목록은 버린다.
 async function loadPayload(env, roomId, sessionId, userId, fallbackRole = null) {
-  const row = await loadSessionForUser(env, roomId, sessionId, userId)
+  const [row, members, recordings] = await Promise.all([
+    loadSessionForUser(env, roomId, sessionId, userId),
+    loadSessionMembers(env, sessionId),
+    loadSessionRecordings(env, sessionId),
+  ])
   if (!row) return null
+  // 방 권한의 표시 역할로 보완해도 녹화 제어는 실제 세션 진행자만 허용한다.
+  const canControlRecording = row.my_role === 'host'
   if (!row.my_role && fallbackRole) {
     row.my_role = fallbackRole
     row.viewer_user_id = userId
   }
-  const [members, recordings] = await Promise.all([
-    loadSessionMembers(env, sessionId),
-    loadSessionRecordings(env, sessionId),
-  ])
-  return serializeSession(row, { members, recordings })
+  return serializeSession(row, { members, recordings, canControlRecording })
 }
 
 export async function onRequestGet({ env, data, params }) {

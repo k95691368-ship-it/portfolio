@@ -31,7 +31,7 @@ vi.mock('../src/context/AuthContext.jsx', () => ({ useAuth: () => ({ user: { id:
 vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }))
 import { api } from '../src/api/client.js'
 import NotificationBell from '../src/components/NotificationBell.jsx'
-import { DmProvider } from '../src/context/DmContext.jsx'
+import { DmProvider } from '../src/context/DmProvider.jsx'
 
 const walk = node => !node || typeof node !== 'object' ? [] : Array.isArray(node) ? node.flatMap(walk) : [node, ...walk(node.props?.children)]
 const text = node => node == null || typeof node === 'boolean' ? '' : typeof node !== 'object' ? String(node) : Array.isArray(node) ? node.map(text).join('') : text(node.props?.children)

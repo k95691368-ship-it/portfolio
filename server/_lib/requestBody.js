@@ -1,5 +1,6 @@
 // Apply before any JSON/multipart parser: Content-Length alone is not a limit.
 const MiB = 1024 * 1024
+/** @param {string} pathname */
 export function requestBodyLimit(pathname) {
   if (/^\/api\/jobs\/[^/]+\/apply\/?$/.test(pathname)) return 21 * MiB // Two 10 MiB files + fields.
   if (/^\/api\/application-self-service\/[^/]+\/?$/.test(pathname)) return 21 * MiB // Replacement resume and portfolio.
@@ -10,9 +11,11 @@ export function requestBodyLimit(pathname) {
 }
 
 export class RequestBodyError extends Error {
+  /** @param {number} status @param {string} message */
   constructor(status, message) { super(message); this.status = status }
 }
 
+/** @param {Request} request @returns {Promise<Request>} */
 export async function boundedRequest(request) {
   if (!request.body) return request
   const limit = requestBodyLimit(new URL(request.url).pathname)
@@ -22,8 +25,11 @@ export async function boundedRequest(request) {
     throw tooLarge()
   }
   const reader = request.body.getReader()
-  let timer, finished = false
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
+  let timer
+  let finished = false
   const timeoutMs = limit > 256 * 1024 ? 120_000 : 30_000
+  /** @type {Promise<never>} */
   const deadline = new Promise((_, reject) => {
     timer = setTimeout(() => reject(new RequestBodyError(408, '데이터 전송 시간이 초과되었습니다. 다시 시도해주세요.')), timeoutMs)
   })

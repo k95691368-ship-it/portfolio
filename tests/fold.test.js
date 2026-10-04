@@ -18,6 +18,10 @@ const read = (...p) => readFileSync(join(ROOT, ...p), 'utf8')
 
 const FILES = [
   ['src', 'pages', 'ContractPage.jsx'],
+  ['src', 'components', 'contract', 'ContractTranslations.jsx'],
+  ['src', 'components', 'contract', 'ContractLifecycle.jsx'],
+  ['src', 'components', 'contract', 'ContractPeriod.jsx'],
+  ['src', 'components', 'contract', 'ChangeRequests.jsx'],
   ['src', 'components', 'WorkerRights.jsx'],
   ['src', 'components', 'ContractExplainer.jsx'],
 ]
@@ -102,7 +106,8 @@ describe('접으면 안 되는 것을 안 접었는가', () => {
 
 describe('스스로 펼쳐져야 할 것이 펼쳐지는가', () => {
   const page = read('src', 'pages', 'ContractPage.jsx')
-  const tags = foldTags(page)
+  const requests = read('src', 'components', 'contract', 'ChangeRequests.jsx')
+  const tags = [...foldTags(page), ...foldTags(requests)]
   const find = (cls) => tags.find((t) => t.includes(`className="${cls}"`))
 
   it('공고보다 달라진 조건이 있으면 열린 채로 나온다', () => {

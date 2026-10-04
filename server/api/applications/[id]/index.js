@@ -15,23 +15,23 @@ export async function onRequestGet({ env, data, params }) {
   // 화면이 탈락 버튼을 내릴지 정하려면 이 값이 필요하다. 서버만 막고 화면은
   // 그대로 두면, 담당자는 누를 수 있는 줄 알고 눌렀다가 거절당한다 — 막는
   // 것이 목적이라면 누르기 전에 보여야 한다.
-  const [docsResult, offer] = await Promise.all([
+  const [docsResult, offer, room] = await Promise.all([
     env.DB.prepare(
       `SELECT id, doc_type, filename, size_bytes FROM application_documents WHERE application_id = ? AND superseded_at IS NULL`
     )
       .bind(params.id)
       .all(),
     offerStatusForApplication(env, a),
+    // 서류합격한 지원자에게 건네야 하는 값이다. 담당자가 언제든 다시 보거나
+    // 다시 보낼 수 있어야 한다 — 코드가 전해지지 않으면 지원자는 면접방에
+    // 들어올 수 없고, 그러면 계약도 서명도 시작되지 않는다.
+    // 위 두 조회와 기대는 것이 없어 함께 읽는다(DB 왕복 한 단계 절약).
+    a.room_id
+      ? env.DB.prepare('SELECT invite_code FROM interview_rooms WHERE id = ?')
+          .bind(a.room_id)
+          .first()
+      : null,
   ])
-
-  // 서류합격한 지원자에게 건네야 하는 값이다. 담당자가 언제든 다시 보거나
-  // 다시 보낼 수 있어야 한다 — 코드가 전해지지 않으면 지원자는 면접방에
-  // 들어올 수 없고, 그러면 계약도 서명도 시작되지 않는다.
-  const room = a.room_id
-    ? await env.DB.prepare('SELECT invite_code FROM interview_rooms WHERE id = ?')
-        .bind(a.room_id)
-        .first()
-    : null
   const docs = docsResult.results
 
   return jsonResponse({

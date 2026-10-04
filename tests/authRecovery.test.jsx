@@ -41,7 +41,7 @@ vi.mock('../src/api/client.js', () => ({
   getAccountSessionIdentity: vi.fn(),
 }))
 import { api, getAccountSessionIdentity } from '../src/api/client.js'
-import { AuthProvider } from '../src/context/AuthContext.jsx'
+import { AuthProvider } from '../src/context/AuthProvider.jsx'
 
 let output
 function render() {
@@ -118,6 +118,17 @@ it('retries initial network failure once and preserves a recoverable connection 
   expect(output.connectionError).toEqual(expect.any(String))
   expect(output.connectionError).not.toContain('Internal detail')
   expect(api.post).not.toHaveBeenCalled()
+})
+
+it('releases an initial retry timer when the provider unmounts', async () => {
+  api.get.mockRejectedValue(new Error('Offline'))
+  render()
+  await settle()
+  expect(vi.getTimerCount()).toBe(1)
+  for (const cell of host.cells) cell?.cleanup?.()
+  expect(vi.getTimerCount()).toBe(0)
+  await vi.advanceTimersByTimeAsync(1200)
+  expect(api.get).toHaveBeenCalledTimes(1)
 })
 
 it('restores the user and clears a connection error when manual retry succeeds', async () => {

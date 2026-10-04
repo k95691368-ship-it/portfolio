@@ -7,19 +7,30 @@
 //   2) 권한 차단이 뚫리지 않았는가 — 비로그인/타역할 접근이 막히는지.
 //   3) 공개 화면이 정상 동작하는가 — 공고 목록·상세·현황 조회.
 //
-// 데이터를 만들지 않으므로 운영 환경에 그대로 돌려도 안전하다.
+// 기본 모드는 GET/HEAD만 사용한다. 업무 데이터·메일·체험 계정을 만들지 않는다.
+// 서버의 접근 로그·보안용 요청 제한 카운터는 읽기 요청에도 기록될 수 있다.
+// 쓰기 경로 검사는 명시한 격리 loopback 환경에서만 허용한다.
 //
 // 실행: npm run smoke            (기본: 운영 도메인)
 //       SMOKE_URL=<배포URL> npm run smoke
-import { describe, expect, it } from 'vitest'
+//       SMOKE_URL=http://127.0.0.1:5189 SMOKE_API_URL=http://127.0.0.1:5189/api SMOKE_ALLOW_WRITES=1 npm run smoke
+import { beforeAll, describe, expect, it } from 'vitest'
+import { assertSmokeMethod, smokePolicy, verifySmokeIsolation } from '../scripts/smoke-policy.mjs'
 
-const BASE = process.env.SMOKE_URL || 'https://portfolio-epa.pages.dev'
-const API_BASE = process.env.SMOKE_API_URL || 'https://obumqkwkvnemkyaahjbn.supabase.co/functions/v1/api'
+const policy = smokePolicy()
+const BASE = policy.base
+const API_BASE = policy.apiBase
+const writeTest = policy.allowWrites ? it : it.skip
+const writeDescribe = policy.allowWrites ? describe : describe.skip
 const PUBLIC_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_zmTib9W6f8wfKt-p_mBuVw_XxCe2EwR'
 
+beforeAll(() => verifySmokeIsolation(policy))
+
 async function call(path, options = {}) {
+  assertSmokeMethod(policy, options.method)
   const res = await fetch(`${API_BASE}${path.replace(/^\/api(?=\/|$)/, '')}`, {
     ...options,
+    redirect: 'error',
     headers: {
       apikey: PUBLIC_KEY,
       Origin: new URL(BASE).origin,
@@ -112,7 +123,8 @@ describe(`배포 스모크 (${BASE})`, () => {
 
   describe('보호된 경로는 살아 있고, 비로그인은 막힌다', () => {
     for (const [method, path] of PROTECTED) {
-      it(`${method} ${path}`, async () => {
+      const routeTest = method === 'GET' ? it : writeTest
+      routeTest(`${method} ${path}`, async () => {
         const res = await call(path, { method })
         // 라우트가 사라지면 SPA HTML이 200으로 돌아온다 — 그것부터 잡는다.
         expect(
@@ -169,7 +181,7 @@ describe(`배포 스모크 (${BASE})`, () => {
 
     // 체험 시작은 비밀번호 없이 세션을 만들어 준다. 이 앱에서 가장 위험한
     // 문이므로, 열 수 있는 대상이 체험 계정으로만 한정되는지 계속 확인한다.
-    it('체험 시작은 체험 계정만 연다', async () => {
+    writeTest('체험 시작은 체험 계정만 연다', async () => {
       const res = await call('/api/demo/login', {
         method: 'POST',
         body: JSON.stringify({ role: 'admin' }),
@@ -177,7 +189,7 @@ describe(`배포 스모크 (${BASE})`, () => {
       expect([400, 404, 429]).toContain(res.status)
     })
 
-    it('화면이 보낸 이메일로는 체험 로그인을 시켜 주지 않는다', async () => {
+    writeTest('화면이 보낸 이메일로는 체험 로그인을 시켜 주지 않는다', async () => {
       const res = await call('/api/demo/login', {
         method: 'POST',
         body: JSON.stringify({ role: 'company', email: 'someone@real.example.com' }),
@@ -197,7 +209,7 @@ describe(`배포 스모크 (${BASE})`, () => {
       }
     })
 
-    it('마감·미존재 공고에는 지원할 수 없다', async () => {
+    writeTest('마감·미존재 공고에는 지원할 수 없다', async () => {
       const res = await call('/api/jobs/smoke-nonexistent/apply', { method: 'POST' })
       expect([400, 404, 429]).toContain(res.status)
       expect(res.json?.error).toBeTruthy()
@@ -215,7 +227,7 @@ describe(`배포 스모크 (${BASE})`, () => {
     })
   })
 
-  describe('로그인', () => {
+  writeDescribe('로그인', () => {
     it('빈 요청을 거부한다', async () => {
       const res = await call('/api/login', {
         method: 'POST',

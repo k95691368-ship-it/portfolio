@@ -17,24 +17,33 @@ export async function onRequestGet({ env, data, params }) {
   const me = data.user.id
   const other = params.partnerId
 
-  const { results } = await env.DB.prepare(
-    `SELECT id, sender_id, body, created_at, read_at
-       FROM direct_messages
-      WHERE (sender_id = ?1 AND recipient_id = ?2) OR (sender_id = ?2 AND recipient_id = ?1)
-      ORDER BY id DESC
-      LIMIT 200`
-  )
-    .bind(me, other)
-    .all()
-
-  // 받은 것만 읽음으로 바꾼다. 내가 보낸 줄의 read_at 은 상대가 열 때 찍힌다.
-  await env.DB.prepare(
-    `UPDATE direct_messages SET read_at = datetime('now')
-      WHERE recipient_id = ? AND sender_id = ? AND read_at IS NULL`
-  )
-    .bind(me, other)
-    .run()
-    .catch((err) => console.error('dm read mark failed:', err))
+  // 창이 열려 있는 동안 7초마다 오는 요청이다. 대화 조회와 읽음 표시를 함께 보내
+  // DB 왕복을 한 단계 줄인다. 두 질의의 순서가 정해지지 않으므로, 이번에 읽음으로
+  // 바뀐 줄은 RETURNING 으로 받아 응답에서는 예전처럼(조회 먼저) 안 읽음으로 둔다.
+  const [{ results }, marked] = await Promise.all([
+    env.DB.prepare(
+      `SELECT id, sender_id, body, created_at, read_at
+         FROM direct_messages
+        WHERE (sender_id = ?1 AND recipient_id = ?2) OR (sender_id = ?2 AND recipient_id = ?1)
+        ORDER BY id DESC
+        LIMIT 200`
+    )
+      .bind(me, other)
+      .all(),
+    // 받은 것만 읽음으로 바꾼다. 내가 보낸 줄의 read_at 은 상대가 열 때 찍힌다.
+    env.DB.prepare(
+      `UPDATE direct_messages SET read_at = datetime('now')
+        WHERE recipient_id = ? AND sender_id = ? AND read_at IS NULL
+        RETURNING id`
+    )
+      .bind(me, other)
+      .all()
+      .catch((err) => {
+        console.error('dm read mark failed:', err)
+        return null
+      }),
+  ])
+  const justRead = new Set((marked?.results || []).map((row) => String(row.id)))
 
   return jsonResponse({
     partner: partnerView(gate.partner),
@@ -45,7 +54,7 @@ export async function onRequestGet({ env, data, params }) {
       fromMe: m.sender_id === me,
       body: m.body,
       createdAt: m.created_at,
-      readAt: m.read_at,
+      readAt: justRead.has(String(m.id)) ? null : m.read_at,
     })),
   })
 }

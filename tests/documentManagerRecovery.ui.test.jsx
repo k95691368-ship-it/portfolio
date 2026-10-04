@@ -121,6 +121,18 @@ it('does not automatically repeat an uncertain write and requires a read before 
   expect(api.delete).toHaveBeenCalledOnce()
 })
 
+it('distinguishes a removed document from physical file cleanup still pending', async () => {
+  api.get.mockResolvedValueOnce({ documents: [doc] }); render(); await settle()
+  api.delete.mockResolvedValueOnce({ ok: true, cleanupPending: true })
+  api.get.mockResolvedValueOnce({ documents: [] })
+  await button('삭제').props.onClick(); await settle()
+  expect(toast.success).not.toHaveBeenCalled()
+  expect(toast.info).toHaveBeenCalledWith('서류 목록에서 삭제되었습니다. 저장 파일 정리는 대기 중입니다.')
+  expect(text(tree)).toContain('저장 파일 정리는 대기 중입니다.')
+  expect(text(tree)).not.toContain(doc.filename)
+  expect(api.delete).toHaveBeenCalledOnce()
+})
+
 it.each(['success', 'failure'])('discards an older retry %s after the newest list resolves', async outcome => {
   api.get.mockRejectedValueOnce(new Error('Initial failure')); render(); await settle()
   const retry = button('서류 목록 다시 불러오기').props.onClick

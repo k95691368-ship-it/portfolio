@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { formatKstDate, formatKst } from '../lib/formatTime.js'
 import { Link } from 'react-router-dom'
 import { api, downloadApiFile, markRoomDoor } from '../api/client.js'
@@ -552,20 +552,11 @@ export default function RecruitPage() {
   // 지원서 검색·필터
   const [appSearch, setAppSearch] = useState('')
   const [appStatus, setAppStatus] = useState('all')
-  const filteredApps = useMemo(() => {
-    const q = appSearch.trim().toLowerCase()
-    return applications.filter((a) => {
-      if (appStatus !== 'all' && a.status !== appStatus) return false
-      if (!q) return true
-      return (
-        a.applicantName?.toLowerCase().includes(q) ||
-        a.applicantEmail?.toLowerCase().includes(q) ||
-        a.postingTitle?.toLowerCase().includes(q)
-      )
-    })
-  }, [applications, appSearch, appStatus])
-
-  const [appsTruncated, setAppsTruncated] = useState(null)
+  const [appPosting, setAppPosting] = useState('')
+  const [appFilters, setAppFilters] = useState({ search: '', status: 'all', posting: '' })
+  const [nextAppsCursor, setNextAppsCursor] = useState(null)
+  const appsRead = useRef(null)
+  const retryAppsCursor = useRef(null)
 
   const loadPostings = useCallback(async () => {
     const generation = ++readGeneration.current.postings
@@ -581,32 +572,67 @@ export default function RecruitPage() {
     }
   }, [])
 
-  const loadApplications = useCallback(async () => {
+  const loadApplications = useCallback(async (cursor = null) => {
+    // Event handlers may receive an event; only an explicit cursor appends.
+    const pageCursor = typeof cursor === 'string' ? cursor : null
+    const query = new URLSearchParams()
+    if (appFilters.search) query.set('q', appFilters.search)
+    if (appFilters.status !== 'all') query.set('status', appFilters.status)
+    if (appFilters.posting) query.set('posting', appFilters.posting)
+    if (pageCursor) query.set('cursor', pageCursor)
+    const path = `/applications${query.size ? `?${query}` : ''}`
+    if (appsRead.current?.path === path) return
+    appsRead.current?.controller.abort()
     const generation = ++readGeneration.current.applications
+    const request = { generation, path, controller: new AbortController() }
+    appsRead.current = request
+    retryAppsCursor.current = pageCursor
     setApplicationsLoading(true)
     setApplicationsError('')
+    if (!pageCursor) { setApplications([]); setNextAppsCursor(null) }
     try {
-      const data = await api.get('/applications')
+      const data = await api.get(path, { signal: request.controller.signal })
       if (generation !== readGeneration.current.applications) return
-      setApplications(data.applications)
-      // 검색·통계는 받아 온 범위 안에서만 계산한다.
-      setAppsTruncated(data.truncated ? data.limit : null)
+      if (!Array.isArray(data?.applications) || (data.nextCursor != null && (typeof data.nextCursor !== 'string' || !data.nextCursor))
+        || (data.truncated === true && !data.nextCursor)) throw new Error('지원서 목록 응답을 확인하지 못했습니다.')
+      setApplications(previous => pageCursor
+        ? [...previous, ...data.applications.filter(row => !previous.some(saved => saved.id === row.id))]
+        : data.applications)
+      setNextAppsCursor(data.nextCursor || null)
+      retryAppsCursor.current = null
     } catch (err) {
       if (generation === readGeneration.current.applications) setApplicationsError(err.message || '지원서 목록을 불러오지 못했습니다.')
     } finally {
-      if (generation === readGeneration.current.applications) setApplicationsLoading(false)
+      if (generation === readGeneration.current.applications) { appsRead.current = null; setApplicationsLoading(false) }
     }
-  }, [])
+  }, [appFilters])
+
+  const searchApplications = event => {
+    event.preventDefault()
+    const next = { search: appSearch.trim(), status: appStatus, posting: appPosting }
+    if (JSON.stringify(next) === JSON.stringify(appFilters)) { void loadApplications(); return }
+    setAppFilters(next)
+  }
 
   // Each resource owns its failure state: a failed application lookup must not
   // hide successfully loaded postings or turn a completed write into a failure.
-  const loadAll = useCallback(() => Promise.all([loadPostings(), loadApplications()]), [loadPostings, loadApplications])
+  // A write may complete after the filters change. Even a callback captured by
+  // that earlier render must refresh the currently selected application list.
+  const latestApplicationsLoad = useRef(loadApplications)
+  latestApplicationsLoad.current = loadApplications
+  const loadAll = useCallback(() => Promise.all([loadPostings(), latestApplicationsLoad.current()]), [loadPostings])
 
   useEffect(() => {
-    void loadAll()
+    void loadPostings()
     const generations = readGeneration.current
-    return () => { generations.postings += 1; generations.applications += 1 }
-  }, [loadAll])
+    return () => { generations.postings += 1 }
+  }, [loadPostings])
+
+  useEffect(() => {
+    void loadApplications()
+    const generations = readGeneration.current
+    return () => { generations.applications += 1; appsRead.current?.controller.abort(); appsRead.current = null }
+  }, [loadApplications])
 
   const handleCreate = async (e) => {
     e.preventDefault()
@@ -900,51 +926,43 @@ export default function RecruitPage() {
 
       <section className="recruit-section">
         <h2>지원서</h2>
-        {applicationsLoading ? (
+        <form className="filter-row" onSubmit={searchApplications}>
+          <input type="search" placeholder="이름·이메일·공고 검색" aria-label="지원자 검색 (이름·이메일·공고)"
+            maxLength={200} value={appSearch} onChange={event => setAppSearch(event.target.value)} />
+          <select value={appStatus} aria-label="지원 상태로 거르기" onChange={event => setAppStatus(event.target.value)}>
+            <option value="all">전체 상태</option><option value="submitted">심사 대기</option><option value="passed">서류합격</option>
+            <option value="rejected">불합격</option><option value="withdrawn">지원 철회</option>
+          </select>
+          <select value={appPosting} aria-label="채용 공고로 거르기" onChange={event => setAppPosting(event.target.value)}>
+            <option value="">전체 공고</option>{postings.map(posting => <option key={posting.id} value={posting.id}>{posting.title}</option>)}
+          </select>
+          <button type="submit" className="btn-sm">검색하기</button>
+          <button type="button" className="btn-sm" onClick={() => {
+            setAppSearch(''); setAppStatus('all'); setAppPosting('')
+            if (!appFilters.search && appFilters.status === 'all' && !appFilters.posting) { void loadApplications(); return }
+            setAppFilters({ search: '', status: 'all', posting: '' })
+          }}>검색 조건 초기화</button>
+        </form>
+        <p className="muted">검색·상태·공고 조건은 전체 지원서에 적용됩니다. 한 번에 100건씩 표시하며 더 불러오면 이어서 확인할 수 있습니다.</p>
+        {applicationsLoading && (
           <p role="status">불러오는 중...</p>
-        ) : applicationsError ? (
+        )}
+        {applicationsError && (
           <div>
             <p className="error" role="alert">지원서 목록을 불러오지 못했습니다. {applicationsError}</p>
-            <button type="button" className="btn-secondary" onClick={loadApplications}>지원서 목록 다시 불러오기</button>
+            <button type="button" className="btn-secondary" disabled={applicationsLoading} onClick={() => loadApplications(retryAppsCursor.current)}>지원서 목록 다시 불러오기</button>
           </div>
-        ) : applications.length === 0 ? (
-          <p className="notice">아직 접수된 지원서가 없습니다.</p>
-        ) : (
+        )}
+        {!applicationsLoading && !applicationsError && applications.length === 0 && (
+          <p className="notice">{appFilters.search || appFilters.status !== 'all' || appFilters.posting ? '조건에 맞는 지원서가 없습니다.' : '아직 접수된 지원서가 없습니다.'}</p>
+        )}
+        {applications.length > 0 && (
           <>
-            {appsTruncated && (
-              <p className="notice">
-                지원서가 많아 최근 {appsTruncated}건만 불러왔습니다. 아래 검색·통계도 이 범위
-                안에서만 계산됩니다.
-              </p>
-            )}
-            <div className="filter-row">
-              <input
-                type="search"
-                placeholder="이름·이메일·공고 검색"
-                aria-label="지원자 검색 (이름·이메일·공고)"
-                value={appSearch}
-                onChange={(e) => setAppSearch(e.target.value)}
-              />
-              <select
-                value={appStatus}
-                aria-label="지원 상태로 거르기"
-                onChange={(e) => setAppStatus(e.target.value)}
-              >
-                <option value="all">전체 상태</option>
-                <option value="submitted">심사 대기</option>
-                <option value="passed">서류합격</option>
-                <option value="rejected">불합격</option>
-                <option value="withdrawn">지원 철회</option>
-              </select>
-              <span className="filter-count">{filteredApps.length}건</span>
-            </div>
-            {filteredApps.length === 0 ? (
-              <p className="notice">조건에 맞는 지원서가 없습니다.</p>
-            ) : (
+            <p className="filter-count">표시된 지원서 {applications.length}건{nextAppsCursor ? ' · 뒤에 지원서가 더 있습니다.' : ' · 조회 결과를 모두 표시했습니다.'}</p>
               <div className="table-scroll" tabIndex={0}>
                 <table className="admin-table">
                   <caption className="sr-only">
-                    조건에 맞는 지원서 {filteredApps.length}건
+                    조건에 맞는 지원서 중 표시된 {applications.length}건
                   </caption>
                   <thead>
                     <tr>
@@ -959,7 +977,7 @@ export default function RecruitPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredApps.map((a) => (
+                    {applications.map((a) => (
                   <tr key={a.id}>
                     <th scope="row" className="cell-rowhead">
                       {a.applicantName}
@@ -987,7 +1005,8 @@ export default function RecruitPage() {
                   </tbody>
                 </table>
               </div>
-            )}
+            {nextAppsCursor && <button type="button" className="btn-secondary" disabled={applicationsLoading || Boolean(applicationsError)}
+              onClick={() => loadApplications(nextAppsCursor)}>{applicationsLoading ? '불러오는 중...' : '지원서 더 불러오기'}</button>}
           </>
         )}
       </section>

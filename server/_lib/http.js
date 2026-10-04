@@ -29,6 +29,7 @@ const PRIVATE_HEADERS = {
   'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
 }
 
+/** @param {unknown} data @param {number} [status] @param {Record<string, string>} [extraHeaders] */
 export function jsonResponse(data, status = 200, extraHeaders = {}) {
   // Drivers can return BIGINT as bigint instead of a decimal string. Preserve
   // its exact value without rounding normal numbers or changing global JSON.
@@ -38,6 +39,7 @@ export function jsonResponse(data, status = 200, extraHeaders = {}) {
   })
 }
 
+/** @param {string} message @param {number} [status] */
 export function jsonError(message, status = 400) {
   return jsonResponse({ error: message }, status)
 }
@@ -48,6 +50,7 @@ export function jsonError(message, status = 400) {
 // 한글 이름이 "%EC%9D%B4%EB%A0%A5%EC%84%9C.pdf" 로 저장된다 — 자기 이력서를
 // 내려받았는데 무슨 파일인지 알아볼 수 없다. RFC 6266/5987 은 이런 경우
 // filename*= 를 쓰라고 정한다. 옛 브라우저를 위해 아스키 대체 이름을 함께 둔다.
+/** @param {string | null | undefined} filename @param {'attachment' | 'inline'} [disposition] */
 export function contentDisposition(filename, disposition = 'attachment') {
   const name = String(filename ?? '').replace(/["\r\n\\]/g, '') || 'download'
   const ascii = name.replace(/[^\x20-\x7e]/g, '_')
@@ -71,6 +74,7 @@ export const FILE_CACHE_HEADERS = {
 //
 // 화면이 fetch 로 부른 요청만 기록 대상으로 본다. 판단할 수 없으면 기록하지
 // 않는다 — 없는 기록이 틀린 기록보다 낫다.
+/** @param {{ headers: Pick<Headers, 'get'> }} request */
 export function isAppFetch(request) {
   if (request.headers.get('X-App-Request') === '1') return true
   const mode = request.headers.get('Sec-Fetch-Mode')

@@ -11,13 +11,16 @@ vi.mock('../server/api/admin/_middleware.js', () => ({ onRequest: ({ next }) => 
 
 let gateway
 const origin = 'https://portfolio-epa.pages.dev'
-beforeEach(async () => {
+async function loadGateway(environment = {}) {
   vi.resetModules()
+  vi.stubGlobal('Deno', { env: { toObject: () => environment }, serve: (handler) => { gateway = handler } })
+  await import('../supabase/functions/api/index.ts')
+}
+beforeEach(async () => {
   mocks.handle.mockReset().mockResolvedValue(new Response('ok', { headers: { 'Set-Cookie': 'test-only=value' } }))
   mocks.middleware.mockReset().mockImplementation(({ next }) => next())
-  vi.stubGlobal('Deno', { env: { toObject: () => ({}) }, serve: (handler) => { gateway = handler } })
   vi.spyOn(console, 'error').mockImplementation(() => {})
-  await import('../supabase/functions/api/index.ts')
+  await loadGateway()
 })
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
@@ -78,5 +81,36 @@ it('preserves preflight and strips legacy cookies from successful responses', as
   expect(response.status).toBe(200)
   expect(response.headers.has('Set-Cookie')).toBe(false)
   expect(response.headers.get('Access-Control-Allow-Origin')).toBe(origin)
+  expect(mocks.middleware).toHaveBeenCalledTimes(1)
+})
+
+it.each(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'])('maintenance blocks %s before authentication or route side effects', async method => {
+  await loadGateway({ PORTFOLIO_MAINTENANCE_MODE: '1' })
+  const response = await gateway(request('/probe', { method }))
+  secureError(response, 503)
+  expect(response.headers.get('Retry-After')).toBe('60')
+  expect(response.headers.get('Access-Control-Allow-Origin')).toBe(origin)
+  expect(await response.json()).toEqual({ error: '자료 보호 점검 중입니다. 잠시 후 다시 시도해주세요.', code: 'MAINTENANCE' })
+  expect(mocks.middleware).not.toHaveBeenCalled()
+  expect(mocks.handle).not.toHaveBeenCalled()
+})
+
+it('maintenance still allows CORS preflight without accessing the route', async () => {
+  await loadGateway({ PORTFOLIO_MAINTENANCE_MODE: '1' })
+  expect((await gateway(request('/probe', { method: 'OPTIONS' }))).status).toBe(204)
+  expect(mocks.middleware).not.toHaveBeenCalled()
+})
+
+it('maintenance does not grant an untrusted origin access', async () => {
+  await loadGateway({ PORTFOLIO_MAINTENANCE_MODE: '1' })
+  const response = await gateway(request('/probe', { requestOrigin: 'https://outside.invalid' }))
+  secureError(response, 403)
+  expect(response.headers.has('Access-Control-Allow-Origin')).toBe(false)
+  expect(mocks.middleware).not.toHaveBeenCalled()
+})
+
+it.each(['0', 'true', undefined])('maintenance is explicit and disabled for %s', async flag => {
+  await loadGateway({ PORTFOLIO_MAINTENANCE_MODE: flag })
+  expect((await gateway(request('/probe'))).status).toBe(200)
   expect(mocks.middleware).toHaveBeenCalledTimes(1)
 })

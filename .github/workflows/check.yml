@@ -1,4 +1,4 @@
-# 린트·시험·빌드를 여기서 돌린다.
+# 린트·타입 검사·시험·빌드를 여기서 돌린다.
 #
 # 이 저장소를 만드는 컴퓨터는 Windows 11 Home이고 스마트 앱 컨트롤이 켜져
 # 있다. 그게 서명 없는 실행 파일을 막는데 oxlint의 네이티브 바이너리가
@@ -27,15 +27,23 @@ jobs:
           cache: npm
 
       - name: 의존성 설치
+        id: install
         run: npm ci
 
-      # 셋을 따로 둔다. 하나로 묶으면 먼저 넘어진 것 뒤는 안 돌아서
-      # 어디가 깨졌는지 알려면 두 번 돌려야 한다.
+      # 설치가 성공하면 앞 검사의 실패와 관계없이 네 검사를 모두 실행한다.
+      # 실패한 단계의 결과는 그대로 남아 전체 작업도 실패한다.
       - name: 린트
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run lint
 
+      - name: 타입 검사
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run typecheck
+
       - name: 시험
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm test
 
       - name: 빌드
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run build

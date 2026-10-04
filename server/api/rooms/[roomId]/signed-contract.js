@@ -11,6 +11,7 @@ import {
 import { notifyUser } from '../../../_lib/notify.js'
 import { recordDelivery } from '../../../_lib/delivery.js'
 import { matchesSignature } from '../../../_lib/uploads.js'
+import { storageCleanupIntent, finishStorageCleanup } from '../../../_lib/storageCleanup.js'
 
 const MAX_PDF_SIZE = 8 * 1024 * 1024 // 8MB
 
@@ -110,42 +111,82 @@ export async function onRequestPost({ request, env, data, params }) {
   const r2Key = `contracts/${params.roomId}/signed-${genId()}.pdf`
   const filename = `근로계약서_${params.roomId.slice(0, 8)}.pdf`
 
-  const existing = await env.DB.prepare('SELECT r2_key FROM signed_contracts WHERE room_id = ?')
-    .bind(params.roomId)
-    .first()
-
-  await env.DOCUMENTS.put(r2Key, buffer, { httpMetadata: { contentType: 'application/pdf' } })
+  const operationId = genId()
+  try {
+    // Persist the immutable key before storage can accept any bytes. A process
+    // crash or ambiguous PUT/DB response must leave an exact cleanup target.
+    // The grace period keeps cleanup away from an upload/save still in flight.
+    const queued = await storageCleanupIntent(env.DB, 'documents', operationId,
+      'SELECT ? AS storage_key', [r2Key], { defer: true }).run()
+    if (!queued?.meta?.changes) throw new Error('Missing PDF cleanup receipt')
+  } catch {
+    return jsonError('계약서 파일 보관을 준비하지 못했습니다. 잠시 후 다시 시도해주세요. 이번 요청에서는 이메일을 전송하지 않았습니다.', 503)
+  }
+  try {
+    await env.DOCUMENTS.put(r2Key, buffer, { httpMetadata: { contentType: 'application/pdf' } })
+  } catch {
+    return jsonError('계약서 업로드 결과를 확인하지 못했습니다. 계약서를 다시 불러와 저장 상태를 확인해주세요. 이번 요청에서는 이메일을 전송하지 않았습니다.', 503)
+  }
 
   const id = genId()
+  // Uploading can outlast a room/archive or participation change. Check the
+  // original save policy again while holding the parent lock, and use it for
+  // both retiring the previous file and inserting its replacement.
+  const saveEligibility = `room.id = ? AND room.status = 'signed' AND room.archived_at IS NULL
+    AND EXISTS (SELECT 1 FROM room_participants participant
+      WHERE participant.room_id = room.id AND participant.user_id = ? AND participant.role_in_room = 'company')`
   try {
-    await env.DB.prepare(
-      `INSERT INTO signed_contracts (id, room_id, r2_key, filename, size_bytes, stored_by_user_id, email_status, sha256_hash)
-       VALUES (?, ?, ?, ?, ?, ?, 'not_sent', ?)
-       ON CONFLICT(room_id) DO UPDATE SET
-         r2_key = excluded.r2_key,
-         filename = excluded.filename,
-         size_bytes = excluded.size_bytes,
-         stored_by_user_id = excluded.stored_by_user_id,
-         email_status = 'not_sent',
-         email_error = NULL,
-         emailed_at = NULL,
-         sha256_hash = excluded.sha256_hash,
-         updated_at = datetime('now')`
-    )
-      .bind(id, params.roomId, r2Key, filename, file.size, data.user.id, sha256)
-      .run()
-  } catch (err) {
-    console.error(`Signed contract DB write failed for room ${params.roomId}:`, err)
-    // 기록이 가리키는 것은 여전히 옛 파일이다. 방금 올린 것만 치운다.
-    await env.DOCUMENTS.delete(r2Key).catch(() => {})
-    return jsonError('계약서 저장에 실패했습니다. 잠시 후 다시 시도해주세요.', 500)
+    const saved = await env.DB.batch([
+      // Each replacement captures the actual preceding PDF under the same
+      // parent/row lock as its UPSERT, including concurrent replacements.
+      env.DB.prepare('UPDATE interview_rooms SET id = id WHERE id = ?').bind(params.roomId),
+      env.DB.prepare('UPDATE signed_contracts SET r2_key = r2_key WHERE room_id = ?').bind(params.roomId),
+      storageCleanupIntent(env.DB, 'documents', operationId,
+        `SELECT stored.r2_key AS storage_key FROM signed_contracts stored
+         JOIN interview_rooms room ON room.id = stored.room_id WHERE ${saveEligibility}`,
+        [params.roomId, data.user.id], { defer: true }),
+      env.DB.prepare(
+        `INSERT INTO signed_contracts (id, room_id, r2_key, filename, size_bytes, stored_by_user_id, email_status, sha256_hash)
+         SELECT ?, ?, ?, ?, ?, ?, 'not_sent', ?
+         WHERE EXISTS (SELECT 1 FROM interview_rooms room WHERE ${saveEligibility})
+         ON CONFLICT(room_id) DO UPDATE SET
+           r2_key = excluded.r2_key,
+           filename = excluded.filename,
+           size_bytes = excluded.size_bytes,
+           stored_by_user_id = excluded.stored_by_user_id,
+           email_status = 'not_sent',
+           email_error = NULL,
+           emailed_at = NULL,
+           sha256_hash = excluded.sha256_hash,
+           updated_at = datetime('now')
+         RETURNING id`
+      )
+        .bind(id, params.roomId, r2Key, filename, file.size, data.user.id, sha256, params.roomId, data.user.id),
+    ])
+    const savedChanges = saved?.[3]?.meta?.changes
+    if (savedChanges === 0) {
+      return jsonError('면접방이 보관되었거나 참여 권한·계약 상태가 변경되어 계약서를 저장하지 않았습니다. 이번 요청에서는 이메일을 전송하지 않았습니다.', 409)
+    }
+    if (!savedChanges) throw new Error('Missing saved signed contract')
+  } catch {
+    console.error('Signed contract save result could not be confirmed')
+    // A lost response can follow a committed write. Keep both PDF versions so
+    // the stored contract remains downloadable, and do not send email until
+    // the save is confirmed.
+    return jsonError('계약서 저장 결과를 확인하지 못했습니다. 계약서를 다시 불러와 저장 상태를 확인해주세요. 이번 요청에서는 이메일을 전송하지 않았습니다.', 503)
   }
 
-  // 기록이 새 파일을 가리킨 뒤에 옛 파일을 지운다. 여기서 실패해도 남는 것은
-  // 아무도 가리키지 않는 객체뿐이라, 계약서가 사라지는 일은 없다.
-  if (existing?.r2_key && existing.r2_key !== r2Key) {
-    await env.DOCUMENTS.delete(existing.r2_key).catch(() => {})
-  }
+  // The new reference is acknowledged. Remove only this upload's receipt;
+  // another replacement may already have requeued its key under another ID.
+  // Previous versions can now be cleaned, but shared/archive references remain
+  // protected and every provider failure retains its durable target.
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM storage_cleanup_intents WHERE bucket = ? AND storage_key = ? AND operation_id = ?')
+      .bind('documents', r2Key, operationId),
+    env.DB.prepare("UPDATE storage_cleanup_intents SET not_before = datetime('now'), next_attempt_at = datetime('now') WHERE operation_id = ?")
+      .bind(operationId),
+  ]).catch(() => {})
+  await finishStorageCleanup(env, operationId)
 
   // 지원자에게 이메일 발송 (설정된 경우에만 시도)
   let emailStatus = 'not_sent'

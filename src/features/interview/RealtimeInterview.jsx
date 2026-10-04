@@ -1,7 +1,10 @@
 import { createAuthorizedChannel } from './authorizedChannel.js'
-import { beginRecordingBackup, appendRecordingChunk, recoverRecording, removeRecordingBackup } from './recordingStore.js'
-import * as tus from 'tus-js-client'
+import { beginRecordingBackup, appendRecordingChunk, recoverRecording, removeRecordingBackup, loadRecordingHash } from './recordingStore.js'
 import { useCallback, useEffect, useRef, useState } from 'react'
+
+// 녹화 업로드 라이브러리는 녹화를 시작한 사람만 필요하다. 면접 화면 첫 묶음에서 빼고
+// 녹화를 시작할 때 미리 받아 두어 끝낸 뒤 업로드가 기다리지 않게 한다.
+const loadUploader = () => import('tus-js-client')
 
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }]
 const RECORDING_WIDTH = 1280
@@ -249,6 +252,9 @@ async function createCompositeRecording(getSources, recordingId, owner, sessionI
   }
 
   return {
+    captureState() {
+      return { recordingId, sessionId, state: recorder.state }
+    },
     pause() {
       if (recorder.state === 'recording') recorder.pause()
     },
@@ -544,12 +550,16 @@ export default function RealtimeInterview({
         },
       },
       recording: {
+        captureState() {
+          return recordingRef.current?.captureState() ?? null
+        },
         async start(recordingId) {
           if (recordingRef.current) throw new Error('이미 녹화 중입니다.')
           recordingRef.current = await createCompositeRecording(() => [
             { stream: localStreamRef.current, label: `${credentials.displayName} (나)` },
             ...remoteRef.current.map((item) => ({ stream: item.stream, label: item.displayName })),
           ].filter((item) => item.stream), recordingId, credentials.customParticipantId, credentials.sessionId)
+          void Promise.all([loadUploader(), loadRecordingHash()]).catch(() => {})
         },
         recover: (id) => recoverRecording(id, credentials.customParticipantId, credentials.sessionId),
         clearBackup: (id) => removeRecordingBackup(id),
@@ -565,7 +575,8 @@ export default function RealtimeInterview({
           recordingRef.current = null
           return recorder.stop()
         },
-        upload(result, ticket, onProgress) {
+        async upload(result, ticket, onProgress) {
+          const tus = await loadUploader()
           return new Promise((resolve, reject) => {
             const upload = new tus.Upload(result.blob, {
               endpoint: directStorageEndpoint(credentials.projectUrl),

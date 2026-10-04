@@ -2,6 +2,7 @@ import { jsonResponse, jsonError } from '../../../../_lib/http.js'
 import { logAdminAction } from '../../../../_lib/auditLog.js'
 import { rowToCamelTerms } from '../../../../_lib/contract.js'
 import { describeRetention, describeRetentionHold } from '../../../../_lib/contractPeriod.js'
+import { storageCleanupIntent, finishStorageCleanup } from '../../../../_lib/storageCleanup.js'
 import {
   InterviewDeletionError,
   acquireInterviewRoomDeletionLocks,
@@ -46,7 +47,7 @@ export async function onRequestDelete({ request, env, data, params }) {
     )
   }
 
-  // 화상 면접 정리 가능 여부와 R2 삭제를 첫 mutation보다 먼저 확정한다.
+  // 화상 면접 정리 가능 여부를 첫 mutation보다 먼저 확인한다.
   // 이 검사가 뒤에 있으면 차단 응답인데도 계약 보관 기록이나 PDF가 먼저
   // 변경되는 부분 삭제가 발생할 수 있다.
   let deletionLock = null
@@ -80,29 +81,22 @@ export async function onRequestDelete({ request, env, data, params }) {
   //
   // 방이 사라졌다는 사실만 적어 둔다. 나중에 "이 계약서는 왜 방이 없는가" 에
   // 답할 수 있어야 한다.
-  await env.DB.prepare(
-    "UPDATE contract_archive SET source_deleted_at = datetime('now'), updated_at = datetime('now') WHERE room_id = ?"
-  )
-    .bind(params.roomId)
-    .run()
-    .catch((err) => console.error('archive stamp failed:', err))
-
-  // 회사가 올린 PDF 사본만 정리한다. 영구 보관소의 정본은 다른 자리
-  // (archive/ 로 시작하는 키)에 있고 여기서 지우지 않는다.
-  const signedContract = await env.DB.prepare(
-    'SELECT r2_key FROM signed_contracts WHERE room_id = ?'
-  )
-    .bind(params.roomId)
-    .first()
-  if (signedContract) {
-    await env.DOCUMENTS.delete(signedContract.r2_key).catch(() => {})
-  }
-
   // documents belong to the user, not the room (a candidate's resume can be shared
   // across rooms), so they're intentionally left untouched here.
   // D1은 외래키를 강제하므로 이 방을 참조하는 모든 행을 함께 정리해야 한다.
+  const operationId = crypto.randomUUID()
   try {
     await env.DB.batch([
+      env.DB.prepare('UPDATE interview_rooms SET id = id WHERE id = ?').bind(params.roomId),
+      env.DB.prepare('UPDATE signed_contracts SET r2_key = r2_key WHERE room_id = ?').bind(params.roomId),
+      env.DB.prepare('UPDATE interview_recordings SET r2_key = r2_key WHERE session_id IN (SELECT id FROM interview_sessions WHERE room_id = ?)').bind(params.roomId),
+      storageCleanupIntent(env.DB, 'documents', operationId,
+        'SELECT r2_key AS storage_key FROM signed_contracts WHERE room_id = ?', [params.roomId]),
+      storageCleanupIntent(env.DB, 'interview-recordings', operationId,
+        `SELECT r.r2_key AS storage_key FROM interview_recordings r
+         JOIN interview_sessions s ON s.id = r.session_id WHERE s.room_id = ?`, [params.roomId]),
+      env.DB.prepare("UPDATE contract_archive SET source_deleted_at = datetime('now'), updated_at = datetime('now') WHERE room_id = ?")
+        .bind(params.roomId),
       env.DB.prepare('UPDATE applications SET room_id = NULL WHERE room_id = ?').bind(params.roomId),
       env.DB.prepare('UPDATE admin_audit_log SET target_room_id = NULL WHERE target_room_id = ?').bind(params.roomId),
       env.DB.prepare('DELETE FROM signed_contracts WHERE room_id = ?').bind(params.roomId),
@@ -163,8 +157,10 @@ export async function onRequestDelete({ request, env, data, params }) {
         console.error(`Interview room deletion lock release failed (${params.roomId}):`, releaseError)
       })
     }
-    return jsonError('면접방 삭제 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', 500)
+    return jsonError('면접방 삭제 결과를 확인하지 못했습니다. 면접방 목록을 다시 확인해주세요.', 503)
   }
+
+  const cleanup = await finishStorageCleanup(env, operationId)
 
   await logAdminAction(env, {
     actorId: data.user.id,
@@ -176,5 +172,5 @@ export async function onRequestDelete({ request, env, data, params }) {
       : `title=${room.title}`,
   })
 
-  return jsonResponse({ ok: true, deleted: true })
+  return jsonResponse({ ok: true, deleted: true, ...cleanup })
 }

@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest'
 vi.mock('../src/context/AuthContext.jsx', () => ({ useAuth: vi.fn() }))
 import { useAuth } from '../src/context/AuthContext.jsx'
-import { DmProvider } from '../src/context/DmContext.jsx'
+import { DmProvider } from '../src/context/DmProvider.jsx'
 
 it('remounts private inbox state when switching accounts without logging out first', () => {
   useAuth.mockReturnValue({ user: { id: 'first' } })

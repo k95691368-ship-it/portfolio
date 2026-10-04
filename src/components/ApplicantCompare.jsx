@@ -65,8 +65,8 @@ export default function ApplicantCompare({ postingId, postingTitle, onClose, onO
           </p>
           {data.truncated && (
             <p className="notice">
-              지원자가 많아 최근 {data.limit}명까지만 비교했습니다. 나머지는 지원서 목록에서
-              확인해주세요.
+              지원자가 많아 최근 {data.limit}명까지만 비교했습니다. 지원서 목록에서 이 공고로
+              검색한 뒤 더 불러오면 나머지 지원서도 확인할 수 있습니다. 비교 순위와 통계는 표시된 범위 기준입니다.
             </p>
           )}
           {data.summary.unscreened > 0 && (

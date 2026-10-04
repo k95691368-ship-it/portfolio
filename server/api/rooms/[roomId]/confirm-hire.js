@@ -18,18 +18,21 @@ export async function onRequestPost({ env, data, params }) {
     return jsonError('채용 확정은 회사(고용) 측만 할 수 있습니다.', 403)
   }
 
-  const room = await env.DB.prepare('SELECT status, archived_at FROM interview_rooms WHERE id = ?')
-    .bind(params.roomId)
-    .first()
+  // 방 상태와 지원자 참여 여부는 서로 기대지 않으므로 함께 읽는다. 판정 순서는 그대로다.
+  const [room, candidate] = await Promise.all([
+    env.DB.prepare('SELECT status, archived_at FROM interview_rooms WHERE id = ?')
+      .bind(params.roomId)
+      .first(),
+    env.DB.prepare(
+      "SELECT user_id FROM room_participants WHERE room_id = ? AND role_in_room = 'candidate'"
+    )
+      .bind(params.roomId)
+      .first(),
+  ])
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
   const closedBlock = blockedWhenFrozen(room, 'confirm_hire')
   if (closedBlock) return jsonError(closedBlock, 409)
 
-  const candidate = await env.DB.prepare(
-    "SELECT user_id FROM room_participants WHERE room_id = ? AND role_in_room = 'candidate'"
-  )
-    .bind(params.roomId)
-    .first()
   if (!candidate) return jsonError('지원자가 아직 면접방에 참여하지 않았습니다.', 409)
 
   // 이미 확정되어 있으면 그대로 둔다 (AI가 남긴 근거 인용을 덮어쓰지 않는다).

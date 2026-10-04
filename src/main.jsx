@@ -4,9 +4,9 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import './fonts.css'
 import './index.css'
 import App from './App.jsx'
-import { AuthProvider } from './context/AuthContext.jsx'
-import { ToastProvider } from './context/ToastContext.jsx'
-import { DmProvider } from './context/DmContext.jsx'
+import { AuthProvider } from './context/AuthProvider.jsx'
+import { ToastProvider } from './context/ToastProvider.jsx'
+import { DmProvider } from './context/DmProvider.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 
 // Keep the existing route tree and providers, but use the data router's

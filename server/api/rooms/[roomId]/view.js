@@ -23,10 +23,12 @@ export async function onRequestGet({ env, data, params, waitUntil }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
 
   const roomId = params.roomId
-  const room = await env.DB.prepare('SELECT * FROM interview_rooms WHERE id = ?').bind(roomId).first()
+  // 방과 참여 여부는 서로 기대지 않으므로 함께 읽는다. 판정 순서(없는 방 → 참여 여부)는 그대로다.
+  const [room, access] = await Promise.all([
+    env.DB.prepare('SELECT * FROM interview_rooms WHERE id = ?').bind(roomId).first(),
+    getRoomAccess(env, roomId, data.user),
+  ])
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
-
-  const access = await getRoomAccess(env, roomId, data.user)
   if (!access) return jsonError('이 면접방에 참여하지 않았습니다.', 403)
 
   const isCompany = access.role_in_room === 'company'

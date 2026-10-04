@@ -54,7 +54,7 @@ vi.mock('../src/components/DmLink.jsx', () => ({ default: () => null }))
 vi.mock('../src/components/DemoMenu.jsx', () => ({ default: () => null }))
 vi.mock('../src/components/DeferredScrollRestoration.jsx', () => ({ default: () => null }))
 import { api, getAccountSessionIdentity } from '../src/api/client.js'
-import { AuthProvider } from '../src/context/AuthContext.jsx'
+import { AuthProvider } from '../src/context/AuthProvider.jsx'
 import App from '../src/App.jsx'
 
 const account = { id: 1, name: 'Existing account' }

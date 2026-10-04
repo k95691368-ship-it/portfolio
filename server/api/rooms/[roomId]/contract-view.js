@@ -137,9 +137,9 @@ export async function onRequestGet({ env, data, params, request }) {
   // 요구하는 수신 기록이면서, 교부가 실제로 닿았다는 증거다.
   // 링크를 눌러 들어온 요청으로는 기록하지 않는다. 그렇게 두면 계약서를 본
   // 적 없는 근로자 앞으로 열람 기록이 남는다.
-  if (room.status === 'signed' && access.role_in_room === 'candidate' && isAppFetch(request)) {
-    await markFirstViewed(env, roomId)
-  }
+  const firstViewed = room.status === 'signed' && access.role_in_room === 'candidate' && isAppFetch(request)
+    ? markFirstViewed(env, roomId)
+    : null
 
   const participantRows = participants.results
   const history = historyRows.results
@@ -163,9 +163,52 @@ export async function onRequestGet({ env, data, params, request }) {
   const period = terms ? describeContractPeriod(terms) : null
   const candidateRow = participantRows.find((p) => p.role_in_room === 'candidate')
 
-  // 갱신으로 이어진 계약이 있으면 계속근로기간을 합산해야 2년 상한을 제대로 본다.
-  // 이어진 계약이 없을 때는 조회 자체를 하지 않는다.
-  const continuity = await loadContinuity(env, roomId, termsRow)
+  // 아래 네 조회(계속근로 사슬·원 공고·교부 이력·연결 가능한 계약)는 서로 기대지 않는다.
+  // 하나씩 기다리면 계약서를 열 때마다 DB 왕복이 최대 네 번 더 쌓이므로 함께 보낸다.
+  // 교부 이력만은 첫 열람 기록이 끝난 뒤에 읽어야 방금 연 시각이 담긴다.
+  const [continuity, posting, deliveries, linkable] = await Promise.all([
+    // 갱신으로 이어진 계약이 있으면 계속근로기간을 합산해야 2년 상한을 제대로 본다.
+    // 이어진 계약이 없을 때는 조회 자체를 하지 않는다.
+    loadContinuity(env, roomId, termsRow),
+    terms ? env.DB.prepare(
+        `SELECT p.title, p.employment_type, p.location,
+                p.wage_type, p.wage_min, p.wage_max,
+                p.work_hours_start, p.work_hours_end, p.work_days
+           FROM applications a JOIN job_postings p ON p.id = a.posting_id
+          WHERE a.room_id = ? LIMIT 1`
+      )
+        .bind(roomId)
+        .first() : null,
+    // 교부 이력 (근로기준법 제17조 제2항 · 전자문서법 제5조)
+    isSigned ? Promise.resolve(firstViewed).then(() => listDeliveries(env, roomId)) : [],
+    // 회사가 이 계약을 어떤 계약의 갱신으로 이을지 고를 수 있게, 같은 근로자의
+    // 이미 체결된 계약 목록을 함께 내려준다.
+    // 요청자도 그 방의 참여자여야 한다.
+    //
+    // 예전에는 "이 근로자가 참여한 체결 계약"만으로 목록을 만들어서, 같은
+    // 사람을 채용한 다른 회사의 계약 제목과 기간이 그대로 보였다. 실제로
+    // 연결이 허용되는 범위(link-previous.js 의 참여자 검사)와 목록이
+    // 어긋나 있었던 것이라, 고를 수도 없는 것을 보여 주면서 남의 계약을
+    // 알려 주고 있었다.
+    !isSigned && access.role_in_room === 'company' && candidateRow
+      ? env.DB.prepare(
+          `SELECT r.id, r.title, ct.contract_start_date, ct.contract_end_date
+             FROM room_participants rp
+             JOIN interview_rooms r ON r.id = rp.room_id
+             LEFT JOIN contract_terms ct ON ct.room_id = r.id
+            WHERE rp.user_id = ?1 AND rp.role_in_room = 'candidate'
+              AND r.status = 'signed' AND r.id != ?2
+              AND EXISTS (
+                SELECT 1 FROM room_participants me
+                 WHERE me.room_id = r.id AND me.user_id = ?3
+              )
+            ORDER BY ct.contract_start_date DESC LIMIT 20`
+        )
+          .bind(candidateRow.id, roomId, data.user.id)
+          .all()
+      : null,
+  ])
+  await firstViewed
 
   // 체결이 끝난 계약은 보존 의무 기간을 관리해야 한다 (근로기준법 제42조).
   //
@@ -181,27 +224,16 @@ export async function onRequestGet({ env, data, params, request }) {
   // 채용절차법 제4조 제3항은 채용광고에 제시한 근로조건을 구직자에게 불리하게
   // 변경하는 것을 금지한다. 비교할 값이 없으면 그 위반을 알아차릴 수 없다.
   let postingComparison = null
-  if (terms) {
-    const posting = await env.DB.prepare(
-      `SELECT p.title, p.employment_type, p.location,
-              p.wage_type, p.wage_min, p.wage_max,
-              p.work_hours_start, p.work_hours_end, p.work_days
-         FROM applications a JOIN job_postings p ON p.id = a.posting_id
-        WHERE a.room_id = ? LIMIT 1`
+  if (posting) {
+    const compared = comparePostingToContract(
+      {
+        ...postingConditionsFromRow(posting),
+        employmentType: posting.employment_type,
+        location: posting.location,
+      },
+      terms
     )
-      .bind(roomId)
-      .first()
-    if (posting) {
-      const compared = comparePostingToContract(
-        {
-          ...postingConditionsFromRow(posting),
-          employmentType: posting.employment_type,
-          location: posting.location,
-        },
-        terms
-      )
-      postingComparison = { postingTitle: posting.title, ...compared }
-    }
+    postingComparison = { postingTitle: posting.title, ...compared }
   }
 
   // 근로자용 계약 해설. 계약서에 적힌 값만으로는 알 수 없는 것(환산 시급, 하루
@@ -209,37 +241,11 @@ export async function onRequestGet({ env, data, params, request }) {
   // 같은 계약이면 언제나 같은 설명이 나온다.
   const explanation = terms ? explainContract(terms) : null
 
-  // 교부 이력 (근로기준법 제17조 제2항 · 전자문서법 제5조)
-  const deliveries = isSigned ? await listDeliveries(env, roomId) : []
   const deliveryState = isSigned ? describeDeliveryState(deliveries) : null
 
-  // 회사가 이 계약을 어떤 계약의 갱신으로 이을지 고를 수 있게, 같은 근로자의
-  // 이미 체결된 계약 목록을 함께 내려준다.
   let linkableRooms = []
-  if (!isSigned && access.role_in_room === 'company' && candidateRow) {
-    // 요청자도 그 방의 참여자여야 한다.
-    //
-    // 예전에는 "이 근로자가 참여한 체결 계약"만으로 목록을 만들어서, 같은
-    // 사람을 채용한 다른 회사의 계약 제목과 기간이 그대로 보였다. 실제로
-    // 연결이 허용되는 범위(link-previous.js 의 참여자 검사)와 목록이
-    // 어긋나 있었던 것이라, 고를 수도 없는 것을 보여 주면서 남의 계약을
-    // 알려 주고 있었다.
-    const { results } = await env.DB.prepare(
-      `SELECT r.id, r.title, ct.contract_start_date, ct.contract_end_date
-         FROM room_participants rp
-         JOIN interview_rooms r ON r.id = rp.room_id
-         LEFT JOIN contract_terms ct ON ct.room_id = r.id
-        WHERE rp.user_id = ?1 AND rp.role_in_room = 'candidate'
-          AND r.status = 'signed' AND r.id != ?2
-          AND EXISTS (
-            SELECT 1 FROM room_participants me
-             WHERE me.room_id = r.id AND me.user_id = ?3
-          )
-        ORDER BY ct.contract_start_date DESC LIMIT 20`
-    )
-      .bind(candidateRow.id, roomId, data.user.id)
-      .all()
-    linkableRooms = results.map((r) => ({
+  if (linkable) {
+    linkableRooms = linkable.results.map((r) => ({
       id: r.id,
       title: r.title,
       startDate: r.contract_start_date,

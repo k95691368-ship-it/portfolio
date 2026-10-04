@@ -50,6 +50,7 @@ CREATE OR REPLACE FUNCTION public.datetime(value TEXT)
 RETURNS TEXT
 LANGUAGE SQL
 STABLE
+SET timezone TO 'UTC'
 AS $$
   SELECT to_char(
     timezone('utc', CASE WHEN value IS NULL OR lower(value) = 'now' THEN now() ELSE value::timestamptz END),
@@ -61,6 +62,7 @@ CREATE OR REPLACE FUNCTION public.datetime(value TEXT, modifier TEXT)
 RETURNS TEXT
 LANGUAGE SQL
 STABLE
+SET timezone TO 'UTC'
 AS $$
   SELECT to_char(
     timezone(
@@ -76,6 +78,7 @@ CREATE OR REPLACE FUNCTION public.datetime(value TEXT, modifier_one TEXT, modifi
 RETURNS TEXT
 LANGUAGE SQL
 STABLE
+SET timezone TO 'UTC'
 AS $$
   SELECT to_char(
     timezone(
@@ -92,6 +95,7 @@ CREATE OR REPLACE FUNCTION public.date(value TEXT, modifier TEXT)
 RETURNS TEXT
 LANGUAGE SQL
 STABLE
+SET timezone TO 'UTC'
 AS $$
   SELECT to_char(
     timezone(
@@ -107,6 +111,7 @@ CREATE OR REPLACE FUNCTION public.julianday(value TEXT)
 RETURNS DOUBLE PRECISION
 LANGUAGE SQL
 STABLE
+SET timezone TO 'UTC'
 AS $$
   SELECT extract(epoch FROM value::timestamptz) / 86400.0 + 2440587.5;
 $$;

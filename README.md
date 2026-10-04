@@ -90,6 +90,13 @@ Supabase 프로젝트의 Edge Function secret에 `CLAUDE_API_KEY`를 등록합�
 | 명령 | 하는 일 |
 | --- | --- |
 | `npm run build` | 프론트엔드와 서버 코드를 함께 빌드 |
-| `npm test` | 단위 테스트 (오프라인) |
-| `npm run smoke` | 배포된 서비스의 경로·권한 점검 |
-| `npm run e2e` | 배포 환경에서 계약 체결 전 과정 실행 |
+| `npm test` | 단위·UI·격리 DB 회귀 테스트 (오프라인, smoke·e2e 제외) |
+| `npm run smoke` | 배포된 서비스의 GET/HEAD 경로·권한 점검. 쓰기 검사는 명시한 격리 로컬 환경에서만 허용 |
+| `npm run e2e` | 외부 요청·메일 발송을 차단한 격리 로컬 환경에서 계약 체결 전 과정 실행 |
+
+`e2e`는 `E2E_API_BASE=http://127.0.0.1:5189/api`, `E2E_ENVIRONMENT=test`,
+`E2E_ALLOW_WRITES=1`과 전용 테스트 관리자 자격(`E2E_ADMIN_EMAIL`,
+`E2E_ADMIN_PASSWORD`)을 모두 요구합니다. 로그인 전에 `/__local/health`로
+외부 요청 차단과 로컬 메일함 사용을 확인하며, 운영 주소·별칭·리다이렉트는
+허용하지 않습니다. `smoke` 쓰기 모드는 `SMOKE_URL=http://127.0.0.1:5189`,
+`SMOKE_API_URL=http://127.0.0.1:5189/api`, `SMOKE_ALLOW_WRITES=1`을 사용합니다.

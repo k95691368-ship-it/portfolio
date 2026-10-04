@@ -72,9 +72,15 @@ export async function onRequestPatch({ env, data, params, request }) {
     return jsonError('계약서는 회사(고용) 측만 수정할 수 있습니다.', 403)
   }
 
-  const room = await env.DB.prepare('SELECT status, archived_at FROM interview_rooms WHERE id = ?')
-    .bind(params.roomId)
-    .first()
+  // 방 상태와 지금 저장된 조건은 서로 기대지 않으므로 함께 읽는다(DB 왕복 한 단계 절약).
+  const [room, existing] = await Promise.all([
+    env.DB.prepare('SELECT status, archived_at FROM interview_rooms WHERE id = ?')
+      .bind(params.roomId)
+      .first(),
+    env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?')
+      .bind(params.roomId)
+      .first(),
+  ])
   if (!room) return jsonError('면접방을 찾을 수 없습니다.', 404)
   if (room.status === 'signed') return jsonError('이미 서명이 완료된 계약서는 수정할 수 없습니다.', 409)
   const editBlock = blockedWhenFrozen(room, 'edit_terms')
@@ -86,10 +92,6 @@ export async function onRequestPatch({ env, data, params, request }) {
   } catch {
     return jsonError('잘못된 요청입니다.', 400)
   }
-
-  const existing = await env.DB.prepare('SELECT * FROM contract_terms WHERE room_id = ?')
-    .bind(params.roomId)
-    .first()
 
   // 임금은 비어 있는 것만 막고 0원·음수는 그대로 받고 있었다. 0원은 필수 항목
   // 검사에서 "값이 있다"로 통과하는데, 최저임금 계산에서는 wage > 0 조건에

@@ -1,5 +1,13 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react'
-import SignaturePadLib from 'signature_pad'
+
+// 그리기 라이브러리는 서명 창을 여는 사람만 쓴다. 계약서 화면 첫 묶음에서 빼고,
+// 화면이 한가할 때 미리 받아 두어 서명 창이 열릴 때는 이미 준비돼 있게 한다.
+const BACKGROUND = 'rgb(255,255,255)'
+const loadPadLibrary = () => import('signature_pad')
+if (typeof window !== 'undefined') {
+  const whenIdle = window.requestIdleCallback || ((callback) => setTimeout(callback, 1))
+  whenIdle(() => { loadPadLibrary().catch(() => {}) })
+}
 
 // 서명 입력.
 //
@@ -16,6 +24,20 @@ const SignaturePad = forwardRef(function SignaturePad(_props, ref) {
   const canvasRef = useRef(null)
   const padRef = useRef(null)
   const typedRef = useRef('')
+
+  // 라이브러리가 오기 전에도 지우기·크기 조정은 같은 흰 배경을 칠한다.
+  // 저장되는 PNG 가 라이브러리 준비 여부와 상관없이 같아야 한다.
+  const clearCanvas = useCallback(() => {
+    if (padRef.current) return padRef.current.clear()
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    ctx.save()
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.fillStyle = BACKGROUND
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.restore()
+  }, [])
 
   // 이름을 캔버스에 직접 그린다. signature_pad 의 내부 상태와는 별개다.
   const drawTypedName = useCallback(() => {
@@ -56,35 +78,42 @@ const SignaturePad = forwardRef(function SignaturePad(_props, ref) {
     canvas.getContext('2d').scale(ratio, ratio)
     // Resizing the backing canvas clears its pixels, so drop any in-progress
     // strokes rather than leave signature_pad's internal state mismatched.
-    padRef.current?.clear()
+    clearCanvas()
     // 리사이즈가 픽셀을 지우므로 타이핑 서명은 다시 그려야 한다.
     drawTypedName()
-  }, [drawTypedName])
+  }, [clearCanvas, drawTypedName])
 
   useEffect(() => {
+    let alive = true
     resizeCanvas()
-    padRef.current = new SignaturePadLib(canvasRef.current, { backgroundColor: 'rgb(255,255,255)' })
+    loadPadLibrary().then(({ default: SignaturePadLib }) => {
+      if (!alive || !canvasRef.current) return
+      padRef.current = new SignaturePadLib(canvasRef.current, { backgroundColor: BACKGROUND })
+      // 라이브러리가 캔버스를 배경색으로 한 번 지우므로, 그 전에 입력한 이름은 다시 그린다.
+      drawTypedName()
+    }).catch(() => {})
 
     window.addEventListener('resize', resizeCanvas)
     window.addEventListener('orientationchange', resizeCanvas)
     return () => {
+      alive = false
       window.removeEventListener('resize', resizeCanvas)
       window.removeEventListener('orientationchange', resizeCanvas)
       padRef.current?.off()
     }
-  }, [resizeCanvas])
+  }, [resizeCanvas, drawTypedName])
 
   useImperativeHandle(ref, () => ({
     clear: () => {
       typedRef.current = ''
-      padRef.current?.clear()
+      clearCanvas()
     },
     // signature_pad 의 isEmpty()는 내부 플래그만 보므로 직접 그린 글자를 모른다.
     // 타이핑 서명도 서명이므로 함께 판단한다.
     isEmpty: () => (padRef.current?.isEmpty() ?? true) && !typedRef.current,
     setTypedName: (name) => {
       typedRef.current = String(name ?? '').trim()
-      padRef.current?.clear() // 배경을 다시 칠해 이전 글자를 지운다
+      clearCanvas() // 배경을 다시 칠해 이전 글자를 지운다
       drawTypedName()
     },
     // 내부 pad 가 아니라 캔버스에서 직접 뽑는다. 손으로 그린 획과 타이핑 서명이

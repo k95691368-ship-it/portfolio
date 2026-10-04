@@ -7,3 +7,8 @@ verify_jwt = false
 # Retention validates its separate RETENTION_JOB_SECRET before any operation.
 [functions.retention]
 verify_jwt = false
+
+# Only durable file cleanup receipts; never invokes retention or email delivery.
+# The handler requires its own STORAGE_CLEANUP_JOB_SECRET.
+[functions.storage-cleanup]
+verify_jwt = false

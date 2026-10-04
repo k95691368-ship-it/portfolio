@@ -1,4 +1,3 @@
-import { sha256 } from '@noble/hashes/sha2.js'
 
 const DATABASE = 'portfolio-interview-recordings'
 function open() {
@@ -50,7 +49,10 @@ export function appendRecordingChunk(id, index, blob) {
     request.onsuccess = () => { if (request.result) tx.objectStore('meta').put({ ...request.result, lastAt: Date.now() }) }
   })
 }
+// 해시 라이브러리는 녹화를 끝낼 때만 쓴다. 면접 화면을 여는 모든 사람이 받지 않게 그때 불러온다.
+export const loadRecordingHash = () => import('@noble/hashes/sha2.js')
 export async function hashRecordingBlob(blob) {
+  const { sha256 } = await loadRecordingHash()
   const hash = sha256.create()
   for (let offset = 0; offset < blob.size; offset += 1024 * 1024) hash.update(new Uint8Array(await blob.slice(offset, offset + 1024 * 1024).arrayBuffer()))
   return [...hash.digest()].map((b) => b.toString(16).padStart(2, '0')).join('')

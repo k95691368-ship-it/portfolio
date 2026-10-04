@@ -23,10 +23,13 @@ export async function onRequestPost({ request, env, data, params }) {
 
   const body = await request.json().catch(() => null)
   const action = body?.action
-  const note = (body?.note ?? '').toString().trim().slice(0, NOTE_MAX)
   if (!['accept', 'decline'].includes(action)) {
     return jsonError('수락 또는 거절만 선택할 수 있습니다.', 400)
   }
+  if (body.note != null && typeof body.note !== 'string') {
+    return jsonError('응답 사유는 글로 입력해주세요.', 400)
+  }
+  const note = (body.note ?? '').trim().slice(0, NOTE_MAX)
 
   const req = await env.DB.prepare(
     'SELECT * FROM contract_change_requests WHERE id = ? AND room_id = ?'
@@ -47,12 +50,12 @@ export async function onRequestPost({ request, env, data, params }) {
   const closedError = blockedWhenFrozen(room, 'respond_change_request')
   if (closedError) return jsonError(closedError, 409)
 
-  const column = EDITABLE_FIELDS[req.field]
+  const column = Object.hasOwn(EDITABLE_FIELDS, req.field) ? EDITABLE_FIELDS[req.field] : null
   if (action === 'accept' && !column) {
     return jsonError('더 이상 수정할 수 없는 항목입니다.', 400)
   }
 
-  const label = FIELD_LABELS[req.field] || req.field
+  const label = Object.hasOwn(FIELD_LABELS, req.field) ? FIELD_LABELS[req.field] : req.field
 
   // 기본급이 두 곳에 있다 — wage_base_amount 컬럼과 wageItems 의 base 항목.
   // 컬럼만 고치면 지원자가 요청해 회사가 수락한 인상이 최저임금·통상임금

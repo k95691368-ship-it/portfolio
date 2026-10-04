@@ -36,11 +36,12 @@ export async function onRequestGet({ env, data, params }) {
 
   const rows = await loadSessionsForUser(env, params.roomId, data.user.id)
   const sessions = rows.map((row) => {
+    const canControlRecording = row.my_role === 'host'
     if (!row.my_role && access.videoRole) {
       row.my_role = access.videoRole
       row.viewer_user_id = data.user.id
     }
-    return serializeSession(row)
+    return serializeSession(row, { canControlRecording })
   })
   return jsonResponse({ sessions, latestSession: sessions[0] ?? null })
 }

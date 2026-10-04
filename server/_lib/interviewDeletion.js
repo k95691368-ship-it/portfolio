@@ -25,9 +25,13 @@ export async function inspectInterviewRoomDeletion(env, roomIds) {
            WHERE session.room_id IN (${placeholders})
              AND recording.deleted_at IS NULL
              AND recording.status IN ('starting','recording','paused','stopping','processing'))
-           AS active_recordings`
+           AS active_recordings,
+         (SELECT COUNT(*) FROM interview_recordings recording
+            JOIN interview_sessions session ON session.id = recording.session_id
+           WHERE session.room_id IN (${placeholders})
+             AND recording.retention_hold_reason IS NOT NULL) AS held_recordings`
     )
-      .bind(...ids, ...ids)
+      .bind(...ids, ...ids, ...ids)
       .first(),
     env.DB.prepare(
       `SELECT recording.r2_key
@@ -46,6 +50,9 @@ export async function inspectInterviewRoomDeletion(env, roomIds) {
       409
     )
   }
+  if (Number(active?.held_recordings) > 0) {
+    throw new InterviewDeletionError('보존이 지정된 녹화가 있어 면접방을 삭제할 수 없습니다.', 409)
+  }
 
   const files = filesResult.results || []
   if (files.length && !env.INTERVIEW_RECORDINGS) {
@@ -54,25 +61,10 @@ export async function inspectInterviewRoomDeletion(env, roomIds) {
   return { ids, files }
 }
 
-export async function deleteInterviewRecordingFiles(env, inspection) {
-  const files = inspection?.files || []
-  if (files.length) {
-    const deleted = await Promise.allSettled(
-      files.map((recording) => env.INTERVIEW_RECORDINGS.delete(recording.r2_key))
-    )
-    if (deleted.some((result) => result.status === 'rejected')) {
-      throw new InterviewDeletionError(
-        '화상 면접 녹화 파일을 모두 삭제하지 못해 면접방 삭제를 중단했습니다.',
-        503
-      )
-    }
-  }
-  return { recordingsDeleted: files.length }
-}
-
 export async function prepareInterviewRoomDeletion(env, roomIds) {
-  const inspection = await inspectInterviewRoomDeletion(env, roomIds)
-  return deleteInterviewRecordingFiles(env, inspection)
+  // Preparation is read-only. The caller queues these keys with parent removal;
+  // physical deletion is permitted only after that transaction is committed.
+  return inspectInterviewRoomDeletion(env, roomIds)
 }
 
 export async function acquireInterviewRoomDeletionLocks(env, roomIds, lockToken) {
@@ -81,6 +73,10 @@ export async function acquireInterviewRoomDeletionLocks(env, roomIds, lockToken)
   try {
     await env.DB.batch(
       ids.flatMap((roomId) => [
+        // Recording start/recovery uses the same parent lock before its
+        // conditional transition. Either it commits first and inspection sees
+        // it, or this deletion lock commits first and blocks the upload claim.
+        env.DB.prepare('UPDATE interview_rooms SET id = id WHERE id = ?').bind(roomId),
         env.DB.prepare(
           `DELETE FROM interview_room_deletion_locks
             WHERE room_id = ? AND datetime(created_at) <= datetime('now', '-10 minutes')`

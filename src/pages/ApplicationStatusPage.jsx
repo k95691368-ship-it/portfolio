@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { formatKstDate } from '../lib/formatTime.js'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client.js'
@@ -27,39 +27,101 @@ export default function ApplicationStatusPage() {
   const [code, setCode] = useState(searchParams.get('code') || '')
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [claiming, setClaiming] = useState(false)
+  const [error, setError] = useState('')
+  const lifetime = useRef(null)
+  const pendingLookup = useRef(null)
+  const pendingClaim = useRef(null)
+  const confirmedReceipt = useRef(null)
+  const generation = useRef(0)
+  const identity = useRef(null)
+  identity.current = user?.id ?? user?.role ?? null
+
+  useEffect(() => {
+    const scope = {}
+    lifetime.current = scope
+    return () => {
+      if (lifetime.current === scope) lifetime.current = null
+      generation.current += 1
+      pendingLookup.current?.controller.abort()
+      pendingLookup.current = null
+      pendingClaim.current?.controller.abort()
+      pendingClaim.current = null
+      confirmedReceipt.current = null
+    }
+  }, [])
+
+  const cancelLookup = () => {
+    generation.current += 1
+    pendingLookup.current?.controller.abort()
+    pendingLookup.current = null
+    confirmedReceipt.current = null
+    setLoading(false)
+  }
+
   const claim = async () => {
-    setLoading(true)
+    const receipt = confirmedReceipt.current
+    if (!lifetime.current || pendingClaim.current || pendingLookup.current || result?.claimed
+      || !receipt || receipt.status !== 'submitted' || receipt.claimed || user?.role !== 'candidate') return
+    const ticket = { scope: lifetime.current, identity: identity.current, code: receipt.lookupCode, controller: new AbortController() }
+    pendingClaim.current = ticket
+    const current = () => lifetime.current === ticket.scope && pendingClaim.current === ticket && identity.current === ticket.identity
+    setClaiming(true)
+    setError('')
     try {
-      await api.post('/applications/claim', { code })
+      const response = await api.post('/applications/claim', { code: ticket.code }, { signal: ticket.controller.signal })
+      if (!current()) return
+      if (response?.ok !== true) throw new Error('계정 연결 결과를 확인하지 못했습니다. 내 지원 현황을 확인한 뒤 필요하면 다시 시도해주세요.')
+      if (confirmedReceipt.current?.lookupCode === ticket.code) confirmedReceipt.current = { ...confirmedReceipt.current, claimed: true }
+      setResult(previous => previous?.lookupCode === ticket.code ? { ...previous, claimed: true } : previous)
       toast.success('이 지원서를 본인 계정에 연결했습니다.')
-    } catch (err) { toast.error(err.message) }
-    finally { setLoading(false) }
+    } catch (err) {
+      if (current()) setError(err.message || '계정 연결 결과를 확인하지 못했습니다.')
+    } finally {
+      if (pendingClaim.current === ticket) { pendingClaim.current = null; if (lifetime.current === ticket.scope) setClaiming(false) }
+    }
   }
 
   const lookup = async (value) => {
     const trimmed = value.trim().toUpperCase()
+    if (!lifetime.current || pendingClaim.current || pendingLookup.current?.code === trimmed) return
     if (!trimmed) {
-      toast.error('접수번호를 입력해주세요.')
+      cancelLookup()
+      setResult(null)
+      setError('접수번호를 입력해주세요.')
       return
     }
+    pendingLookup.current?.controller.abort()
+    const ticket = { scope: lifetime.current, code: trimmed, generation: ++generation.current, controller: new AbortController() }
+    pendingLookup.current = ticket
+    const current = () => lifetime.current === ticket.scope && pendingLookup.current === ticket && generation.current === ticket.generation
     setLoading(true)
     setResult(null)
+    confirmedReceipt.current = null
+    setError('')
     try {
-      const data = await api.get(`/application-status?code=${encodeURIComponent(trimmed)}`)
-      setResult(data)
+      const data = await api.get(`/application-status?code=${encodeURIComponent(trimmed)}`, { signal: ticket.controller.signal })
+      if (!current()) return
+      if (!data || !Object.hasOwn(STATUS_INFO, data.status) || typeof data.postingTitle !== 'string'
+        || typeof data.applicantName !== 'string' || typeof data.submittedAt !== 'string' || !Number.isFinite(Date.parse(data.submittedAt))) {
+        throw new Error('지원 현황 응답을 확인하지 못했습니다. 다시 조회해주세요.')
+      }
+      const receipt = { ...data, lookupCode: trimmed, claimed: false }
+      confirmedReceipt.current = receipt
+      setResult(receipt)
     } catch (err) {
-      toast.error(err.message)
+      if (current()) setError(err.message || '지원 현황을 불러오지 못했습니다.')
     } finally {
-      setLoading(false)
+      if (current()) { pendingLookup.current = null; setLoading(false) }
     }
   }
 
   // URL 에 코드가 있으면 자동 조회
   useEffect(() => {
     const fromUrl = searchParams.get('code')
-    if (fromUrl) lookup(fromUrl)
+    if (fromUrl) { setCode(fromUrl); void lookup(fromUrl) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [searchParams])
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -88,27 +150,38 @@ export default function ApplicationStatusPage() {
         <input
           id="lookup-code"
           value={code}
-          onChange={(e) => setCode(e.target.value)}
+          disabled={claiming}
+          onChange={(e) => {
+            if (pendingClaim.current) return
+            cancelLookup()
+            setCode(e.target.value)
+            setResult(null)
+            setError('')
+          }}
           placeholder="접수번호 입력 (예: ABCD2345EF)"
           maxLength={20}
           autoComplete="off"
         />
-        <button type="submit" className="btn-primary" disabled={loading}>
+        <button type="submit" className="btn-primary" disabled={loading || claiming}>
           {loading ? '조회 중...' : '조회하기'}
         </button>
       </form>
+      {loading && <button type="button" className="btn-secondary" onClick={cancelLookup}>조회 취소</button>}
+      {error && <p className="error" role="alert">{error}</p>}
 
       {result && info && (
         <div className="status-card" role="status" aria-live="polite">
           <span className={`badge ${info.badge}`}>{info.label}</span>
           <h2>{result.postingTitle}</h2>
+          <p>조회한 접수번호: <code>{result.lookupCode}</code></p>
           <p className="status-meta">
             지원자 {result.applicantName} · 접수 {formatKstDate(result.submittedAt)}
             {result.reviewedAt && ` · 심사 완료 ${formatKstDate(result.reviewedAt)}`}
           </p>
           <p className="status-desc">{info.desc}</p>
           {result.status === 'submitted' && (user?.role === 'candidate'
-            ? <button type="button" className="btn-secondary" disabled={loading} onClick={claim}>접수번호로 내 계정에 연결</button>
+            ? result.claimed ? <p role="status">이 지원서를 본인 계정에 연결했습니다.</p>
+              : <button type="button" className="btn-secondary" disabled={loading || claiming} onClick={claim}>{claiming ? '연결 중...' : '접수번호로 내 계정에 연결'}</button>
             : <Link to="/login" className="back-link">기존 지원자 계정이 있다면 로그인 후 접수번호로 연결해주세요.</Link>)}
           {result.status === 'passed' && (
             <Link to="/jobs" className="btn-primary status-login-btn">

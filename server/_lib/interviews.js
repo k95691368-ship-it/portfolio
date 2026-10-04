@@ -126,7 +126,10 @@ export function retentionHasExpired(value, now = Date.now()) {
   return !Number.isFinite(expiresAt) || expiresAt <= now
 }
 
-export function serializeSession(row, { members = [], recordings = [] } = {}) {
+export function serializeSession(
+  row,
+  { members = [], recordings = [], canControlRecording = row.my_role === 'host' } = {}
+) {
   const myRole = row.my_role ?? null
   const serializedRecordings = recordings.map(serializeRecording)
   return {
@@ -145,6 +148,7 @@ export function serializeSession(row, { members = [], recordings = [] } = {}) {
     myConsentDecided: Number(row.my_consent_decided) === 1,
     myConsentGranted: Number(row.my_consent_granted) === 1,
     canManage: myRole === 'host',
+    permissions: { canControlRecording: myRole === 'host' && canControlRecording === true },
     consentNotice: CONSENT_NOTICE,
     participantCount: Number(row.participant_count ?? members.length ?? 0),
     consentedCount: Number(row.consented_count ?? 0),

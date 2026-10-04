@@ -93,13 +93,26 @@ export async function onRequestPost({ request, env, data, params }) {
   // 동시에 사슬 길이도 센다. 조회 쪽이 일정 깊이까지만 거슬러 올라가므로,
   // 그보다 길어지면 계속근로기간이 실제보다 짧게 계산되고 2년 초과 경고를
   // 놓치게 된다. 그렇게 되기 전에 막는다.
-  let cursor = previousRoomId
+  //
+  // 한 칸씩 되묻던 것을 재귀 질의 하나로 받는다. 사슬이 길수록 왕복이 그만큼
+  // 늘었다(최대 10번). 판정은 예전처럼 거슬러 오른 순서대로 한다.
+  // 이 방에 닿거나 상한을 넘으면 더 오를 필요가 없으므로 질의도 거기서 멈춘다.
+  const { results: ancestors } = await env.DB.prepare(
+    `WITH RECURSIVE chain(previous_room_id, depth) AS (
+       SELECT previous_room_id, 1 FROM contract_terms WHERE room_id = ?1
+       UNION ALL
+       SELECT ct.previous_room_id, chain.depth + 1
+         FROM contract_terms ct, chain
+        WHERE ct.room_id = chain.previous_room_id AND chain.previous_room_id <> ?2 AND chain.depth < ?3
+     )
+     SELECT previous_room_id FROM chain ORDER BY depth`
+  )
+    .bind(previousRoomId, params.roomId, MAX_CHAIN)
+    .all()
   let depth = 1
-  while (cursor) {
-    const row = await env.DB.prepare('SELECT previous_room_id FROM contract_terms WHERE room_id = ?')
-      .bind(cursor)
-      .first()
-    cursor = row?.previous_room_id ?? null
+  for (const row of ancestors || []) {
+    const cursor = row.previous_room_id ?? null
+    if (!cursor) break
     if (cursor === params.roomId) {
       return jsonError('계약 연결이 순환합니다. 다른 계약을 선택해주세요.', 400)
     }

@@ -16,31 +16,33 @@ const MAX_ROWS = 500
 export async function onRequestGet({ env, data }) {
   if (!data.user) return jsonError('로그인이 필요합니다.', 401)
 
-  const { results } = await env.DB.prepare(
-    `SELECT a.id, a.room_id, a.room_title, a.employer_name, a.employee_name,
-            a.employee_email, a.contract_start_date, a.contract_end_date,
-            a.employment_ended_at, a.signed_at, a.retention_until,
-            a.fingerprint, a.certificate_serial, a.document_bytes,
-            a.created_at, a.source_deleted_at,
-            json_array_length(a.signatures_json) AS signature_count,
-            -- 방이 아직 살아 있는가. 없으면 계약서만 남은 것이다.
-            (SELECT 1 FROM interview_rooms r WHERE r.id = a.room_id) AS room_alive,
-            -- 회사가 따로 올려 둔 PDF 사본이 있는가(있으면 그것도 내려받게 한다).
-            (SELECT 1 FROM signed_contracts sc WHERE sc.room_id = a.room_id) AS has_pdf
-       FROM contract_archive a
-      ORDER BY COALESCE(a.signed_at, a.created_at) DESC
-      LIMIT ?`
-  )
-    .bind(MAX_ROWS)
-    .all()
-
-  // 아직 보관되지 않은 체결 계약이 있는가. 이 기능을 붙이기 전에 체결된
-  // 계약들이 여기에 잡힌다. 몇 건인지 알려 주고, 아래 POST 로 마저 보관한다.
-  const pending = await env.DB.prepare(
-    `SELECT COUNT(*) AS n FROM interview_rooms r
-      WHERE r.status = 'signed'
-        AND NOT EXISTS (SELECT 1 FROM contract_archive a WHERE a.room_id = r.id)`
-  ).first()
+  // 보관 목록과 아직 보관되지 않은 건수는 서로 기대지 않으므로 함께 읽는다.
+  const [{ results }, pending] = await Promise.all([
+    env.DB.prepare(
+      `SELECT a.id, a.room_id, a.room_title, a.employer_name, a.employee_name,
+              a.employee_email, a.contract_start_date, a.contract_end_date,
+              a.employment_ended_at, a.signed_at, a.retention_until,
+              a.fingerprint, a.certificate_serial, a.document_bytes,
+              a.created_at, a.source_deleted_at,
+              json_array_length(a.signatures_json) AS signature_count,
+              -- 방이 아직 살아 있는가. 없으면 계약서만 남은 것이다.
+              (SELECT 1 FROM interview_rooms r WHERE r.id = a.room_id) AS room_alive,
+              -- 회사가 따로 올려 둔 PDF 사본이 있는가(있으면 그것도 내려받게 한다).
+              (SELECT 1 FROM signed_contracts sc WHERE sc.room_id = a.room_id) AS has_pdf
+         FROM contract_archive a
+        ORDER BY COALESCE(a.signed_at, a.created_at) DESC
+        LIMIT ?`
+    )
+      .bind(MAX_ROWS)
+      .all(),
+    // 아직 보관되지 않은 체결 계약이 있는가. 이 기능을 붙이기 전에 체결된
+    // 계약들이 여기에 잡힌다. 몇 건인지 알려 주고, 아래 POST 로 마저 보관한다.
+    env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM interview_rooms r
+        WHERE r.status = 'signed'
+          AND NOT EXISTS (SELECT 1 FROM contract_archive a WHERE a.room_id = r.id)`
+    ).first(),
+  ])
 
   return jsonResponse({
     contracts: (results || []).map((c) => ({
