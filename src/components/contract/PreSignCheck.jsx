@@ -1,6 +1,6 @@
 import SeverityBadge from '../SeverityBadge.jsx'
 
-// 서명 전 최종 안전 점검 — 합의 불일치 / 법적 문제 / 필수 누락
+// 서명 전 자동 점검 — 기록된 값·이력·본문 표현의 일부만 대조한다.
 export default function PreSignCheck({ check, onRequestFix, onRedraft, redrafting }) {
   const { diffs, legalIssues, missingFields } = check
   const doc = check.documentCheck ?? { hasDocument: false, issues: [], missingArticles: [] }
@@ -14,11 +14,14 @@ export default function PreSignCheck({ check, onRequestFix, onRedraft, redraftin
   return (
     <section className={`presign-check${clean ? ' clean' : ''}`}>
       <h3>서명 전 최종 확인</h3>
+      <p className="period-detail">
+        점검은 기록된 변경 이력과 입력 조건, 일부 본문 표현을 기준으로 합니다. 전체 합의나 계약의
+        법적 유효성을 보증하지 않습니다. 서명 전에 대화에서 합의한 내용과 계약서 전체를 직접 대조해주세요.
+      </p>
 
       {clean && (
         <p className="presign-ok">
-          ✓ 채팅에서 합의한 조건과 계약서 내용이 일치하며, 계약서 본문도 조건과 같습니다. 법적 검토에서도
-          문제가 발견되지 않았습니다.
+          ✓ 자동 점검 대상 항목에서 차이·누락·경고가 발견되지 않았습니다.
         </p>
       )}
 

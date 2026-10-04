@@ -432,4 +432,38 @@ root는 StrictMode/AuthProvider/ProtectedRoute/ChangePasswordPage/LoginPage/clie
 
 로컬 전체196파일/2,707개가22:46:48 시작·120.02초에 통과했다. lint/좁은6런타임 모듈 typecheck/일반·격리403모듈/API101 빌드도 성공했다. 최초 전체 검사·lint의 관찰은 자동 goal continuation 때 tool output이 유실됐고 handle이 소멸한 상태를 확인한 뒤 재실행했다. 이전 실패나 성공으로 추정하지 않고 위 최종 출력만 증거로 쓴다. 병렬 빌드/브라우저·독립 검사가 포함된 실행시간을 실사용 속도/과거 실행과 단순 비교하지 않는다. 별도 새 격리 runtime59788의 HTTP20개가22:49:10/2.02초에 통과, 외부요청false·실제메일false·로컬메일3통·합성admin1명과 close 성공을 확인했다. Temp lme8uJ는 보존했다. 기존 HTTP 계약 회귀이며 새 불확실 응답의 실제 원격 제공자 end-to-end 증거는 아니다.5204 UI helper handle 소멸/리스너 부재·탭 종료/viewport 원복 확인 완료다.
 
-22:52 독립 최종 검토는Approve/차단 문제 없음, 별도 관련7파일196개·변경두파일oxlint PASS다. 일반409의prewrite와postcommit모두가능한보수적분류,지속안내·정상초기화·lifetime·실제anchor의보장범위도대조했다. 같은시각추가reviewer를시작한직후기존승인메시지가도착해중복검사확대를중지하고이미시작한최소검토만요청했다. 검토응답지연을결함이나추가수정의근거로삼지않는다.현재범위는UI/test와근거기록이며DBschema/서버정책/운영업무쓰기는없다.
+22:51 독립 최종 검토는Approve/차단 문제 없음, 별도 관련7파일196개·변경두파일oxlint PASS다. 일반409의prewrite와postcommit모두가능한보수적분류,지속안내·정상초기화·lifetime·실제anchor의보장범위도대조했다. 같은시각추가reviewer를시작한직후기존승인메시지가도착해중복검사확대를중지하고이미시작한최소검토만요청했다. 검토응답지연을결함이나추가수정의근거로삼지않는다.현재범위는UI/test와근거기록이며DBschema/서버정책/운영업무쓰기는없다.
+
+### 10월 4일 22:51~22:55 — 새 배포 확인과 중복 후보 기각
+
+a516f4f5595470f8ff1d4878f604952df9fd4319를 정확한portfolio/master에푸시했다. GitHubCI37207140708/job111450578857 성공, Pages84a060c6-a833-4c9a-9ee9-3530bb51a442와Supabase check도성공했다. 공개56자산 중55개바이트일치/index줄바꿈제외일치,새entry app-YHwwM6eu.js가 확인됐다. 자동연동API46/retention25/storage-cleanup13은22:52:31.245 ACTIVE이며DBschema/서버정책수정없이UI/test만반영됐다.22:53:46 운영읽기38통과/업무쓰기31건너뜀(10.42초),점검/보존삭제0·예약비밀/정리execute부재·두worker미인증403을확인했다.
+
+첫설정진단이digest라는추정JSON필드로false를낸것은설정변경이아니다. 실제출력shape는name/updated_at/value이며CLI표의DIGEST헤더와64hex형식·0의SHA를대조한뒤disabled true로확정했다. 필드가없으면조용한false가아니라미검증실패로취급하는원칙을다음진단에적용한다. 비밀평문은읽거나출력하지않았고설정을바꾸지않았다. 기록상22:52였던독립검토시각은실제clock대조로22:51로교정했다. 조회미확인값이나대략시각을제품설정·완료증거로쓰지않는다.
+
+Forgot/Reset의새불확실안내는별도독립16개 actualhandler/client/JSX+SQLite격리대조와기존7파일96개통과를확인한뒤이번회차기각했다. Forgot는정상/없는계정/provider실패모두조건부202이며메일도착을확정하지않고,응답유실뒤자동재전송도없다. Reset는정상200만완료·token폐기/로그인링크,커밋유실후명시retry400·만료/claim직전만료의기존자격보존·lateupdate0을대조했다. 실패상태의항상있는새링크요청과전체새로고침/새비밀번호로그인대안은살아있다. 같은선택비밀·응답불확실의추가안내를필수새기능으로세지않고유용하지만선택적인중복후보로보류한다. 실제메일/운영발생률/ReactDOM/사용시간은미측정이다. 실제복구가막히거나거짓완료·자동replay가재현되면재검토한다.
+
+### 10월 4일 22:52~22:59 — 함수 직접 소스 대조의 범위와 일정 후보 반증
+
+독립 읽기 검사는Supabase2.119.0을새Temp+명시workdir/project-ref/use-api로실행했고metadata전후API46/retention25/storage-cleanup13을확인했다.세다운로드모두app/server경로를functions밖으로판정하는UnsafeFunctionDownloadPathError/exit1로전체추출을거절했다. 구버전이나guard해제로우회하지않았고원격쓰기/현재소스덮어쓰기/다운로드코드실행은없다.부분API2파일·retention4파일·cleanup4파일의원본bytes/SHA는일치하며중복제거7개파일이다. root도기능별격리snapshot의10개대응(고유7개)을재대조해모두rawHashMatched true를확인했다. worker에서받은어댑터를API번들직접증거로세지않는다.
+
+로컬실행importclosure의독립검사는API184/retention7/cleanup8·union188파일,동적·계산import0·외부npm:postgres@3.4.7하나이며생성101routes를메모리에서재구성해byte일치를확인했다. 이는로컬closure정확성이지원격188파일이확보됐다는뜻이아니다.전체함수소스·외부패키지bytes/설정/비밀/DB동등성은여전히미검증이다. Temp portfolio-function-source-audit-d51aa5b3f84e41d59a23651ed62221c0의부분소스를보존했다. 공식읽기body API를통한메모리대조가능성은별도안전한대안조사이며추출guard를완화하거나원격경로에따라파일을쓰지않는다.
+
+일정조사의actualPanel/SlotPicker/client와실제slot/book/change/detail/list handler·SQLite합성5흐름은기존회귀134개와함께대조했다. 정상A→B는card/DB일치,pending선택disabled·같은tick2제출PATCH1이다. 변경commitloss에서는DB B/child불확실잠금/상위card A·입장/취소유지가재현돼표시비대칭은남는다. 하지만기존child새로고침이parent까지GET-only동기화하고명시취소도같은sessionID를정확히취소한다. parent취소commitloss의전역잠금과첫예약commitloss의POST1/GET복구는정상이다. 다른예약취소/자동replay·대상불일치로확대하지않는다. 상위‘이전확정일정/확인필요’표시는유용하지만선택적으로보류했다. 새상태·수명·교차잠금부담에비해실제오인/사용자편익은미측정이고경고+명시GET대안이있다. 실제DOM/RTC·운영발생률은이번조사밖이며현재표시비대칭을모두해결했다고하지않는다.
+
+### 10월 4일 23:06 — 서명 전 검사 결과 안내의 범위 선정
+
+root 코드 대조와 독립 순수 checker+실제 JSX RAM 컴파일/SSR에서 clean의 단정 범위를 확인했다. 빈 수정 이력의 수동 조건·파생 본문에도 ‘채팅 합의와 본문이 일치/법적 검토 문제 없음’이 나오며, 자동 값 대조에서 제외된 업무 내용을 다른 문장으로 바꿔도 keyword가 있으면 같은 안내다. 반대로 읽을 수 없는 시각/근무일은 이미 missingFields로 잡히므로 모든 입력이 무검사로 통과한다는 가설은 철회한다. 표시 정확성의 작은 필수 보완으로 선정하고 자동 점검 결과와 전체 합의·법적 유효성 보증을 구분한다. 서명 gate/법령 계산/API/동의 정책은 유지한다. 실제 사용자 오인·법률 효력은 미검증이며 구현 전 분류·부담·폐기 조건을 백로그에 남겼다.
+
+### 10월 4일 23:02~23:15 — 중복 후보 기각과 직접 소스 검증의 제한
+
+독립 실제 DmProvider/DmDock/privateDmWindow/client와 DM handler·전체 migration의 격리 SQLite 7흐름 및 관련6파일47개는 기존 편집 버전·대상 key·pending ref·수명·GET 복구를 확인했다. A 전송 후 B 편집, A→B 수신자 이동, 닫고 재진입, 같은 tick 중복, 늦은 GET, commit 응답 유실에서도 새 초안을 유지하고 자동 POST가 없었다. DB는 정확한 제출 대상만 저장했다. 기존 쪽지 보완과 겹쳐 신규 상태/영구 초안/전송 개편 후보를 기각했다. 격리 DB7개 close·원격/메일/파일쓰기0이며 실제 DOM·사용시간·운영 발생률은 이번 대조 밖이다.
+
+함수 body 공식 읽기 API의 RAM 대조 helper와 로컬 closure manifest를 검토했다. PowerShell helper의 AST 오류0·로컬184/7/8·union188은 확인했지만 Windows 실행 정책이 파일 실행을 차단해 합성 parser·자격 조회·body GET은 실행되지 않았다. inline 평가/Bypass/정책 변경으로 우회하지 않았다. 기존 환경의 SUPABASE_ACCESS_TOKEN 존재만 boolean으로 확인했으며 false라 독립 Node 대안도 body 요청 없이 종료했다. 기존7개 raw 일치와 metadata/배포 성공은 유지하되 전체188개 원격 소스·외부 의존성 bytes의 직접 동일성은 미검증이다. 비밀·응답·원격 소스 출력/저장이나 새 권한 요청은 없으며 helper는 ignored 상태로 보존했다. 경로 추측이 실패한 탐색은 rg inventory 먼저 선택하는 방식으로 교정했고 파일 부재를 제품 오류로 세지 않았다.
+
+### 10월 4일 23:09~23:16 — 서명 전 안내 구현·반증·배포 준비
+
+PreSignCheck의 항상 보이는 검사 범위와 clean 문구만 변경했다. 기존 판정식·경고·수정 요청·본문 재작성·서명 확인/gate·API·법률 계산은 그대로다. 새4회귀의 최종 기준선은 원하는 문구4실패/기존14대조 통과, 변경 뒤 관련5파일175개 통과다. 처음 생성 본문 fixture가 별도 당사자 정보를 누락해 기존 이름 경고를 낸 것은 시험 준비 오류로 고쳤으며 본문 검사기를 완화하지 않았다. 독립 actual contract-view+SQLite+React SSR 6대조와 최소3파일107개는 수동/업무 의미 차이에서 한정 안내, 낮은임금·읽을 수 없는 시각/요일·기록금액 차이의 기존 경고/hasBlocking을 확인하고 Approve했다. 조회 전후 total_changes 동일, 기존 실제 repair 콜백2개도 보존됐다.
+
+root는 실제 StrictMode 컴포넌트·순수 검사·운영 CSS의 합성 DOM에서 수동/본문 의미차이/경고 상태와 1265/390px 넘침0을 확인했다. 실제 계약 전체 화면·서명 gate 여정이나 법적 적합성 증거로 확대하지 않는다. ignored presign-scope-wide/mobile PNG를 보존했다. UI health는 DB none·외부요청false·메일none·거절된쓰기0이다. 자체54667 helper의 stdin이 닫혀 정상 명령 전달이 안 됐으므로 정확한 PID12124/명령행을 읽기 대조한 뒤 그 프로세스만 종료했다. 자체 탭 종료·viewport 원복을 확인했으며 기존 정책 거절된 QA helper나 Temp 자료는 건드리지 않았다.
+
+전체196파일2,711개가23:11:33 시작·39.77초에 통과했다. lint·좁은6런타임 모듈 typecheck·일반/격리403모듈/API101 빌드 성공. fresh49688 runtime의 HTTP20개는23:15:08/1.89초에 통과했고 외부요청false·실제메일false·로컬메일3통·합성admin1명·close를 확인했다. Temp dJYkKh는 보존했다. 실행시간은 실제 사용자 속도 향상으로 세지 않는다. 배포 대상은 기존 승인 portfolio/master·Pages·Supabase만이고 DBschema/설정/업무 자료 변경은 없다. 이번 범위의 복구 기준은 새 안내 누락·경고/수정 요청/서명 경계 회귀·공개 자산 불일치·읽기 smoke 실패이며 이전 a516f4f가 되돌릴 기준이다. CI/운영 상태는 푸시 후 별도로 확인한다.

@@ -28,6 +28,11 @@ import ContractLifecycle from '../src/components/contract/ContractLifecycle.jsx'
 import ContractPeriod from '../src/components/contract/ContractPeriod.jsx'
 import EmploymentEnd from '../src/components/contract/EmploymentEnd.jsx'
 import PreSignCheck from '../src/components/contract/PreSignCheck.jsx'
+import { buildArticlesFromTerms } from '../server/_lib/contract.js'
+import { checkLegalCompliance, diffAgreedVsCurrent, findMissingFields } from '../server/_lib/contractCheck.js'
+import { checkContractDocument } from '../server/_lib/documentCheck.js'
+import { checkPeriodCompliance, checkContinuityCompliance } from '../server/_lib/contractPeriod.js'
+import { checkProbationCompliance } from '../server/_lib/probation.js'
 
 const walk = node => !node || typeof node !== 'object' ? []
   : Array.isArray(node) ? node.flatMap(walk) : [node, ...walk(node.props?.children)]
@@ -159,6 +164,78 @@ describe('contract change requests', () => {
 })
 
 describe('contract lifecycle and sign checks', () => {
+  const checkedTerms = () => ({
+    employerName: 'Synthetic employer', employeeName: 'Synthetic employee',
+    contractStartDate: '2026-09-01', contractEndDate: '2027-08-31',
+    workLocation: '합성 테스트 근무지', jobDescription: '고객 응대 및 매장 관리',
+    workHoursStart: '09:00', workHoursEnd: '18:00', workDays: '주 5일 (월~금)',
+    restDays: '토요일, 일요일', breakTime: '12:00~13:00', wageBaseAmount: 3200000,
+    wagePayMethod: '계좌이체', wagePayDate: '매월 25일', annualLeave: '근로기준법에 따름',
+    employeeCount: 10,
+  })
+  // Mirror contract-view's pure checks, without storage, signing, AI or mail.
+  const checked = terms => ({
+    diffs: diffAgreedVsCurrent([], terms),
+    legalIssues: [...checkLegalCompliance(terms), ...checkProbationCompliance(terms),
+      ...checkPeriodCompliance(terms), ...checkContinuityCompliance(null)],
+    missingFields: findMissingFields(terms), documentCheck: checkContractDocument(terms),
+  })
+  const assertScope = tree => {
+    expect(text(tree)).toContain('기록된 변경 이력과 입력 조건, 일부 본문 표현')
+    expect(text(tree)).toContain('전체 합의나 계약의 법적 유효성을 보증하지 않습니다')
+    expect(text(tree)).toContain('계약서 전체를 직접 대조해주세요')
+    expect(text(tree)).not.toContain('채팅에서 합의한 조건과 계약서 내용이 일치하며')
+  }
+
+  it('limits a clean manual-contract result to automatic checks without claiming a recorded agreement', () => {
+    const check = checked(checkedTerms())
+    expect(check.diffs).toEqual([])
+    expect(check.legalIssues).toEqual([])
+    expect(check.missingFields).toEqual([])
+    expect(check.documentCheck).toEqual({ hasDocument: false, issues: [], missingArticles: [], hasConflict: false })
+    const tree = PreSignCheck({ check })
+    expect(text(tree)).toContain('자동 점검 대상 항목에서 차이·누락·경고가 발견되지 않았습니다')
+    assertScope(tree)
+  })
+
+  it('does not certify whole-document agreement when an excluded semantic field differs', () => {
+    const terms = checkedTerms()
+    const articles = [...buildArticlesFromTerms(terms),
+      { heading: '계약 당사자', body: `사업주 ${terms.employerName}, 근로자 ${terms.employeeName}` }]
+    const jobArticle = articles.find(article => /업무의 내용/.test(article.heading))
+    expect(jobArticle).toBeDefined()
+    terms.aiDocument = articles.map(article => article === jobArticle
+      ? { ...article, body: '일반 사무 보조 및 재고 운반 업무를 담당한다.' } : article)
+    const check = checked(terms)
+    expect(check.documentCheck.hasDocument).toBe(true)
+    expect(check.documentCheck.issues).toEqual([])
+    expect(check.documentCheck.missingArticles).toEqual([])
+    const tree = PreSignCheck({ check })
+    assertScope(tree)
+    expect(text(tree)).toContain('자동 점검 대상 항목에서 차이·누락·경고가 발견되지 않았습니다')
+    expect(text(tree)).not.toContain('계약서 본문도 조건과 같습니다')
+  })
+
+  it('keeps the checking limits visible for a warning and preserves existing repair actions', () => {
+    const props = { check: checked({ ...checkedTerms(), wageBaseAmount: 1000 }), onRequestFix: vi.fn() }
+    const tree = PreSignCheck(props)
+    assertScope(tree)
+    expect(text(tree)).not.toContain('자동 점검 대상 항목에서 차이·누락·경고가 발견되지 않았습니다')
+    expect(text(tree)).toContain('최저임금 미달 소지')
+    button(tree, '최소 적법 금액으로 요청').props.onClick()
+    expect(props.onRequestFix).toHaveBeenCalledOnce()
+    expect(props.onRequestFix.mock.calls[0][0].field).toBe('wageBaseAmount')
+  })
+
+  it('does not turn an unreadable time into a clean check result', () => {
+    const check = checked({ ...checkedTerms(), workHoursStart: '아홉시' })
+    expect(check.missingFields.some(item => item.field === 'workHoursStart' && item.unreadable)).toBe(true)
+    const tree = PreSignCheck({ check })
+    assertScope(tree)
+    expect(text(tree)).toContain('필수 항목 누락')
+    expect(text(tree)).not.toContain('자동 점검 대상 항목에서 차이·누락·경고가 발견되지 않았습니다')
+  })
+
   it('keeps lifecycle status visible in the folded summary and gates linking', () => {
     const props = {
       continuity: null, retention: null, linkableRooms: [], canLink: false, canRecordEnd: false,
