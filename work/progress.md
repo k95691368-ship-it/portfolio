@@ -489,3 +489,15 @@ TechPage는 stack 소개 두 항목의 현재 검증 범위만 변경했다. 신
 최신 전체198파일2,726개가23:23:17 시작·46.10초에 통과했고 lint/좁은6런타임 모듈 typecheck/일반403모듈/API101 및 세 worker 빌드 성공이다.23:28 격리 빌드도 성공. fresh51115 runtime의 HTTP20개는23:28:11/1.69초 통과, 외부요청false·실제메일false·로컬메일3통/합성admin1명·close를 확인했다. Temp09vQXC는 보존했다. 화면 helper52835 health는DBnone/메일none/외부요청false/거절쓰기0이며 tty stop으로exit0·리스너 부재, 탭 종료/viewport 원복을 확인했다. application-current-stage-wide/mobile 및 tech-inspection-scope-wide/mobile·tech-cleanup-scope-mobile PNG는 ignored 증거로 보존한다.
 
 현재 변경은 제품 copy2파일+SSR회귀2파일+근거기록2파일이다. 실제 계정·메일·서명·동의·자료 삭제는 없고 자동삭제/정리 예약도 켜지 않는다. 현재 단계 설명·기존 링크/경고·소개 범위의 회귀, 공개 자산 불일치 또는 운영읽기 실패가 생기면 이전1d03807이 복구 기준이다. 로컬 검사와 GitHub/운영 반영은 구분하고 푸시 뒤 새 SHA로 확인한다.
+
+### 10월 4일 23:29~23:33 — 마지막 제품 반영과 종료 준비 인계
+
+제품 변경 b9ded790727cd26423a57ebcd62f9f4cf6b7917c를 정확한portfolio/master에 푸시했다. CI37209426441/job111457389591의 설치·lint·typecheck·시험·빌드 모두 success, Pages9d59446f-fdde-42a9-a1d4-5a7039d4bcf0와 Supabase check도 success다. 자동연동API48/retention27/storage-cleanup15는23:29:49.106 ACTIVE다. 새 entry app-DagJ6va4.js, 공개56자산 중55raw/index CRLF만 제외 일치·mismatch0이다.23:30:59 운영읽기38통과/업무쓰기31건너뜀(10.99초). 점검/보존삭제0 및 정리execute·정리jobsecret·retentionjobsecret 부재, 미인증 worker GET각403을 확인했다. 이 배포 metadata·읽기 점검은 전체 원격 소스 byte 동일성·실제 계약/메일/Storage 제공자 업무 쓰기의 완료 증거가 아니다.
+
+인계 기록 자체도 독립 최소diff/현재 구현 대조에서 Approve다. 최신 two-copy 기록이 처음 필수/signed-only 판단을 철회한 사실, SSR mock·합성 상태·실제 AT/사용자 효과 한계, 함수 원본 고유7/closure188·공식body GET0·전체미검증을 덮지 않는다고 확인했다. 추가 full/build/운영 조회를 중복 수행하지 않았다. 현재 Git 작업 트리 clean·HEAD와 원격master 일치를 확인했다. 다음 인계 기록 commit은 제품 소스 변경 없이 반영하며 그 자체의 후속 CI/배포 확인은 별도로 한다.
+
+백업 archive100425bytes/SHA b4c316688a64871292c83724b9fceb5f563eee48f00132e1e0c048c5d3a91f57와 DPAPI key262bytes의 존재를 재확인했다. 두 보관 디렉터리는 상속 차단·현재 사용자/SYSTEM allow만 있으며 파일은 그 제한된 부모 권한을 상속한다. 키 평문·SQL·자료를 출력/재복원/외부 전송하지 않았다.18:37 복원점은 public46테이블38행/두 private bucket 범위이며 큐 마이그레이션 전 스냅샷이므로 후속 migration 필요, 플랫폼 Auth/권한/설정/비밀과 PC 분실·재설치/독립 원격 보관은 범위 밖이다. 현재 전체 DB의 최신 백업이라고 주장하지 않는다.
+
+최근 자체 UI/HTTP/native PostgreSQL helper는 종료 확인했고 현재 live agent 작업도 모두 종료됐다. 이전 정책 거절된 QA helper22080은 읽기 조회에서 현재 프로세스 부재를 확인했다. 앞선 거절 작업을 분할/우회 재시도하지 않았고 해당 Temp 자료의 삭제 완료는 주장하지 않는다. 합성 DB·파일·메일·PNG·ignored helper는 필요한 증거와 기존 자료를 보존했다. 신규 제품 변경은 여기서 마무리하며23:40 이후 새 대규모 개발·미검증 배포를 시작하지 않는다.23:50 시각 종료 확인과 최종 보고는 채팅에서 별도로 남긴다.
+
+다음 우선순위는 미검증 범위를 확인 가능한 조건에서 줄이는 것이다. (1) 정상 승인 실행/안전한 로컬 인증이 준비되면 공식 읽기 경로로 전체 함수 source closure를 직접 대조한다. guard/실행 정책은 우회하지 않는다. (2) 실제 자료가 늘기 전에 현행 schema를 포함한 새 복원점과 독립 복구 계획을 검토하되 새 키/외부 보관/예약/복원은 별도 승인 없이 활성화하지 않는다. (3) 담당자·지원자 파일럿에서 같은 합성 채용 과제를 기존 방식과 새 방식으로 수행해 완료 여부·누락·재입력·복구 요청 수·시간을 기록한다. 실제 사람/모바일 장치·RTC·AT 및 법적 적합성은 현재 증거와 별도로 확인한다. 시간·채용 성과 개선 가설이 지지되지 않으면 선택적 안내/후보를 축소·폐기한다.
