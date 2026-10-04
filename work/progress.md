@@ -361,3 +361,23 @@ PGlite의 다중 연결 한계를 보완하기 위해 공식 portable PostgreSQL
 21:27:57 독립 검토의 관련7파일83개와 보조2파일30개가 통과했고 릴리스를 막는 새 결함을 발견·재현하지 못했다. 구현자가 선택한7파일103개와 검사 집합을 구분한다. mount 수명 방어가 provider 변경 전체를 보장하는 것은 아니며, 이를 이번 새 회귀나 실사용 문제로 확정하지 않는다. 전체188파일/2,520개가21:31:08 시작·40.33초에 통과했고 lint/좁은6모듈 typecheck/일반·격리403모듈/API101라우트 빌드 및 공백검사도 성공했다.
 
 실제 React StrictMode·InterviewConversationPanel·useChatPolling·대상 모델·apiClient를 localhost5201 합성 transport/provider와 현재 CSS에 연결했다. 공개 A와 전용 A를 동시에 대기시키고 각각 B를 작성한 뒤, 공개 A 성공이 전용 B/대기 잠금에 영향을 주지 않음과 양측 A 성공 뒤 두 B 보존을 확인했다. 가상 전용 대상은 등록된 다른 면접관 peer-provider 1명뿐이며 지원자와 본인은 제외됐다. 다음 명시 전송 뒤 각 입력창이 정상 초기화됐고 최종 공개POST2·전용provider전송2·다른쓰기0이다. 폴링GET25는 기존 주기 동작이며 새 HTTP 기능으로 세지 않는다. 1265px와390px 문서 client/scroll 각각1265/375px로 가로 넘침0이다. 전체 면접실/RTC/DB 저장 검증이 아니라 실제 패널 DOM 검증이며 가상장치 영역을 썼다. 전용 서버 stop/exit0·5201리스너 없음·탭종료·viewport 원복 완료, ignored jpg 증거 보존이다. 계약 요청과 같은 입력 보존 경계를 한 배치로 운영 반영할 준비를 마쳤다.
+
+21:35~21:39 운영 반영: `bc067c28037df6ec0259ebeaaa42e303ec05a426`를 master에 푸시했다. CI37202631289/job111437250614·Pages ce019dbd-ef27-4df9-9c37-d2317c9d7cc6·Supabase check 성공이다. 현재 공개56자산의55개 바이트/index줄바꿈 제외 일치와 entry app-BylUCp2e.js, 운영 읽기38통과/쓰기31건너뜀(21:37:53/11.26초)을 확인했다. 수동 Edge 없이 자동 연동이21:35:59.510에 API42/retention21/storage-cleanup9를 ACTIVE로 갱신했다. 점검0/RETENTION_EXECUTE0 및 두 작업자 비밀·Storage 실행 플래그 부재, 작업자 미인증GET403은 유지됐다. UI2파일 변경으로 DB migration/config 수정은 없고 실제 업무 쓰기·메일·삭제·입장·RTC는 시험하지 않았다. 함수 전체본문 직접일치는 여전히 미검증이다. 신규27+17개는 다른 컴포넌트의 미전송 입력 보존이며 전체 Goal 완료로 처리하지 않는다.
+
+### 10월 4일 21:39~21:45 — 다음 필수 후보 선정과 반증
+
+독립 계정 조사에서 가입 또는 미확인 계정 로그인에 false로 선택한 remember가 EmailVerificationPending의 true 초기값으로 바뀜을 재현했다. 실제 부모/대기 화면/클라이언트와 signup/login/resend/correct/verify 핸들러를 합성state·SQLite·가상storage/메일에 연결했다. 원래 링크 확인은 false/12시간/sessionStorage, 대기 화면 재요청·주소정정 뒤 확인은 true/720시간/localStorage, 대기 화면에서 다시 false를 선택한 대조는 false였다. 체크박스는 보이고 재해제·로그아웃 대안이 있으므로 은밀한 무단 로그인/실제 유출로 단정하지 않는다. 같은 여정의 명시 선택 연속성만 필수로 채택하고 initialRemember 전달/초기값 보완을 구현한다. 직접 확인 페이지 기본값·새 재선택·서버정책·자동메일·영구설정은 바꾸지 않는다.
+
+독립 일정 조사에서 실제 전체 migration·PostgresD1/sqlCompat·PGlite와 slot/book/join-token/GET/PATCH 라우트를 연결했다. 정보 생성의 config 오류503가 Response 성공값으로 transaction을 commit해 scheduled/admitted/providerID를 남기고 지원자 변경·취소/담당자 변경409를 만들었다. 정상입장 전 취소200과 정상 정보200→waiting/admitted/event1→지원자취소409는 정상 대조다. 정상200을 클라이언트에서 버리는 응답 유실은 기존 admission 잠금을 유지해야 하므로 자동 marker 삭제 대상으로 삼지 않는다. 이미 입장한 사용자의 config503 재입장은 providerID를 덮어 이전 heartbeat403으로 만드는 추가 보존 문제도 확인했다.
+
+hosted 런타임에서 URL 전체 누락은 Storage 초기화 실패로 이 라우트에 도달하지 못한다는 반증을 적용했다. valid URL+공개키만 부재인 경우와 기본 격리 로컬의 config 부재를 별도 재현했고 실제 운영 설정에 오류가 있다는 주장은 하지 않는다. issueParticipantCredentials는 동기 local 설정/난수 생성이며 외부 호출·등록이 아니므로 해당 생성 try/catch를 admission UPDATE 앞에 옮기는 작은 보완을 채택한다. 동의·계정상태·원자조건·직후 재검사·회사 스케줄 lock·정상 입장 후 잠금은 유지하며, 모든503 rollback/이전 admission 삭제·서버 정책 개편은 제외한다. 호스트 취소는 기존 대안이지만 지원자의 자력 복구/기존 연결 보존을 충족하지 않는다. 실제 RTC·운영 pooler·법적 판단·사용자 시간효과는 미검증이고 별도 agent의 source/test 소유를 분리해 검증한다.
+
+### 10월 4일 21:46~22:05 — 선택 연속성과 입장 실패 경계 검증
+
+로그인 유지 변경은 부모2곳의 initialRemember 전달과 대기 화면의 초기값만 보완했다. 신규12개 중 수정 전5실패/정상대조7통과→수정 후 관련7파일158개 통과이며, 독립 검토의 별도7파일138개도 통과했다. 실제 signup/login/resend/correct/verify 핸들러·SQLite·가상메일과 실제 API client의 저장까지 연결해 false→12시간/sessionStorage, true→720시간/localStorage, 원래 false링크·재선택·직접 진입 기본값·나중 prop 변화의 초기값 불변을 대조했다. 가상 탭 저장소 폐기는 모든 브라우저의 탭 복원 정책 검증이 아니다.
+
+실제 StrictMode·AuthProvider·ToastProvider·LoginPage/SignupPage/대기화면·apiClient를 localhost5202 합성 HTTP 응답과 현재 CSS에 연결했다. PC 가입false→대기false→재요청false, 모바일 로그인false→대기false→주소정정false와 이후 명시 true 재선택을 확인했다. 직접 진입은 기존 true 기본값이며 최종 합성 POST5/다른쓰기0이다. 성공 뒤 비밀번호 공란,1265/390px 문서 client/scroll1250/375px로 넘침0을 확인했다. 이 화면 검사는 실제 가입·메일·세션 발급을 하지 않았고, 위 actual handler 검사가 별도로 저장 의미를 검증한다. 자체 process handle은 후속 호출 때 이미 소멸했으며5202 리스너 부재를 확인했다. 탭종료/viewport원복 완료, ignored jpg에 화면 증거를 보존했다.
+
+입장 preflight는 로컬 credentials 생성 try/catch만 admission UPDATE 앞으로 옮겼다. 신규44개 기준선18실패/26대조통과→추가 정상대조 포함48개/관련8파일90개 통과, 독립4파일75개도 통과했다. 실제 PostgresD1+전체 migrations/PGlite와 별도 SQLite에서 Response503의 정상 transaction commit을 그대로 두고 admission/provider/leave/updated 필드·session·event 보존, 후보 취소·변경/slot해제, 기존 발급ID heartbeat유지, 설정 복구 뒤 명시재입장, 정상200/응답폐기 후409잠금, 동의·활성계정·접근권한 및 UPDATE 전후 합성 변화 검사를 확인했다. ensureSessionMember의 기존 생성 쓰기는 남으므로 모든503에서 DB쓰기0이라고 주장하지 않는다. before/after 주입은 같은 연결의 합성 경계이며 실제 다중 연결 경합이나 RTC/TURN 성공 증거가 아니다. 기존 오염자료 백필/자동삭제는 하지 않는다.
+
+전체190파일/2,580개가21:53:25 시작·47.27초에 통과했고 lint/좁은6모듈 typecheck/일반·로컬403모듈/API101라우트 빌드도 성공했다. 별도 새 격리 runtime의 HTTP20개가22:05:12/1.74초에 통과했고 외부요청false·실제메일false·로컬메일3통·종료후합성admin1명인 격리DB를 확인했다. runtime close 성공, 새 Temp 디렉터리 MJCHpV는 보존했다. 이 E2E는 면접 RTC 전체 검증이 아니라 기존 HTTP 계약 경로이며 현재 source와 결합한 회귀 근거다. 실제 사용자 빈도/시간·운영 키/config/DB업무쓰기·법적효과는 미검증이고 기존 승인 대상에 반영 준비 완료다.

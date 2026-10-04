@@ -49,7 +49,7 @@ export default function LoginPage() {
       : <Navigate to={destination} replace />
   }
 
-  if (pendingEmail) return <EmailVerificationPending email={pendingEmail} />
+  if (pendingEmail) return <EmailVerificationPending email={pendingEmail} initialRemember={remember} />
   return (
     <div className="auth-page">
       <h1>로그인</h1>

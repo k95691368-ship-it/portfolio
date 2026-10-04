@@ -64,6 +64,25 @@ async function joinInterview({ env, data, params }) {
   }
 
   const participantId = crypto.randomUUID()
+  // Credentials are generated locally. Reject missing configuration before
+  // changing admission or replacing an already issued participant identity.
+  let credentials
+  try {
+    credentials = issueParticipantCredentials(env, {
+      meetingId: session.provider_meeting_id,
+      participantId,
+      customParticipantId: member.custom_participant_id,
+      role: member.role,
+      displayName: String(data.user.display_name || '참가자').slice(0, 100),
+    })
+  } catch (error) {
+    if (error instanceof VideoServiceConfigError) {
+      console.error('Supabase realtime configuration is incomplete:', error.missing.join(', '))
+      return jsonError('화상 면접 서비스가 아직 설정되지 않았습니다.', 503)
+    }
+    throw error
+  }
+
   const admitted = await env.DB.prepare(
     `UPDATE interview_session_members
         SET provider_participant_id = ?, admitted_at = COALESCE(admitted_at, datetime('now')),
@@ -107,23 +126,6 @@ async function joinInterview({ env, data, params }) {
       .bind(params.sessionId, data.user.id)
       .run()
     return jsonError('입장 조건이 변경되어 화상 면접 입장을 차단했습니다.', 403)
-  }
-
-  let credentials
-  try {
-    credentials = issueParticipantCredentials(env, {
-      meetingId: session.provider_meeting_id,
-      participantId,
-      customParticipantId: member.custom_participant_id,
-      role: member.role,
-      displayName: String(data.user.display_name || '참가자').slice(0, 100),
-    })
-  } catch (error) {
-    if (error instanceof VideoServiceConfigError) {
-      console.error('Supabase realtime configuration is incomplete:', error.missing.join(', '))
-      return jsonError('화상 면접 서비스가 아직 설정되지 않았습니다.', 503)
-    }
-    throw error
   }
 
   await env.DB.prepare(

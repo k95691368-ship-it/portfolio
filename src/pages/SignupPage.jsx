@@ -36,7 +36,7 @@ export default function SignupPage() {
     }
   }
 
-  if (pendingEmail) return <EmailVerificationPending email={pendingEmail} />
+  if (pendingEmail) return <EmailVerificationPending email={pendingEmail} initialRemember={form.remember} />
   return (
     <div className="auth-page">
       <h1>회원가입</h1>

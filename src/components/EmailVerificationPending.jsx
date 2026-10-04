@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client.js'
 
-export default function EmailVerificationPending({ email: initialEmail = '' }) {
+export default function EmailVerificationPending({ email: initialEmail = '', initialRemember = true }) {
   const [email, setEmail] = useState(initialEmail)
   const [password, setPassword] = useState('')
   const [newEmail, setNewEmail] = useState('')
-  const [remember, setRemember] = useState(true)
+  const [remember, setRemember] = useState(initialRemember)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
