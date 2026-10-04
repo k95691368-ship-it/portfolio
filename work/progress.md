@@ -393,3 +393,23 @@ hosted 런타임에서 URL 전체 누락은 Storage 초기화 실패로 이 라�
 22:14:30 독립 검토는Approve/차단 결함 없음이며 별도2파일25개를 통과했다. 서로 다른 두 실제 mock PUT을 계속 보류한 뒤 barrier를 풀어 저장준비 경계를 보존하고 최종 파일·receipt 단언은 동일하다. PUT 이전 handler 실패는 barrier가 풀리지 않아 deadline 실패로 남는다. 즉시 원인 대신 timeout 진단이 될 수 있는 한계는 남지만 성공을 숨기지 않는다. 실제 digest bound 호출과 afterEach mock 복구도 확인했다.
 
 조사 방법도 교정한다. 추정 파일명과 PowerShell rg glob을 그대로 전달해 발생한 검색 실패는 제품 결함이 아니다. 다음 조회부터 실제 import 또는 rg --files의 경로를 사용하고 rg -g로 파일 패턴을 지정한다. 후보간 서류 접근 노출 추정은 one_candidate UNIQUE와 실제 join409 대조 뒤 폐기했으며 새 권한규칙을 넣지 않았다. 긴 회사 대화의500개 경계는 별도 격리 재현 대상으로만 분류한다.
+
+### 10월 4일 22:15~22:21 — CI 회복과 다음 필수 경계 선정
+
+daf17d1c74f44e5aa014c6e42e28321a788c9807를 정확한portfolio/master에푸시했다. CI37204973966/job111444156596의린트/타입/시험/빌드모두성공, Pages7073774b-e8ab-4055-90cc-c896ecd51af1·Supabase check성공, 공개56자산(55바이트/index줄바꿈제외)과기존entry app-BftUT632.js 일치를확인했다. 자동함수API44/retention23/storage-cleanup11이22:16:20.352에ACTIVE로갱신됐다.22:19:40 운영읽기38통과/쓰기31건너뜀(10.92초). 전체함수본문직접동등성/업무쓰기/삭제/메일미검증이며DB스키마·정책·수동재배포없음.
+
+독립담당자3명이각각핵심경계를재현한뒤기존대안·폐기조건과함께필수로선정했다.①회사발화501번째첫통보가화면에는보이지만판정의ASC500창밖으로빠져view/close/archive/조건warning가달라진다. 실제messagePOST신호도후속GET에서사라짐을재현했고최초통보·후보제외·명시확정반증대조를포함했다.②내서류교체후이전DELETE실패가삼켜져후속현재서류삭제와retention에서도이전bytes키를찾지못한다.③관리자두번째재설정P2저장후응답유실때무효P1을화면이계속전달안내하며GET복구도고치지못한다.모두합성/격리관찰이고운영발생률·실사용시간미측정이다.
+
+현재소스내기존수동확정/AI/메일·파일큐·관리자GET복구를읽고중복기능을제외했다. 각각bounded keyset+기존parser, 기존durableintent+참조보호, 기존일회성안내/불확실분류를재사용하는좁은범위를담당자별분리했다. 새로운역할/법률정책/연동/자동동의·채용확정/삭제소비활성화는도입하지않는다. 구현전분류·부담·검증·폐기조건은백로그22:21표에기록했다. source편집과desired회귀를끝낸뒤별도독립검토와실제화면/격리HTTP 검증을한다.
+
+### 10월 4일 22:22~22:32 — 세 필수 경계 구현과 새 회귀 교정
+
+긴 회사 발화는 ASC keyset500과 첫 조회의 고정 ID 상한으로 끝까지 읽고 기존 strong/weak 최초5개에 필요한 원문 최대10개만 보존한다. 신규40개와 독립3파일81개는501번째 최초 통보/최초 시각·인용/role 제외/명시 확정/500·1001 경계/append 상한/안전 정수 밖 ID/전체 parser 동등성을 확인했다. 신호 쿼터가 부족하면 O(N) 읽기 비용이 늘며 짧거나 빈 방은1query다. 채팅2.5초 폴링은 이 함수를 호출하지 않으며 단일 snapshot 격리·운영 지연 측정을 주장하지 않는다. 새 법률 판단·자동 확정·정규식 변경은 없다.
+
+문서 업로드는 새 immutable key를 PUT 전48시간 유예 intent로 기록하고 parent/document 잠금·실제 이전 key·UPSERT를 같은 transaction에 넣는다. ACK는 bucket/key/operationId가 일치하는 자기 영수증만 해제하고 기존 processor가 현재/지원서/서명/보관 참조를 보호한다. 실패는 저장201과 cleanupPending을 구분하고 PUT/DB 불확실 응답에서는 유예 영수증을 보존한다. 독립 검토에서 후속 SELECT id의 새 회귀가 발견됐다: A commit→실제 A delete200→B upload201→A response가 B ID를 반환했다. PostgreSQL/SQLite 둘 다 재현했고 동일 batch의 RETURNING id로 교정했다. 제품 어댑터는 반환 행을 지원하지만 SQLite helper가 meta만 제공한다는 불일치를 fixture에서 보완했다. helper3개는 단일 실행/변경 수·원자 반환/rollback을 검증하며 관련9파일144개·독립8파일148개/Approve를 통과했다. 실제 Storage·운영 고아파일 유무·새 다중 연결 경계는 이 인메모리 검사 범위 밖이다.
+
+관리자는 대상 재설정 대기 중 이전 값/복사/전달 문구를 보류하고 불확실 결과에는 password 없는 안내로 교체한다. GET 성공 뒤에도 새 값 복원 불가 안내를 유지하며 명시적 재설정만 허용한다. 정상200 새 값/확정403·취소 이전 유효 값/다른 대상 값/lifetime/동기 복사 guard를 유지한다. 신규22개·독립67개/50개·실제 PBKDF2 유효성 대조가 통과했다. 처음 실패 단언에서 합성 무작위 임시 비밀번호가 출력된 것은 진단을 boolean/count로 변경했고 실제 운영 비밀은 읽거나 출력하지 않았다.
+
+root 실제 StrictMode/AuthProvider/현재 apiClient/AdminPage DOM의 합성 HTTP는 정상 가상P1→가상P2 변경 후503→GET-only 복구→명시 재설정 가상P3를 확인했다. 최종 재설정POST3/사용자GET4/다른쓰기0이며1265/390px 넘침0, 대기/불확실 시 이전값·복사 없음, GET 뒤 안내 지속, 마지막 명시 요청 뒤만 새 값·복사 표시다. helper의 최초 auth 준비 gate 누락은 root fixture 오류로 고쳤으며 제품 결함으로 세지 않는다. Playwright focus 지연은 문서화된 AX 대안으로 관찰했고 같은 동작을 무작정 반복하지 않았다. 임시 탭/viewport override와5203 helper를 종료했다. 증거 PNG는 ignored `.tmp-release-audit-20261004/admin-password-uncertain-{wide,mobile}.png`에 보존했다.
+
+최종 전체195파일/2,681개가22:28:39 시작·50.72초에 통과했다. lint/좁은6모듈 typecheck/일반·격리403모듈/API101 빌드도 성공했다. 별도 fresh local runtime(port58133) HTTP20개가22:31:08/1.69초에 통과, 외부요청false·실제메일false·로컬메일3통·합성admin1명 남음/close 성공이며 Temp5Nv4Ym은 보존했다. 이는 기존 HTTP 계약 회귀이고 실제 채용·법적 서명·외부메일·새 파일 제공자 race의 end-to-end 증거로 확대하지 않는다. 스키마/설정/기존 자료/다른 프로젝트 변경 없이 승인 대상 반영을 준비한다.

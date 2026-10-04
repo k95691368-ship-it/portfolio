@@ -126,9 +126,9 @@ export default function AdminPage() {
     const state = resourceRef.current[key]
     return lifecycle.current.active && !mutation.current && state.loaded && !state.loading && !state.error
   }
-  const runMutation = async (key, id, action) => {
+  const runMutation = async (key, id, action, { onUncertain, hideRevealed = false } = {}) => {
     if (!canMutate(key)) return
-    const operation = { epoch: lifecycle.current.epoch }
+    const operation = { epoch: lifecycle.current.epoch, id, hideRevealed }
     mutation.current = operation
     setPendingId(id)
     const isCurrent = () => lifecycle.current.active && lifecycle.current.epoch === operation.epoch && mutation.current === operation
@@ -136,8 +136,11 @@ export default function AdminPage() {
       await action(isCurrent)
     } catch (err) {
       if (!isCurrent()) return
-      const uncertain = !err?.status || err.status >= 500
-      if (uncertain) updateResource(key, { error: '변경 결과를 확인하지 못했습니다. 다시 불러와 현재 상태를 확인해주세요.' })
+      const uncertain = err?.code === 'STALE_AUTH_RESPONSE' || !err?.status || err.status === 408 || err.status >= 500
+      if (uncertain) {
+        onUncertain?.()
+        updateResource(key, { error: '변경 결과를 확인하지 못했습니다. 다시 불러와 현재 상태를 확인해주세요.' })
+      }
       toast.error(uncertain
         ? '변경 결과를 확인하지 못했습니다. 목록을 다시 불러와 확인해주세요.'
         : '요청을 처리하지 못했습니다. 입력값과 현재 권한을 확인해주세요.')
@@ -240,6 +243,11 @@ export default function AdminPage() {
       setRevealed((prev) => ({ ...prev, [target.id]: { email: target.email, password: res.tempPassword } }))
       toast.success('임시 비밀번호가 발급되었습니다. 확인하세요.')
       await refreshAfterMutation(isCurrent)
+    }, {
+      hideRevealed: true,
+      // A second reset may have committed even when its new one-time value
+      // never arrives. Keep the recovery explanation, not the previous secret.
+      onUncertain: () => setRevealed(prev => ({ ...prev, [target.id]: { email: target.email, uncertain: true } })),
     })
   }
 
@@ -402,20 +410,34 @@ export default function AdminPage() {
       {Object.keys(revealed).length > 0 && (
         <section aria-label="일회성 계정 안내">
           <h2>일회성 계정 안내</h2>
-          {Object.entries(revealed).map(([id, result]) => (
-            <div key={id} className="temp-password-banner">
-              <p>{result.email}</p>
-              <p>임시 비밀번호: <code>{result.password}</code></p>
-              <p>이 값은 현재 화면에서만 확인할 수 있습니다. 필요한 곳에 전달한 뒤 닫아주세요.</p>
-              <div>
-                <button type="button" className="btn-sm" onClick={async () => {
-                  try { await navigator.clipboard.writeText(result.password) }
-                  catch { if (lifecycle.current.active) toast.error('복사하지 못했습니다. 화면에서 직접 선택해 복사해주세요.') }
-                }}>복사</button>
-                <button type="button" className="btn-sm" onClick={() => dismissRevealed(id)}>닫기</button>
+          {Object.entries(revealed).map(([id, result]) => {
+            const resetting = pendingId === id && mutation.current?.hideRevealed
+            return (
+              <div key={id} className="temp-password-banner">
+                <p>{result.email}</p>
+                {resetting ? (
+                  <p role="status">비밀번호를 재설정하는 중입니다. 이전 임시 비밀번호는 복사하거나 전달하지 마세요.</p>
+                ) : result.uncertain ? (
+                  <p role="status">비밀번호 재설정 결과를 확인하지 못했습니다. 이전 임시 비밀번호는 사용하지 마세요. 새 임시 비밀번호는 목록 조회로 복구할 수 없습니다. 사용자 목록을 다시 불러온 뒤 비밀번호를 명시적으로 다시 재설정해주세요.</p>
+                ) : (
+                  <>
+                    <p>임시 비밀번호: <code>{result.password}</code></p>
+                    <p>이 값은 현재 화면에서만 확인할 수 있습니다. 필요한 곳에 전달한 뒤 닫아주세요.</p>
+                  </>
+                )}
+                <div>
+                  {!resetting && !result.uncertain && <button type="button" className="btn-sm" onClick={async () => {
+                    // The live operation guard also covers a click queued
+                    // before the pending-state render hides this button.
+                    if (!lifecycle.current.active || (mutation.current?.hideRevealed && mutation.current.id === id)) return
+                    try { await navigator.clipboard.writeText(result.password) }
+                    catch { if (lifecycle.current.active) toast.error('복사하지 못했습니다. 화면에서 직접 선택해 복사해주세요.') }
+                  }}>복사</button>}
+                  <button type="button" className="btn-sm" onClick={() => dismissRevealed(id)}>닫기</button>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </section>
       )}
 

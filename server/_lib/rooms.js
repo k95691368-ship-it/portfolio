@@ -1,3 +1,5 @@
+import { MAX_SIGNALS, scanForOfferSignals } from './jobOffer.js'
+
 export async function getRoomParticipant(env, roomId, userId) {
   return env.DB.prepare('SELECT role_in_room FROM room_participants WHERE room_id = ? AND user_id = ?')
     .bind(roomId, userId)
@@ -14,15 +16,37 @@ export async function getRoomParticipant(env, roomId, userId) {
 // 그래서 판정은 화면과 다른 조회를 쓴다. 확정은 회사만 할 수 있으므로 회사
 // 발화만 보고(대개 절반 이하다), 성립시킨 것은 처음 그렇게 말한 문장이므로
 // 오래된 것부터 읽는다.
-const OFFER_SCAN_LIMIT = 500
+const OFFER_SCAN_PAGE_SIZE = 500
 
+// 이 조회의 사용처는 모두 채용내정 판정이다. 전체 본문을 보관하는 대신 기존
+// 판정이 보여 줄 최초 strong/weak 각 5개를 대표하는 원문만 남긴다(최대 10개).
+// 조회 상한은 한 페이지의 크기이며, 501번째 이후의 첫 통보도 끝까지 찾는다.
 export async function loadCompanyMessages(env, roomId) {
-  const { results } = await env.DB.prepare(
-    `SELECT m.body, m.created_at, 'company' AS role_in_room
+  const evidence = []
+  let strongCount = 0
+  let weakCount = 0
+  let upperId = null
+  let cursor = null
+
+  while (strongCount < MAX_SIGNALS || weakCount < MAX_SIGNALS) {
+    // 첫 페이지와 함께 방 전체 메시지의 시작 상한을 잡아 추가 왕복을 피한다.
+    // 지원자 메시지가 상한이어도 아래 역할 조건으로 판정에서는 제외한다. 이후에
+    // 도착하는 메시지는 다음 판정에서 읽는다. id는 BIGINT 정밀도를 보존한다.
+    const snapshot = upperId === null
+      ? 'SELECT MAX(id) AS upper_id FROM chat_messages WHERE room_id = ?'
+      : 'SELECT CAST(? AS BIGINT) AS upper_id'
+    const statement = env.DB.prepare(
+      `WITH offer_scan_snapshot AS (${snapshot})
+       SELECT m.body, m.created_at, 'company' AS role_in_room,
+              CAST(m.id AS TEXT) AS offer_message_id,
+              CAST(scan.upper_id AS TEXT) AS offer_upper_id
        FROM chat_messages m
+       CROSS JOIN offer_scan_snapshot scan
        LEFT JOIN room_participants rp
          ON rp.room_id = m.room_id AND rp.user_id = m.sender_user_id
       WHERE m.room_id = ?
+        AND m.id <= scan.upper_id
+        ${cursor === null ? '' : 'AND m.id > ?'}
         AND (
           rp.role_in_room = 'company'
           OR EXISTS (
@@ -36,10 +60,29 @@ export async function loadCompanyMessages(env, roomId) {
         )
       ORDER BY m.id ASC
       LIMIT ?`
-  )
-    .bind(roomId, OFFER_SCAN_LIMIT)
-    .all()
-  return results || []
+    )
+    const { results } = await (cursor === null
+      ? statement.bind(roomId, roomId, OFFER_SCAN_PAGE_SIZE)
+      : statement.bind(upperId, roomId, cursor, OFFER_SCAN_PAGE_SIZE)).all()
+    const page = results || []
+    if (page.length === 0) break
+    upperId ??= page[0].offer_upper_id
+
+    for (const message of page) {
+      const signals = scanForOfferSignals([message])
+      const keepStrong = strongCount < MAX_SIGNALS && signals.strong.length > 0
+      const keepWeak = weakCount < MAX_SIGNALS && signals.weak.length > 0
+      if (keepStrong || keepWeak) {
+        evidence.push({ body: message.body, created_at: message.created_at, role_in_room: message.role_in_room })
+        if (keepStrong) strongCount++
+        if (keepWeak) weakCount++
+      }
+      if (strongCount === MAX_SIGNALS && weakCount === MAX_SIGNALS) return evidence
+    }
+    cursor = page[page.length - 1].offer_message_id
+    if (page.length < OFFER_SCAN_PAGE_SIZE) break
+  }
+  return evidence
 }
 
 // 참여 여부와 방 상태를 한 번에 읽는다.

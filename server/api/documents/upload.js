@@ -1,6 +1,7 @@
 import { genId } from '../../_lib/db.js'
 import { jsonResponse, jsonError } from '../../_lib/http.js'
 import { validateFileContent } from '../../_lib/uploads.js'
+import { storageCleanupIntent, finishStorageCleanup } from '../../_lib/storageCleanup.js'
 
 const ALLOWED_EXT = ['pdf', 'doc', 'docx', 'hwp', 'hwpx']
 const MAX_SIZE = 10 * 1024 * 1024 // 10MB
@@ -34,55 +35,74 @@ export async function onRequestPost({ request, env, data }) {
   const contentError = await validateFileContent(file)
   if (contentError) return jsonError(contentError, 400)
 
-  // 이력서를 새로 올릴 때 기존 파일과 기록을 먼저 지우고 있었다. 그다음
-  // 업로드가 실패하면 — 파일이 크거나 연결이 끊기거나 R2 가 잠깐 흔들리면 —
-  // 새것은 없는데 옛것도 사라진다. 지원자는 "다시 올리면 되지"가 아니라
-  // 원본 파일을 다시 찾아야 하고, 심사 중이던 지원서의 첨부가 비어 버린다.
-  //
-  // 새것을 먼저 올려 자리를 잡은 다음, 성공한 뒤에 옛것을 지운다.
-  const existing = await env.DB.prepare(
-    'SELECT id, r2_key FROM documents WHERE user_id = ? AND doc_type = ?'
-  )
-    .bind(data.user.id, docType)
-    .first()
-
   const id = genId()
   // Concurrent uploads must never overwrite or clean up another request's file.
   const r2Key = `documents/${data.user.id}/${docType}-${id}.${ext}`
   const contentType = EXT_MIME[ext] || 'application/octet-stream'
+  const operationId = genId()
 
-  await env.DOCUMENTS.put(r2Key, file.stream(), {
-    httpMetadata: { contentType },
-  })
+  try {
+    // Record the immutable key before storage can accept any bytes. Uncertain
+    // PUT/DB responses retain an exact retry target without deleting a file
+    // that may already be referenced by a committed save.
+    const queued = await storageCleanupIntent(env.DB, 'documents', operationId,
+      'SELECT ? AS storage_key', [r2Key], { defer: true }).run()
+    if (!queued?.meta?.changes) throw new Error('Missing document cleanup receipt')
+  } catch {
+    return jsonError('파일 보관을 준비하지 못했습니다. 잠시 후 다시 시도해주세요.', 503)
+  }
+  try {
+    await env.DOCUMENTS.put(r2Key, file.stream(), { httpMetadata: { contentType } })
+  } catch {
+    return jsonError('파일 업로드 결과를 확인하지 못했습니다. 문서 목록을 다시 확인해주세요.', 503)
+  }
 
   let saved
   try {
-    // documents 에는 UNIQUE(user_id, doc_type) 가 있으므로 한 문장으로 바꾼다.
-    saved = await env.DB.prepare(
-      `INSERT INTO documents (id, user_id, doc_type, filename, r2_key, size_bytes, content_type)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(user_id, doc_type) DO UPDATE SET
-         filename = excluded.filename,
-         r2_key = excluded.r2_key,
-         size_bytes = excluded.size_bytes,
-         content_type = excluded.content_type,
-         uploaded_at = datetime('now')
-       RETURNING id`
-    )
-      .bind(id, data.user.id, docType, file.name, r2Key, file.size, contentType)
-      .first()
+    const results = await env.DB.batch([
+      // The parent lock also serializes first uploads when no document row
+      // exists yet. Capture the actual preceding key inside this transaction,
+      // rather than a snapshot read before another upload finishes.
+      env.DB.prepare('UPDATE users SET id = id WHERE id = ?').bind(data.user.id),
+      env.DB.prepare('UPDATE documents SET r2_key = r2_key WHERE user_id = ? AND doc_type = ?')
+        .bind(data.user.id, docType),
+      storageCleanupIntent(env.DB, 'documents', operationId,
+        'SELECT r2_key AS storage_key FROM documents WHERE user_id = ? AND doc_type = ?',
+        [data.user.id, docType], { defer: true }),
+      env.DB.prepare(
+        `INSERT INTO documents (id, user_id, doc_type, filename, r2_key, size_bytes, content_type)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(user_id, doc_type) DO UPDATE SET
+           filename = excluded.filename,
+           r2_key = excluded.r2_key,
+           size_bytes = excluded.size_bytes,
+           content_type = excluded.content_type,
+           uploaded_at = datetime('now')
+         RETURNING id`
+      ).bind(id, data.user.id, docType, file.name, r2Key, file.size, contentType),
+    ])
+    if (!results?.[3]?.meta?.changes) throw new Error('Missing document save acknowledgement')
+    // A later delete/reupload can create another row. Keep this transaction's
+    // exact ID rather than reading whichever row exists after it commits.
+    saved = results[3].results?.[0]
     if (!saved?.id) throw new Error('Missing saved document')
   } catch {
-    // A lost database response does not prove rollback. The write can already
-    // have committed, so deleting this object could destroy the saved document.
     console.error('Document save result could not be confirmed')
     return jsonError('파일 저장 결과를 확인하지 못했습니다. 문서 목록을 다시 확인해주세요.', 503)
   }
 
-  // 여기서 실패해도 남는 것은 아무도 가리키지 않는 옛 객체뿐이다.
-  if (existing && existing.r2_key !== r2Key) {
-    await env.DOCUMENTS.delete(existing.r2_key).catch(() => {})
-  }
+  // A later replacement can reassign this key's receipt. Acknowledge only our
+  // operation, then let the existing processor protect all live/archive uses.
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM storage_cleanup_intents WHERE bucket = ? AND storage_key = ? AND operation_id = ?')
+      .bind('documents', r2Key, operationId),
+    env.DB.prepare("UPDATE storage_cleanup_intents SET not_before = datetime('now'), next_attempt_at = datetime('now') WHERE operation_id = ?")
+      .bind(operationId),
+  ]).catch(() => {})
+  const cleanup = await finishStorageCleanup(env, operationId)
 
-  return jsonResponse({ id: saved.id, docType, filename: file.name, sizeBytes: file.size }, 201)
+  return jsonResponse(
+    { id: saved.id, docType, filename: file.name, sizeBytes: file.size, ...cleanup },
+    201
+  )
 }

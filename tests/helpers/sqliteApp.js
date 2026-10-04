@@ -17,6 +17,15 @@ export function sqliteApp() {
     CREATE TABLE interview_signals (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT, sender_id TEXT, recipient_id TEXT, payload TEXT, created_at TEXT DEFAULT (datetime('now')));
     CREATE TABLE email_outbox (id TEXT PRIMARY KEY, status TEXT, provider_id TEXT, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')));
     CREATE TABLE retention_jobs (id TEXT PRIMARY KEY, lock_token TEXT, status TEXT, attempts INTEGER, updated_at TEXT DEFAULT (datetime('now')));`)
+  function runStatement(source, values) {
+    const statement = sql.prepare(source)
+    // D1 and PostgresD1 expose mutation RETURNING rows through run()/batch().
+    // Reading these rows must execute the mutation exactly once.
+    const rows = /\bRETURNING\b/i.test(source) ? statement.all(...values) : null
+    const result = rows === null ? statement.run(...values)
+      : sql.prepare('SELECT changes() AS changes, last_insert_rowid() AS lastInsertRowid').get()
+    return { results: rows || [], meta: { changes: Number(result.changes), last_row_id: Number(result.lastInsertRowid) } }
+  }
   const db = {
     sql,
     prepare(source) {
@@ -27,8 +36,7 @@ export function sqliteApp() {
         async first() { return sql.prepare(source).get(...values) || null },
         async all() { return { results: sql.prepare(source).all(...values) } },
         async run() {
-          const result = sql.prepare(source).run(...values)
-          return { meta: { changes: Number(result.changes), last_row_id: Number(result.lastInsertRowid) } }
+          return runStatement(source, values)
         },
       }
       return statement
@@ -38,8 +46,7 @@ export function sqliteApp() {
       try {
         const results = []
         for (const st of statements) {
-          const result = sql.prepare(st.source).run(...st.values)
-          results.push({ meta: { changes: Number(result.changes), last_row_id: Number(result.lastInsertRowid) } })
+          results.push(runStatement(st.source, st.values))
         }
         sql.exec('COMMIT'); return results
       } catch (error) { sql.exec('ROLLBACK'); throw error }

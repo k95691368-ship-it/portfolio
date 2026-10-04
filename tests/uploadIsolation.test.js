@@ -29,20 +29,31 @@ function fixture() {
 }
 
 function failWrite(db, table, { afterCommit = false, failAt = 1 } = {}) {
-  const original = db.prepare.bind(db)
   let writes = 0
-  vi.spyOn(db, 'prepare').mockImplementation((source) => {
-    const statement = original(source)
-    if (new RegExp(`INSERT INTO ${table}\\b`).test(source)) {
-      const first = statement.first.bind(statement)
-      statement.first = async () => {
-        if (++writes !== failAt) return first()
-        if (afterCommit) await first()
-        throw new Error('Simulated database response failure')
+  if (table === 'documents') {
+    // Document replacement now commits its predecessor receipt and UPSERT in
+    // one batch. Inject at that actual transaction/acknowledgement boundary.
+    const batch = db.batch.bind(db)
+    vi.spyOn(db, 'batch').mockImplementation(async statements => {
+      if (!statements.some(statement => /INSERT INTO documents\b/.test(statement.source)) || ++writes !== failAt) return batch(statements)
+      if (afterCommit) await batch(statements)
+      throw new Error('Simulated database response failure')
+    })
+  } else {
+    const original = db.prepare.bind(db)
+    vi.spyOn(db, 'prepare').mockImplementation((source) => {
+      const statement = original(source)
+      if (new RegExp(`INSERT INTO ${table}\\b`).test(source)) {
+        const first = statement.first.bind(statement)
+        statement.first = async () => {
+          if (++writes !== failAt) return first()
+          if (afterCommit) await first()
+          throw new Error('Simulated database response failure')
+        }
       }
-    }
-    return statement
-  })
+      return statement
+    })
+  }
   vi.spyOn(console, 'error').mockImplementation(() => {})
 }
 

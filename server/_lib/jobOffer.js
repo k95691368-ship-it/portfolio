@@ -63,7 +63,7 @@ const WEAK_PATTERNS = [
   { re: /서류[를]?\s*준비/, label: '입사 서류 언급' },
 ]
 
-const MAX_SIGNALS = 5
+export const MAX_SIGNALS = 5
 const EXCERPT_MAX = 200
 
 function excerpt(body) {
