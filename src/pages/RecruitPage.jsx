@@ -30,6 +30,10 @@ const EMPTY_POSTING = {
   workDays: '',
 }
 
+const DEFINITE_DRAFT_REJECTIONS = new Set([400, 401, 403, 404, 409, 410, 413, 415, 422, 429])
+const DRAFT_UNCONFIRMED_MESSAGE = '임시저장 결과를 확인하지 못했습니다. 입력은 보존했습니다. 저장 상태를 확인하기 전에는 다시 저장하거나 공개 등록하지 마세요.'
+const validDraftTimestamp = value => typeof value === 'string' && value !== '' && Number.isFinite(Date.parse(value))
+
 const STATUS_LABEL = {
   submitted: { label: '심사 대기', badge: 'badge-warning' },
   passed: { label: '서류합격', badge: 'badge-success' },
@@ -482,8 +486,25 @@ export default function RecruitPage() {
   const [loadingDraft, setLoadingDraft] = useState(false)
   const [draftsLoading, setDraftsLoading] = useState(true)
   const [draftsError, setDraftsError] = useState('')
-  const draftBusy = creating || savingDraft || loadingDraft || createRequest.unconfirmed
+  const [draftUnconfirmed, setDraftUnconfirmed] = useState(false)
+  const [checkingDraft, setCheckingDraft] = useState(false)
+  const [draftRecoveryError, setDraftRecoveryError] = useState('')
+  const draftOperation = useRef({ active: false, epoch: 0, save: null, confirmation: null, unconfirmed: null })
+  const draftBusy = creating || savingDraft || loadingDraft || checkingDraft || createRequest.unconfirmed
   const unsaved = JSON.stringify(form) !== savedForm
+
+  useEffect(() => {
+    const current = draftOperation.current
+    current.active = true
+    return () => {
+      current.active = false
+      current.epoch += 1
+      current.confirmation?.controller.abort()
+      current.confirmation = null
+      current.save = null
+      current.unconfirmed = null
+    }
+  }, [])
 
   const loadDrafts = useCallback(async () => {
     setDraftsLoading(true)
@@ -496,6 +517,9 @@ export default function RecruitPage() {
   useEffect(() => { loadDrafts() }, [loadDrafts])
 
   const resetDraftForm = () => {
+    draftOperation.current.unconfirmed = null
+    setDraftUnconfirmed(false)
+    setDraftRecoveryError('')
     setForm(EMPTY_POSTING)
     setDraftId(null)
     setDraftRevision(0)
@@ -503,20 +527,96 @@ export default function RecruitPage() {
     setSavedForm(JSON.stringify(EMPTY_POSTING))
   }
 
+  const confirmDraftSave = () => {
+    const current = draftOperation.current
+    const operation = current.unconfirmed
+    if (!current.active || !operation) return Promise.resolve()
+    if (current.confirmation) return current.confirmation.promise
+    const confirmation = { controller: new AbortController(), promise: null }
+    current.confirmation = confirmation
+    const isCurrent = () => current.active && current.epoch === operation.epoch &&
+      current.unconfirmed === operation && current.confirmation === confirmation
+    setCheckingDraft(true)
+    confirmation.promise = (async () => {
+      try {
+        const { draft } = await api.get(`/posting-drafts/${operation.id}`, { signal: confirmation.controller.signal })
+        if (!isCurrent()) return
+        const keys = Object.keys(EMPTY_POSTING)
+        if (draft?.id !== operation.id || !Number.isSafeInteger(draft.revision) || draft.revision < 1 ||
+            !validDraftTimestamp(draft.updatedAt) || !draft.fields || Array.isArray(draft.fields) ||
+            Object.keys(draft.fields).length !== keys.length || keys.some(key => typeof draft.fields[key] !== 'string')) {
+          throw new Error('Unverified draft lookup')
+        }
+        if (keys.some(key => draft.fields[key] !== operation.fields[key])) {
+          setDraftRecoveryError('저장된 초안의 내용이 이번 요청과 다릅니다. 현재 입력은 덮어쓰지 않았습니다. 목록에서 저장된 초안을 불러오거나 새 공고 작성으로 전환해주세요.')
+          return
+        }
+        if (draft.revision !== operation.revision + 1) {
+          setDraftRecoveryError('저장된 초안의 버전이 변경되어 이번 저장 결과로 확인할 수 없습니다. 현재 입력은 보존했습니다. 목록에서 초안을 불러오거나 새 공고 작성으로 전환해주세요.')
+          return
+        }
+        setDraftRevision(draft.revision)
+        setDraftSavedAt(draft.updatedAt)
+        setSavedForm(JSON.stringify(operation.fields))
+        current.unconfirmed = null
+        setDraftUnconfirmed(false)
+        setDraftRecoveryError('')
+        toast.success('임시저장된 내용을 확인했습니다. 현재 입력은 그대로 보존했습니다.')
+        await loadDrafts()
+      } catch {
+        if (isCurrent()) setDraftRecoveryError(DRAFT_UNCONFIRMED_MESSAGE)
+      } finally {
+        if (current.active && current.confirmation === confirmation) {
+          current.confirmation = null
+          setCheckingDraft(false)
+        }
+      }
+    })()
+    return confirmation.promise
+  }
+
   const saveDraft = async () => {
-    if (draftBusy) return
+    const current = draftOperation.current
+    if (!current.active || draftBusy || current.save || current.confirmation || current.unconfirmed) return
     const id = draftId || crypto.randomUUID()
+    const operation = { id, epoch: current.epoch, revision: draftRevision, fields: structuredClone(form) }
+    current.save = operation
+    const isCurrent = () => current.active && current.epoch === operation.epoch && current.save === operation
     setDraftId(id) // Retain the id after network errors for an idempotent retry.
     setSavingDraft(true)
+    setDraftRecoveryError('')
     try {
-      const saved = await api.put(`/posting-drafts/${id}`, { fields: form, revision: draftRevision })
+      const saved = await api.put(`/posting-drafts/${id}`, { fields: operation.fields, revision: operation.revision })
+      if (!isCurrent()) return
+      if (saved?.id !== id || saved.revision !== operation.revision + 1 || !validDraftTimestamp(saved.updatedAt)) {
+        throw new Error('Unverified draft save')
+      }
       setDraftRevision(saved.revision)
       setDraftSavedAt(saved.updatedAt)
-      setSavedForm(JSON.stringify(form))
+      setSavedForm(JSON.stringify(operation.fields))
       toast.success('임시저장했습니다. 공고는 아직 공개되지 않습니다.')
       await loadDrafts()
-    } catch (err) { toast.error(err.message) }
-    finally { setSavingDraft(false) }
+    } catch (err) {
+      if (!isCurrent()) return
+      if (err?.code === 'STALE_AUTH_RESPONSE') {
+        // A newer login makes this response unusable, not proof that the PUT
+        // failed. Preserve it for an explicit check without querying as a new
+        // account automatically.
+        current.unconfirmed = operation
+        setDraftUnconfirmed(true)
+        setDraftRecoveryError(DRAFT_UNCONFIRMED_MESSAGE)
+      } else if (DEFINITE_DRAFT_REJECTIONS.has(err?.status)) {
+        setDraftRecoveryError(err.message || '임시저장 요청이 거절되었습니다. 입력과 권한을 확인해주세요.')
+        toast.error(err.message)
+      } else {
+        current.unconfirmed = operation
+        setDraftUnconfirmed(true)
+        setDraftRecoveryError(DRAFT_UNCONFIRMED_MESSAGE)
+        await confirmDraftSave()
+      }
+    } finally {
+      if (isCurrent()) { current.save = null; setSavingDraft(false) }
+    }
   }
 
   const openDraft = async (id) => {
@@ -525,6 +625,9 @@ export default function RecruitPage() {
     try {
       const { draft } = await api.get(`/posting-drafts/${id}`)
       const fields = { ...EMPTY_POSTING, ...draft.fields }
+      draftOperation.current.unconfirmed = null
+      setDraftUnconfirmed(false)
+      setDraftRecoveryError('')
       setForm(fields)
       setDraftId(draft.id)
       setDraftRevision(draft.revision)
@@ -636,7 +739,8 @@ export default function RecruitPage() {
 
   const handleCreate = async (e) => {
     e.preventDefault()
-    if (creating || savingDraft || loadingDraft || createRequest.inFlight()) return
+    if (creating || savingDraft || loadingDraft || checkingDraft || draftOperation.current.save ||
+        draftOperation.current.unconfirmed || createRequest.inFlight()) return
     setCreating(true)
     try {
       const result = await createRequest.run({ ...form, ...(draftId ? { draftId, draftRevision } : {}) })
@@ -679,7 +783,9 @@ export default function RecruitPage() {
 
   return (
     <div className="recruit-page">
-      <UnsavedChangesGuard when={unsaved || draftBusy} message={createRequest.unconfirmed
+      <UnsavedChangesGuard when={unsaved || draftBusy || draftUnconfirmed} message={draftUnconfirmed
+        ? '임시저장 결과가 아직 확인되지 않았습니다. 현재 입력과 확인 요청은 이 화면에 보존했습니다. 이동하기 전에 저장 상태를 확인해주세요.'
+        : createRequest.unconfirmed
         ? '공고 등록 결과가 아직 확인되지 않았습니다. 이 화면에서 같은 요청으로 다시 시도해 결과를 확인해주세요. 지금 이동하면 재시도 정보가 사라집니다.'
         : '작성 중인 공고가 있습니다. 내용을 보관하려면 먼저 임시저장해주세요. 저장하지 않고 이동하면 변경사항이 사라집니다.'} />
       <header className="dashboard-header">
@@ -698,6 +804,16 @@ export default function RecruitPage() {
         <p className="muted" role="status">
           {draftSavedAt ? `${formatKst(draftSavedAt)} 임시저장${unsaved ? ' · 저장하지 않은 변경사항' : ''}` : '임시저장한 공고는 본인에게만 보입니다.'}
         </p>
+        {draftRecoveryError && (
+          <div className="notice" role="alert">
+            <p>{draftRecoveryError}</p>
+            {draftUnconfirmed && <>
+              <p>{checkingDraft ? '저장된 초안을 확인하는 동안 편집과 저장을 잠시 잠급니다.' : '입력은 계속 편집할 수 있습니다. 확인 전에는 저장·공개 등록을 잠그며, 저장된 초안 불러오기나 새 공고 작성은 변경사항을 버릴지 확인한 뒤 선택할 수 있습니다.'}</p>
+              <button type="button" className="btn-secondary" disabled={checkingDraft || savingDraft || loadingDraft || creating}
+                onClick={confirmDraftSave}>{checkingDraft ? '저장 상태 확인 중...' : '임시저장 상태 확인'}</button>
+            </>}
+          </div>
+        )}
         {createRequest.unconfirmed && (
           <div className="notice" role="alert">
             <p>공고 등록 결과를 확인하지 못했습니다. 입력은 보존했으며, 중복 등록을 막기 위해 같은 요청으로 다시 시도합니다. 이 화면을 닫거나 새로고침하기 전에 결과를 확인해주세요.</p>
@@ -819,14 +935,14 @@ export default function RecruitPage() {
               setForm({ ...EMPTY_POSTING, ...EXAMPLE_POSTING })
             }} />
           <div className="posting-editor-toolbar">
-          <button type="button" className="btn-secondary" onClick={saveDraft}>
+          <button type="button" className="btn-secondary" onClick={saveDraft} disabled={draftUnconfirmed}>
             {savingDraft ? '저장 중...' : '임시저장'}
           </button>
-          <button type="submit" className="btn-primary">
+          <button type="submit" className="btn-primary" disabled={draftUnconfirmed}>
             {creating ? '등록 중...' : '공고 등록'}
           </button>
           <button type="button" className="btn-ghost" onClick={() => {
-            if (unsaved && !window.confirm('저장하지 않은 변경사항이 있습니다. 새 공고를 작성하시겠습니까?')) return
+            if ((unsaved || draftUnconfirmed) && !window.confirm('저장하지 않은 변경사항이 있습니다. 새 공고를 작성하시겠습니까?')) return
             resetDraftForm()
           }}>새 공고 작성</button>
           </div>
