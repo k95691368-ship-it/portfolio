@@ -251,3 +251,21 @@
 실제 React StrictMode 컴포넌트+현재 dist CSS를 사용하는 localhost 합성 GET 화면에서 B503일 때 A 이름/통계/열기 버튼이 없는 것, GET 재시도 후 B만 표시되는 것과 app-B 콜백을 확인했다. A↔B 정상 전환도 통과했다. 390×844에서는 document client/scroll390px, 비교표 래퍼346px/내용780px로 표 내부만 스크롤된다. 이는 실제 담당자 로그인/DB/모바일 전체 여정 검증이 아니다. 최초 fixture를 '첫 요청만 실패'로 만들면 StrictMode가 첫 요청을 취소하고 두 번째 요청에 성공해 오류 증거가 사라졌다. 실패를 명시적 합성 응답 복구 전까지 유지하도록 fixture를 교정한 뒤 다시 검증했다. 임시 viewport 원복·검증 탭 종료·전용 서버 종료 exit0/5194 리스너 없음/HTTP mutation0을 확인했다. 기존 QA 정리 미완료와 별개다.
 
 PGlite의 다중 연결 한계를 보완하기 위해 공식 portable PostgreSQL17.11을127.0.0.1:62374에서 격리 실행했다. 실제 PostgresD1/호출 제한/파일 정리/계약 저장·보관 핸들러를 사용하는 서로 다른 앱 backend PID6488/21236에서 advisory 및 transactionid 잠금 대기를 관찰했다. 호출 제한32요청×3회는 매회 정확히7개만 허용, 동일 정리 의도 두 선택은 제공자 삭제1회, 이전 ACK 뒤 새 operation 영수증 보존, 계약 두 저장201/201 뒤 최종 두 번째 PDF 참조와 이전·중간 파일 영수증2개 유지/회수, 업로드 중 별도 보관200→저장409·이전 PDF 보존이 통과했다. 추가 연결은 관찰만이 아니라 fixture 준비·갱신·정리 재시도 제어에도 사용했으므로 'read-only observation'이라는 초기 표현을 교정했다. Storage는 메모리 모의 제공자이고 외부 HTTP/실제 메일은 금지했다. 운영 pooler/네트워크/Deno/강제 종료·응답 유실의 전부를 입증하지 않는다. 자신의 서버 PID25340만 대조해 pg_ctl exit0·프로세스/리스너/postmaster.pid 없음으로 종료했고 일회성 자료는 ignored 경로에 남겼다.
+
+### 10월 4일 19:17~19:21 — 두 번째 운영 반영과 배포 범위 교정
+
+`9bb6df1d8d8523dcb6cb61c4f0ff4caae6017086`의 공고 비교 및 선언 경로 수정은 GitHub master에 반영됐고 CI37194912102, Pages 배포9aef1f35-8263-4b9a-98e3-c295df0b0197 및 해당 Supabase check가 성공했다. 수동 API35 업로드는 core.d.ts를 실제 포함하며 기존 core.js 파일 누락 경고 없이 성공했다. 운영 읽기 smoke38통과/쓰기31건너뜀(19:18:31 시작,10.54초), 공개 dist56개 중55개 바이트 일치/index 줄바꿈 제외 일치, entry app-CnBEEqaY.js를 확인했다.
+
+**범위 교정:** 수동 명령은 API만 배포했지만 GitHub 푸시 후 API36/retention15/storage-cleanup3이 모두19:18:25.113에 갱신됐다. 앞선 첫 푸시도18:53:37.676에 API34/retention14/cleanup2로 자동 반영됐다. 따라서 18:51 수동 배포 전후의 retention13 유지 기록을 GitHub 푸시 이후 상태로 확대하지 않는다. [Supabase 공식 GitHub 연동 문서](https://supabase.com/docs/guides/deployment/branching/github-integration)는 production push에서 config의 Edge 함수·migration·Storage 반영을 설명한다. 이 설정과 동일 갱신 시각/체크 결과는 기존 GitHub 연동의 세 함수 재배포를 강하게 뒷받침하지만 대시보드 연동 설정 자체를 읽은 증거는 아니다. 다음 프런트 전용 수정은 불필요한 수동 API 재배포를 생략하되 푸시 후 세 함수 상태를 모두 확인한다.
+
+19:21 읽기 확인에서 migration12개·계정1/공고1/지원서0/방0/녹화0/Storage0·queue0/RLS true/공개 테이블 권한 false가 유지됐다. 점검 모드는0이며 cleanup 비밀/execute 및 retention 작업 비밀은 없고 기존 RETENTION_EXECUTE=0, cron/net도 없다. 별도 worker GET은403이었다. 예약 삭제를 활성화하거나 실제 자료를 삭제하지 않았다. retention15 SHA256은87a52c3d52da73abb1026dbea132d9f8137ae6f85e087e3852583df1565a6668, API36은d5bbf25b4f0cfbf13a305e9d46da2d8b6dab754d39dab7347420d13c3b8f5248, cleanup3은5c1aef1df0cd0fd65bbd81af0fbb1ae3eb6a01f744a6786b854d60ee8626d124다. 서로 다른 업로더 번들 해시를 소스 변경 자체로 단정하지 않는다.
+
+자동 반영 함수의 소스 직접 대조는 부분 검증이다. 별도 디렉터리로 수행한 readonly CLI download가 app/server 의존성을 함수 디렉터리 밖으로 추출하려다 안전 경계에서 거부됐다. 먼저 받은4개 파일은 검증 소스와 줄바꿈 제외 일치했으나 전체 함수 본문 일치로 주장하지 않는다. RAM-only 대조용 별도 PowerShell 스크립트도 OS 실행 정책에서 시작 전 거부됐으며 우회·정책 완화·자격 증명 출력은 하지 않았다. 운영 smoke/자산/commit check와 직접 소스 증거의 한계를 구분한다.
+
+### 10월 4일 19:27~19:37 — 지원 완료 안내의 실제 접수와 입력 초안 구분
+
+독립 재현에서 제출 시작 시 FormData 이메일A를 보냈으나 완료 전 입력을B로 바꾸면 완료 화면이B를 표시했다. 응답 유실 뒤 동일 operation으로 변경한 지원서를 재시도해도 실제 apply 핸들러는 기존A의 접수증을 SELECT1회로 먼저 반환하므로 현재 입력이 저장됐다는 오인이 생겼다. 정상A→A 대조는 통과했다. **필수 결과 정확성**으로 채택하되 개인정보 응답 추가·전체 폼 잠금/구조 개편은 제외했다. 입력 잠금만으로는 응답 유실 후 편집·재시도를 해결하지 못하기 때문이다.
+
+결과 이메일 안내는 '지원서에 제출된 이메일'로 표시하고 기존 접수 재확인/페이지 재개에서는 현재 입력 변경의 저장을 보장하지 않는 지속 안내와 기존 제출 내용 확인·수정 링크를 보여준다. 철회 후 명시적 새 지원은 복구 안내를 초기화한다. 신규6개 검사 모두 수정 전 실패, 수정 후 통과했다. 독립3파일/19개 검토도 차단 사유 없이 통과했다. 최종 전체183파일/2,379개(19:27:24 시작,43.18초), 일반·로컬403모듈/API101 빌드 성공이며 이 수치는 앞선 실행과 단순 속도 비교하지 않는다.
+
+실제 ApplyPage+React StrictMode+memory data router/현재 CSS로 합성 접수 조회 재개를 확인했다. 넓은1265px 및390×844에서 문서 가로 넘침0, persistent role=status 경고 및 /application-manage 링크가 일치했다. screenshot apply-receipt-recovered-wide.jpg/mobile.jpg는 ignored 회차 폴더의 합성 화면 증거이며 실제 제출·본인 확인·메일 도착의 증거가 아니다. localhost5196은 DB/메일/파일업로드 없음, 합성 receipt 조회 POST만 허용하고 다른 쓰기는 차단했다. health는 조회4회/거부된쓰기0, 자체 서버 exit0·탭 종료·viewport 원복을 확인했다. 현재 새 수정은 운영 반영 준비 단계이며 Goal은 ACTIVE다.

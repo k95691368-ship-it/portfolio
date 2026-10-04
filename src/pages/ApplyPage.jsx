@@ -90,6 +90,7 @@ export default function ApplyPage() {
   const [done, setDone] = useState(false)
   const [lookupCode, setLookupCode] = useState('')
   const [receiptStatus, setReceiptStatus] = useState('submitted')
+  const [receiptRecovered, setReceiptRecovered] = useState(false)
   const careerKeyRef = useRef(0)
   const submitRef = useRef(false)
 
@@ -121,7 +122,7 @@ export default function ApplyPage() {
     try {
       const operationToken = sessionStorage.getItem(`portfolioApplicationOperation:${id}`)
       if (operationToken) void api.post('/application-receipt', { postingId: id, operationToken })
-        .then(result => { if (active) { setLookupCode(result.lookupCode); setReceiptStatus(result.status || 'submitted'); setDone(true) } })
+        .then(result => { if (active) { setLookupCode(result.lookupCode); setReceiptStatus(result.status || 'submitted'); setReceiptRecovered(true); setDone(true) } })
         .catch(() => {})
     } catch { /* Receipt recovery remains available through email verification. */ }
     return () => { active = false }
@@ -185,6 +186,7 @@ export default function ApplyPage() {
       const res = await api.upload(`/jobs/${id}/apply`, form)
       setLookupCode(res.lookupCode || '')
       setReceiptStatus(res.status || 'submitted')
+      setReceiptRecovered(Boolean(res.recovered))
       setDone(true)
       if (res.recovered) toast.success('기존 접수 내역을 확인했습니다.')
       else toast.success('지원서가 정상 제출되었습니다.')
@@ -192,7 +194,7 @@ export default function ApplyPage() {
       // A response lost after database commit must recover the original receipt.
       try {
         const result = await api.post('/application-receipt', { postingId: id, operationToken: applicationOperation(id) })
-        setLookupCode(result.lookupCode); setReceiptStatus(result.status || 'submitted'); setDone(true)
+        setLookupCode(result.lookupCode); setReceiptStatus(result.status || 'submitted'); setReceiptRecovered(true); setDone(true)
         toast.success('접수된 지원 내역을 확인했습니다.')
       } catch { toast.error(`${err.message} 접수 여부가 불확실하면 다시 제출하거나 이메일로 지원 내역을 확인해주세요.`) }
     } finally {
@@ -206,16 +208,19 @@ export default function ApplyPage() {
       <div className="apply-page">
         <div className="apply-done">
           <h1>{receiptStatus === 'withdrawn' ? '철회한 지원 내역입니다' : receiptStatus === 'passed' ? '서류에 합격한 지원입니다' : receiptStatus === 'rejected' ? '불합격한 지원 내역입니다' : '지원이 완료되었습니다'}</h1>
+          {receiptRecovered && <p className="notice" role="status">
+            기존에 접수된 지원 내역을 확인했습니다. 현재 화면에서 수정한 내용이 저장되었다는 뜻은 아닙니다.
+            제출된 내용은 아래의 제출 내용 확인·수정에서 확인해주세요.
+          </p>}
           {receiptStatus === 'submitted' && <p>
-            서류 심사 후 결과를 지원하신 이메일{email ? <>(<strong>{email}</strong>)</> : null}로
-            안내드립니다.
+            서류 심사 후 결과를 지원서에 제출된 이메일로 안내드립니다.
           </p>}
           {['submitted', 'passed'].includes(receiptStatus) && <p className="notice">
             서류에 합격하면 결과 이메일의 입장 코드로 면접방에 들어갈 수 있습니다.
           </p>}
           {receiptStatus === 'withdrawn' && <><p>이전 지원은 철회되어 심사하지 않습니다. 새로 지원하려면 아래에서 새 지원서를 시작해주세요.</p>
             {posting?.status === 'open' && <button type="button" className="btn-primary" onClick={() => {
-              try { restartApplicationOperation(id); setLookupCode(''); setReceiptStatus('submitted'); setDone(false) }
+              try { restartApplicationOperation(id); setLookupCode(''); setReceiptStatus('submitted'); setReceiptRecovered(false); setDone(false) }
               catch { toast.error('새 지원 정보를 저장하지 못했습니다. 브라우저 저장소 설정을 확인해주세요.') }
             }}>새 지원서 작성</button>}</>}
           {lookupCode && (
