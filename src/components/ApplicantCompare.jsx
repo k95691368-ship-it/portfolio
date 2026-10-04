@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api/client.js'
-import { useToast } from '../context/ToastContext.jsx'
 
 const FIT_BADGE = {
   high: 'badge-success',
@@ -20,26 +19,47 @@ const STATUS_LABEL = {
 // 적합도와 경력 기간으로 정한 것이다. 그래서 각 줄에 "왜 이 자리인지"를 함께
 // 보여주고, 아직 심사하지 않은 지원서가 몇 건인지도 분명히 알린다.
 export default function ApplicantCompare({ postingId, postingTitle, onClose, onOpenApplication }) {
-  const toast = useToast()
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [snapshot, setSnapshot] = useState({ postingId, data: null, loading: true, error: '' })
+  const currentPosting = useRef(postingId)
+  currentPosting.current = postingId
+  const active = useRef(false)
+  const read = useRef(null)
+
+  const load = useCallback(() => {
+    // A captured retry must not query an old posting or start after exit.
+    if (!active.current || currentPosting.current !== postingId || read.current?.postingId === postingId) return
+    read.current?.controller.abort()
+    const request = { postingId, controller: new AbortController() }
+    read.current = request
+    setSnapshot(previous => ({ postingId, data: null, loading: true,
+      error: previous.postingId === postingId ? previous.error : '' }))
+    const current = () => active.current && currentPosting.current === postingId
+      && read.current === request && !request.controller.signal.aborted
+    void api.get(`/postings/${postingId}/applications`, { signal: request.controller.signal })
+      .then(data => {
+        if (current()) setSnapshot({ postingId, data, loading: false, error: '' })
+      })
+      .catch(err => {
+        if (current()) setSnapshot({ postingId, data: null, loading: false,
+          error: err.message || '지원자 비교를 불러오지 못했습니다.' })
+      })
+      .finally(() => { if (read.current === request) read.current = null })
+  }, [postingId])
 
   useEffect(() => {
-    let alive = true
-    setLoading(true)
-    api
-      .get(`/postings/${postingId}/applications`)
-      .then((d) => {
-        if (alive) setData(d)
-      })
-      .catch((err) => toast.error(err.message))
-      .finally(() => {
-        if (alive) setLoading(false)
-      })
+    active.current = true
+    load()
     return () => {
-      alive = false
+      active.current = false
+      read.current?.controller.abort()
+      read.current = null
     }
-  }, [postingId, toast])
+  }, [load])
+
+  // Props change before effects run. Never label retained A data as posting B.
+  const data = snapshot.postingId === postingId ? snapshot.data : null
+  const loading = snapshot.postingId !== postingId || snapshot.loading
+  const error = snapshot.postingId === postingId ? snapshot.error : ''
 
   return (
     <section className="recruit-section applicant-compare">
@@ -50,7 +70,11 @@ export default function ApplicantCompare({ postingId, postingTitle, onClose, onO
         </button>
       </div>
 
-      {loading && <p>불러오는 중...</p>}
+      {loading && <p role="status">불러오는 중...</p>}
+      {error && <div>
+        <p className="error" role="alert">지원자 비교를 불러오지 못했습니다. {error}</p>
+        <button type="button" className="btn-secondary" disabled={loading} onClick={load}>지원자 비교 다시 불러오기</button>
+      </div>}
 
       {!loading && data && data.applicants.length === 0 && (
         <p className="notice">이 공고에 접수된 지원서가 없습니다.</p>
@@ -135,7 +159,9 @@ export default function ApplicantCompare({ postingId, postingTitle, onClose, onO
                       <button
                         type="button"
                         className="btn-sm"
-                        onClick={() => onOpenApplication(a.id)}
+                        onClick={() => {
+                          if (active.current && currentPosting.current === postingId) onOpenApplication(a.id)
+                        }}
                         aria-label={`${a.applicantName} 지원서 보기`}
                       >
                         지원서 보기

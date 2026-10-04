@@ -2,11 +2,11 @@
 // 두 값 모두 조건문에서 그대로 쓸 수 있고(0은 거짓), 이 id를 releaseRateLimit에
 // 넘기면 다른 요청의 기록을 건드리지 않고 내 것만 되돌릴 수 있다.
 /**
- * @param {{ DB: import('../../typecheck/core.js').RateLimitDatabase }} env
+ * @param {{ DB: import('../../typecheck/core.d.ts').RateLimitDatabase }} env
  * @param {string} bucket
  * @param {number} maxHits
  * @param {number} windowSeconds
- * @returns {Promise<import('../../typecheck/core.js').RateLimitTicket>}
+ * @returns {Promise<import('../../typecheck/core.d.ts').RateLimitTicket>}
  */
 export async function checkRateLimit(env, bucket, maxHits, windowSeconds) {
   if (!Number.isInteger(maxHits) || maxHits < 1 || !Number.isInteger(windowSeconds) || windowSeconds < 1) return 0
@@ -19,7 +19,7 @@ export async function checkRateLimit(env, bucket, maxHits, windowSeconds) {
 }
 
 /**
- * @param {import('../../typecheck/core.js').RateLimitDatabase} db
+ * @param {import('../../typecheck/core.d.ts').RateLimitDatabase} db
  * @param {string} bucket
  * @param {number} maxHits
  * @param {number} windowSeconds
@@ -67,9 +67,9 @@ async function reserve(db, bucket, maxHits, windowSeconds) {
 // 그중 하나만 실패하면, "가장 최근 기록"을 지우는 방식은 성공한 쪽의 기록을
 // 지울 수 있다. 내 것을 정확히 지우기 위해 id로 지운다.
 /**
- * @param {{ DB: import('../../typecheck/core.js').RateLimitDatabase }} env
+ * @param {{ DB: import('../../typecheck/core.d.ts').RateLimitDatabase }} env
  * @param {string} bucket
- * @param {import('../../typecheck/core.js').RateLimitTicket | null | undefined} ticket
+ * @param {import('../../typecheck/core.d.ts').RateLimitTicket | null | undefined} ticket
  */
 export async function releaseRateLimit(env, bucket, ticket) {
   if (!ticket) return

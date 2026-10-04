@@ -5,7 +5,7 @@ const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024
 const encoder = new TextEncoder()
 
 export class EmailDeliveryError extends Error {
-  /** @param {string} message @param {import('../../typecheck/core.js').DeliveryFailureState} [deliveryState] */
+  /** @param {string} message @param {import('../../typecheck/core.d.ts').DeliveryFailureState} [deliveryState] */
   constructor(message, deliveryState = 'failed') {
     super(message)
     this.name = 'EmailDeliveryError'
@@ -25,9 +25,9 @@ function mailbox(value) {
 }
 
 /**
- * @template {import('../../typecheck/core.js').MailEnvironment} Env
+ * @template {import('../../typecheck/core.d.ts').MailEnvironment} Env
  * @param {Env} env
- * @returns {env is Env & import('../../typecheck/core.js').ConfiguredMailEnvironment}
+ * @returns {env is Env & import('../../typecheck/core.d.ts').ConfiguredMailEnvironment}
  */
 export function isGmailConfigured(env) {
   if (env.EMAIL_ENABLED !== '1') return false
@@ -85,7 +85,7 @@ function textPart(type, content) {
   ].join(CRLF)
 }
 
-/** @param {import('../../typecheck/core.js').EmailAttachment} attachment */
+/** @param {import('../../typecheck/core.d.ts').EmailAttachment} attachment */
 function attachmentPart(attachment) {
   const filename = String(attachment.filename || 'attachment.pdf')
   header(filename) // Validate before interpolating encoded filename parameters.
@@ -116,7 +116,7 @@ function attachmentPart(attachment) {
   ].join(CRLF)
 }
 
-/** @param {import('../../typecheck/core.js').EmailMessage & { from: string }} message */
+/** @param {import('../../typecheck/core.d.ts').EmailMessage & { from: string }} message */
 function rawMessage({ from, fromName, to, subject, text, html, attachments = [], messageId }) {
   if (!Array.isArray(attachments) || attachments.length > 1) throw new Error('계약서 첨부는 1개까지 가능합니다.')
   const alternative = `alternative_${crypto.randomUUID()}`
@@ -181,9 +181,9 @@ async function googleRequest(url, init, stage) {
 }
 
 /**
- * @param {import('../../typecheck/core.js').MailEnvironment} env
- * @param {import('../../typecheck/core.js').EmailMessage} message
- * @returns {Promise<import('../../typecheck/core.js').EmailReceipt>}
+ * @param {import('../../typecheck/core.d.ts').MailEnvironment} env
+ * @param {import('../../typecheck/core.d.ts').EmailMessage} message
+ * @returns {Promise<import('../../typecheck/core.d.ts').EmailReceipt>}
  */
 export async function sendGmailEmail(env, message) {
   // Also gate direct callers; checking only at the route is not sufficient.

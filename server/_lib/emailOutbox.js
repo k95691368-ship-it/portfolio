@@ -2,9 +2,9 @@ import { sendGmailEmail, isGmailConfigured, EmailDeliveryError } from './gmail.j
 import { checkRateLimit } from './rateLimit.js'
 
 /**
- * @param {import('../../typecheck/core.js').TrackedMailEnvironment} env
- * @param {import('../../typecheck/core.js').EmailMessage} message
- * @returns {Promise<import('../../typecheck/core.js').EmailReceipt>}
+ * @param {import('../../typecheck/core.d.ts').TrackedMailEnvironment} env
+ * @param {import('../../typecheck/core.d.ts').EmailMessage} message
+ * @returns {Promise<import('../../typecheck/core.d.ts').EmailReceipt>}
  */
 export async function sendTrackedEmail(env, message) {
   if (!isGmailConfigured(env)) throw new EmailDeliveryError('Gmail 발송 설정이 완료되지 않았습니다.')

@@ -917,6 +917,7 @@ export default function RecruitPage() {
       {qrPosting && <PostingQrModal posting={qrPosting} onClose={() => setQrPosting(null)} />}
       {comparePosting && (
         <ApplicantCompare
+          key={comparePosting.id}
           postingId={comparePosting.id}
           postingTitle={comparePosting.title}
           onClose={() => setComparePosting(null)}
