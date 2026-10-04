@@ -239,7 +239,7 @@ export default function ContractPage() {
   }, [loadAll])
 
   const canMutate = () => lifecycle.current.active && viewTrusted.current && !mutation.current
-  const runMutation = async (setBusy, action) => {
+  const runMutation = async (setBusy, action, { reconcileConflict = false, onReconcile } = {}) => {
     if (!canMutate()) return false
     const operation = { epoch: lifecycle.current.epoch }
     mutation.current = operation
@@ -250,9 +250,14 @@ export default function ContractPage() {
       return await action(isCurrent)
     } catch (err) {
       if (!isCurrent()) return false
-      if (!err?.status || err.status === 408 || err.status >= 500) {
+      if (!err?.status || err.status === 408 || err.status >= 500 || (reconcileConflict && err.status === 409)) {
         viewTrusted.current = false
-        setError('변경 결과를 확인하지 못했습니다. 다시 불러와 현재 계약 상태를 확인해주세요.')
+        setError(reconcileConflict && err.status === 409
+          ? `${err.message} 계약서를 다시 불러와 현재 서명과 계약 내용을 확인해주세요.`
+          : '변경 결과를 확인하지 못했습니다. 다시 불러와 현재 계약 상태를 확인해주세요.')
+        // 서명409는 INSERT 이전 거절과 저장 후 지문 충돌을 모두 포함한다.
+        // 성공/실패를 단정하거나 재전송하지 않고, 모달 뒤의 GET 복구를 연다.
+        onReconcile?.()
       }
       toast.error(err.message)
       return false
@@ -272,14 +277,14 @@ export default function ContractPage() {
     }
     return refreshed
   }
-  const writeAndRefresh = (setBusy, request, message, committed) => runMutation(setBusy, async (isCurrent) => {
+  const writeAndRefresh = (setBusy, request, message, committed, recovery) => runMutation(setBusy, async (isCurrent) => {
     const response = await request()
     if (!isCurrent()) return false
     committed?.(response)
     toast.success(message)
     await refreshAfterWrite(isCurrent)
     return isCurrent()
-  })
+  }, recovery)
   const retryLoad = () => !mutation.current ? loadAll() : Promise.resolve(null)
 
   const updateField = (key, value) => setForm((f) => ({ ...f, [key]: value }))
@@ -427,7 +432,10 @@ export default function ContractPage() {
         documentSha256,
         // 지문에 들어가지 않는 항목(임금 구성항목 등)의 변경까지 잡는다.
         termsUpdatedAt,
-      }), '서명이 완료되었습니다.', () => setSigningRole(null)
+      }), '서명이 완료되었습니다.', () => setSigningRole(null), {
+        reconcileConflict: true,
+        onReconcile: () => setSigningRole(null),
+      }
     )
   }
 
@@ -528,13 +536,13 @@ export default function ContractPage() {
   const wageItemsForPrint = (form.wageItems ?? []).filter(
     (w) => w?.name && Number(w.amount) > 0
   )
-  // 계약 체결일. 양측이 서명한 뒤에는 마지막 서명 시각이 곧 체결일이다.
+  // 이 시스템의 전자서명 체결일은 체결 완료된 계약의 마지막 서명 시각이다.
   //
   // 서명이 몇 개인지 보지 않고 '가장 늦은 서명 시각'만 골라 쓰고 있었다.
-  // 그래서 회사만 서명한 계약서에도 체결일이 찍혔다 — 근로자 서명란은 빈칸인
-  // 채로. 계약이 언제 성립했는지를 다투기 위해 만든 서비스가, 아직 성립하지
-  // 않은 계약에 성립일을 적어 내보내는 문서를 만든 것이다.
+  // 한쪽 서명만 있거나, 서로 다른 문서에 서명해 체결 전환이 거절된 경우에는
+  // 날짜를 찍지 않는다. 채용내정의 법적 성립일을 여기서 새로 판단하지 않는다.
   const signedDateText = (() => {
+    if (!isSigned) return '____년 __월 __일'
     const at = (role) => signatures.find((x) => x.role === role)?.signedAt || null
     const company = at('company')
     const candidate = at('candidate')

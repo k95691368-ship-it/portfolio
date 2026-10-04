@@ -326,3 +326,135 @@ it('does not let stale export handlers generate documents while the view is untr
   await exportPdf()
   expect(pdfSave).not.toHaveBeenCalled()
 })
+
+const signModal = () => walk(tree).find(node => node.type === SignatureModal)
+const openSignature = () => { button('서명하기').props.onClick(); render(); return signModal().props.onSave }
+
+it('opens GET-only recovery after a stored signature conflict without claiming signing success', async () => {
+  await load()
+  const sign = openSignature()
+  const message = '상대방이 서명한 계약 내용과 지금 내용이 다릅니다. 서명은 저장되었지만 체결로 넘기지 않았습니다.'
+  api.post.mockRejectedValueOnce(Object.assign(new Error(message), { status: 409 }))
+  expect(await sign('data:image/png;base64,AA==')).toBe(false); await settle()
+  expect(signModal()).toBeUndefined()
+  expect(button('계약서 다시 불러오기')).toBeDefined()
+  expect(button('서명하기').props.disabled).toBe(true)
+  expect(button('저장').props.disabled).toBe(true)
+  expect(text(tree)).toContain(message)
+  expect(toast.success).not.toHaveBeenCalled()
+  await expect(sign('data:image/png;base64,AA==')).rejects.toThrow('최신 계약서')
+  expect(api.post).toHaveBeenCalledOnce()
+  expect(api.get).toHaveBeenCalledOnce()
+
+  const recovered = view()
+  recovered.documentSha256 = 'new-current-fingerprint'
+  recovered.contract.updatedAt = '2026-10-04T10:00:00.000Z'
+  recovered.signatures = [{ role: 'company', signedAt: '2026-10-04T10:00:01.000Z', documentSha256: recovered.documentSha256 },
+    { role: 'candidate', signedAt: '2026-10-04T09:00:00.000Z', documentSha256: 'older-fingerprint' }]
+  api.get.mockResolvedValueOnce(recovered)
+  await button('계약서 다시 불러오기').props.onClick(); await settle()
+  expect(text(tree)).toContain('new-current-')
+  expect(text(tree)).toContain('현재 내용과 다름')
+  expect(api.post).toHaveBeenCalledOnce()
+  expect(api.get).toHaveBeenCalledTimes(2)
+  expect(button('계약서 다시 불러오기')).toBeUndefined()
+  expect(button('저장').props.disabled).toBe(false)
+})
+
+it('recovers a pre-insert signature conflict without describing it as a stored signature', async () => {
+  await load()
+  const sign = openSignature()
+  const message = '계약 내용이 변경되었습니다. 바뀐 내용을 확인해주세요.'
+  api.post.mockRejectedValueOnce(Object.assign(new Error(message), { status: 409 }))
+  await sign('data:image/png;base64,AA=='); await settle()
+  expect(signModal()).toBeUndefined()
+  expect(text(tree)).toContain(message)
+  expect(text(tree)).not.toContain('서명이 저장되었습니다')
+  expect(toast.success).not.toHaveBeenCalled()
+  expect(button('계약서 다시 불러오기')).toBeDefined()
+})
+
+it.each([408, 500, 503, undefined])('makes existing GET recovery accessible after an uncertain signature HTTP %s', async status => {
+  await load()
+  const sign = openSignature()
+  api.post.mockRejectedValueOnce(Object.assign(new Error('Synthetic uncertain signature'), { status }))
+  await sign('data:image/png;base64,AA=='); await settle()
+  expect(signModal()).toBeUndefined()
+  expect(button('계약서 다시 불러오기')).toBeDefined()
+  expect(button('서명하기').props.disabled).toBe(true)
+  expect(api.post).toHaveBeenCalledOnce()
+  expect(api.get).toHaveBeenCalledOnce()
+})
+
+it('preserves draft edits and the write lock while a conflict recovery GET fails and is retried', async () => {
+  await load()
+  const sign = openSignature()
+  input('기본급(원)').props.onChange({ target: { value: '2000000' } }); render()
+  api.post.mockRejectedValueOnce(Object.assign(new Error('Synthetic signature conflict'), { status: 409 }))
+  await sign('data:image/png;base64,AA=='); await settle()
+  api.get.mockRejectedValueOnce(new Error('Synthetic recovery failure'))
+  await button('계약서 다시 불러오기').props.onClick(); await settle()
+  expect(input('기본급(원)').props.value).toBe('2000000')
+  expect(button('저장').props.disabled).toBe(true)
+  api.get.mockResolvedValueOnce(view({ wageBaseAmount: 1500000 }))
+  await button('계약서 다시 불러오기').props.onClick(); await settle()
+  expect(input('기본급(원)').props.value).toBe('2000000')
+  expect(api.post).toHaveBeenCalledOnce()
+  expect(api.get).toHaveBeenCalledTimes(3)
+})
+
+it('does not close an unmounted modal or start recovery for a late signature conflict', async () => {
+  await load()
+  const sign = openSignature(), pending = deferred()
+  api.post.mockReturnValueOnce(pending.promise)
+  const result = sign('data:image/png;base64,AA==')
+  host.cleanups[0](); host.dirty = false
+  pending.reject(Object.assign(new Error('Synthetic obsolete conflict'), { status: 409 }))
+  await result
+  expect(host.dirty).toBe(false)
+  expect(toast.error).not.toHaveBeenCalled()
+  expect(api.get).toHaveBeenCalledOnce()
+})
+
+it('keeps a definite signature input rejection editable without GET recovery or success', async () => {
+  await load()
+  const sign = openSignature()
+  api.post.mockRejectedValueOnce(Object.assign(new Error('Synthetic invalid signature image'), { status: 400 }))
+  await sign('data:image/png;base64,AA=='); await settle()
+  expect(signModal()).toBeDefined()
+  expect(button('계약서 다시 불러오기')).toBeUndefined()
+  expect(button('서명하기').props.disabled).toBeFalsy()
+  expect(toast.success).not.toHaveBeenCalled()
+  expect(api.get).toHaveBeenCalledOnce()
+})
+
+it('does not apply signature-specific conflict recovery to a rejected contract edit', async () => {
+  await load()
+  input('기본급(원)').props.onChange({ target: { value: '2000000' } }); render()
+  api.patch.mockRejectedValueOnce(Object.assign(new Error('Synthetic rejected edit'), { status: 409 }))
+  await button('저장').props.onClick(); await settle()
+  expect(button('계약서 다시 불러오기')).toBeUndefined()
+  expect(button('저장').props.disabled).toBe(false)
+  expect(input('기본급(원)').props.value).toBe('2000000')
+  expect(api.get).toHaveBeenCalledOnce()
+})
+
+it.each(['open', 'active', 'contract_pending', 'closed'])('leaves the electronic signing date blank when two signatures have not completed a %s room', async status => {
+  const initial = view()
+  initial.room.status = status
+  initial.documentSha256 = 'current-document'
+  initial.signatures = [{ role: 'company', signedAt: '2026-10-04T10:00:00.000Z', documentSha256: 'current-document' },
+    { role: 'candidate', signedAt: '2026-10-04T09:00:00.000Z', documentSha256: 'older-document' }]
+  await load(initial)
+  expect(text(walk(tree).find(node => node.props?.className === 'print-date'))).toBe('____년 __월 __일')
+})
+
+it.each([false, true])('preserves the final signing date for a completed contract, archived=%s', async archived => {
+  const initial = view()
+  initial.room.status = 'signed'
+  if (archived) initial.room.archivedAt = '2026-10-05T00:00:00.000Z'
+  initial.signatures = [{ role: 'company', signedAt: '2026-10-04T10:00:00.000Z' },
+    { role: 'candidate', signedAt: '2026-10-03T09:00:00.000Z' }]
+  await load(initial)
+  expect(text(walk(tree).find(node => node.props?.className === 'print-date'))).toBe('2026년 10월 4일')
+})
