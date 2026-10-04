@@ -303,3 +303,23 @@ PGlite의 다중 연결 한계를 보완하기 위해 공식 portable PostgreSQL
 실제 ContractPage/SignatureModal/SignaturePad+React StrictMode+memory data router+현재 CSS/실제api client를 localhost5198 합성 transport로 검증했다. 가상 입력은 RAM fixture에만 보내고 실제DB/서명/메일/교부는 없다.409 뒤 모달0/저장·서명·PDF잠금/GET복구버튼,503조회실패에도잠금,다음GET성공 뒤 양측 지문과불일치표시/미완료날짜공란을 확인했다.넓은1265px·모바일390×844(client/scroll375px)에서 가로 넘침0이다. health의합성POST1/GET3/거부된쓰기0은 실제 저장/사용자효과 검증이 아니다. screenshot contract-conflict-wide/mobile.png/recovered-mobile.png/date-mobile.png는 ignored 폴더의 가상 화면 증거다.
 
 검증 도구 교정: 최초 비TTY 실행의stdin이 닫혀 중지 명령이 전달되지 않았다. 자신이 시작한nodePID27916의정확한실행파일·명령행·127.0.0.1:5198소유를 재확인해 해당프로세스만 종료했다. 파일삭제/다른QA프로세스 정리는 하지 않았다. TTY로 다시 실행해 수정된 미완료날짜를 재검증했고 stop으로exit0/리스너없음을 확인했다. 탭종료·viewport원복 완료다. 현재 소스의운영 반영은 다음릴리스이며 Goal은ACTIVE다.
+
+20:11~20:17 운영 반영: `b2c0f4bd942e84d976c1109d1ad13034318b01a8`를 master에 푸시했다. CI37197874942/job111423378109·Pages041a7cdc-9a15-4294-a9be-69b0cad38d3b·Supabase check 성공, 공개56자산 중55바이트/index 줄바꿈 제외 일치 및 entry app-BSxvUJNX.js를 확인했다. 운영 읽기38통과/쓰기31건너뜀(20:16:51 시작,10.73초). 수동 Edge 배포 없이 자동 연동이20:12:15.574에 API39/retention18/storage-cleanup6 ACTIVE로 갱신됐다. 실제 이름/metadata.value의 SHA256으로 점검0·RETENTION_EXECUTE0 및 예약비밀 부재를 확인했으며 두 worker 미인증GET403이다. DB12migration·queue0/RLS/공개권한 없음·기존 업무 집계·cron/net 부재가 유지됐다. 실제 업무 쓰기·서명·교부·메일·삭제는 시험하지 않았다.
+
+### 10월 4일 20:19 — 격리 통합 검사의 오래된 전제 재현
+
+새 mkdtemp/127.0.0.1 임의 포트/PGlite·로컬 파일·메일함과 외부 fetch 차단 번들에서 전용 합성 관리자만 준비해 기존 E2E 첫 과정을 실행했다. 관리자 로그인은 성공했으나 회사 가입의 실제202/verificationRequired 응답을 예전201 즉시로그인으로 기대해 beforeAll이 실패하고20개 검사 모두 실행되지 않았다. 로컬 계정2/메일1만 생성됐고 서버·DB는finally로 종료했으며 자료는 별도 private Temp 경로에 남겼다. 실제 계정/DB/메일은 사용하지 않았다.
+
+필수 검증 정확성 후보: 서비스의 새 가입/이메일 확인 조건과 검사 전제를 맞춘다. 기존 계정 재사용은 새 가입 경로를 검증하지 못하고,202를201로 되돌리는 제품 변경은 보안을 약화한다. 로컬 격리 health를 재확인한 뒤 합성 example.invalid 수신자의 같은-origin 확인 링크만 읽고 실제 확인 API를 거치는 작은 보완을 채택한다. 확인 토큰/응답 본문은 진단 출력에 넣지 않으며 원격/리디렉션/다른-origin 링크는 거부한다. 계정 준비 후 나머지 과정의 현재 상태를 다시 확인한다. 외부 AI 성공을 전제하는 기존 두 검사는 별도 미검증 후보이며 실제 외부 호출을 허용하거나 가짜 AI 성공으로 바꾸지 않는다. 통합 검사 통과는 운영·법적 체결·AI 품질·실제 사용자 효과 증거와 구분한다.
+
+20:24~20:25 원인 분리: 가입 확인 준비 보완 후20개 검사가 실행됐고10통과/10실패였다. 서명 저장500의 실제 PGlite query는 `WHERE (...) IS $14`에서 PostgreSQL42601/position391을 반환했다. 매개변수 값 없이 문장과 오류 code/position만 기록했다. 운영 PostgresD1과 격리 어댑터 모두 같은 postgresQuery를 사용하며 이 SQLite용 IS 매개변수 비교를 변환하지 않는다. 같은 문법을 analyze의 조건부 UPSERT에서도 발견했다. 나머지 교부/이력/갱신/보존 실패는 서명 미저장 이후 연쇄 실패일 수 있으므로 독립 결함으로 단정하지 않는다. medium 휴게 안내가 남는 것을 '모든 문제0'으로 기대한 검사와, 외부AI 차단 환경의502를200/201로 기대한 검사는 별도 잘못된 검사 전제로 분리한다.
+
+새 필수 과제: 계약 당사자의 정상 서명 저장과 담당자의 조건 정리가 PostgreSQL에서 실행되도록 두 문장의 NULL-safe snapshot 비교를 두 엔진에서 지원하는 명시적 문법으로 바꾼다. 비교 조건을 없애거나 일반등호로 바꾸면 동시 변경/NULL 경계를 잃으므로 제외한다. 일반 SQL 문자열 전체에 치환을 추가하는 것보다 사용처 두 곳을 직접 고치는 작은 대안을 채택한다. 실제 운영 서명 시험은 하지 않는다. 실제 핸들러와 생산 PostgresD1/PGlite·SQLite 회귀에서 일치/NULL/불일치·변경 중 저장 거절 및 기존 본문 불일치 거절을 확인하고, 격리 HTTP 여정으로 교부·이력까지 재검증한다. 원격pooler/Deno/실제AI 성공과 법적 효력은 범위 밖이다. 이미 공통 정규화가 해당SQL을 지원하거나 실제 PostgreSQL 정상 대조가 반증하면 후보를 폐기한다.
+
+20:28~20:39 실제 핸들러22개 기준선은 PostgreSQL5실패/SQLite 및 독립NULL비교17통과였다. 두 SQL의 `IS ?`만 `IS NOT DISTINCT FROM ?`로 바꾼 뒤22개가 통과했다. 정상 서명/재서명 이력, INSERT 직전 버전 변경409, 늦은 분석 결과409·새 조건 보존, 기존 AI 본문 임금충돌 차단을 실제 저장소와 연결했다. 외부 AI/알림/자동 보관은 명시적 mock이며 두 실제 연결 경합 시험이 아니다. updated_at 스키마는NOT NULL이고 NULL 대조는 독립SELECT이다.
+
+격리 HTTP는20:31:49에20개 통과했다. 앞선16통과/4실패에서 휴게 안내 누락·외부AI 차단·계약시작보다 이른 종료일이라는 검사 가정만 바로잡았다. 휴게/사업장규모를 합성 fixture에 명시해 기존 점검을 약화하지 않았고, 날짜는 실행일 기준으로 구성하되 잘못된 종료일400 대조를 추가했다. AI 생성 성공 대신502 뒤 기존 기본조항·조건·대화 보존과 회사 전용 조회403을 검사한다. 운영 쓰기나 실제AI 품질의 증거로 확대하지 않는다. 로컬 fixture 삭제 실패도 이제 숨기지 않고 계속 정리한 뒤 상태만 보고한다. 자신이 시작한 서버/DB는 finally로 종료했고 합성 관리자1/메일3과 테스트자료는 해당 Temp 경로에 보존했다.
+
+20:37:08 전체185파일/2,456개가38.89초에 통과했다. lint/좁은6모듈typecheck/일반·격리403모듈 및 API101라우트 빌드/공백검사 성공이다. 새 확인 링크 검사에는userinfo·위조정책·중복메일 거절을 포함한다. 최종 문구/들여쓰기 변경 뒤 HTTP 경로를 다시 확인하고 배포한다. 선택적 상시 native PostgreSQL CI나 별도 E2E 실행기 신설은 이번 핵심 SQL 수정에 필요한 전제가 아니므로 추가하지 않는다.
+
+20:39:31 최종 격리 HTTP20개가1.75초에 통과했고 포트59104/DB가정상종료됐다. 합성자료는Temp portfolio-e2e-audit-20261004-H5HO7w에 보존했다. 관련 두 파일76개도20:40:02/3.11초 통과했다. 배포 전 운영DB는읽기 전용으로 기존업무집계·12migration·queue0/RLS/공개권한없음·cron/net없음·UTC함수 동일을확인했다. 스키마변경은없다. 비교 문법의 NULL 동등성은 [PostgreSQL 공식 비교 문서](https://www.postgresql.org/docs/current/functions-comparison.html)와 [SQLite 공식 표현식 문서](https://www.sqlite.org/lang_expr.html)를 참고했으며 실제 두 엔진 대조로 확인했다. SQL만 호환하게하고 사용자의 서명/조건 변경 권한은 그대로 유지한다.

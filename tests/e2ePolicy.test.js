@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { e2ePolicy, e2eRequest, verifyE2eIsolation } from '../scripts/e2e-policy.mjs'
+import * as e2e from '../scripts/e2e-policy.mjs'
 
 const local = { E2E_API_BASE: 'http://127.0.0.1:5189/api', E2E_ALLOW_WRITES: '1', E2E_ENVIRONMENT: 'test' }
 const healthResponse = (changes = {}, headers = { 'X-Portfolio-Environment': 'local' }, status = 200) => new Response(JSON.stringify({
@@ -78,5 +79,69 @@ describe('E2E isolation policy', () => {
     const fetcher = vi.fn()
     expect(() => e2eRequest(e2ePolicy(local), 'https://test.example.com/api', {}, fetcher)).toThrow('/api path')
     expect(fetcher).not.toHaveBeenCalled()
+  })
+})
+
+describe('local verification link lookup', () => {
+  const token = 'A'.repeat(43)
+  const email = 'synthetic@example.invalid'
+  const mailResponse = (href, recipient = email, headers = { 'X-Portfolio-Environment': 'local' }, status = 200) =>
+    new Response(`<article><p>수신: ${recipient} · 2026-10-04</p><pre><a href="${href}">확인</a></pre></article>`, { headers, status })
+  const href = `http://127.0.0.1:5189/verify-email#token=${token}`
+  const mailbox = response => vi.fn().mockResolvedValueOnce(healthResponse()).mockResolvedValueOnce(response)
+
+  it('reads only the selected synthetic recipient after isolated health, without following links', async () => {
+    const fetcher = mailbox(mailResponse(href))
+    expect(await e2e.readE2eVerificationToken(e2ePolicy(local), email, fetcher)).toBe(token)
+    expect(fetcher.mock.calls).toEqual([
+      [new URL('http://127.0.0.1:5189/__local/health'), { redirect: 'error' }],
+      [new URL('http://127.0.0.1:5189/__local/mail'), { redirect: 'error' }],
+    ])
+  })
+
+  it.each([
+    `https://portfolio-epa.pages.dev/verify-email#token=${token}`,
+    `http://127.0.0.1:5190/verify-email#token=${token}`,
+    `http://localhost:5189/verify-email#token=${token}`,
+    `http://user:secret@127.0.0.1:5189/verify-email#token=${token}`,
+    `http://127.0.0.1:5189/reset-password#token=${token}`,
+    `http://127.0.0.1:5189/verify-email?token=${token}`,
+    `http://127.0.0.1:5189/verify-email#token=${token}&extra=1`,
+    'http://127.0.0.1:5189/verify-email#token=invalid',
+  ])('refuses unsafe or unrelated links without contacting them %#', async link => {
+    const fetcher = mailbox(mailResponse(link))
+    await expect(e2e.readE2eVerificationToken(e2ePolicy(local), email, fetcher)).rejects.toThrow('verification link')
+    expect(fetcher).toHaveBeenCalledTimes(2)
+  })
+
+  it.each(['real@example.com', '<img>@example.invalid', 'OTHER@EXAMPLE.INVALID'])('rejects non-synthetic or non-canonical recipients before reading mail %#', async recipient => {
+    const fetcher = vi.fn()
+    await expect(e2e.readE2eVerificationToken(e2ePolicy(local), recipient, fetcher)).rejects.toThrow('synthetic recipient')
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it('never opens the mailbox when isolation health is invalid', async () => {
+    const fetcher = vi.fn().mockResolvedValue(healthResponse({ externalRequests: true }))
+    await expect(e2e.readE2eVerificationToken(e2ePolicy(local), email, fetcher)).rejects.toThrow('blocked external')
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    { ...e2ePolicy(local), base: 'https://portfolio-epa.pages.dev' },
+    { ...e2ePolicy(local), apiBase: 'https://portfolio-epa.pages.dev/api' },
+    { ...e2ePolicy(local), allowWrites: false },
+  ])('rejects a forged mailbox policy before HTTP %#', async policy => {
+    const fetcher = vi.fn()
+    await expect(e2e.readE2eVerificationToken(policy, email, fetcher)).rejects.toThrow()
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    mailResponse(href, 'another@example.invalid'), mailResponse(href, email, {}),
+    mailResponse(href, email, undefined, 503),
+    new Response(`<article><p>수신: ${email} · now</p><a href="${href}">one</a><a href="${href}">two</a></article>`, { headers: { 'X-Portfolio-Environment': 'local' } }),
+    new Response(`<article><p>수신: ${email} · now</p><a href="${href}">one</a></article><article><p>수신: ${email} · now</p><a href="${href}">two</a></article>`, { headers: { 'X-Portfolio-Environment': 'local' } }),
+  ])('rejects missing, unverified or ambiguous mail without exposing its content %#', async response => {
+    await expect(e2e.readE2eVerificationToken(e2ePolicy(local), email, mailbox(response))).rejects.toThrow(/local mailbox|verification link/)
   })
 })

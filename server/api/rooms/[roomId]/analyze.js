@@ -203,7 +203,7 @@ export async function onRequestPost({ env, data, params }) {
        last_analyzed_message_id=excluded.last_analyzed_message_id,
        analysis_warnings_json=excluded.analysis_warnings_json,
        updated_at=datetime('now')
-     WHERE contract_terms.updated_at IS ?`
+     WHERE contract_terms.updated_at IS NOT DISTINCT FROM ?`
   )
     .bind(
       params.roomId,

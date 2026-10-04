@@ -12,7 +12,7 @@
 //   E2E_API_BASE=http://127.0.0.1:5189/api E2E_ENVIRONMENT=test E2E_ALLOW_WRITES=1
 //   E2E_ADMIN_EMAIL=... E2E_ADMIN_PASSWORD=... npm run e2e
 import { describe, expect, it, beforeAll, afterAll } from 'vitest'
-import { e2ePolicy, e2eRequest, verifyE2eIsolation } from '../scripts/e2e-policy.mjs'
+import { e2ePolicy, e2eRequest, verifyE2eIsolation, readE2eVerificationToken } from '../scripts/e2e-policy.mjs'
 
 const policy = e2ePolicy()
 const BASE = policy.apiBase
@@ -30,6 +30,13 @@ const REUSE = Boolean(
 )
 const RUN = `e2e${Date.now().toString(36)}`
 const PASSWORD = 'e2e-test-password-2026'
+const dateOnly = date => date.toISOString().slice(0, 10)
+const dayOffset = (value, days) => { const date = new Date(`${value}T00:00:00Z`); date.setUTCDate(date.getUTCDate() + days); return dateOnly(date) }
+const yearOffset = (value, years) => { const date = new Date(`${value}T00:00:00Z`); date.setUTCFullYear(date.getUTCFullYear() + years); return dateOnly(date) }
+const TODAY = dateOnly(new Date())
+const START = dayOffset(TODAY, -30)
+const END = yearOffset(TODAY, 1)
+const ENDED_ON = dayOffset(TODAY, -1)
 
 // 쿠키를 직접 들고 다닌다 (fetch에는 쿠키 저장소가 없다).
 function makeClient() {
@@ -79,7 +86,7 @@ const state = {
 const hasAdmin = Boolean(ADMIN_EMAIL && ADMIN_PASSWORD)
 if (!hasAdmin) throw new Error('Dedicated test administrator credentials are required; this suite must not silently skip.')
 
-describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
+describe.skipIf(!hasAdmin)(`격리 HTTP 계약 경로 (${BASE})`, () => {
   beforeAll(async () => {
     await verifyE2eIsolation(policy)
     const res = await admin('/api/login', {
@@ -111,7 +118,7 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
     const c = await company('/api/signup', {
       method: 'POST',
       body: {
-        email: `${RUN}-co@example.com`,
+        email: `${RUN}-co@example.invalid`,
         password: PASSWORD,
         role: 'company',
         displayName: 'E2E회사',
@@ -123,20 +130,34 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
         '가입 요청 제한(시간당 10회)에 걸렸습니다. 앱은 정상이며, 잠시 후 다시 실행하세요.'
       )
     }
-    expect(c.status, `회사 가입 실패: ${c.text}`).toBe(201)
-    state.companyId = c.json.id
+    expect(c.status, '회사 가입 요청 상태').toBe(202)
+    expect(c.json.verificationRequired).toBe(true)
+    const companyProof = await readE2eVerificationToken(policy, `${RUN}-co@example.invalid`)
+    const verifiedCompany = await company('/api/account/verify-email', {
+      method: 'POST', body: { token: companyProof, password: PASSWORD },
+    })
+    expect(verifiedCompany.status, '로컬 회사 이메일 확인 상태').toBe(200)
+    expect(verifiedCompany.json.emailVerified).toBe(true)
+    state.companyId = verifiedCompany.json.id
 
     const k = await candidate('/api/signup', {
       method: 'POST',
       body: {
-        email: `${RUN}-ca@example.com`,
+        email: `${RUN}-ca@example.invalid`,
         password: PASSWORD,
         role: 'candidate',
         displayName: 'E2E지원자',
       },
     })
-    expect(k.status, `지원자 가입 실패: ${k.text}`).toBe(201)
-    state.candidateId = k.json.id
+    expect(k.status, '지원자 가입 요청 상태').toBe(202)
+    expect(k.json.verificationRequired).toBe(true)
+    const candidateProof = await readE2eVerificationToken(policy, `${RUN}-ca@example.invalid`)
+    const verifiedCandidate = await candidate('/api/account/verify-email', {
+      method: 'POST', body: { token: candidateProof, password: PASSWORD },
+    })
+    expect(verifiedCandidate.status, '로컬 지원자 이메일 확인 상태').toBe(200)
+    expect(verifiedCandidate.json.emailVerified).toBe(true)
+    state.candidateId = verifiedCandidate.json.id
   })
 
   afterAll(async () => {
@@ -144,20 +165,31 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
     // 갱신 계약이 이전 계약을 참조하므로 갱신 쪽을 먼저 지운다.
     // 체결된 계약서는 보존 의무(근로기준법 제42조)로 삭제가 한 번 막힌다.
     // 검증용 데이터이므로 확인을 함께 보낸다 — 이 사실은 감사 로그에 남는다.
+    const failures = []
     for (const id of [state.duplicateRoomId, state.renewalRoomId, state.roomId]) {
-      if (id)
-        await admin(`/api/admin/rooms/${id}`, {
-          method: 'DELETE',
-          body: { acknowledgeRetention: true },
-        }).catch(() => {})
+      if (id) {
+        try {
+          const result = await admin(`/api/admin/rooms/${id}`, {
+            method: 'DELETE',
+            body: { acknowledgeRetention: true },
+          })
+          if (result.status !== 200) failures.push(`room:${result.status}`)
+        } catch { failures.push('room:transport') }
+      }
     }
     // 빌려 쓴 계정은 지우지 않는다. 이번 실행에서 만든 계정만 정리한다.
     if (!REUSE) {
       for (const id of [state.candidateId, state.companyId]) {
-        if (id) await admin(`/api/admin/users/${id}`, { method: 'DELETE' }).catch(() => {})
+        if (id) {
+          try {
+            const result = await admin(`/api/admin/users/${id}`, { method: 'DELETE' })
+            if (result.status !== 200) failures.push(`user:${result.status}`)
+          } catch { failures.push('user:transport') }
+        }
       }
     }
-  })
+    if (failures.length) throw new Error(`Isolated fixture cleanup failed: ${failures.join(', ')}`)
+  }, 20_000)
 
   it('면접방을 만들고 지원자가 참여한다', async () => {
     const room = await company('/api/rooms/create', {
@@ -200,10 +232,12 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
         employeeName: 'E2E지원자',
         workLocation: '서울 본사',
         jobDescription: '개발',
-        contractStartDate: '2026-09-01',
-        contractEndDate: '2027-08-31',
+        contractStartDate: START,
+        contractEndDate: END,
         workHoursStart: '09:00',
         workHoursEnd: '18:00',
+        breakTime: '12:00~13:00',
+        employeeCount: 10,
         workDays: '주 5일 (월~금)',
         restDays: '토요일, 일요일',
         wageBaseAmount: 1700000, // 최저임금 미달 — 점검이 잡아야 한다
@@ -333,7 +367,7 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
     expect(view.json.room.status).toBe('contract_pending')
   })
 
-  it('본문이 조건과 어긋나면 서명이 막힌다', async () => {
+  it('외부 AI 없이도 현재 조건의 기본 조항과 조건 수정 흐름을 유지한다', async () => {
     // 계약서 본문은 채용자 권한이 있어야 작성할 수 있다.
     // 빌려 쓴 계정은 이미 권한을 갖고 있으므로 건드리지 않는다.
     if (!REUSE) {
@@ -349,16 +383,23 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
       method: 'POST',
       body: before.json.contract.terms,
     })
-    expect(draft.status, `AI 계약서 작성 실패: ${draft.text}`).toBe(200)
-    expect(draft.json.articles.length).toBeGreaterThan(0)
+    // This runtime deliberately has no provider credentials or outbound fetch.
+    // Do not invent generated articles or enable external AI just for a green test.
+    expect(draft.status, '외부 AI 차단 상태').toBe(502)
 
-    // 방금 만든 본문은 현재 조건과 같아야 한다.
+    // The existing non-AI document is derived from current saved conditions.
+    // Stored-AI-body mismatch rejection is exercised by the actual sign handler
+    // in contractSnapshot.engines.test.js with an explicit database fixture.
     const fresh = await candidate(`/api/rooms/${state.roomId}/contract-view`)
     const doc = fresh.json.preSignCheck.documentCheck
-    expect(doc.hasDocument).toBe(true)
+    expect(fresh.json.contract.terms).toEqual(before.json.contract.terms)
+    expect(fresh.json.contract.terms.aiDocument).toBeNull()
+    expect(fresh.json.sourceArticles.length).toBeGreaterThan(0)
+    expect(JSON.stringify(fresh.json.sourceArticles)).toContain(Number(state.suggested).toLocaleString('ko-KR'))
+    expect(doc.hasDocument).toBe(false)
     expect(doc.issues.find((i) => i.field === 'wageBaseAmount')).toBeUndefined()
 
-    // 본문은 그대로 두고 기본급만 바꾼다 — 예전에는 이 상태로 서명이 됐다.
+    // Updating structured conditions must update the fallback document too.
     const bumped = Number(state.suggested) + 500000
     await company(`/api/rooms/${state.roomId}/contract`, {
       method: 'PATCH',
@@ -366,21 +407,11 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
     })
 
     const stale = await candidate(`/api/rooms/${state.roomId}/contract-view`)
-    const wage = stale.json.preSignCheck.documentCheck.issues.find(
-      (i) => i.field === 'wageBaseAmount'
-    )
-    expect(wage, '본문과 조건의 임금 불일치를 잡지 못했습니다.').toBeTruthy()
-    expect(wage.conflict).toBe(true)
+    expect(JSON.stringify(stale.json.sourceArticles)).toContain(bumped.toLocaleString('ko-KR'))
+    expect(stale.json.preSignCheck.documentCheck.hasConflict).toBe(false)
     expect(stale.json.preSignCheck.hasBlocking).toBe(true)
 
-    const blocked = await company(`/api/rooms/${state.roomId}/sign`, {
-      method: 'POST',
-      body: { imageDataUrl: 'data:image/png;base64,iVBORw0KGgo=' },
-    })
-    expect(blocked.status, `본문 불일치 상태에서 서명이 막히지 않았습니다: ${blocked.text}`).toBe(409)
-    expect(blocked.json.error).toContain('본문')
-
-    // 본문에 적힌 금액으로 되돌리면 다시 서명할 수 있다.
+    // 기존 기본급으로 되돌린 뒤 현재 기본 조항의 점검 상태를 확인한다.
     await company(`/api/rooms/${state.roomId}/contract`, {
       method: 'PATCH',
       body: { wageBaseAmount: Number(state.suggested) },
@@ -389,8 +420,7 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
     expect(
       fixed.json.preSignCheck.documentCheck.issues.find((i) => i.field === 'wageBaseAmount')
     ).toBeUndefined()
-    // AI가 계약서 본문을 쓰는 데 시간이 걸려 기본 제한(5초)으로는 부족하다.
-  }, 120000)
+  })
 
   it('필수 명시사항이 비면 서버가 서명을 막는다', async () => {
     const sig = 'data:image/png;base64,iVBORw0KGgo='
@@ -511,7 +541,7 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
     expect(times).toEqual([...times].sort())
   })
 
-  it('면접 대화를 회사 보관용 기록으로 정리한다', async () => {
+  it('외부 AI 요약이 실패해도 기존 대화와 회사 전용 조회 경계를 보존한다', async () => {
     // 요약할 만한 대화를 채운다 (최소 4건).
     const lines = [
       ['company', '근무는 주 5일, 09시부터 18시까지입니다. 가능하실까요?'],
@@ -537,16 +567,15 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
     expect(empty.json.summary).toBeNull()
 
     const written = await company(`/api/rooms/${state.roomId}/interview-summary`, { method: 'POST' })
-    expect(written.status, `요약 작성 실패: ${written.text}`).toBe(201)
-    expect(written.json.summary.overview.length).toBeGreaterThan(10)
-    expect(written.json.messageCount).toBeGreaterThanOrEqual(5)
+    expect(written.status, '외부 AI 차단 상태').toBe(502)
 
     const saved = await company(`/api/rooms/${state.roomId}/interview-summary`)
-    expect(saved.json.summary.overview).toBe(written.json.summary.overview)
-    expect(saved.json.author).toBeTruthy()
-    expect(saved.json.messageCount).toBe(written.json.messageCount)
-    // AI가 본문을 쓰는 데 시간이 걸린다.
-  }, 120000)
+    expect(saved.status).toBe(200)
+    expect(saved.json.summary).toBeNull()
+    const messages = await company(`/api/rooms/${state.roomId}/messages?after=0`)
+    expect(messages.status).toBe(200)
+    for (const [, line] of lines) expect(messages.json.messages.some(message => message.body === line)).toBe(true)
+  })
 
   it('갱신 계약을 이전 계약과 이으면 계속근로기간이 합산된다', async () => {
     // 같은 근로자와 두 번째 계약을 맺는다 (계정은 그대로 쓴다).
@@ -562,10 +591,11 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
     })
     expect(join.status).toBe(200)
 
-    // 이 계약 하나만 보면 딱 2년 이내라 아무 문제가 없다.
+    // A two-year renewal alone is within the existing period-check boundary.
+    const renewalStart = dayOffset(END, 1)
     await company(`/api/rooms/${state.renewalRoomId}/contract`, {
       method: 'PATCH',
-      body: { contractStartDate: '2027-09-01', contractEndDate: '2029-08-31' },
+      body: { contractStartDate: renewalStart, contractEndDate: dayOffset(yearOffset(renewalStart, 2), -1) },
     })
     const alone = await company(`/api/rooms/${state.renewalRoomId}/contract-view`)
     expect(alone.json.period.exceedsFixedTermLimit).toBe(false)
@@ -634,9 +664,8 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
   it('체결된 계약은 보존 의무 기간을 알려준다', async () => {
     const view = await candidate(`/api/rooms/${state.roomId}/contract-view`)
     expect(view.json.retention.known).toBe(true)
-    // 계약 종료일(2027-08-31)부터 3년. 다만 그 날이 아직 오지 않았으므로
-    // 근로관계가 끝나지 않았고, 보존 기간은 시작되지 않았다.
-    expect(view.json.retention.until).toBe('2030-08-31')
+    // The fixture's scheduled end remains in the future regardless of run date.
+    expect(view.json.retention.until).toBe(yearOffset(END, 3))
     expect(view.json.retention.started).toBe(false)
     expect(view.json.retention.expired).toBe(false)
   })
@@ -646,19 +675,23 @@ describe.skipIf(!hasAdmin)(`계약 체결 전 과정 (${BASE})`, () => {
     // 근로관계가 실제로 끝난 날이다.
     const denied = await candidate(`/api/rooms/${state.roomId}/employment-end`, {
       method: 'POST',
-      body: { endedOn: '2026-07-01' },
+      body: { endedOn: ENDED_ON },
     })
     expect(denied.status).toBe(403)
 
+    const tooEarly = await company(`/api/rooms/${state.roomId}/employment-end`, {
+      method: 'POST', body: { endedOn: dayOffset(START, -1), reason: 'Invalid synthetic date' },
+    })
+    expect(tooEarly.status).toBe(400)
     const recorded = await company(`/api/rooms/${state.roomId}/employment-end`, {
       method: 'POST',
-      body: { endedOn: '2026-07-01', reason: '중도 퇴사' },
+      body: { endedOn: ENDED_ON, reason: '중도 퇴사' },
     })
     expect(recorded.status, `종료 기록 실패: ${recorded.text}`).toBe(200)
 
     const view = await candidate(`/api/rooms/${state.roomId}/contract-view`)
-    expect(view.json.retention.basis).toBe('2026-07-01')
-    expect(view.json.retention.until).toBe('2029-07-01')
+    expect(view.json.retention.basis).toBe(ENDED_ON)
+    expect(view.json.retention.until).toBe(yearOffset(ENDED_ON, 3))
     expect(view.json.retention.started).toBe(true)
     expect(view.json.auditTrail.events.map((e) => e.event)).toContain('근로관계 종료 기록')
   })

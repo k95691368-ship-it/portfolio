@@ -160,14 +160,15 @@ export async function onRequestPost({ env, data, params, request }) {
   // 돌아 새 값은 서버에서 한 번도 확인되지 않는다.
   //
   // D1 에는 트랜잭션이 없으므로 문장 하나로 조건을 건다. 읽었을 때의
-  // updated_at 과 지금이 같을 때만 INSERT 가 성립한다. IS 는 NULL 도 비교한다.
+  // updated_at 과 지금이 같을 때만 INSERT 가 성립한다. NULL도 동등하게
+  // 비교하는 명시적 문법은 SQLite와 PostgreSQL에서 모두 실행된다.
   const inserted = await env.DB.prepare(
     `INSERT INTO signatures
        (id, room_id, signer_user_id, signer_role, image_data_url, signed_at,
         signer_ip, signer_user_agent, signer_country, document_sha256,
         verified_email, session_started_at, verification_method)
      SELECT ?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, ?, ?
-      WHERE (SELECT updated_at FROM contract_terms WHERE room_id = ?) IS ?
+      WHERE (SELECT updated_at FROM contract_terms WHERE room_id = ?) IS NOT DISTINCT FROM ?
      ON CONFLICT(room_id, signer_role) DO UPDATE SET
        signer_user_id = excluded.signer_user_id,
        image_data_url = excluded.image_data_url,

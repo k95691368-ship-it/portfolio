@@ -92,7 +92,7 @@ Supabase 프로젝트의 Edge Function secret에 `CLAUDE_API_KEY`를 등록합�
 | `npm run build` | 프론트엔드와 서버 코드를 함께 빌드 |
 | `npm test` | 단위·UI·격리 DB 회귀 테스트 (오프라인, smoke·e2e 제외) |
 | `npm run smoke` | 배포된 서비스의 GET/HEAD 경로·권한 점검. 쓰기 검사는 명시한 격리 로컬 환경에서만 허용 |
-| `npm run e2e` | 외부 요청·메일 발송을 차단한 격리 로컬 환경에서 계약 체결 전 과정 실행 |
+| `npm run e2e` | 격리 로컬 환경의 HTTP 계약 경로 검사: 이메일 확인·조건·서명·교부 기록·이력 |
 
 `e2e`는 `E2E_API_BASE=http://127.0.0.1:5189/api`, `E2E_ENVIRONMENT=test`,
 `E2E_ALLOW_WRITES=1`과 전용 테스트 관리자 자격(`E2E_ADMIN_EMAIL`,
@@ -100,3 +100,10 @@ Supabase 프로젝트의 Edge Function secret에 `CLAUDE_API_KEY`를 등록합�
 외부 요청 차단과 로컬 메일함 사용을 확인하며, 운영 주소·별칭·리다이렉트는
 허용하지 않습니다. `smoke` 쓰기 모드는 `SMOKE_URL=http://127.0.0.1:5189`,
 `SMOKE_API_URL=http://127.0.0.1:5189/api`, `SMOKE_ALLOW_WRITES=1`을 사용합니다.
+
+새 테스트 계정은 `example.invalid` 주소로 가입하고 로컬 메일함의 확인 링크와
+실제 이메일 확인 API를 거칩니다. 운영 메일함은 읽지 않으며 확인 토큰을 출력하지
+않습니다. 이 검사는 브라우저 전체 여정이나 실제 서명·교부의 법적 효력 검증이
+아닙니다. 외부 AI 호출은 차단하여 실패 후 조건·대화 보존을 검사하며, 생성 품질이나
+제공자 연동 성공은 검증하지 않습니다. 저장된 AI 본문과 조건의 불일치 차단은
+별도 실제 핸들러·격리 DB 회귀 검사에서 확인합니다.
