@@ -262,16 +262,28 @@ it('keeps a previous PDF used by the permanent archive during replacement cleanu
   expect(receipts()).toEqual([{ storage_key: oldKey }])
 })
 
-it('captures the actual preceding key when two replacements prepare uploads before either saves', async () => {
+it.each(['native', 'delayed hash'])('captures the actual preceding key when two replacements prepare uploads before either saves (%s)', async timing => {
   seedStoredContract()
+  const secondPdf = '%PDF-1.7\nsecond replacement\n%%EOF'
+  if (timing === 'delayed hash') {
+    const digest = crypto.subtle.digest.bind(crypto.subtle)
+    vi.spyOn(crypto.subtle, 'digest').mockImplementation(async (algorithm, bytes) => {
+      if (new TextDecoder().decode(bytes) === secondPdf) await new Promise(resolve => setTimeout(resolve, 100))
+      return digest(algorithm, bytes)
+    })
+  }
   const puts = new Map()
+  let ready
+  const bothUploadsPrepared = new Promise(resolve => { ready = resolve })
   env.DOCUMENTS.put.mockImplementation((key, bytes) => new Promise(resolve => {
     puts.set(new TextDecoder().decode(bytes), () => { objects.set(key, new Uint8Array(bytes).slice()); resolve() })
+    if (puts.size === 2) ready()
   }))
   const first = storeContract(context())
-  const secondPdf = '%PDF-1.7\nsecond replacement\n%%EOF'
   const second = storeContract(context(secondPdf))
-  for (let count = 0; count < 50 && puts.size < 2; count++) await new Promise(resolve => setImmediate(resolve))
+  // CPU load and async hashing are not bounded by a number of event-loop turns.
+  // Wait for the exact fixture boundary; the normal test deadline still applies.
+  await bothUploadsPrepared
   expect(puts.size).toBe(2)
   puts.get(newPdf)()
   expect((await first).status).toBe(201)

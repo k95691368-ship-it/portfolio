@@ -381,3 +381,15 @@ hosted 런타임에서 URL 전체 누락은 Storage 초기화 실패로 이 라�
 입장 preflight는 로컬 credentials 생성 try/catch만 admission UPDATE 앞으로 옮겼다. 신규44개 기준선18실패/26대조통과→추가 정상대조 포함48개/관련8파일90개 통과, 독립4파일75개도 통과했다. 실제 PostgresD1+전체 migrations/PGlite와 별도 SQLite에서 Response503의 정상 transaction commit을 그대로 두고 admission/provider/leave/updated 필드·session·event 보존, 후보 취소·변경/slot해제, 기존 발급ID heartbeat유지, 설정 복구 뒤 명시재입장, 정상200/응답폐기 후409잠금, 동의·활성계정·접근권한 및 UPDATE 전후 합성 변화 검사를 확인했다. ensureSessionMember의 기존 생성 쓰기는 남으므로 모든503에서 DB쓰기0이라고 주장하지 않는다. before/after 주입은 같은 연결의 합성 경계이며 실제 다중 연결 경합이나 RTC/TURN 성공 증거가 아니다. 기존 오염자료 백필/자동삭제는 하지 않는다.
 
 전체190파일/2,580개가21:53:25 시작·47.27초에 통과했고 lint/좁은6모듈 typecheck/일반·로컬403모듈/API101라우트 빌드도 성공했다. 별도 새 격리 runtime의 HTTP20개가22:05:12/1.74초에 통과했고 외부요청false·실제메일false·로컬메일3통·종료후합성admin1명인 격리DB를 확인했다. runtime close 성공, 새 Temp 디렉터리 MJCHpV는 보존했다. 이 E2E는 면접 RTC 전체 검증이 아니라 기존 HTTP 계약 경로이며 현재 source와 결합한 회귀 근거다. 실제 사용자 빈도/시간·운영 키/config/DB업무쓰기·법적효과는 미검증이고 기존 승인 대상에 반영 준비 완료다.
+
+### 10월 4일 22:06~22:10 — 배포 후 CI 차이와 검사 대기 조건 교정
+
+92033b964386e8129da289de061845a64dbddebb를 master에 푸시했고 Pages772b9d32-3663-4a69-9db0-0622ef1b51eb의 공개56자산(55바이트/index줄바꿈제외)이 현재 entry app-BftUT632.js와 일치한다. 자동 연동은22:07:15.097에 API43/retention22/storage-cleanup10을ACTIVE로 갱신했다. 하지만 GitHubCI37204448245/job111442611217은190파일 중189개/2,580개 중2,579개 통과 후 실패했다. 이를 운영 전체 검증 완료로 세지 않는다.
+
+실패는 기존 signedContractPersistence의 두 PUT 준비 대기 검사이며50회 setImmediate 반복 뒤 puts.size가1인 상태에서2를 기대했다. 실제 계약 교체/정리 실패가 아니라 두 비동기 hash·multipart 준비가 모두 끝났다는 test 전제가 충족되지 않은 경계에서 assertion이 실행됐다. 로컬 통과만으로 CI 신뢰성을 가정한 판단을 수정한다. 필수 검증 정확성 보완으로 실제 mock PUT2회 도달 이벤트를 기다리고, 지연된 실제 hash 대조도 추가한다. 50회 반복 수를 늘리거나 제품 제한/CI 전체 timeout을 완화하지 않는다. 이 준비 barrier 뒤에도 현재 참조/이전 파일/영수증 대조는 그대로 수행한다. 만일 handler가 PUT 전에 실패하거나 계약 보존 대조가 실패하면 timeout/실패를 유지해야 한다.
+
+22:14 검증 갱신:후속 전체190파일/2,581개가22:09:51 시작·40.43초에 통과했고 관련2파일25개·lint/좁은6모듈typecheck/일반403모듈/API101빌드도 통과했다. 기존 제품 소스와 공개 entry app-BftUT632.js는 동일하다. 운영 읽기38통과/쓰기31건너뜀은22:08:53/11.71초 실행이며 점검/보존삭제0·예약소비 비활성·두worker미인증403도 유지됐다. 직접 전체함수소스·운영 DB업무쓰기/RTC/사용자효과는 미검증이다. 독립 검토 후 검사 보완만 별도 반영한다.
+
+22:14:30 독립 검토는Approve/차단 결함 없음이며 별도2파일25개를 통과했다. 서로 다른 두 실제 mock PUT을 계속 보류한 뒤 barrier를 풀어 저장준비 경계를 보존하고 최종 파일·receipt 단언은 동일하다. PUT 이전 handler 실패는 barrier가 풀리지 않아 deadline 실패로 남는다. 즉시 원인 대신 timeout 진단이 될 수 있는 한계는 남지만 성공을 숨기지 않는다. 실제 digest bound 호출과 afterEach mock 복구도 확인했다.
+
+조사 방법도 교정한다. 추정 파일명과 PowerShell rg glob을 그대로 전달해 발생한 검색 실패는 제품 결함이 아니다. 다음 조회부터 실제 import 또는 rg --files의 경로를 사용하고 rg -g로 파일 패턴을 지정한다. 후보간 서류 접근 노출 추정은 one_candidate UNIQUE와 실제 join409 대조 뒤 폐기했으며 새 권한규칙을 넣지 않았다. 긴 회사 대화의500개 경계는 별도 격리 재현 대상으로만 분류한다.
