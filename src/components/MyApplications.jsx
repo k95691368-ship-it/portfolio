@@ -8,11 +8,10 @@ const STATUS_BADGE = {
   withdrawn: { label: '지원 철회', badge: 'badge-neutral' },
 }
 
-// 단계의 상태는 점 색깔로만 구분된다. 색을 구분하지 못하거나 화면을 읽어 주는
-// 도구를 쓰는 사람에게는 아무 뜻도 전달되지 않으므로 말로도 함께 남긴다.
+// 점 색깔의 뜻을 말로도 남긴다. current는 처리 중이 아니라 현재 도달한 단계다.
 const STEP_STATE_TEXT = {
   done: '완료',
-  current: '진행 중',
+  current: '현재 단계',
   stopped: '여기서 중단됨',
   upcoming: '예정',
 }

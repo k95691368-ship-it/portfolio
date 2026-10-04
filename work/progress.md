@@ -467,3 +467,25 @@ PreSignCheck의 항상 보이는 검사 범위와 clean 문구만 변경했다. 
 root는 실제 StrictMode 컴포넌트·순수 검사·운영 CSS의 합성 DOM에서 수동/본문 의미차이/경고 상태와 1265/390px 넘침0을 확인했다. 실제 계약 전체 화면·서명 gate 여정이나 법적 적합성 증거로 확대하지 않는다. ignored presign-scope-wide/mobile PNG를 보존했다. UI health는 DB none·외부요청false·메일none·거절된쓰기0이다. 자체54667 helper의 stdin이 닫혀 정상 명령 전달이 안 됐으므로 정확한 PID12124/명령행을 읽기 대조한 뒤 그 프로세스만 종료했다. 자체 탭 종료·viewport 원복을 확인했으며 기존 정책 거절된 QA helper나 Temp 자료는 건드리지 않았다.
 
 전체196파일2,711개가23:11:33 시작·39.77초에 통과했다. lint·좁은6런타임 모듈 typecheck·일반/격리403모듈/API101 빌드 성공. fresh49688 runtime의 HTTP20개는23:15:08/1.89초에 통과했고 외부요청false·실제메일false·로컬메일3통·합성admin1명·close를 확인했다. Temp dJYkKh는 보존했다. 실행시간은 실제 사용자 속도 향상으로 세지 않는다. 배포 대상은 기존 승인 portfolio/master·Pages·Supabase만이고 DBschema/설정/업무 자료 변경은 없다. 이번 범위의 복구 기준은 새 안내 누락·경고/수정 요청/서명 경계 회귀·공개 자산 불일치·읽기 smoke 실패이며 이전 a516f4f가 되돌릴 기준이다. CI/운영 상태는 푸시 후 별도로 확인한다.
+
+### 10월 4일 23:18 — 지원 현황의 완료 단계 접근성 설명 선정
+
+독립 actual my-applications handler→client→React SSR/SQLite7대조·41회귀와 root의 실제 JSX/progress 대조로 signed의 마지막 current 단계가 sr-only ‘진행 중’인 표시 모순을 확인했다. current의 현재 도달 단계/CSS 의미는 유지한다. 완료 headline·계약서 링크 대안도 확인했으며 저장/서명/법률 결함으로 확대하지 않는다. signed+contract+current 한 조합만 ‘완료’로 설명하는 작은 표시 정확성 보완을 구현 전 백로그에 선정했다. 실제 AT/사용자 효과는 아직 미검증이다.
+
+23:21 독립 반증으로 최초 필수 분류와 signed 전용 분기안을 철회했다. 서류합격·면접방 안내 대기에서도 screened=current가 같은 부정확한 진행중 설명을 만든다. 같은 카드의 정확한 headline·링크가 대안이라 신규 핵심 장애로 주장하지 않고, 유용하지만 선택적 copy 보완으로 축소한다. 제품 수정 전 current 설명만 ‘현재 단계’로 맞추는 더 단순한 대안을 선정하고 작성 중 회귀도 그 의미에 맞게 고친다. 모델/CSS/정렬/API/서명은 변경하지 않는다.
+
+### 10월 4일 23:23 — 공개 기술 소개의 검증 범위 선정
+
+독립 실제 TechPage stack JSX/SSR와 actual e2e/smoke policy·2파일71개는 현재형 운영계정/계약/삭제 검증 설명과 실제 loopback 격리 쓰기 정책의 불일치를 확인했다. README는 이미 정확한 별도 대안이라 필수 새검증 기능으로 확대하지 않고 선택적 copy 두 항목 보완만 선정했다. 과거 운영경험이 없거나 거짓이었다고 주장하지 않는다. 공개 소개에서 현재 격리/운영읽기/별도승인·실제사용효과 경계만 바로잡고 정책/API/자동실행은 바꾸지 않는다. 실제 평가자 오인/효과는 미측정이다.
+
+### 10월 4일 23:18~23:29 — 직전 배포 확인과 마지막 표시 보완 검증
+
+서명 전 안내 1d0380752d27060c08650c025f8bd67b0f97b30a의 GitHub CI37208680519/job111455190625·Pages f025b59a-79d4-4ccd-9327-a09340b665e4·Supabase check 성공을 확인했다. API47/retention26/storage-cleanup14는23:18:11.240 ACTIVE다. 공개56자산은55 raw 일치/index CRLF만 제외 일치, entry app-DDqi54Qr.js 확인.23:21:43 운영읽기38통과/업무쓰기31건너뜀(12.71초).23:24 실제 secret value의64hex digest shape와0의SHA를 대조해 점검/보존삭제0, 정리execute·정리jobsecret·retentionjobsecret 부재를 확인했으며 미인증 worker GET은 각각403이었다. DBschema/업무 자료/설정 변경은 없다.
+
+MyApplications의 current 설명만 ‘현재 단계’로 바꿨다. 실제 progress→JSX 신규11개는 최종 기준선6실패/5대조→11통과, 독립 최종22회귀/변경 lint와 기존 actual route·SQLite7흐름을 대조해 Approve다. 완료/보관 계약·서류합격 방대기·중단/예정·빈 목록과 기존 headline/링크를 보존한다. signed+stopped는 문구 매핑의 인위적 방어 대조이지 실제 생산 상태라고 주장하지 않는다.
+
+TechPage는 stack 소개 두 항목의 현재 검증 범위만 변경했다. 신규 actual JSX SSR4개는2실패/2대조→4통과. 독립 최종 신규4+smoke/e2e policy71=75개와 fetch 차단·로컬 DB/파일/메일함·종료/보존·삭제 실패 집계를 읽기 대조해 Approve했다. SSR 테스트의 탭 상태 mock은 실제 클릭/운영 격리 증명이 아니다. 별도 root의 StrictMode 실제 DOM에서 stack 탭 클릭·문구와1265/390px 넘침0을 확인했다. MyApplications 실제 DOM에서도 체결 완료·서류합격 방대기의 현재 단계와 headline/링크를 확인했다. 실제 AT 음성·법적 적합성·평가자 오인·시간 절감/채용 결과는 미측정이다.
+
+최신 전체198파일2,726개가23:23:17 시작·46.10초에 통과했고 lint/좁은6런타임 모듈 typecheck/일반403모듈/API101 및 세 worker 빌드 성공이다.23:28 격리 빌드도 성공. fresh51115 runtime의 HTTP20개는23:28:11/1.69초 통과, 외부요청false·실제메일false·로컬메일3통/합성admin1명·close를 확인했다. Temp09vQXC는 보존했다. 화면 helper52835 health는DBnone/메일none/외부요청false/거절쓰기0이며 tty stop으로exit0·리스너 부재, 탭 종료/viewport 원복을 확인했다. application-current-stage-wide/mobile 및 tech-inspection-scope-wide/mobile·tech-cleanup-scope-mobile PNG는 ignored 증거로 보존한다.
+
+현재 변경은 제품 copy2파일+SSR회귀2파일+근거기록2파일이다. 실제 계정·메일·서명·동의·자료 삭제는 없고 자동삭제/정리 예약도 켜지 않는다. 현재 단계 설명·기존 링크/경고·소개 범위의 회귀, 공개 자산 불일치 또는 운영읽기 실패가 생기면 이전1d03807이 복구 기준이다. 로컬 검사와 GitHub/운영 반영은 구분하고 푸시 뒤 새 SHA로 확인한다.
